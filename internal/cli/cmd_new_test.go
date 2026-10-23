@@ -325,3 +325,13 @@ func TestCleanupIfCreated(t *testing.T) {
 		t.Fatal("folder created by the command was kept")
 	}
 }
+
+func TestNewVersionCommandFails(t *testing.T) {
+	r := cleanRepo(t)
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=--version"}, "add-x", "--kind", "feature", "--source", "x")
+	if code != 4 || !strings.Contains(se, "DOCKET_OPENSPEC") || !strings.Contains(se, "fake failure") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	noChange(t, r.Dir)
+}

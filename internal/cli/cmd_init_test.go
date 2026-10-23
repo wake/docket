@@ -273,3 +273,17 @@ func TestInitUnsupportedVersion(t *testing.T) {
 		t.Error("openspec/ was created")
 	}
 }
+
+func TestInitVersionCommandFails(t *testing.T) {
+	r := committedRepo(t)
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	var so, se bytes.Buffer
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+cmd, "FAKE_OPENSPEC_FAIL=--version")
+	code := Run(Options{Args: []string{"init", "--json"}, Dir: r.Dir, Env: env, Stdout: &so, Stderr: &se})
+	if code != 4 || !strings.Contains(se.String(), "DOCKET_OPENSPEC") || !strings.Contains(se.String(), "fake failure") {
+		t.Fatalf("exit %d\n%s\n%s", code, so.String(), se.String())
+	}
+	if _, err := os.Stat(filepath.Join(r.Dir, "openspec")); err == nil {
+		t.Error("openspec directory was created")
+	}
+}

@@ -28,10 +28,14 @@ type Runner struct {
 	version string
 }
 
-// UnavailableError reports that no OpenSpec program could be found.
-type UnavailableError struct{ Program string }
+// UnavailableError reports that no usable OpenSpec program exists: it was not
+// found, or its --version check could not run (Detail says why).
+type UnavailableError struct{ Program, Detail string }
 
 func (e *UnavailableError) Error() string {
+	if e.Detail != "" {
+		return fmt.Sprintf("OpenSpec CLI %q is not usable: %s; check DOCKET_OPENSPEC or install OpenSpec %s", e.Program, e.Detail, SupportedRange)
+	}
 	return fmt.Sprintf("OpenSpec CLI %q not found; install OpenSpec %s or set DOCKET_OPENSPEC to a command that runs it", e.Program, SupportedRange)
 }
 
@@ -137,7 +141,12 @@ func (r *Runner) CheckVersion() (string, error) {
 	}
 	out, err := r.exec("--version")
 	if err != nil {
-		return "", err
+		detail := err.Error()
+		var fe *FailedError
+		if errors.As(err, &fe) {
+			detail = fmt.Sprintf("%s exited with %d: %s", strings.Join(fe.Command, " "), fe.Code, strings.TrimSpace(fe.Stderr))
+		}
+		return "", &UnavailableError{Program: r.Cmd[0], Detail: detail}
 	}
 	v := strings.TrimSpace(out)
 	if !versionPattern.MatchString(v) {
