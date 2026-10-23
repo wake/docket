@@ -38,6 +38,10 @@
 
 Implementing Task 5 showed that "worktree first" lets the main checkout, which sits on the default branch, shadow an unmerged branch's edits. The `workspace-scan` delta now ranks sources: a worktree whose HEAD the default branch tip does not contain, a local branch, a remote-tracking branch, a worktree whose HEAD the default branch tip contains, the default branch tip. Task 5 gains the scenario `workspace-scan#worktree-with-unmerged-work-comes-first`; no other task changes.
 
+## Revision 2 (2026-10-24): `archive` is a reserved slug
+
+The Task 7 review found that `dkt new archive` passed the slug rules, because the scan never lists `archive` as an active change, so a failed run's cleanup could remove `openspec/changes/archive/`. The `change-creation` delta now reserves the name, and cleanup removes the change folder only when it did not exist before `openspec new change` ran. Task 7 gains the scenario `change-creation#reserved-name-rejected`; no other task changes.
+
 ## Reuse
 
 | Need | Existing (path:symbol) | Decision | Reason | Evidence |
@@ -270,7 +274,7 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
 
 ### Task 7: `dkt new`
 
-**Scenarios:** `change-creation#date-prefix-rejected`, `change-creation#uppercase-rejected`, `change-creation#slug-active-in-another-worktree`, `change-creation#slug-archived`, `change-creation#unreadable-worktree-blocks-creation`, `change-creation#missing-source`, `change-creation#unknown-kind`, `change-creation#change-created`, `change-creation#schema-not-installed`, `cli-output#json-on-failure`, `cli-output#usage-error`, `cli-output#unreadable-source-with-other-findings`, `openspec-runtime#unsupported-version`, `openspec-runtime#openspec-command-fails`
+**Scenarios:** `change-creation#date-prefix-rejected`, `change-creation#uppercase-rejected`, `change-creation#reserved-name-rejected`, `change-creation#slug-active-in-another-worktree`, `change-creation#slug-archived`, `change-creation#unreadable-worktree-blocks-creation`, `change-creation#missing-source`, `change-creation#unknown-kind`, `change-creation#change-created`, `change-creation#schema-not-installed`, `cli-output#json-on-failure`, `cli-output#usage-error`, `cli-output#unreadable-source-with-other-findings`, `openspec-runtime#unsupported-version`, `openspec-runtime#openspec-command-fails`
 
 **Files:**
 - Create: `internal/change/new.go`, `internal/cli/cmd_new.go`
@@ -281,11 +285,11 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
 - Consumes: `scan.ResolveDefaultBranch`, `scan.Scan`, `Inventory.Uses` (Task 5); `openspec.New`, `Runner.Run` (Task 4); `Git.MergeBase`, `Git.Head` (Task 2); `cli` types (Task 3).
 - Produces (package `change`):
   - `var Kinds = []string{"feature", "change-request", "fix", "baseline"}`
-  - `func ValidateSlug(slug string) error` — accepts `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 200 characters, not starting with `\d{4}-\d{2}-\d{2}`; the date-prefix error says archiving adds the date.
+  - `func ValidateSlug(slug string) error` — accepts `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 200 characters, not starting with `\d{4}-\d{2}-\d{2}`, and not `archive`; the date-prefix error says archiving adds the date, the `archive` error says the name is reserved for OpenSpec's archive folder.
   - `func AppendMetadata(path, kind, source, base string) error` — appends `x-kind`, `x-source`, `x-base` (each value YAML-encoded with `go.yaml.in/yaml/v3`), first adding a newline if the file does not end with one, then parses the whole file and checks the three values read back exactly.
   - `type NewResult struct { Slug, Path, Kind, Source, Base string }` — JSON `slug`, `path`, `kind`, `source`, `base`.
 - The `new` command: one positional slug, flags `--kind` and `--source`. Checks, in this order, each stopping the command: argument and flag errors (usage, 2; an unknown kind lists the four kinds) → slug rules (finding `slug-invalid`, 1) → HEAD has a commit (finding `no-commits`, "commit first", 1; checked before the default branch, which an empty repository does not have yet) → `openspec/schemas/docket/schema.yaml` exists (finding `schema-missing` pointing to `dkt init`, 1) → default branch (4) → scan: any unreadable source stops with 3 and creates nothing, with `slug-used` findings for any uses found; a use without unreadable sources gives `slug-used` naming every source and archive folder, 1 → merge base of HEAD and the default tip (finding `no-merge-base`, 1) → `openspec new change <slug> --schema docket` (OpenSpec version errors → 4; `*FailedError` → finding `openspec-failed` with its exit code and stderr, 1) → `AppendMetadata` (error → finding `metadata-failed`, 1).
-- Creates nothing on failure: `openspec/changes/<slug>/` does not exist before `openspec new change` runs (the scan has just shown the slug unused), so when that command or `AppendMetadata` fails, the command removes the directory before returning.
+- Creates nothing on failure: the command checks whether `openspec/changes/<slug>/` exists just before `openspec new change` runs, and when that command or `AppendMetadata` fails, removes the directory only if it did not exist then. A directory that existed before is never removed.
 
 Tests that only need a successful OpenSpec (`TestChangeCreated`, the slug and scan tests) use `testutil.OpenSpecCmd`, so CI also runs them against the real CLI; tests that inject a version or a failure use `testutil.FakeOpenSpec`.
 

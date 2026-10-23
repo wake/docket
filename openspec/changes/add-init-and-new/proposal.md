@@ -134,7 +134,8 @@ None.
   `project-setup#locally-edited-template`, `project-setup#re-run-with-no-differences`,
   `project-setup#routing-section-printed`.
 - New change: `change-creation#date-prefix-rejected`,
-  `change-creation#uppercase-rejected`, `change-creation#slug-active-in-another-worktree`,
+  `change-creation#uppercase-rejected`, `change-creation#reserved-name-rejected`,
+  `change-creation#slug-active-in-another-worktree`,
   `change-creation#slug-archived`, `change-creation#unreadable-worktree-blocks-creation`,
   `change-creation#missing-source`, `change-creation#unknown-kind`,
   `change-creation#change-created`, `change-creation#schema-not-installed`.
@@ -144,3 +145,4 @@ None.
 | Date | Source | Change | Impact |
 |---|---|---|---|
 | 2026-10-24 | self: Task 5 implementer's report | Content precedence ranks a worktree by whether the default branch already contains its HEAD; the main checkout no longer shadows an unmerged branch. New scenario `workspace-scan#worktree-with-unmerged-work-comes-first` | Task 5 gets a fix round; no other task affected |
+| 2026-10-24 | self: Task 7 task review | The slug `archive` is reserved: it names OpenSpec's archive folder, and a failed `dkt new archive` could have removed it. New scenario `change-creation#reserved-name-rejected` | Task 7 gets a fix round; no other task affected |

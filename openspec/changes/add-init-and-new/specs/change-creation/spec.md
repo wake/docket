@@ -9,7 +9,7 @@ request came from, and which commit it started from.
 ## ADDED Requirements
 
 ### Requirement: Slug rules
-`dkt new` SHALL accept a slug only if it is lowercase kebab-case (letters a-z and digits, in groups joined by single hyphens), at most 200 characters long, and does not start with a date of the form `YYYY-MM-DD`.
+`dkt new` SHALL accept a slug only if it is lowercase kebab-case (letters a-z and digits, in groups joined by single hyphens), at most 200 characters long, does not start with a date of the form `YYYY-MM-DD`, and is not `archive`, the name of OpenSpec's archive folder.
 
 #### Scenario: Date prefix rejected
 - **WHEN** a user runs `dkt new 2026-10-24-add-x --kind feature --source x`
@@ -18,6 +18,10 @@ request came from, and which commit it started from.
 #### Scenario: Uppercase rejected
 - **WHEN** a user runs `dkt new Add-X --kind feature --source x`
 - **THEN** the command exits with 1
+
+#### Scenario: Reserved name rejected
+- **WHEN** a repository has archived changes and a user runs `dkt new archive --kind feature --source x`
+- **THEN** the command exits with 1 and `openspec/changes/archive/` is unchanged
 
 ### Requirement: Slug never reused
 `dkt new` SHALL refuse a slug that any scanned source already uses, whether active or archived, and SHALL name every place it is used. When any source is unreadable it SHALL create nothing and exit with 3, because it cannot show that the slug is unused.
