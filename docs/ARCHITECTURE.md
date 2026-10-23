@@ -37,4 +37,4 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 - Only `internal/openspec` starts OpenSpec.
 - Only `internal/gitx` starts git (test helpers excepted).
 - Nothing below `cmd/dkt` reads the process environment; it is passed in through `cli.Options` (test helpers excepted).
-- Readers will take bytes, not paths, so that content can come from any revision.
+- Readers take bytes, not paths, so that content can come from any revision.
