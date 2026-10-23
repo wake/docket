@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 
 	"github.com/wake/docket/internal/gitx"
 )
@@ -17,43 +19,50 @@ func Run(o Options) int { return RunWith(o, commands) }
 
 // RunWith runs dkt with the given command set.
 func RunWith(o Options, cmds []func() Command) int {
-	if len(o.Args) == 0 {
-		usage(o.Stderr, cmds, "no command given")
-		return 2
+	// Global flags may come before the command name as well as after it.
+	var preJSON bool
+	var preBranch string
+	gfs := flag.NewFlagSet("dkt", flag.ContinueOnError)
+	gfs.SetOutput(io.Discard)
+	gfs.BoolVar(&preJSON, "json", false, "")
+	gfs.StringVar(&preBranch, "default-branch", "", "")
+	if err := gfs.Parse(o.Args); err != nil {
+		return usageFailure(o, cmds, "", jsonRequested(o.Args), err.Error())
+	}
+	rest := gfs.Args()
+	if len(rest) == 0 {
+		return usageFailure(o, cmds, "", preJSON, "no command given")
 	}
 	var cmd *Command
 	for _, f := range cmds {
-		if c := f(); c.Name == o.Args[0] {
+		if c := f(); c.Name == rest[0] {
 			cmd = &c
 			break
 		}
 	}
 	if cmd == nil {
-		usage(o.Stderr, cmds, fmt.Sprintf("unknown command %q", o.Args[0]))
-		return 2
+		return usageFailure(o, cmds, rest[0], preJSON || jsonRequested(rest[1:]), fmt.Sprintf("unknown command %q", rest[0]))
 	}
 
-	ctx := &Context{Dir: o.Dir, Env: o.Env}
+	ctx := &Context{Dir: o.Dir, Env: o.Env, JSON: preJSON, DefaultBranch: preBranch}
 	fs := flag.NewFlagSet(cmd.Name, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	if cmd.Define != nil {
 		cmd.Define(fs)
 	}
-	fs.BoolVar(&ctx.JSON, "json", false, "print one JSON object")
-	fs.StringVar(&ctx.DefaultBranch, "default-branch", "", "name of the default branch")
+	fs.BoolVar(&ctx.JSON, "json", preJSON, "print one JSON object")
+	fs.StringVar(&ctx.DefaultBranch, "default-branch", preBranch, "name of the default branch")
 
 	var outcome Outcome
-	args, err := parse(fs, o.Args[1:])
+	args, err := parse(fs, rest[1:])
 	if err != nil {
 		// Parsing stopped early; still honor --json so stdout stays one object.
-		for _, a := range o.Args[1:] {
-			if a == "--json" || a == "-json" {
-				ctx.JSON = true
-			}
+		if jsonRequested(o.Args) {
+			ctx.JSON = true
 		}
 	}
 	if err == nil {
-		ctx.Git =gitx.Git{Dir: o.Dir, Env: o.Env}
+		ctx.Git = gitx.Git{Dir: o.Dir, Env: o.Env}
 		ctx.Repo, err = identify(ctx)
 	}
 	if err == nil {
@@ -131,4 +140,34 @@ func usage(w io.Writer, cmds []func() Command, msg string) {
 		c := f()
 		fmt.Fprintf(w, "  dkt %s\n", c.Usage)
 	}
+}
+
+// jsonRequested reports whether any argument is a --json flag the flag parser
+// would read as true: --json, -json, or --json=<bool>.
+func jsonRequested(args []string) bool {
+	for _, a := range args {
+		a = strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-")
+		if a == "json" {
+			return true
+		}
+		if v, ok := strings.CutPrefix(a, "json="); ok {
+			if b, err := strconv.ParseBool(v); err == nil && b {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// usageFailure reports a usage error before any command ran: usage text on
+// stderr and, under --json, one envelope on stdout.
+func usageFailure(o Options, cmds []func() Command, name string, asJSON bool, msg string) int {
+	usage(o.Stderr, cmds, msg)
+	if asJSON {
+		out := Outcome{Findings: []Finding{{Rule: "usage", Message: msg}}}
+		if err := writeJSON(o.Stdout, name, nil, out, 2); err != nil {
+			fmt.Fprintf(o.Stderr, "dkt: writing output: %v\n", err)
+		}
+	}
+	return 2
 }

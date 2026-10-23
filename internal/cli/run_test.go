@@ -169,6 +169,60 @@ func TestBadFlagIsUsageError(t *testing.T) {
 	if decode(t, so)["repo"] != nil {
 		t.Errorf("repo should be null before identification")
 	}
+	assertUsageEnvelope(t, so, "probe")
+}
+
+func assertUsageEnvelope(t *testing.T, so, command string) {
+	t.Helper()
+	m := decode(t, so)
+	if m["command"] != command || m["ok"] != false {
+		t.Errorf("command/ok = %v/%v: %s", m["command"], m["ok"], so)
+	}
+	f, _ := m["findings"].([]any)
+	if len(f) != 1 || f[0].(map[string]any)["rule"] != "usage" {
+		t.Errorf("findings = %v", m["findings"])
+	}
+}
+
+func TestJSONBeforeCommand(t *testing.T) {
+	r := testutil.NewRepo(t)
+	code, so, _ := run(t, r.Dir, probeCmd(Outcome{}, nil, nil), "--json", "probe")
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if decode(t, so)["command"] != "probe" {
+		t.Errorf("stdout %s", so)
+	}
+}
+
+func TestUnknownCommandJSON(t *testing.T) {
+	code, so, se := run(t, t.TempDir(), probeCmd(Outcome{}, nil, nil), "nosuch", "--json")
+	if code != 2 || !strings.Contains(se, "usage") {
+		t.Fatalf("exit %d stderr %q", code, se)
+	}
+	assertUsageEnvelope(t, so, "nosuch")
+}
+
+func TestNoCommandJSON(t *testing.T) {
+	code, so, se := run(t, t.TempDir(), probeCmd(Outcome{}, nil, nil), "--json")
+	if code != 2 || !strings.Contains(se, "usage") {
+		t.Fatalf("exit %d stderr %q", code, se)
+	}
+	assertUsageEnvelope(t, so, "")
+}
+
+func TestJSONEqualsTrue(t *testing.T) {
+	r := testutil.NewRepo(t)
+	code, so, _ := run(t, r.Dir, probeCmd(Outcome{}, nil, nil), "probe", "--json=true")
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	decode(t, so)
+	code, so, _ = run(t, r.Dir, probeCmd(Outcome{}, nil, nil), "probe", "--bogus", "--json=true")
+	if code != 2 {
+		t.Fatalf("exit %d", code)
+	}
+	assertUsageEnvelope(t, so, "probe")
 }
 
 func TestTextOutput(t *testing.T) {
