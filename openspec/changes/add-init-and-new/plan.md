@@ -34,6 +34,10 @@
 
 ---
 
+## Revision 1 (2026-10-24): content precedence across sources
+
+Implementing Task 5 showed that "worktree first" lets the main checkout, which sits on the default branch, shadow an unmerged branch's edits. The `workspace-scan` delta now ranks sources: a worktree whose HEAD the default branch tip does not contain, a local branch, a remote-tracking branch, a worktree whose HEAD the default branch tip contains, the default branch tip. Task 5 gains the scenario `workspace-scan#worktree-with-unmerged-work-comes-first`; no other task changes.
+
 ## Reuse
 
 | Need | Existing (path:symbol) | Decision | Reason | Evidence |
@@ -190,7 +194,7 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
 
 ### Task 5: Default branch and workspace scan
 
-**Scenarios:** `workspace-scan#change-only-in-another-worktree`, `workspace-scan#change-only-on-a-remote-tracking-branch`, `workspace-scan#merged-branch-skipped`, `workspace-scan#origin-head-set`, `workspace-scan#no-default-branch`, `workspace-scan#merged-change-also-on-a-branch`, `workspace-scan#archived-slug-found`, `workspace-scan#worktree-on-an-unmounted-volume`, `workspace-scan#scan-offline`
+**Scenarios:** `workspace-scan#change-only-in-another-worktree`, `workspace-scan#change-only-on-a-remote-tracking-branch`, `workspace-scan#merged-branch-skipped`, `workspace-scan#origin-head-set`, `workspace-scan#no-default-branch`, `workspace-scan#merged-change-also-on-a-branch`, `workspace-scan#worktree-with-unmerged-work-comes-first`, `workspace-scan#archived-slug-found`, `workspace-scan#worktree-on-an-unmounted-volume`, `workspace-scan#scan-offline`
 
 **Files:**
 - Create: `internal/scan/defaultbranch.go`, `internal/scan/scan.go`
@@ -204,7 +208,7 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
   - `func ResolveDefaultBranch(g gitx.Git, flag string) (DefaultBranch, error)` — the name from `flag`, else the target of `refs/remotes/origin/HEAD`, else `main`, else `master` (a name exists if `refs/remotes/origin/<n>` or `refs/heads/<n>` does); the tip is `refs/remotes/origin/<name>` when it exists, else `refs/heads/<name>`.
   - `type Kind string` with `KindWorktree = "worktree"`, `KindLocalBranch = "local-branch"`, `KindRemoteBranch = "remote-branch"`, `KindDefaultBranch = "default-branch"`.
   - `type Source struct { Kind Kind; Name, Commit string }` — `Name` is the worktree path or the full refname; JSON `kind`, `name`, `commit`.
-  - `type Change struct { Slug string; Sources []Source }` — sources ordered worktree, local branch, remote-tracking branch, default branch tip, then by `Name`; `Sources[0]` is where content is read from.
+  - `type Change struct { Slug string; Sources []Source }` — sources ordered: worktree whose HEAD the default tip does not contain, local branch, remote-tracking branch, worktree whose HEAD the default tip contains, default branch tip; then by `Name`. `Sources[0]` is where content is read from.
   - `type Archived struct { Slug, Folder string; Sources []Source }` — `Folder` is the archive directory name, e.g. `2026-10-24-add-x`.
   - `type Unreadable struct { Source Source; Reason string }`
   - `type Inventory struct { DefaultBranch DefaultBranch; Changes []Change; Archived []Archived; Unreadable []Unreadable }` — `Changes` and `Archived` sorted by slug.
@@ -218,7 +222,8 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
   - `TestMergedBranchSkipped`: a local branch merged into `main` appears in no source.
   - `TestOriginHeadSet`: `git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/trunk` → `DefaultBranch{Name:"trunk", Ref:"refs/remotes/origin/trunk"}`.
   - `TestNoDefaultBranch`: only a branch `dev`, no remote → `ErrNoDefaultBranch`.
-  - `TestMergedChangeAlsoOnBranch`: `add-x` on `main` with `x-kind: feature`, edited on unmerged `feature` to `x-kind: fix` → one `Change`, two sources, the local branch first, and `ReadFile(g, Sources[0], "openspec/changes/add-x/.openspec.yaml")` contains `x-kind: fix`.
+  - `TestMergedChangeAlsoOnBranch`: `add-x` on `main` with `x-kind: feature` (so the main worktree, checked out on `main`, also holds it), edited on unmerged `feature` to `x-kind: fix` → one `Change`, three sources, `Sources[0]` the local branch `feature`, and `ReadFile(g, Sources[0], "openspec/changes/add-x/.openspec.yaml")` contains `x-kind: fix`.
+  - `TestWorktreeWithUnmergedWorkComesFirst`: worktree B on branch `b` with one commit `main` lacks, and an uncommitted edit to `add-x` (`x-kind: change-request`) → `Sources[0]` is worktree B and `ReadFile` on it contains `x-kind: change-request`.
   - `TestUnreadableBranchTree`: branch `broken` adds `add-z`; delete the loose object of `git rev-parse broken:openspec/changes` from `.git/objects` → `Scan` returns no error, `refs/heads/broken` is in `Unreadable`, and changes from other sources are still listed.
   - `TestArchivedSlugFound`: `openspec/changes/archive/2026-10-24-add-x/` on `main` → `Archived{Slug:"add-x", Folder:"2026-10-24-add-x"}`; a folder without a date prefix is not counted.
   - `TestWorktreeOnUnmountedVolume`: a worktree whose directory was removed → listed in `Unreadable` with its path; other sources still scanned.

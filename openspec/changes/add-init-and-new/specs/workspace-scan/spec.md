@@ -36,11 +36,15 @@ Docket SHALL take the default branch from `--default-branch` when given; otherwi
 - **THEN** the command exits with 4 and suggests `--default-branch`
 
 ### Requirement: One change per slug
-A change SHALL be identified by its slug. When the same slug appears in several sources, Docket SHALL report it once with every source listed, and SHALL use the content from the first source in this order: worktree, local branch, remote-tracking branch, default branch tip.
+A change SHALL be identified by its slug. When the same slug appears in several sources, Docket SHALL report it once with every source listed, and SHALL use the content from the first source in this order: a worktree whose HEAD the default branch tip does not contain, a local branch, a remote-tracking branch, a worktree whose HEAD the default branch tip contains, the default branch tip.
 
 #### Scenario: Merged change also on a branch
-- **WHEN** `add-x` exists on the default branch tip and also on an unmerged branch that has edited it
-- **THEN** the scan reports `add-x` once, lists both sources, and uses the branch's content
+- **WHEN** `add-x` exists on the default branch tip, in the main worktree checked out on the default branch, and on an unmerged branch that has edited it
+- **THEN** the scan reports `add-x` once, lists all three sources, and uses the branch's content
+
+#### Scenario: Worktree with unmerged work comes first
+- **WHEN** worktree B, on a branch with commits the default branch tip does not contain, has uncommitted edits to `add-x`, which also exists on B's branch and on the default branch tip
+- **THEN** the scan uses worktree B's content
 
 ### Requirement: Archived slugs
 Every directory `openspec/changes/archive/<YYYY-MM-DD>-<slug>/` in a scanned source SHALL count as an archived use of `<slug>`.
