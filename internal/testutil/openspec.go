@@ -1,10 +1,13 @@
 package testutil
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/wake/docket"
 )
 
 const fakeOpenSpecScript = `#!/bin/sh
@@ -70,6 +73,29 @@ func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 		t.Fatalf("write fake openspec: %v", err)
 	}
 	return cmd, log
+}
+
+// InstallSchema writes every file of the shipped docket schema under
+// <root>/openspec/schemas/docket/, so a real OpenSpec CLI accepts it.
+func InstallSchema(t testing.TB, root string) {
+	t.Helper()
+	err := fs.WalkDir(docket.Schema(), ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, err := fs.ReadFile(docket.Schema(), p)
+		if err != nil {
+			return err
+		}
+		dst := filepath.Join(root, "openspec/schemas/docket", filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return err
+		}
+		return os.WriteFile(dst, data, 0o644)
+	})
+	if err != nil {
+		t.Fatalf("install schema: %v", err)
+	}
 }
 
 // OpenSpecCmd returns DOCKET_TEST_OPENSPEC when set (the real CLI), else a fake
