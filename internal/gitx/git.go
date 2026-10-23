@@ -100,14 +100,22 @@ func (g Git) runOptional(args ...string) (string, bool, error) {
 	return out, true, nil
 }
 
-// Toplevel returns the root of the work tree containing Dir.
+// Toplevel returns the root of the work tree containing Dir. It returns
+// ErrNotRepo outside a repository, inside a .git directory and in a bare
+// repository, judged by exit status and output, never by message text.
 func (g Git) Toplevel() (string, error) {
-	out, err := g.Run("rev-parse", "--show-toplevel")
+	inside, err := g.Run("rev-parse", "--is-inside-work-tree")
 	var ee *ExitError
-	if errors.As(err, &ee) && strings.Contains(ee.Stderr, "not a git repository") {
+	if errors.As(err, &ee) && ee.Code == 128 {
+		return "", fmt.Errorf("%w: %s", ErrNotRepo, ee.Stderr)
+	}
+	if err != nil {
+		return "", err
+	}
+	if inside != "true" {
 		return "", ErrNotRepo
 	}
-	return out, err
+	return g.Run("rev-parse", "--show-toplevel")
 }
 
 // Head returns the commit HEAD points at; ok is false while HEAD is unborn.

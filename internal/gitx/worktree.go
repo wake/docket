@@ -14,13 +14,13 @@ type Worktree struct {
 
 // Worktrees lists the repository's worktrees, the main one first.
 func (g Git) Worktrees() ([]Worktree, error) {
-	out, err := g.output("worktree", "list", "--porcelain", "-z")
+	out, err := g.output("worktree", "list", "--porcelain")
 	if err != nil {
 		return nil, err
 	}
 	var wts []Worktree
 	var cur *Worktree
-	for _, field := range strings.Split(string(out), "\x00") {
+	for _, field := range strings.Split(string(out), "\n") {
 		if field == "" {
 			cur = nil // blank field ends an entry
 			continue

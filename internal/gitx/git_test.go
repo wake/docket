@@ -30,6 +30,48 @@ func TestToplevelInRepo(t *testing.T) {
 	}
 }
 
+func TestToplevelInsideGitDir(t *testing.T) {
+	r := testutil.NewRepo(t)
+	g := Git{Dir: filepath.Join(r.Dir, ".git"), Env: r.Env}
+	if _, err := g.Toplevel(); !errors.Is(err, ErrNotRepo) {
+		t.Fatalf("err = %v, want ErrNotRepo", err)
+	}
+}
+
+func TestToplevelBareRepo(t *testing.T) {
+	g := Git{Dir: testutil.NewBare(t), Env: testutil.Env(t)}
+	if _, err := g.Toplevel(); !errors.Is(err, ErrNotRepo) {
+		t.Fatalf("err = %v, want ErrNotRepo", err)
+	}
+}
+
+func TestToplevelLocaleIndependent(t *testing.T) {
+	env := append(testutil.Env(t), "LANG=de_DE.UTF-8", "LC_ALL=de_DE.UTF-8")
+	g := Git{Dir: t.TempDir(), Env: env}
+	if _, err := g.Toplevel(); !errors.Is(err, ErrNotRepo) {
+		t.Fatalf("err = %v, want ErrNotRepo", err)
+	}
+}
+
+func TestWorktreesPathWithSpace(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("one", map[string]string{"a": "1"})
+	wt := filepath.Join(t.TempDir(), "with space", "wt")
+	if err := os.MkdirAll(filepath.Dir(wt), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r.AddWorktree(wt, "feature")
+	wts, err := Git{Dir: r.Dir, Env: r.Env}.Worktrees()
+	if err != nil || len(wts) != 2 {
+		t.Fatalf("Worktrees = %+v, %v", wts, err)
+	}
+	want, _ := filepath.EvalSymlinks(wt)
+	got, _ := filepath.EvalSymlinks(wts[1].Path)
+	if got != want {
+		t.Fatalf("path = %q, want %q", got, want)
+	}
+}
+
 func TestGitMissing(t *testing.T) {
 	g := Git{Dir: t.TempDir(), Env: []string{"PATH="}}
 	if _, err := g.Toplevel(); !errors.Is(err, ErrGitMissing) {
