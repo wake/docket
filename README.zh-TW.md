@@ -110,6 +110,14 @@ dkt index                         # 既有能力的複用索引
 - **輸出標明 commit。**每個結果都附上 repo 與 commit SHA，不同機器跑出來的結果才能互相比對。
 - **每個指令都能輸出 JSON。**所以能放進 CI、測試工具，或 agent 的 session 管理工具裡跑。
 
+## 安裝
+
+```
+go install github.com/wake/docket/cmd/dkt@latest
+```
+
+`dkt init` 和 `dkt new` 需要 OpenSpec CLI 1.14.x 在 `PATH` 上，或用 `DOCKET_OPENSPEC` 指定要執行的指令。
+
 ## 需求（規劃中）
 
 - git

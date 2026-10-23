@@ -110,6 +110,14 @@ The first milestone is `init`, `new`, `lint`, `conflicts`, `sync`, `archive` and
 - **Output names the commit.** Every result carries the repository and commit SHA, so runs on different machines can be compared.
 - **`--json` everywhere.** Every command can produce JSON, so Docket can run in CI, a test runner or an agent session manager.
 
+## Install
+
+```
+go install github.com/wake/docket/cmd/dkt@latest
+```
+
+`dkt init` and `dkt new` need the OpenSpec CLI 1.14.x on `PATH`, or set `DOCKET_OPENSPEC` to the command to run.
+
 ## Requirements (planned)
 
 - git

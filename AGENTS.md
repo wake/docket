@@ -15,9 +15,9 @@ does not exist: open changes with
 `openspec new change <slug> --schema docket`, add the `x-` keys to
 `.openspec.yaml` by hand, and check the lint rules by reading.
 
-Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` (once it
-exists) for module boundaries and shared capabilities. Ideas that are not
-ready, and the order of upcoming work, are in `docs/ideas/`.
+Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` for module
+boundaries and shared capabilities. Ideas that are not ready, and the order of
+upcoming work, are in `docs/ideas/`.
 
 ## Change workflow (superpowers × OpenSpec)
 
