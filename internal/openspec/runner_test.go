@@ -119,6 +119,60 @@ func TestMissingProgram(t *testing.T) {
 	}
 }
 
+func copyFake(t *testing.T, fake, dst string) {
+	t.Helper()
+	b, err := os.ReadFile(fake)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, b, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEmptyPathEntryResolvesAgainstDir(t *testing.T) {
+	fake, log := testutil.FakeOpenSpec(t, "1.14.3")
+	dir := t.TempDir()
+	copyFake(t, fake, filepath.Join(dir, "openspec"))
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC=", "PATH=:"+t.TempDir())
+	r, err := openspec.New(dir, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(r.Cmd[0]) {
+		t.Fatalf("Cmd[0] = %q, want absolute", r.Cmd[0])
+	}
+	if _, err := r.Run("--help"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readLog(t, log); len(got) != 2 {
+		t.Fatalf("log = %q", got)
+	}
+}
+
+func TestRelativeOverrideResolvesAgainstDir(t *testing.T) {
+	fake, log := testutil.FakeOpenSpec(t, "1.14.3")
+	dir := t.TempDir()
+	copyFake(t, fake, filepath.Join(dir, "bin", "openspec"))
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC=./bin/openspec")
+	r, err := openspec.New(dir, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(r.Cmd[0]) {
+		t.Fatalf("Cmd[0] = %q, want absolute", r.Cmd[0])
+	}
+	if _, err := r.Run("--help"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readLog(t, log); len(got) != 2 {
+		t.Fatalf("log = %q", got)
+	}
+}
+
 func TestFailureCarriesStderr(t *testing.T) {
 	fake, _ := testutil.FakeOpenSpec(t, "1.14.3")
 	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+fake, "FAKE_OPENSPEC_FAIL=new")

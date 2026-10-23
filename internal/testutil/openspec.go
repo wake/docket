@@ -8,6 +8,7 @@ import (
 )
 
 const fakeOpenSpecScript = `#!/bin/sh
+set -e
 log=@LOG@
 if [ "$#" -gt 0 ]; then
   printf '%s' "$1" >> "$log"

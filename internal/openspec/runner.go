@@ -72,7 +72,7 @@ func New(dir string, env []string) (*Runner, error) {
 	if v, _ := envValue(env, "DOCKET_OPENSPEC"); len(strings.Fields(v)) > 0 {
 		cmd = strings.Fields(v)
 	}
-	prog, ok := resolve(cmd[0], env)
+	prog, ok := resolve(cmd[0], dir, env)
 	if !ok {
 		return nil, &UnavailableError{Program: cmd[0]}
 	}
@@ -80,16 +80,28 @@ func New(dir string, env []string) (*Runner, error) {
 	return &Runner{Cmd: cmd, Dir: dir, Env: env}, nil
 }
 
-func resolve(prog string, env []string) (string, bool) {
+// resolve returns an absolute program path. Relative paths and relative (or
+// empty) PATH entries are taken relative to dir, where the child will run.
+func resolve(prog, dir string, env []string) (string, bool) {
+	abs := func(p string) string {
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(dir, p)
+		}
+		if a, err := filepath.Abs(p); err == nil {
+			return a
+		}
+		return p
+	}
 	if strings.Contains(prog, "/") {
-		return prog, isExecutable(prog)
+		p := abs(prog)
+		return p, isExecutable(p)
 	}
 	path, _ := envValue(env, "PATH")
 	for _, d := range filepath.SplitList(path) {
 		if d == "" {
 			d = "."
 		}
-		if p := filepath.Join(d, prog); isExecutable(p) {
+		if p := abs(filepath.Join(d, prog)); isExecutable(p) {
 			return p, true
 		}
 	}
