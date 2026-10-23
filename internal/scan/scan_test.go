@@ -173,46 +173,68 @@ func TestMergedChangeAlsoOnBranch(t *testing.T) {
 		t.Fatalf("changes = %+v", inv.Changes)
 	}
 	c := inv.Changes[0]
-	// Sources: the primary worktree (on main), the feature branch, the default tip.
-	if len(c.Sources) != 3 || c.Sources[0].Kind != scan.KindWorktree {
+	// Sources: the branch, the main checkout (on the default branch), the default tip.
+	if len(c.Sources) != 3 || c.Sources[0].Kind != scan.KindLocalBranch || c.Sources[0].Name != "refs/heads/feature" {
 		t.Fatalf("sources = %+v", c.Sources)
 	}
-	var branch scan.Source
-	for _, s := range c.Sources {
-		if s.Name == "refs/heads/feature" {
-			branch = s
-		}
-	}
-	if branch.Kind != scan.KindLocalBranch {
-		t.Fatalf("feature branch missing: %+v", c.Sources)
-	}
-	if last := c.Sources[len(c.Sources)-1]; last.Kind != scan.KindDefaultBranch {
-		t.Fatalf("last = %+v", last)
-	}
-	b, err := scan.ReadFile(g, branch, yamlPath("add-x"))
+	b, err := scan.ReadFile(g, c.Sources[0], yamlPath("add-x"))
 	if err != nil || !strings.Contains(string(b), "x-kind: fix") {
 		t.Fatalf("ReadFile = %q, %v", b, err)
+	}
+}
+
+func TestWorktreeWithUnmergedWorkComesFirst(t *testing.T) {
+	a := baseRepo(t)
+	a.Commit("x", map[string]string{yamlPath("add-x"): "x-kind: feature\n"})
+	bPath := filepath.Join(t.TempDir(), "b")
+	b := a.AddWorktree(bPath, "b")
+	b.Commit("other work", map[string]string{"other.txt": "o\n"})
+	b.Write(yamlPath("add-x"), "x-kind: change-request\n")
+	inv, g := scanOf(t, a)
+	c := find(inv, "add-x")
+	if c == nil {
+		t.Fatalf("add-x not found: %+v", inv)
+	}
+	got := c.Sources[0]
+	if got.Kind != scan.KindWorktree || realPath(t, got.Name) != realPath(t, bPath) {
+		t.Fatalf("Sources[0] = %+v, want worktree %s; all %+v", got, bPath, c.Sources)
+	}
+	data, err := scan.ReadFile(g, got, yamlPath("add-x"))
+	if err != nil || !strings.Contains(string(data), "x-kind: change-request") {
+		t.Fatalf("ReadFile = %q, %v", data, err)
 	}
 }
 
 func TestSourceOrder(t *testing.T) {
 	r := baseRepo(t)
 	r.Commit("x", map[string]string{yamlPath("add-x"): "x-kind: feature\n"})
+	mPath := filepath.Join(t.TempDir(), "m")
+	r.AddWorktree(mPath, "merged-wt") // HEAD is the default tip: contained
 	r.Git("checkout", "-q", "-b", "feature")
 	r.Commit("edit", map[string]string{yamlPath("add-x"): "x-kind: fix\n"})
+	// The primary worktree is on feature (unmerged work).
 	inv, _ := scanOf(t, r)
 	c := find(inv, "add-x")
-	kinds := []scan.Kind{}
-	for _, s := range c.Sources {
-		kinds = append(kinds, s.Kind)
+	if c == nil {
+		t.Fatalf("add-x not found: %+v", inv)
 	}
-	want := []scan.Kind{scan.KindWorktree, scan.KindLocalBranch, scan.KindDefaultBranch}
-	if len(kinds) != len(want) {
-		t.Fatalf("kinds = %v", kinds)
+	want := []scan.Source{
+		{Kind: scan.KindWorktree, Name: realPath(t, r.Dir)},
+		{Kind: scan.KindLocalBranch, Name: "refs/heads/feature"},
+		{Kind: scan.KindWorktree, Name: realPath(t, mPath)},
+		{Kind: scan.KindDefaultBranch, Name: "refs/heads/main"},
 	}
-	for i := range want {
-		if kinds[i] != want[i] {
-			t.Fatalf("kinds = %v, want %v", kinds, want)
+	if len(c.Sources) != len(want) {
+		t.Fatalf("sources = %+v", c.Sources)
+	}
+	for i, w := range want {
+		got := c.Sources[i]
+		name := got.Name
+		if got.Kind == scan.KindWorktree {
+			name = realPath(t, name)
+		}
+		if got.Kind != w.Kind || name != w.Name {
+			t.Fatalf("sources[%d] = %+v, want %+v (all %+v)", i, got, w, c.Sources)
 		}
 	}
 }

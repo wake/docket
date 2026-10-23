@@ -22,7 +22,16 @@ const (
 	KindDefaultBranch Kind = "default-branch"
 )
 
-var kindRank = map[Kind]int{KindWorktree: 0, KindLocalBranch: 1, KindRemoteBranch: 2, KindDefaultBranch: 3}
+// Content precedence, lowest first. Sources[0] of a Change supplies content.
+// Kind alone does not decide it: a worktree ranks by whether the default
+// branch tip contains its HEAD.
+const (
+	rankUnmergedWorktree = iota // worktree with commits the default branch lacks
+	rankLocalBranch
+	rankRemoteBranch
+	rankContainedWorktree // worktree whose HEAD the default tip contains, or unborn
+	rankDefaultBranch
+)
 
 // Source is one place a change was found.
 type Source struct {
@@ -67,9 +76,11 @@ var archiveName = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(.+)$`)
 type found struct {
 	active   map[string][]Source
 	archived map[string][]Source // keyed by archive folder
+	rank     map[Source]int
 }
 
-func (f *found) add(src Source, active, archived []string) {
+func (f *found) add(src Source, rank int, active, archived []string) {
+	f.rank[src] = rank
 	for _, s := range active {
 		if s != "archive" {
 			f.active[s] = append(f.active[s], src)
@@ -87,7 +98,7 @@ func (f *found) add(src Source, active, archived []string) {
 // one source are returned; a source that cannot be read goes into Unreadable.
 func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	inv := Inventory{DefaultBranch: db, Changes: []Change{}, Archived: []Archived{}, Unreadable: []Unreadable{}}
-	f := &found{active: map[string][]Source{}, archived: map[string][]Source{}}
+	f := &found{active: map[string][]Source{}, archived: map[string][]Source{}, rank: map[Source]int{}}
 
 	wts, err := g.Worktrees()
 	if err != nil {
@@ -107,7 +118,14 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{src, err.Error()})
 			continue
 		}
-		f.add(src, active, archived)
+		rank := rankContainedWorktree
+		if !unbornHead(w.Head) {
+			// On error, assume unmerged work so that it is not hidden.
+			if contained, err := g.IsAncestor(w.Head, db.Commit); err != nil || !contained {
+				rank = rankUnmergedWorktree
+			}
+		}
+		f.add(src, rank, active, archived)
 	}
 
 	refs, err := g.Refs("refs/heads", "refs/remotes")
@@ -118,9 +136,9 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		if r.Name == db.Ref {
 			continue
 		}
-		kind := KindLocalBranch
+		kind, rank := KindLocalBranch, rankLocalBranch
 		if strings.HasPrefix(r.Name, "refs/remotes/") {
-			kind = KindRemoteBranch
+			kind, rank = KindRemoteBranch, rankRemoteBranch
 		}
 		src := Source{Kind: kind, Name: r.Name, Commit: r.SHA}
 		merged, err := g.IsAncestor(r.SHA, db.Commit)
@@ -136,7 +154,7 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{src, err.Error()})
 			continue
 		}
-		f.add(src, active, archived)
+		f.add(src, rank, active, archived)
 	}
 
 	dbSrc := Source{Kind: KindDefaultBranch, Name: db.Ref, Commit: db.Commit}
@@ -144,16 +162,16 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	if err != nil {
 		inv.Unreadable = append(inv.Unreadable, Unreadable{dbSrc, err.Error()})
 	} else {
-		f.add(dbSrc, active, archived)
+		f.add(dbSrc, rankDefaultBranch, active, archived)
 	}
 
 	for slug, srcs := range f.active {
-		inv.Changes = append(inv.Changes, Change{Slug: slug, Sources: sortSources(srcs)})
+		inv.Changes = append(inv.Changes, Change{Slug: slug, Sources: f.sortSources(srcs)})
 	}
 	sort.Slice(inv.Changes, func(i, j int) bool { return inv.Changes[i].Slug < inv.Changes[j].Slug })
 	for folder, srcs := range f.archived {
 		slug := archiveName.FindStringSubmatch(folder)[1]
-		inv.Archived = append(inv.Archived, Archived{Slug: slug, Folder: folder, Sources: sortSources(srcs)})
+		inv.Archived = append(inv.Archived, Archived{Slug: slug, Folder: folder, Sources: f.sortSources(srcs)})
 	}
 	sort.Slice(inv.Archived, func(i, j int) bool {
 		a, b := inv.Archived[i], inv.Archived[j]
@@ -165,10 +183,15 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	return inv, nil
 }
 
-func sortSources(s []Source) []Source {
+// unbornHead reports a worktree whose HEAD has no commit yet.
+func unbornHead(head string) bool {
+	return strings.Trim(head, "0") == ""
+}
+
+func (f *found) sortSources(s []Source) []Source {
 	sort.Slice(s, func(i, j int) bool {
-		if kindRank[s[i].Kind] != kindRank[s[j].Kind] {
-			return kindRank[s[i].Kind] < kindRank[s[j].Kind]
+		if f.rank[s[i]] != f.rank[s[j]] {
+			return f.rank[s[i]] < f.rank[s[j]]
 		}
 		return s[i].Name < s[j].Name
 	})
