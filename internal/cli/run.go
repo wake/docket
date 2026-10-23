@@ -12,7 +12,7 @@ import (
 )
 
 // commands is the real command set.
-var commands = []func() Command{initCommand}
+var commands = []func() Command{initCommand, newCommand}
 
 // Run runs dkt with the real command set and returns the exit code.
 func Run(o Options) int { return RunWith(o, commands) }
@@ -70,7 +70,11 @@ func RunWith(o Options, cmds []func() Command) int {
 	}
 	if err != nil {
 		outcome.Findings = append(outcome.Findings, errorFinding(err))
-		fmt.Fprintf(o.Stderr, "dkt %s: %v\n", cmd.Name, err)
+		if asUsage(err) {
+			usage(o.Stderr, cmds, fmt.Sprintf("%s: %v", cmd.Name, err))
+		} else {
+			fmt.Fprintf(o.Stderr, "dkt %s: %v\n", cmd.Name, err)
+		}
 	}
 	code := ExitCode(outcome, err)
 	var werr error
