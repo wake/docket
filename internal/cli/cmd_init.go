@@ -39,6 +39,10 @@ func initCommand() Command {
 				if errors.As(err, &un) || errors.As(err, &us) {
 					return Outcome{}, EnvError{Msg: err.Error()}
 				}
+				var fe *openspec.FailedError
+				if errors.As(err, &fe) {
+					return Outcome{Findings: []Finding{{Rule: "openspec-failed", Message: fe.Error()}}}, nil
+				}
 				return Outcome{}, err
 			}
 			res.AgentsSection = docket.AgentsSection()

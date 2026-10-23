@@ -238,3 +238,38 @@ func TestInitUnbornRepository(t *testing.T) {
 		t.Errorf("head not null: %s", so)
 	}
 }
+
+func TestInitOpenSpecFails(t *testing.T) {
+	r := committedRepo(t)
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	var so, se bytes.Buffer
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+cmd, "FAKE_OPENSPEC_FAIL=init")
+	code := Run(Options{Args: []string{"init", "--json"}, Dir: r.Dir, Env: env, Stdout: &so, Stderr: &se})
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so.String(), se.String())
+	}
+	findings, _ := decode(t, so.String())["findings"].([]any)
+	if len(findings) != 1 {
+		t.Fatalf("findings: %s", so.String())
+	}
+	f := findings[0].(map[string]any)
+	msg, _ := f["message"].(string)
+	if f["rule"] != "openspec-failed" || !strings.Contains(msg, "3") || !strings.Contains(msg, "fake failure") {
+		t.Errorf("finding: %v", f)
+	}
+	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/schemas/docket")); err == nil {
+		t.Error("schema directory was written")
+	}
+}
+
+func TestInitUnsupportedVersion(t *testing.T) {
+	r := committedRepo(t)
+	cmd, _ := testutil.FakeOpenSpec(t, "1.3.0")
+	code, so, se := runInit(t, r.Dir, cmd)
+	if code != 4 || !strings.Contains(se, "1.3.0") || !strings.Contains(se, "1.14.x") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if _, err := os.Stat(filepath.Join(r.Dir, "openspec")); err == nil {
+		t.Error("openspec/ was created")
+	}
+}
