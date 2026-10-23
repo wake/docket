@@ -30,9 +30,11 @@ Docket 讀 repo 裡的檔案和 git 紀錄，做四種工作：
 | 角色 | 指令 | 做什麼 |
 |---|---|---|
 | 檢查（唯讀，失敗時回傳非零結束碼） | `lint`、`conflicts`、`check` | 必填段落、殘留的佔位字、任務標題格式、複用表裡不存在的路徑、被多個進行中 change 修改的需求、沒有測試的 scenario |
-| 記帳 | `status`、`sync`、`log` | 從 commit trailer 算出進度、閒置天數、一條需求怎麼演變。`sync` 是唯一會改檔的指令，而且只改 `plan.md` 的勾選框 |
+| 記帳 | `status`、`sync`、`log` | 從 commit trailer 算出進度、閒置天數、一條需求怎麼演變。`sync` 只改 `plan.md` 的勾選框，不動其他內容 |
 | 組裝 | `brief`、`accept --export` | 把散在多個檔案的內容拼成給實作 agent 的 brief，或拼成給客戶確認的頁面 |
-| 流程包裝 | `new`、`archive` | 依固定順序呼叫 OpenSpec CLI 和上面的檢查，並記下 base commit 與審查證據 |
+| 流程包裝 | `init`、`new`、`archive`、`rebase` | 安裝 schema，依固定順序呼叫 OpenSpec CLI 和上面的檢查，並記下 base commit 與證據 |
+
+會寫檔的指令有：`init`（schema）、`new`（change 資料夾）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 `evidence.md`）、`rebase`（`.openspec.yaml` 的一行）。它們都不會 commit。
 
 ## Docket 不是什麼
 
@@ -66,7 +68,8 @@ Docket **不會**：
      ```
 
    - 審查 pull request，`dkt check` 必須通過。
-7. **封存。**在 main 分支上一次封存一個 change：`dkt archive <slug>`。
+   - 用 merge commit 合併，不要 squash，每個 commit 的 trailer 才留得下來。
+7. **封存。**在發版步驟，從預設分支最新版開出的分支上執行 `dkt archive <slug>...`。
 
 ### 一份任務清單
 
@@ -82,11 +85,13 @@ Docket **不會**：
 ## 規劃中的指令（草案）
 
 ```
+dkt init [--force]                # 安裝 docket schema
 dkt new <slug> --kind feature|change-request|fix|baseline --source "<出處>"
-dkt lint [<slug>]                 # 文件規則
-dkt conflicts [--archive <slug>]  # 進行中的 change 之間；或封存前與 base 比對
-dkt sync <slug>                   # 依 commit trailer 勾 plan.md
-dkt archive <slug>...             # 只在 main 分支
+dkt lint [<slug>...]              # 文件規則
+dkt conflicts [<slug>]            # 被多個進行中 change 碰到的需求
+dkt sync <slug> [--check]         # 依 commit trailer 勾 plan.md
+dkt archive <slug>...             # 發版步驟，在從預設分支開出的分支上
+dkt rebase <slug>                 # 把較新的規格接受為 change 的 base
 dkt status [--json]               # 階段、任務、worktree、負責人、PR、閒置天數、驗收輪
 dkt brief <slug> --task N         # 給實作 agent 的 brief
 dkt check <slug>                  # scenario 覆蓋與勾選一致性（PR 閘門）
@@ -95,7 +100,7 @@ dkt log <capability>
 dkt index                         # 既有能力的複用索引
 ```
 
-第一個里程碑是 `new`、`lint`、`conflicts`、`sync`、`archive`。
+第一個里程碑是 `init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`，拆成 `openspec/changes/` 底下的四個 OpenSpec change 來做。
 
 ## 設計守則
 

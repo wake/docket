@@ -1,0 +1,5 @@
+schema: docket
+created: 2026-10-24
+x-kind: feature
+x-source: "self: milestone 1 design discussion, 2026-10-24"
+x-base: 538f530999cd099103939e45b07660c36356e829
