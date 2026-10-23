@@ -26,7 +26,7 @@
 
 ## Review Focus
 
-1. A repository with no commits yet (`git init` only): `dkt init` must work and report `repo.head` as null; `dkt new` must refuse with exit 1 and say to commit first, because there is no merge base. Tests in Tasks 3, 6 and 7.
+1. A repository with no commits yet (`git init` only): `dkt init` must work and report `repo.head` as null; `dkt new` must refuse with exit 1 and say to commit first, before it looks for a default branch, which such a repository does not have yet. Tests in Tasks 3, 6 and 7.
 2. Paths containing spaces, for the repository root and for worktrees. Tests in Tasks 5 and 7.
 3. `--source` text with YAML-significant or non-ASCII characters (`issue #12: "x"`, `需求 R1#3`) must round-trip exactly through `.openspec.yaml`. Test in Task 7.
 4. OpenSpec writing `.openspec.yaml` without a trailing newline: the `x-` keys must still start on their own lines. Test in Task 7.
@@ -45,6 +45,7 @@
 | Worktrees, refs, trees, merge bases | external: git CLI | reuse | Behaves exactly as the user's git | design.md "Git through the git binary" |
 | YAML scalars in `.openspec.yaml` | external: `go.yaml.in/yaml/v3` | reuse | Maintained successor of `gopkg.in/yaml.v3` | `go list -m -versions go.yaml.in/yaml/v3` → v3.0.5 |
 | Flag parsing, embedding, JSON | external: Go `flag`, `embed`, `encoding/json` | reuse | Standard library; no CLI framework | design.md "Go, standard library first" |
+| Failing CI on new duplicated code only | external: jscpd 5.4.2 | reuse | Compares against a git ref without a committed baseline file | `npx -y jscpd@5.4.2 --help` lists `--baseline-from-ref <REF>` and `--fail-on-new-clones [<N>]` (checked 2026-10-24) |
 | Output envelope, exit codes, dispatch | none | new | The repository has no Go code | `git ls-files '*.go'` → empty |
 | Workspace scan | none | new | No code yet; no library discovers OpenSpec changes across git worktrees and refs | `git ls-files '*.go'` → empty |
 | OpenSpec runner with version gate | none | new | No code yet | `git ls-files '*.go'` → empty |
@@ -100,6 +101,7 @@ Rows marked `external:` name a dependency outside the repository; there is no pa
   - `type Ref struct { Name, SHA string }`; `func (g Git) Refs(patterns ...string) ([]Ref, error)` — full refnames; symbolic refs are left out.
   - `type Worktree struct { Path, Head, Branch string; Detached, Bare, Prunable bool }`; `func (g Git) Worktrees() ([]Worktree, error)` — parsed from `git worktree list --porcelain`.
   - `func (g Git) ListDirs(rev, dir string) ([]string, error)` — names of the directories directly under `dir` in `rev`'s tree; a missing `dir` gives an empty list and no error.
+  - `func (g Git) Show(rev, path string) ([]byte, error)` — the blob at `rev:path`, via `git show`.
 - Produces (package `testutil`, test helpers only):
   - `func Env(t testing.TB) []string` — `os.Environ()` plus a temporary `HOME`, `GIT_CONFIG_NOSYSTEM=1`, and `GIT_CONFIG_GLOBAL` pointing to a temporary file with `user.name`, `user.email`, `init.defaultBranch=main`, `commit.gpgsign=false`.
   - `type Repo struct { T testing.TB; Dir string; Env []string }`
@@ -109,7 +111,7 @@ Rows marked `external:` name a dependency outside the repository; there is no pa
   - `func (r *Repo) AddWorktree(path, newBranch string) *Repo`
   - `func NewBare(t testing.TB) string` and `func (r *Repo) CloneTo(t testing.TB, dir string) *Repo` for remote scenarios.
 
-- [ ] **Step 1: Write the failing tests** in `internal/gitx/git_test.go`, each on a `testutil` repository: `TestToplevelOutsideRepo` (`ErrNotRepo`), `TestGitMissing` (`Env` with an empty `PATH` → `ErrGitMissing`), `TestHeadUnborn` (`ok` false), `TestBranchDetached`, `TestRemoteURLMissing`, `TestRefsSkipsSymbolic` (a clone's `refs/remotes/origin/HEAD` is absent from `Refs("refs/remotes")`), `TestWorktreesPrunable` (add a worktree, delete its directory, entry has `Prunable` true), `TestListDirsMissing` (empty, nil), `TestMergeBaseUnrelated` (`ok` false for two unrelated roots).
+- [ ] **Step 1: Write the failing tests** in `internal/gitx/git_test.go`, each on a `testutil` repository: `TestToplevelOutsideRepo` (`ErrNotRepo`), `TestGitMissing` (`Env` with an empty `PATH` → `ErrGitMissing`), `TestHeadUnborn` (`ok` false), `TestBranchDetached`, `TestRemoteURLMissing`, `TestRefsSkipsSymbolic` (a clone's `refs/remotes/origin/HEAD` is absent from `Refs("refs/remotes")`), `TestWorktreesPrunable` (add a worktree, delete its directory, entry has `Prunable` true), `TestListDirsMissing` (empty, nil), `TestShow` (returns the committed bytes of a file at a given commit), `TestMergeBaseUnrelated` (`ok` false for two unrelated roots).
 - [ ] **Step 2: Run** `go test ./internal/gitx/` — expected: build failure.
 - [ ] **Step 3: Implement** with `os/exec`; look `git` up in the `PATH` from `Env`, not the process's. `ListDirs` uses `git ls-tree -d --name-only <rev> -- <dir>/` and returns base names.
 - [ ] **Step 4: Run** `go test ./internal/gitx/` — expected: PASS.
@@ -166,16 +168,17 @@ Rows marked `external:` name a dependency outside the repository; there is no pa
   - `const SupportedRange = "1.14.x"`
   - `type Runner struct { Cmd []string; Dir string; Env []string }`
   - `func New(dir string, env []string) (*Runner, error)` — `Cmd` from `DOCKET_OPENSPEC` split on whitespace when set and non-empty, else `["openspec"]`; a bare program name is looked up on the `PATH` in `env`. Returns `*UnavailableError` when the program cannot be found; its message names `DOCKET_OPENSPEC`.
-  - `func (r *Runner) CheckVersion() (string, error)` — runs `<Cmd> --version` once per `Runner`; `*UnsupportedError{Found, Range}` unless the version is `1.14.<anything>`.
+  - `func (r *Runner) CheckVersion() (string, error)` — runs `<Cmd> --version` once per `Runner`; the trimmed output must match `^1\.14\.(0|[1-9][0-9]*)$`, else `*UnsupportedError{Found, Range}`.
   - `func (r *Runner) Run(args ...string) (string, error)` — calls `CheckVersion` first; a non-zero exit gives `*FailedError{Command []string; Code int; Stderr string}`.
 - Produces (package `testutil`):
-  - `func FakeOpenSpec(t testing.TB, version string) (cmd, log string)` — writes a POSIX `sh` script and returns its path and the path of a log file that gets one line per invocation (arguments joined by a tab). Behavior: `--version` prints `version`; `init --tools none` creates `openspec/config.yaml` (`schema: spec-driven`), `openspec/specs/.gitkeep`, `openspec/changes/archive/.gitkeep`; `new change <slug> --schema <s>` creates `openspec/changes/<slug>/.openspec.yaml` with `schema: <s>` and `created: 2026-01-02`, without a trailing newline when `FAKE_OPENSPEC_NO_EOL=1`; when `FAKE_OPENSPEC_FAIL=<subcommand>`, that subcommand prints `fake failure` to stderr and exits 3.
+  - `func FakeOpenSpec(t testing.TB, version string) (cmd, log string)` — writes a POSIX `sh` script and returns its path and the path of a log file that gets one line per invocation (arguments joined by a tab). Behavior: `--version` prints `version`; `init --tools none` creates `openspec/config.yaml` (`schema: spec-driven`), `openspec/specs/.gitkeep`, `openspec/changes/archive/.gitkeep`; `new change <slug> --schema <s>` creates `openspec/changes/<slug>/.openspec.yaml` with `schema: <s>` and `created: 2026-01-02`, without a trailing newline when `FAKE_OPENSPEC_NO_EOL=1`, and as invalid YAML (`schema: [`) when `FAKE_OPENSPEC_BAD_YAML=1`; when `FAKE_OPENSPEC_FAIL=<subcommand>`, that subcommand first does its usual file work, then prints `fake failure` to stderr and exits 3.
   - `func OpenSpecCmd(t testing.TB) string` — the value of `DOCKET_TEST_OPENSPEC` when set (the real CLI, used by CI), else a fake reporting `1.14.3`.
 
 - [ ] **Step 1: Write the failing tests:**
   - `TestOverrideSplitsWords`: `DOCKET_OPENSPEC="<fake> -y @fission-ai/openspec@1.14.3"`; `Run("new","change","x","--schema","docket")` → the log's line is `-y`, `@fission-ai/openspec@1.14.3`, `new`, `change`, `x`, `--schema`, `docket` (after the `--version` line).
   - `TestDefaultFromPath`: `DOCKET_OPENSPEC` unset, `PATH` holds a directory with the fake copied to `openspec` → `Run("--help")` reaches it.
   - `TestUnsupportedVersion`: fake reports `1.3.0` → `*UnsupportedError{Found:"1.3.0", Range:"1.14.x"}` and the log shows only `--version`.
+  - `TestVersionMatching`: table — `1.14.0`, `1.14.3`, `1.14.12` accepted; `1.15.0`, `1.14`, `1.14.bad`, `v1.14.3`, `1.14.3-beta`, empty output rejected.
   - `TestMissingProgram`: `DOCKET_OPENSPEC=/nonexistent/openspec` → `*UnavailableError` whose message contains `DOCKET_OPENSPEC`.
   - `TestFailureCarriesStderr`: `FAKE_OPENSPEC_FAIL=new` → `*FailedError` with `Code` 3 and `Stderr` containing `fake failure`.
 - [ ] **Step 2: Run** `go test ./internal/openspec/` — expected: build failure.
@@ -194,7 +197,7 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
 - Test: `internal/scan/scan_test.go`
 
 **Interfaces:**
-- Consumes: `gitx.Git`, `gitx.Ref`, `gitx.Worktree`, `Git.ListDirs`, `Git.IsAncestor` (Task 2).
+- Consumes: `gitx.Git`, `gitx.Ref`, `gitx.Worktree`, `Git.ListDirs`, `Git.Show`, `Git.IsAncestor` (Task 2).
 - Produces (package `scan`):
   - `type DefaultBranch struct { Name, Ref, Commit string }` — `Ref` is the full refname of the tip.
   - `var ErrNoDefaultBranch error`
@@ -205,8 +208,9 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
   - `type Archived struct { Slug, Folder string; Sources []Source }` — `Folder` is the archive directory name, e.g. `2026-10-24-add-x`.
   - `type Unreadable struct { Source Source; Reason string }`
   - `type Inventory struct { DefaultBranch DefaultBranch; Changes []Change; Archived []Archived; Unreadable []Unreadable }` — `Changes` and `Archived` sorted by slug.
-  - `func Scan(g gitx.Git, db DefaultBranch) (Inventory, error)`
+  - `func Scan(g gitx.Git, db DefaultBranch) (Inventory, error)` — returns an error only for failures that are not tied to one source (`Worktrees`, `Refs`); a source that cannot be read goes into `Unreadable` and the scan continues.
   - `func (inv Inventory) Uses(slug string) (active *Change, archived []Archived)`
+  - `func ReadFile(g gitx.Git, src Source, rel string) ([]byte, error)` — `rel` is relative to the repository root (e.g. `openspec/changes/add-x/.openspec.yaml`); a worktree source reads the file on disk, a branch source reads `src.Commit:rel` with `Git.Show`. This is how later changes read a change's content from `Sources[0]`.
 
 - [ ] **Step 1: Write the failing tests** in `internal/scan/scan_test.go`:
   - `TestChangeOnlyInAnotherWorktree`: worktree B has an uncommitted `openspec/changes/add-x/.openspec.yaml`; `Scan` from A lists `add-x` with `Sources[0] = {worktree, <B path>}`.
@@ -214,13 +218,14 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
   - `TestMergedBranchSkipped`: a local branch merged into `main` appears in no source.
   - `TestOriginHeadSet`: `git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/trunk` → `DefaultBranch{Name:"trunk", Ref:"refs/remotes/origin/trunk"}`.
   - `TestNoDefaultBranch`: only a branch `dev`, no remote → `ErrNoDefaultBranch`.
-  - `TestMergedChangeAlsoOnBranch`: `add-x` on `main` and edited on unmerged `feature` → one `Change`, two sources, the local branch first.
+  - `TestMergedChangeAlsoOnBranch`: `add-x` on `main` with `x-kind: feature`, edited on unmerged `feature` to `x-kind: fix` → one `Change`, two sources, the local branch first, and `ReadFile(g, Sources[0], "openspec/changes/add-x/.openspec.yaml")` contains `x-kind: fix`.
+  - `TestUnreadableBranchTree`: branch `broken` adds `add-z`; delete the loose object of `git rev-parse broken:openspec/changes` from `.git/objects` → `Scan` returns no error, `refs/heads/broken` is in `Unreadable`, and changes from other sources are still listed.
   - `TestArchivedSlugFound`: `openspec/changes/archive/2026-10-24-add-x/` on `main` → `Archived{Slug:"add-x", Folder:"2026-10-24-add-x"}`; a folder without a date prefix is not counted.
   - `TestWorktreeOnUnmountedVolume`: a worktree whose directory was removed → listed in `Unreadable` with its path; other sources still scanned.
   - `TestScanOffline`: `origin` set to `ssh://invalid.invalid/x.git` and existing remote-tracking refs → `Scan` succeeds.
   - `TestOriginHEADNotASource` (Review Focus 5) and `TestPathsWithSpaces` (Review Focus 2): a repository under a directory named `with space` and a worktree under `another dir` both scan.
 - [ ] **Step 2: Run** `go test ./internal/scan/` — expected: build failure.
-- [ ] **Step 3: Implement.** Worktrees are read from the filesystem (`os.ReadDir` of `openspec/changes` and `openspec/changes/archive`; a missing `openspec/` means no changes, an unreadable or missing worktree directory or a `Prunable` entry means unreadable); bare entries are skipped. Branch sources are read with `ListDirs`. A branch is skipped when `IsAncestor(branchSHA, db.Commit)`. Archive folders match `^\d{4}-\d{2}-\d{2}-(.+)$`; the directory `archive` is never an active change.
+- [ ] **Step 3: Implement.** Worktrees are read from the filesystem (`os.ReadDir` of `openspec/changes` and `openspec/changes/archive`; a missing `openspec/` means no changes, an unreadable or missing worktree directory or a `Prunable` entry means unreadable); bare entries are skipped. Branch sources are read with `ListDirs`; a `ListDirs` error for one branch makes that branch unreadable. A branch is skipped when `IsAncestor(branchSHA, db.Commit)`. Archive folders match `^\d{4}-\d{2}-\d{2}-(.+)$`; the directory `archive` is never an active change.
 - [ ] **Step 4: Run** `go test ./internal/scan/` — expected: PASS.
 - [ ] **Step 5: Commit** `feat(scan): find changes in worktrees and branches`.
 
@@ -240,7 +245,7 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
   - `type File struct { Path string; Status FileStatus }` — `Path` relative to the repository root; JSON `path`, `status`.
   - `type Result struct { OpenSpecInitialized bool; Files []File; AgentsSection string }` — JSON `openspec_initialized`, `files`, `agents_section`.
   - `func Init(root string, schema fs.FS, force bool, initOpenSpec func() error) (Result, error)` — calls `initOpenSpec` only when `<root>/openspec` does not exist.
-- The `init` command: flag `--force`; finding rule `schema-differs` for each `Differs` file; an `*openspec.UnavailableError` or `*UnsupportedError` becomes `EnvError`; text mode prints each file with its status, then `Add this section to AGENTS.md:` and the section.
+- The `init` command: flag `--force`; the OpenSpec `Runner` is created inside the `initOpenSpec` callback, never before, so a repository that already has `openspec/` needs no OpenSpec CLI; finding rule `schema-differs` for each `Differs` file; an `*openspec.UnavailableError` or `*UnsupportedError` becomes `EnvError`; text mode prints each file with its status, then `Add this section to AGENTS.md:` and the section.
 
 - [ ] **Step 1: Write the failing tests:**
   - `TestFreshRepository` (cli level, `testutil.OpenSpecCmd`): `dkt init` in a committed repository without `openspec/` → `openspec/config.yaml` exists, every file of `docket.Schema()` is byte-identical under `openspec/schemas/docket/`, exit 0.
@@ -251,6 +256,7 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
   - `TestRerunNoDifferences`: second run → every status `unchanged`, no file's modification time changed, exit 0.
   - `TestRoutingSectionPrinted`: existing AGENTS.md → output contains `docket.AgentsSection()`, AGENTS.md byte-for-byte unchanged, CLAUDE.md and `openspec/config.yaml` untouched.
   - `TestCLIMissing`: `DOCKET_OPENSPEC=/nonexistent/openspec`, fresh repository → exit 4, message contains `DOCKET_OPENSPEC`.
+  - `TestExistingOpenSpecWithoutCLI`: `openspec/` present and `DOCKET_OPENSPEC=/nonexistent/openspec` → exit 0, schema written.
   - `TestInitUnbornRepository` (Review Focus 1): `git init` only → exit 0, `repo.head` null.
 - [ ] **Step 2: Run** `go test ./internal/setup/ ./internal/cli/` — expected: FAIL.
 - [ ] **Step 3: Implement** `setup.Init` (compare bytes before writing; directories 0755, files 0644) and the command.
@@ -273,13 +279,14 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
   - `func ValidateSlug(slug string) error` — accepts `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 200 characters, not starting with `\d{4}-\d{2}-\d{2}`; the date-prefix error says archiving adds the date.
   - `func AppendMetadata(path, kind, source, base string) error` — appends `x-kind`, `x-source`, `x-base` (each value YAML-encoded with `go.yaml.in/yaml/v3`), first adding a newline if the file does not end with one, then parses the whole file and checks the three values read back exactly.
   - `type NewResult struct { Slug, Path, Kind, Source, Base string }` — JSON `slug`, `path`, `kind`, `source`, `base`.
-- The `new` command: one positional slug, flags `--kind` and `--source`. Checks, in this order, each stopping the command: argument and flag errors (usage, 2; an unknown kind lists the four kinds) → slug rules (finding `slug-invalid`, 1) → `openspec/schemas/docket/schema.yaml` exists (finding `schema-missing` pointing to `dkt init`, 1) → default branch (4) → scan: any unreadable source stops with 3 and creates nothing, with `slug-used` findings for any uses found; a use without unreadable sources gives `slug-used` naming every source and archive folder, 1 → merge base of HEAD and the default tip (finding `no-merge-base`, "commit first", 1) → `openspec new change <slug> --schema docket` (OpenSpec version errors → 4; `*FailedError` → finding `openspec-failed` with its exit code and stderr, 1) → `AppendMetadata`.
+- The `new` command: one positional slug, flags `--kind` and `--source`. Checks, in this order, each stopping the command: argument and flag errors (usage, 2; an unknown kind lists the four kinds) → slug rules (finding `slug-invalid`, 1) → HEAD has a commit (finding `no-commits`, "commit first", 1; checked before the default branch, which an empty repository does not have yet) → `openspec/schemas/docket/schema.yaml` exists (finding `schema-missing` pointing to `dkt init`, 1) → default branch (4) → scan: any unreadable source stops with 3 and creates nothing, with `slug-used` findings for any uses found; a use without unreadable sources gives `slug-used` naming every source and archive folder, 1 → merge base of HEAD and the default tip (finding `no-merge-base`, 1) → `openspec new change <slug> --schema docket` (OpenSpec version errors → 4; `*FailedError` → finding `openspec-failed` with its exit code and stderr, 1) → `AppendMetadata` (error → finding `metadata-failed`, 1).
+- Creates nothing on failure: `openspec/changes/<slug>/` does not exist before `openspec new change` runs (the scan has just shown the slug unused), so when that command or `AppendMetadata` fails, the command removes the directory before returning.
 
 Tests that only need a successful OpenSpec (`TestChangeCreated`, the slug and scan tests) use `testutil.OpenSpecCmd`, so CI also runs them against the real CLI; tests that inject a version or a failure use `testutil.FakeOpenSpec`.
 
 - [ ] **Step 1: Write the failing tests:**
   - `change` package: `TestValidateSlug` (table: `add-x` ok; `Add-X`, `add_x`, `-x`, `x-`, `a--b`, 201 characters, `2026-10-24-add-x` rejected, the last with a message containing `archiv`); `TestAppendMetadataRoundTrip` (sources `issue 12`, `issue #12: "x"`, `需求 R1#3` read back exactly; `issue 12` is written plain, as `x-source: issue 12`); `TestAppendMetadataNoTrailingNewline` (Review Focus 4).
-  - cli level: `TestDatePrefixRejected` (exit 1); `TestUppercaseRejected` (exit 1); `TestJSONOnFailure` (`new Bad_Slug --kind feature --source x --json` → `ok` false, finding `slug-invalid` mentioning `Bad_Slug`, exit 1); `TestUsageError` (`new` with no slug → exit 2, usage on stderr; with `--json`, finding rule `usage`); `TestMissingSource` (2); `TestUnknownKind` (2, stderr lists all four kinds); `TestSlugActiveInAnotherWorktree` (exit 1, message names worktree B's path); `TestSlugArchived` (exit 1, names `2025-01-02-add-x`); `TestUnreadableWorktreeBlocksCreation` (exit 3, no `openspec/changes/add-x/`); `TestUnreadableSourceWithOtherFindings` (worktree B uses the slug and worktree C is gone → a `slug-used` finding and an unreadable entry, exit 3); `TestChangeCreated` (`--source "issue 12"` on a branch made from `main` → `.openspec.yaml` has `schema: docket`, the `created` line, `x-kind: feature`, `x-source: issue 12`, `x-base` equal to `git merge-base HEAD main`); `TestSchemaNotInstalled` (exit 1, message contains `dkt init`); `TestUnsupportedVersion` (fake `1.3.0` → exit 4, no change folder, message names `1.3.0` and `1.14.x`); `TestOpenSpecCommandFails` (`FAKE_OPENSPEC_FAIL=new` → exit 1, finding `openspec-failed` with `3` and `fake failure`, no `x-` keys written); `TestNewUnbornRepository` (Review Focus 1, exit 1 `no-merge-base`); `TestNewInPathWithSpaces` (Review Focus 2).
+  - cli level: `TestDatePrefixRejected` (exit 1); `TestUppercaseRejected` (exit 1); `TestJSONOnFailure` (`new Bad_Slug --kind feature --source x --json` → `ok` false, finding `slug-invalid` mentioning `Bad_Slug`, exit 1); `TestUsageError` (`new` with no slug → exit 2, usage on stderr; with `--json`, finding rule `usage`); `TestMissingSource` (2); `TestUnknownKind` (2, stderr lists all four kinds); `TestSlugActiveInAnotherWorktree` (exit 1, message names worktree B's path); `TestSlugArchived` (exit 1, names `2025-01-02-add-x`); `TestUnreadableWorktreeBlocksCreation` (exit 3, no `openspec/changes/add-x/`); `TestUnreadableSourceWithOtherFindings` (worktree B uses the slug and worktree C is gone → a `slug-used` finding and an unreadable entry, exit 3); `TestChangeCreated` (`--source "issue 12"` on a branch made from `main` → `.openspec.yaml` has `schema: docket`, the `created` line, `x-kind: feature`, `x-source: issue 12`, `x-base` equal to `git merge-base HEAD main`); `TestSchemaNotInstalled` (exit 1, message contains `dkt init`); `TestUnsupportedVersion` (fake `1.3.0` → exit 4, no change folder, message names `1.3.0` and `1.14.x`); `TestOpenSpecCommandFails` (`FAKE_OPENSPEC_FAIL=new` → exit 1, finding `openspec-failed` with `3` and `fake failure`, and `openspec/changes/add-x/` does not exist afterwards); `TestMetadataFailureRollsBack` (`FAKE_OPENSPEC_BAD_YAML=1` → exit 1, finding `metadata-failed`, no `openspec/changes/add-x/`); `TestNewUnbornRepository` (Review Focus 1: `git init` only → exit 1, finding `no-commits`); `TestNoMergeBase` (HEAD on an orphan branch with one commit, `main` elsewhere → exit 1, finding `no-merge-base`, nothing created); `TestNewInPathWithSpaces` (Review Focus 2).
 - [ ] **Step 2: Run** `go test ./internal/change/ ./internal/cli/` — expected: FAIL.
 - [ ] **Step 3: Implement** `change` and the command.
 - [ ] **Step 4: Run** `go test ./...` — expected: PASS.
@@ -301,7 +308,7 @@ Tests that only need a successful OpenSpec (`TestChangeCreated`, the slug and sc
 - [ ] **Step 2: Write `.github/workflows/ci.yml`** with three jobs on `push` and `pull_request`:
   - `test` on `ubuntu-latest` and `macos-latest`: `actions/setup-go` (`go-version: stable`), `go vet ./...`, `go test ./...`.
   - `openspec` on `ubuntu-latest`: setup-go and `actions/setup-node` (Node 22); `go test ./...` with `DOCKET_TEST_OPENSPEC="npx -y @fission-ai/openspec@1.14.3"` and `OPENSPEC_TELEMETRY=0`.
-  - `duplicates` on `ubuntu-latest`: checkout with `fetch-depth: 0`, then jscpd at a pinned version over `**/*.go`, failing only on clones that are new relative to `origin/main`. Check the exact option names in the jscpd version you pin before writing them; if that version has no baseline option, run it on the files changed against `origin/main` instead and say so in the pull request.
+  - `duplicates` on `ubuntu-latest`: checkout with `fetch-depth: 0`, setup-node, then `npx -y jscpd@5.4.2 --format go --ignore "**/testdata/**" --baseline-from-ref origin/main --fail-on-new-clones .`, which fails only on clones absent from `origin/main`.
 - [ ] **Step 3: Add the Install section** to both READMEs: `go install github.com/wake/docket/cmd/dkt@latest`, plus that `dkt init` and `dkt new` need the OpenSpec CLI 1.14.x (or `DOCKET_OPENSPEC`).
 - [ ] **Step 4: Verify** `go vet ./...` and `go test ./...` pass locally, and the workflow file parses: `ruby -ryaml -e 'YAML.load_file(".github/workflows/ci.yml")'` exits 0.
 - [ ] **Step 5: Commit** `docs: architecture map, CI and install note`.
