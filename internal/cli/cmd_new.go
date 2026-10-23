@@ -102,8 +102,10 @@ func newCommand() Command {
 				return Outcome{}, envOrErr(err)
 			}
 			dir := filepath.Join(c.Repo.Root, "openspec/changes", slug)
+			_, statErr := os.Lstat(dir)
+			existed := statErr == nil
 			if _, err := r.Run("new", "change", slug, "--schema", "docket"); err != nil {
-				_ = os.RemoveAll(dir)
+				_ = cleanupIfCreated(dir, existed)
 				var fe *openspec.FailedError
 				if errors.As(err, &fe) {
 					return fail("openspec-failed", fe.Error())
@@ -111,7 +113,7 @@ func newCommand() Command {
 				return Outcome{}, envOrErr(err)
 			}
 			if err := change.AppendMetadata(filepath.Join(dir, ".openspec.yaml"), kind, source, base); err != nil {
-				if rerr := os.RemoveAll(dir); rerr != nil {
+				if rerr := cleanupIfCreated(dir, existed); rerr != nil {
 					err = errors.Join(err, rerr)
 				}
 				return fail("metadata-failed", err.Error())
@@ -120,6 +122,15 @@ func newCommand() Command {
 			return Outcome{Result: res, Human: []string{"created " + dir}}, nil
 		},
 	}
+}
+
+// cleanupIfCreated removes dir only when this command created it; a folder
+// that existed before is never touched.
+func cleanupIfCreated(dir string, existed bool) error {
+	if existed {
+		return nil
+	}
+	return os.RemoveAll(dir)
 }
 
 // envOrErr maps OpenSpec availability and version errors to an EnvError.

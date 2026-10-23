@@ -24,6 +24,7 @@ func TestValidateSlug(t *testing.T) {
 		{strings.Repeat("a", 200), true, ""},
 		{strings.Repeat("a", 201), false, "200"},
 		{"2026-10-24-add-x", false, "archiv"},
+		{"archive", false, "reserved"},
 	}
 	for _, c := range cases {
 		err := ValidateSlug(c.slug)

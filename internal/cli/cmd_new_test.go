@@ -74,14 +74,14 @@ func hasRule(t *testing.T, so, rule string) bool {
 func TestDatePrefixRejected(t *testing.T) {
 	r := cleanRepo(t)
 	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "2026-10-24-add-x", "--kind", "feature", "--source", "x")
-	if code != 1 || !strings.Contains(so, "archiv") {
+	if code != 1 || !hasRule(t, so, "slug-invalid") || !strings.Contains(so, "archiv") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 }
 
 func TestUppercaseRejected(t *testing.T) {
 	r := cleanRepo(t)
-	if code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "Add-X", "--kind", "feature", "--source", "x"); code != 1 {
+	if code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "Add-X", "--kind", "feature", "--source", "x"); code != 1 || !hasRule(t, so, "slug-invalid") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 }
@@ -235,7 +235,7 @@ func TestOpenSpecCommandFails(t *testing.T) {
 	r := cleanRepo(t)
 	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
 	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=new"}, "add-x", "--kind", "feature", "--source", "x")
-	if code != 1 || !hasRule(t, so, "openspec-failed") || !strings.Contains(so, "3") || !strings.Contains(so, "fake failure") {
+	if code != 1 || !hasRule(t, so, "openspec-failed") || !strings.Contains(so, "exited with 3") || !strings.Contains(so, "fake failure") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 	noChange(t, r.Dir)
@@ -283,5 +283,45 @@ func TestNewInPathWithSpaces(t *testing.T) {
 	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "fix", "--source", "x")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+}
+
+func TestReservedNameRejected(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "main")
+	r.Commit("init", map[string]string{
+		"README.md":                           "x\n",
+		"openspec/schemas/docket/schema.yaml": "name: docket\n",
+		"openspec/changes/archive/2026-01-01-old/proposal.md": "old\n",
+	})
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "archive", "--kind", "feature", "--source", "x")
+	if code != 1 || !hasRule(t, so, "slug-invalid") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	b, err := os.ReadFile(filepath.Join(r.Dir, "openspec/changes/archive/2026-01-01-old/proposal.md"))
+	if err != nil || string(b) != "old\n" {
+		t.Fatalf("archived file changed: %q %v", b, err)
+	}
+	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/changes/archive/.openspec.yaml")); err == nil {
+		t.Error(".openspec.yaml written into the archive folder")
+	}
+}
+
+func TestCleanupIfCreated(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "add-x")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := cleanupIfCreated(dir, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("pre-existing folder removed: %v", err)
+	}
+	if err := cleanupIfCreated(dir, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); err == nil {
+		t.Fatal("folder created by the command was kept")
 	}
 }

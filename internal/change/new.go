@@ -36,6 +36,8 @@ func ValidateSlug(slug string) error {
 		return fmt.Errorf("slug %q must be lowercase kebab-case: letters a-z and digits in groups joined by single hyphens", slug)
 	case len(slug) > maxSlug:
 		return fmt.Errorf("slug is %d characters long; the limit is %d", len(slug), maxSlug)
+	case slug == "archive":
+		return fmt.Errorf("slug %q is reserved for OpenSpec's archive folder", slug)
 	case datePrefix.MatchString(slug):
 		return fmt.Errorf("slug %q must not start with a date: archiving adds the date", slug)
 	}
