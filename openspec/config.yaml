@@ -1,0 +1,8 @@
+schema: docket
+
+# Only constraints an agent cannot infer by reading the code.
+context: |
+  Docket is a public project. Write every artifact in English.
+  The OpenSpec CLI used with this repository is pinned to 1.14.x.
+  Docket never calls a language model and never judges content; specs
+  describe checks of structure and consistency only.
