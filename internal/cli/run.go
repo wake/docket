@@ -11,8 +11,8 @@ import (
 	"github.com/wake/docket/internal/gitx"
 )
 
-// commands is the real command set; later tasks add init and new.
-var commands = []func() Command{}
+// commands is the real command set.
+var commands = []func() Command{initCommand}
 
 // Run runs dkt with the real command set and returns the exit code.
 func Run(o Options) int { return RunWith(o, commands) }
