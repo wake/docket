@@ -7,6 +7,7 @@ import (
 
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/openspec"
+	"github.com/wake/docket/internal/safepath"
 	"github.com/wake/docket/internal/setup"
 )
 
@@ -34,16 +35,15 @@ func initCommand() Command {
 			}
 			res, err := setup.Init(c.Repo.Root, docket.Schema(), force, initOpenSpec)
 			if err != nil {
-				var un *openspec.UnavailableError
-				var us *openspec.UnsupportedError
-				if errors.As(err, &un) || errors.As(err, &us) {
-					return Outcome{}, EnvError{Msg: err.Error()}
+				var sl *safepath.SymlinkError
+				if errors.As(err, &sl) {
+					return Outcome{Result: res, Findings: []Finding{{Rule: "symlink-refused", Message: sl.Error(), File: sl.Path}}}, nil
 				}
 				var fe *openspec.FailedError
 				if errors.As(err, &fe) {
-					return Outcome{Findings: []Finding{{Rule: "openspec-failed", Message: fe.Error()}}}, nil
+					return Outcome{Result: res, Findings: []Finding{{Rule: "openspec-failed", Message: fe.Error()}}}, nil
 				}
-				return Outcome{}, err
+				return Outcome{Result: res}, envOrErr(err)
 			}
 			res.AgentsSection = docket.AgentsSection()
 			out := Outcome{Result: res}
