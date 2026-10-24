@@ -55,11 +55,8 @@ func newCommand() Command {
 				}
 				return fail("schema-missing", "the docket schema is not installed; run dkt init")
 			}
-			db, err := scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)
+			db, err := resolveDefaultBranch(c)
 			if err != nil {
-				if errors.Is(err, scan.ErrNoDefaultBranch) {
-					return Outcome{}, EnvError{Msg: err.Error()}
-				}
 				return Outcome{}, err
 			}
 			inv, err := scan.Scan(c.Git, db)
@@ -178,6 +175,16 @@ func refuse(fail func(rule, msg string) (Outcome, error), err error) (Outcome, e
 		return fail("symlink-refused", err.Error())
 	}
 	return Outcome{}, err
+}
+
+// resolveDefaultBranch resolves the default branch; having none is an
+// EnvError.
+func resolveDefaultBranch(c *Context) (scan.DefaultBranch, error) {
+	db, err := scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)
+	if errors.Is(err, scan.ErrNoDefaultBranch) {
+		return db, EnvError{Msg: err.Error()}
+	}
+	return db, err
 }
 
 // envOrErr maps OpenSpec availability and version errors to an EnvError.

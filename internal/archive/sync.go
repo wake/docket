@@ -105,16 +105,10 @@ func computeSync(c *loadedChange, commits []gitx.Commit) syncResult {
 // as plan-unsynced. The error is for failures not tied to the change.
 func Sync(e Env, slug string, check bool) (SyncReport, error) {
 	rep := SyncReport{Change: slug, Ticked: []TaskTicks{}}
-	head, ok, err := e.Git.Head()
+	head, c, finds, unread, err := loadAtHead(e, slug, loadOpts{Plan: true, BaseIsCommit: true})
 	if err != nil {
 		return rep, err
 	}
-	if !ok {
-		rep.Findings = append(rep.Findings, Finding{Rule: "no-commits", Change: slug,
-			Message: "the repository has no commits; commit first"})
-		return rep, nil
-	}
-	c, finds, unread := loadChange(e, slug, loadOpts{Plan: true, BaseIsCommit: true})
 	if c == nil {
 		rep.Findings, rep.Unreadable = finds, unread
 		return rep, nil
@@ -145,16 +139,26 @@ func Sync(e Env, slug string, check bool) (SyncReport, error) {
 	if err != nil {
 		return rep, err
 	}
-	if err := writeFile(e.Root, c.path("plan.md"), out); err != nil {
-		var sl *safepath.SymlinkError
-		if errors.As(err, &sl) {
-			rep.Ticked = []TaskTicks{}
-			rep.Findings = append(rep.Findings, Finding{Rule: "symlink-refused", Change: slug, File: c.path("plan.md"), Message: err.Error()})
-			return rep, nil
-		}
+	f, err := writeOrRefuse(e.Root, c.path("plan.md"), slug, out)
+	if err != nil {
 		return rep, err
 	}
+	if f != nil {
+		rep.Ticked = []TaskTicks{}
+		rep.Findings = append(rep.Findings, *f)
+	}
 	return rep, nil
+}
+
+// writeOrRefuse writes like writeFile; a link on the path comes back as a
+// symlink-refused finding and nothing is written.
+func writeOrRefuse(root, rel, slug string, b []byte) (*Finding, error) {
+	err := writeFile(root, rel, b)
+	var sl *safepath.SymlinkError
+	if errors.As(err, &sl) {
+		return &Finding{Rule: "symlink-refused", Change: slug, File: rel, Message: err.Error()}, nil
+	}
+	return nil, err
 }
 
 // writeAll is the default writeTemp. Tests replace writeTemp to inject a

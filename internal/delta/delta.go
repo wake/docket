@@ -23,6 +23,9 @@ type Requirement struct {
 	Name      string
 	Line      int
 	Scenarios []Scenario
+	// Text is the block from the header line up to the next requirement
+	// header or "## " line, joined with LF and trimmed.
+	Text string
 }
 
 // Rename is a FROM/TO pair; Line is the line of the FROM entry.
@@ -121,7 +124,8 @@ func (d doc) requirements(from, to int) []Requirement {
 			}
 			end++
 		}
-		out = append(out, Requirement{Name: reqName(m[1]), Line: i + 1, Scenarios: d.scenarios(i, end)})
+		out = append(out, Requirement{Name: reqName(m[1]), Line: i + 1, Scenarios: d.scenarios(i, end),
+			Text: markdown.Trim(strings.Join(d.lines[i:end], "\n"))})
 		i = end - 1
 	}
 	return out
