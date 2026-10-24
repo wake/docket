@@ -162,6 +162,35 @@ func TestDefaultBranchFlagAndMaster(t *testing.T) {
 	}
 }
 
+func TestDanglingOriginHeadFallsBackToMain(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/gone")
+	db, err := scan.ResolveDefaultBranch(newGit(r), "")
+	if err != nil || db.Name != "main" || db.Ref != "refs/heads/main" {
+		t.Fatalf("db = %+v, %v", db, err)
+	}
+}
+
+func TestOriginHeadOutsideOriginNamespace(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("update-ref", "refs/remotes/upstream/main", "HEAD")
+	r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/upstream/main")
+	db, err := scan.ResolveDefaultBranch(newGit(r), "")
+	if err != nil || db.Name != "main" || db.Ref != "refs/heads/main" {
+		t.Fatalf("db = %+v, %v", db, err)
+	}
+}
+
+func TestDanglingOriginHeadNoFallbackBranch(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "dev")
+	r.Commit("init", map[string]string{"a": "b"})
+	r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/gone")
+	if _, err := scan.ResolveDefaultBranch(newGit(r), ""); !errors.Is(err, scan.ErrNoDefaultBranch) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestMergedChangeAlsoOnBranch(t *testing.T) {
 	r := baseRepo(t)
 	r.Commit("x", map[string]string{yamlPath("add-x"): "x-kind: feature\n"})
@@ -202,6 +231,38 @@ func TestWorktreeWithUnmergedWorkComesFirst(t *testing.T) {
 	data, err := scan.ReadFile(g, got, yamlPath("add-x"))
 	if err != nil || !strings.Contains(string(data), "x-kind: change-request") {
 		t.Fatalf("ReadFile = %q, %v", data, err)
+	}
+}
+
+func TestWorktreeWithFailedAncestryCheckIsUnreadable(t *testing.T) {
+	a := baseRepo(t)
+	a.Commit("keep", map[string]string{yamlPath("add-keep"): "a: b\n"})
+	bPath := filepath.Join(t.TempDir(), "b")
+	b := a.AddWorktree(bPath, "w")
+	sha := b.Commit("extra", map[string]string{"extra.txt": "e\n"})
+	b.Write(yamlPath("add-w"), "a: b\n")
+	obj := filepath.Join(a.Dir, ".git", "objects", sha[:2], sha[2:])
+	if err := os.Chmod(obj, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(obj); err != nil {
+		t.Fatal(err)
+	}
+	inv, _ := scanOf(t, a)
+	var got bool
+	for _, u := range inv.Unreadable {
+		if u.Source.Kind == scan.KindWorktree && realPath(t, u.Source.Name) == realPath(t, bPath) && u.Reason != "" {
+			got = true
+		}
+	}
+	if !got {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+	if c := find(inv, "add-w"); c != nil {
+		t.Fatalf("changes of an unreadable worktree were added: %+v", c)
+	}
+	if find(inv, "add-keep") == nil {
+		t.Fatal("other sources lost")
 	}
 }
 
@@ -250,6 +311,54 @@ func TestReadFileWorktree(t *testing.T) {
 	b, err := scan.ReadFile(g, c.Sources[0], yamlPath("add-w"))
 	if err != nil || string(b) != "hello\n" {
 		t.Fatalf("ReadFile = %q, %v", b, err)
+	}
+}
+
+func TestReadFileRejectsNonLocalPath(t *testing.T) {
+	r := baseRepo(t)
+	r.Write(yamlPath("add-w"), "hello\n")
+	if err := os.WriteFile(filepath.Join(filepath.Dir(r.Dir), "x"), []byte("outside\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	inv, g := scanOf(t, r)
+	c := find(inv, "add-w")
+	if c == nil {
+		t.Fatalf("inv = %+v", inv)
+	}
+	dbSrc := inv.Changes[0].Sources[len(c.Sources)-1]
+	for _, src := range []scan.Source{c.Sources[0], dbSrc} {
+		for _, rel := range []string{"../x", "a/../../x", filepath.Join(r.Dir, "README.md"), ""} {
+			if b, err := scan.ReadFile(g, src, rel); err == nil {
+				t.Fatalf("ReadFile(%s, %q) = %q, want error", src.Kind, rel, b)
+			}
+		}
+	}
+}
+
+func TestReadFileWorktreeSymlinks(t *testing.T) {
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(outside, []byte("secret\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := baseRepo(t)
+	r.Write(yamlPath("add-w"), "hello\n")
+	if err := os.Symlink(outside, filepath.Join(r.Dir, "leak")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := os.Symlink("README.md", filepath.Join(r.Dir, "inner")); err != nil {
+		t.Fatal(err)
+	}
+	inv, g := scanOf(t, r)
+	c := find(inv, "add-w")
+	if c == nil || c.Sources[0].Kind != scan.KindWorktree {
+		t.Fatalf("c = %+v", c)
+	}
+	if b, err := scan.ReadFile(g, c.Sources[0], "leak"); err == nil {
+		t.Fatalf("symlink out of the worktree read: %q", b)
+	}
+	b, err := scan.ReadFile(g, c.Sources[0], "inner")
+	if err != nil || string(b) != "x\n" {
+		t.Fatalf("inner symlink = %q, %v", b, err)
 	}
 }
 
