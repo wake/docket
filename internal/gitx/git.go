@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -36,7 +38,9 @@ type Git struct {
 	Env []string
 }
 
-// lookPath finds git on the last PATH entry of env.
+// lookPath finds git on the last PATH entry of env. Relative and empty
+// entries are resolved against Dir, where git will run, and the result is
+// always absolute.
 func (g Git) lookPath() (string, error) {
 	var path string
 	for _, kv := range g.Env {
@@ -45,15 +49,43 @@ func (g Git) lookPath() (string, error) {
 		}
 	}
 	for _, d := range filepath.SplitList(path) {
-		if d == "" {
+		if !filepath.IsAbs(d) {
+			d = filepath.Join(g.Dir, d)
+		}
+		p, err := filepath.Abs(filepath.Join(d, "git"))
+		if err != nil {
 			continue
 		}
-		p := filepath.Join(d, "git")
-		if found, err := exec.LookPath(p); err == nil {
-			return found, nil
+		if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o111 != 0 {
+			return p, nil
 		}
 	}
 	return "", ErrGitMissing
+}
+
+// gitMarkerPossible reports whether Dir may be inside a repository that git
+// failed to open: GIT_DIR is set, or a .git exists (or cannot be examined)
+// in Dir or any parent.
+func (g Git) gitMarkerPossible() bool {
+	for _, kv := range g.Env {
+		if strings.HasPrefix(kv, "GIT_DIR=") {
+			return true
+		}
+	}
+	dir, err := filepath.Abs(g.Dir)
+	if err != nil {
+		return true
+	}
+	for {
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil || !errors.Is(err, fs.ErrNotExist) {
+			return true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
 }
 
 // output runs git and returns raw stdout.
@@ -101,12 +133,14 @@ func (g Git) runOptional(args ...string) (string, bool, error) {
 }
 
 // Toplevel returns the root of the work tree containing Dir. It returns
-// ErrNotRepo outside a repository, inside a .git directory and in a bare
-// repository, judged by exit status and output, never by message text.
+// ErrNotRepo outside a repository (no .git anywhere up to the filesystem
+// root and no GIT_DIR), inside a .git directory and in a bare repository.
+// Any other failure, such as a corrupt repository, keeps its *ExitError. It
+// never looks at git's message text.
 func (g Git) Toplevel() (string, error) {
 	inside, err := g.Run("rev-parse", "--is-inside-work-tree")
 	var ee *ExitError
-	if errors.As(err, &ee) && ee.Code == 128 {
+	if errors.As(err, &ee) && ee.Code == 128 && !g.gitMarkerPossible() {
 		return "", fmt.Errorf("%w: %s", ErrNotRepo, ee.Stderr)
 	}
 	if err != nil {
