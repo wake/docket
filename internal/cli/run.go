@@ -89,12 +89,17 @@ func RunWith(o Options, cmds []func() Command) int {
 }
 
 // parse lets flags follow positionals: it parses, takes one positional, and
-// parses again until the arguments run out.
+// parses again until the arguments run out. A "--" ends flag parsing: every
+// token after it is a positional. A "--" taken as the value of a non-bool flag
+// is not a terminator.
 func parse(fs *flag.FlagSet, args []string) ([]string, error) {
 	var pos []string
 	for {
 		if err := fs.Parse(args); err != nil {
 			return nil, UsageError{Msg: err.Error()}
+		}
+		if endedByTerminator(fs, args[:len(args)-fs.NArg()]) {
+			return append(pos, fs.Args()...), nil
 		}
 		if fs.NArg() == 0 {
 			return pos, nil
@@ -117,21 +122,25 @@ func identify(c *Context) (*Repo, error) {
 	c.Git = g
 	r := &Repo{Root: root}
 	if sha, ok, err := g.Head(); err != nil {
-		return nil, err
+		return nil, identifyError(err)
 	} else if ok {
 		r.Head = &sha
 	}
 	if name, ok, err := g.Branch(); err != nil {
-		return nil, err
+		return nil, identifyError(err)
 	} else if ok {
 		r.Branch = &name
 	}
 	if url, ok, err := g.RemoteURL("origin"); err != nil {
-		return nil, err
+		return nil, identifyError(err)
 	} else if ok {
 		r.Origin = &url
 	}
 	return r, nil
+}
+
+func identifyError(err error) error {
+	return EnvError{Msg: "cannot identify the repository: " + err.Error()}
 }
 
 func usage(w io.Writer, cmds []func() Command, msg string) {
@@ -170,4 +179,25 @@ func usageFailure(o Options, cmds []func() Command, name string, asJSON bool, ms
 		}
 	}
 	return 2
+}
+
+// endedByTerminator reports whether the consumed tokens end with a "--" that
+// flag parsing treated as the terminator, not as a flag's value.
+func endedByTerminator(fs *flag.FlagSet, consumed []string) bool {
+	for i := 0; i < len(consumed); i++ {
+		tok := consumed[i]
+		if tok == "--" {
+			return i == len(consumed)-1
+		}
+		name := strings.TrimPrefix(strings.TrimPrefix(tok, "-"), "-")
+		if len(tok) < 2 || tok[0] != '-' || name == "" || strings.Contains(name, "=") {
+			continue
+		}
+		if f := fs.Lookup(name); f != nil {
+			if b, ok := f.Value.(interface{ IsBoolFlag() bool }); !ok || !b.IsBoolFlag() {
+				i++
+			}
+		}
+	}
+	return false
 }
