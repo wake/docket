@@ -126,6 +126,19 @@ func TestConflictsSlugNotActive(t *testing.T) {
 	if code != 1 || !hasRule(t, so, "change-not-active") || !strings.Contains(so, "archived as 2025-01-02-add-x") {
 		t.Fatalf("archived: exit %d\n%s\n%s", code, so, se)
 	}
+	for _, slug := range []string{"add-q", "add-x"} {
+		_, so, _ = runConflicts(t, r.Dir, true, slug)
+		res, _ := decode(t, so)["result"].(map[string]any)
+		if res == nil {
+			t.Fatalf("%s: result is null\n%s", slug, so)
+		}
+		if ch, ok := res["changes"].([]any); !ok || len(ch) != 1 || ch[0] != "add-y" {
+			t.Errorf("%s: result.changes = %v, want [add-y]", slug, res["changes"])
+		}
+		if ov, ok := res["overlaps"].([]any); !ok || len(ov) != 0 {
+			t.Errorf("%s: result.overlaps = %#v, want []", slug, res["overlaps"])
+		}
+	}
 }
 
 func TestConflictsSlugInvalid(t *testing.T) {

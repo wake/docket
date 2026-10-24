@@ -63,6 +63,7 @@ func conflictsCommand() Command {
 						msg += "; archived as " + a.Folder
 					}
 					out.Findings = append(out.Findings, Finding{Rule: "change-not-active", Change: slug, Message: msg})
+					out.Result = ConflictsResult{Changes: slugs, Overlaps: []conflicts.Overlap{}}
 					return out, nil
 				}
 				overlaps = conflicts.Involving(overlaps, slug)
