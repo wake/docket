@@ -14,6 +14,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/scan` | Finds changes across worktrees and branches; resolves the default branch |
 | `internal/setup` | Installs the schema (`dkt init`) |
 | `internal/change` | Change-folder rules: slug validation, `.openspec.yaml` metadata |
+| `internal/safepath` | Refuses a write path that passes through a symbolic link |
 | `internal/testutil` | Test-only helpers: temporary repositories, a fake OpenSpec |
 
 ## Capability index
@@ -28,6 +29,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Validate a slug | `change.ValidateSlug` |
 | Record kind, source and base | `change.AppendMetadata` |
 | Install the schema | `setup.Init` |
+| Check a path before writing to it | `safepath.Check` |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |
 | Stand in for OpenSpec | `testutil.FakeOpenSpec` |
@@ -38,3 +40,4 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 - Only `internal/gitx` starts git (test helpers excepted).
 - Nothing below `cmd/dkt` reads the process environment; it is passed in through `cli.Options` (test helpers excepted).
 - Readers take bytes, not paths, so that content can come from any revision.
+- Nothing writes through a symbolic link in the repository: check the path with `safepath.Check` first.
