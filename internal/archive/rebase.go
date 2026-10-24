@@ -26,14 +26,9 @@ type RebaseReport struct {
 // the change.
 func Rebase(e Env, slug string) (RebaseReport, error) {
 	rep := RebaseReport{Change: slug, Changed: []Drift{}}
-	head, ok, err := e.Git.Head()
-	if err != nil {
+	head, done, err := headOrNoCommits(e, slug, &rep.Findings)
+	if err != nil || done {
 		return rep, err
-	}
-	if !ok {
-		rep.Findings = append(rep.Findings, Finding{Rule: "no-commits", Change: slug,
-			Message: "the repository has no commits; commit first"})
-		return rep, nil
 	}
 	c, finds, unread := loadChange(e, slug, false, false)
 	if c == nil {

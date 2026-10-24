@@ -26,6 +26,21 @@ type loadedChange struct {
 
 func (c *loadedChange) path(name string) string { return path.Join(c.Dir, name) }
 
+// headOrNoCommits returns the commit HEAD names. When the repository has no
+// commits it appends a no-commits finding for slug to finds and reports done.
+func headOrNoCommits(e Env, slug string, finds *[]Finding) (head string, done bool, err error) {
+	head, ok, err := e.Git.Head()
+	if err != nil {
+		return "", false, err
+	}
+	if !ok {
+		*finds = append(*finds, Finding{Rule: "no-commits", Change: slug,
+			Message: "the repository has no commits; commit first"})
+		return "", true, nil
+	}
+	return head, false, nil
+}
+
 // loadChange reads openspec/changes/<slug>/. wantPlan asks for plan.md;
 // baseIsCommit requires x-base to name a commit. It returns nil together
 // with the findings and unreadable sources when the change cannot be used.
