@@ -29,9 +29,11 @@ turns `specs/<capability>/spec.md` into a capability path.
 
 ## Decisions
 
-- **Read a change's files from any source.** `scan.ReadFiles(g, src, dir)`
-  returns every regular file below `dir` in a source, keyed by its path
-  relative to `dir`, and lists the paths it could not read. A worktree is
+- **Read a change's files from any source.** `scan.ReadFiles(g, src, dir,
+  keep)` returns every regular file below `dir` in a source that `keep`
+  accepts, keyed by its path relative to `dir`, and lists the paths it
+  could not read. Files `keep` rejects are not read, so an unreadable file
+  that is not a delta spec never makes the command exit with 3. A worktree is
   walked through `os.Root`, as `scan.ReadFile` already reads it, so neither
   `..` nor a link leads out of it; links are skipped. A branch is listed
   with `git ls-tree -r -z` at its commit (blobs with a regular file mode
