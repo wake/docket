@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -63,9 +64,45 @@ func (g Git) lookPath() (string, error) {
 	return "", ErrGitMissing
 }
 
+// ceilingDirs returns the GIT_CEILING_DIRECTORIES entries from the last such
+// variable in Env, as git reads them: only absolute entries count, entries
+// before the first empty one are resolved through symlinks (and dropped when
+// that fails), entries after it are only cleaned.
+func (g Git) ceilingDirs() []string {
+	var list string
+	for _, kv := range g.Env {
+		if v, ok := strings.CutPrefix(kv, "GIT_CEILING_DIRECTORIES="); ok {
+			list = v
+		}
+	}
+	var dirs []string
+	resolve := true
+	for _, d := range filepath.SplitList(list) {
+		if d == "" {
+			resolve = false
+			continue
+		}
+		if !filepath.IsAbs(d) {
+			continue
+		}
+		if resolve {
+			r, err := filepath.EvalSymlinks(d)
+			if err != nil {
+				continue
+			}
+			d = r
+		}
+		dirs = append(dirs, filepath.Clean(d))
+	}
+	return dirs
+}
+
 // gitMarkerPossible reports whether Dir may be inside a repository that git
 // failed to open: GIT_DIR is set, or a .git exists (or cannot be examined)
-// in Dir or any parent.
+// in Dir or a parent. Like git it walks the physical parent chain of Dir and
+// stops before a proper ancestor listed in GIT_CEILING_DIRECTORIES; Dir itself
+// is always examined. It does not model filesystem boundaries, so a .git above
+// one still counts and the failure keeps its *ExitError.
 func (g Git) gitMarkerPossible() bool {
 	for _, kv := range g.Env {
 		if strings.HasPrefix(kv, "GIT_DIR=") {
@@ -76,12 +113,16 @@ func (g Git) gitMarkerPossible() bool {
 	if err != nil {
 		return true
 	}
+	if dir, err = filepath.EvalSymlinks(dir); err != nil {
+		return true
+	}
+	ceilings := g.ceilingDirs()
 	for {
 		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil || !errors.Is(err, fs.ErrNotExist) {
 			return true
 		}
 		parent := filepath.Dir(dir)
-		if parent == dir {
+		if parent == dir || slices.Contains(ceilings, parent) {
 			return false
 		}
 		dir = parent
@@ -133,10 +174,11 @@ func (g Git) runOptional(args ...string) (string, bool, error) {
 }
 
 // Toplevel returns the root of the work tree containing Dir. It returns
-// ErrNotRepo outside a repository (no .git anywhere up to the filesystem
-// root and no GIT_DIR), inside a .git directory and in a bare repository.
-// Any other failure, such as a corrupt repository, keeps its *ExitError. It
-// never looks at git's message text.
+// ErrNotRepo outside a repository (no GIT_DIR and no .git on the parent chain
+// git searches, which GIT_CEILING_DIRECTORIES can cut short; a .git above a
+// filesystem boundary still counts and keeps the *ExitError), inside a .git
+// directory and in a bare repository. Any other failure, such as a corrupt
+// repository, keeps its *ExitError. It never looks at git's message text.
 func (g Git) Toplevel() (string, error) {
 	inside, err := g.Run("rev-parse", "--is-inside-work-tree")
 	var ee *ExitError
