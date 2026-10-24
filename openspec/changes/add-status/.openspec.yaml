@@ -1,0 +1,5 @@
+schema: docket
+created: 2026-10-24
+x-kind: feature
+x-source: 'docs/ideas/2026-10-24-web-workbench.md, Order item 4: the status feed the workbench reads'
+x-base: 152bff55cdfcc1490984aa9f3e22d39995a7007a
