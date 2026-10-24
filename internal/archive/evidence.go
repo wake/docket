@@ -3,6 +3,7 @@ package archive
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/wake/docket/internal/change"
@@ -71,33 +72,39 @@ func firstLine(s string) string {
 	return ""
 }
 
-// evidenceOrigin makes the origin URL fit for a committed file: credentials
-// and local paths must not reach evidence.md.
+// scpOrigin matches user@host:path, the form git accepts without a scheme.
+var scpOrigin = regexp.MustCompile(`^[^/:\s]+@[^/:\s]+:[^?#\s]*$`)
+
+// evidenceOrigin makes the origin URL fit for a committed file: credentials,
+// query strings, fragments and local paths must not reach evidence.md. Only
+// a recognizable remote is kept; everything else is "none".
+//
+//	http, https with a host: scheme, host, port and path
+//	ssh, git, git+ssh with a host: the same plus the user name
+//	user@host:path: as written
 func evidenceOrigin(s string) string {
 	s = strings.TrimSpace(s)
-	if s == "" || strings.HasPrefix(s, "/") || strings.HasPrefix(s, ".") || strings.HasPrefix(s, "~") {
+	if !strings.Contains(s, "://") {
+		if scpOrigin.MatchString(s) {
+			return s
+		}
 		return "none"
 	}
-	if strings.Contains(s, "://") {
-		u, err := url.Parse(s)
-		if err != nil || u.Host == "" {
-			return "none"
-		}
-		switch strings.ToLower(u.Scheme) {
-		case "file":
-			return "none"
-		case "http", "https":
-			u.User = nil
-		default:
-			if u.User != nil {
-				u.User = url.User(u.User.Username())
-			}
-		}
-		return u.String()
+	u, err := url.Parse(s)
+	if err != nil || u.Host == "" {
+		return "none"
 	}
-	colon, slash := strings.Index(s, ":"), strings.Index(s, "/")
-	if colon > 0 && (slash < 0 || colon < slash) {
-		return s
+	keepUser := false
+	switch scheme := strings.ToLower(u.Scheme); scheme {
+	case "http", "https":
+	case "ssh", "git", "git+ssh":
+		keepUser = true
+	default:
+		return "none"
 	}
-	return "none"
+	out := url.URL{Scheme: strings.ToLower(u.Scheme), Host: u.Host, Path: u.Path, RawPath: u.RawPath}
+	if keepUser && u.User != nil {
+		out.User = url.User(u.User.Username())
+	}
+	return out.String()
 }

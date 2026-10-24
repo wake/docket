@@ -280,6 +280,17 @@ func TestArchiveReadingsDisagree(t *testing.T) {
 	}
 }
 
+func TestArchiveMalformedShowKeepsDocketsReading(t *testing.T) {
+	_, e, f := archRepo(t, "add-x")
+	f.show = `{"deltas":[{"spec":"booking","operation":"ADDED"}]}`
+	rep, _ := Archive(f.input(e, nil, "add-x"))
+	if !reflect.DeepEqual(ruleList(rep.Findings), []string{"readings-disagree"}) || rep.Readings == nil ||
+		len(rep.Readings.Docket) == 0 || len(rep.Readings.OpenSpec) != 0 ||
+		rep.Stopped == nil || *rep.Stopped != (Stop{"add-x", "cross-check"}) || f.called("archive") {
+		t.Fatalf("%+v", rep)
+	}
+}
+
 func TestOpenSpecValidateFails(t *testing.T) {
 	_, e, f := archRepo(t, "add-x")
 	f.validate = "OUT-TEXT"

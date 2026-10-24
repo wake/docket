@@ -15,6 +15,22 @@ func runRebase(t *testing.T, r *testutil.Repo, env []string, args ...string) (in
 	return code, so.String(), se.String()
 }
 
+func TestRebaseNeedsOneSlug(t *testing.T) {
+	r := cleanRepo(t)
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{}, "rebase needs a slug"},
+		{[]string{"add-x", "add-y"}, "rebase takes one slug"},
+	} {
+		code, so, se := runRebase(t, r, r.Env, tc.args...)
+		if code != 2 || !strings.Contains(se, tc.want) {
+			t.Fatalf("%v: exit %d, want 2 with %q\n%s\n%s", tc.args, code, tc.want, so, se)
+		}
+	}
+}
+
 const rebaseSpec = "# b\n\n## Purpose\nB.\n\n## Requirements\n\n### Requirement: Cancel\nThe system SHALL cancel.\n\n#### Scenario: ok\n- **WHEN** a\n- **THEN** b\n"
 
 func TestRebaseCommand(t *testing.T) {

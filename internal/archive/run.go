@@ -157,7 +157,7 @@ func (r *archiveRun) preconditions() error {
 // change runs the steps for one change; stopped says a step had findings.
 func (r *archiveRun) change(slug string) (stopped bool, err error) {
 	e := r.in.Env
-	c, finds, unread := loadChange(e, slug, true, true)
+	c, finds, unread := loadChange(e, slug, loadOpts{Plan: true, BaseIsCommit: true, Deltas: true})
 	if c == nil {
 		return r.stop(slug, "plan", finds, unread), nil
 	}
@@ -202,9 +202,8 @@ func (r *archiveRun) change(slug string) (stopped bool, err error) {
 		msg := "Docket and OpenSpec read the delta specs differently"
 		if cerr != nil {
 			msg = cerr.Error()
-		} else {
-			r.rep.Readings = &rd
 		}
+		r.rep.Readings = &rd
 		return r.stop(slug, "cross-check", []Finding{{Rule: "readings-disagree", Change: slug, Message: msg}}, nil), nil
 	}
 
