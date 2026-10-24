@@ -16,8 +16,6 @@ type LintResult struct {
 	Changes []string `json:"changes"`
 }
 
-var routedPaths = []string{"docs/superpowers/specs", "docs/superpowers/plans"}
-
 func lintCommand() Command {
 	return Command{
 		Name:  "lint",
@@ -70,7 +68,7 @@ func addedFiles(c *Context) ([]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("HEAD and %s share no history; pass --default-branch to name another branch", db.Name)
 		}
-		files, err := c.Git.AddedFiles(base, routedPaths...)
+		files, err := c.Git.AddedFiles(base, lint.RoutedDirs...)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +76,7 @@ func addedFiles(c *Context) ([]string, error) {
 			set[f] = true
 		}
 	}
-	files, err := c.Git.UncommittedAdded(routedPaths...)
+	files, err := c.Git.UncommittedAdded(lint.RoutedDirs...)
 	if err != nil {
 		return nil, err
 	}
