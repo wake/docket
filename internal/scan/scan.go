@@ -57,6 +57,7 @@ type Archived struct {
 // Unreadable is a source that could not be read.
 type Unreadable struct {
 	Source Source
+	Path   string // empty when the whole source is unreadable, else the one file or folder that was not
 	Reason string
 }
 
@@ -112,19 +113,19 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		}
 		src := Source{Kind: KindWorktree, Name: w.Path, Commit: w.Head}
 		if w.Prunable {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{src, "worktree is prunable: its directory is gone"})
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: "worktree is prunable: its directory is gone"})
 			continue
 		}
 		active, archived, err := readDisk(w.Path)
 		if err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{src, err.Error()})
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
 			continue
 		}
 		rank := rankContainedWorktree
 		if !unbornHead(w.Head) {
 			contained, err := g.IsAncestor(w.Head, db.Commit)
 			if err != nil {
-				inv.Unreadable = append(inv.Unreadable, Unreadable{src, err.Error()})
+				inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
 				continue
 			}
 			if !contained {
@@ -149,7 +150,7 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		src := Source{Kind: kind, Name: r.Name, Commit: r.SHA}
 		merged, err := g.IsAncestor(r.SHA, db.Commit)
 		if err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{src, err.Error()})
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
 			continue
 		}
 		if merged {
@@ -157,7 +158,7 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		}
 		active, archived, err := readTree(g, r.SHA)
 		if err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{src, err.Error()})
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
 			continue
 		}
 		f.add(src, rank, active, archived)
@@ -166,7 +167,7 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	dbSrc := Source{Kind: KindDefaultBranch, Name: db.Ref, Commit: db.Commit}
 	active, archived, err := readTree(g, db.Commit)
 	if err != nil {
-		inv.Unreadable = append(inv.Unreadable, Unreadable{dbSrc, err.Error()})
+		inv.Unreadable = append(inv.Unreadable, Unreadable{Source: dbSrc, Reason: err.Error()})
 	} else {
 		f.add(dbSrc, rankDefaultBranch, active, archived)
 	}
@@ -282,4 +283,84 @@ func ReadFile(g gitx.Git, src Source, rel string) ([]byte, error) {
 		return io.ReadAll(f)
 	}
 	return g.Show(src.Commit, rel)
+}
+
+// ReadFiles reads every regular file below dir (repository-relative, slash
+// separated) from a source for which keep, given the path relative to dir,
+// returns true; the result is keyed by that relative path. Files keep rejects
+// are neither read nor reported. A worktree is walked through os.Root, so
+// uncommitted and untracked files are read and links are neither read nor
+// followed; any other source is listed and read from its commit. A missing dir
+// gives an empty result. A kept file or a folder that cannot be read is
+// returned as Unreadable with its Path, and the rest is still read.
+func ReadFiles(g gitx.Git, src Source, dir string, keep func(rel string) bool) (map[string][]byte, []Unreadable, error) {
+	if !filepath.IsLocal(dir) {
+		return nil, nil, fmt.Errorf("path %q is not a local path inside the repository", dir)
+	}
+	dir = filepath.ToSlash(filepath.Clean(dir))
+	files := map[string][]byte{}
+	var unread []Unreadable
+	fail := func(path string, err error) {
+		unread = append(unread, Unreadable{Source: src, Path: path, Reason: err.Error()})
+	}
+	if src.Kind != KindWorktree {
+		paths, err := g.ListFiles(src.Commit, dir)
+		if err != nil {
+			fail(dir, err)
+			return files, unread, nil
+		}
+		for _, p := range paths {
+			rel := strings.TrimPrefix(p, dir+"/")
+			if !keep(rel) {
+				continue
+			}
+			b, err := g.Show(src.Commit, p)
+			if err != nil {
+				fail(p, err)
+				continue
+			}
+			files[rel] = b
+		}
+		return files, unread, nil
+	}
+	root, err := os.OpenRoot(src.Name)
+	if err != nil {
+		fail("", err)
+		return files, unread, nil
+	}
+	defer root.Close()
+	if fi, err := root.Lstat(dir); err != nil || !fi.IsDir() {
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			fail(dir, err)
+		}
+		return files, unread, nil
+	}
+	fsys := root.FS()
+	walkErr := fs.WalkDir(fsys, dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			fail(p, err)
+			if d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			return nil // folders are walked into; links and the rest are skipped
+		}
+		rel := strings.TrimPrefix(p, dir+"/")
+		if !keep(rel) {
+			return nil
+		}
+		b, err := fs.ReadFile(fsys, p)
+		if err != nil {
+			fail(p, err)
+			return nil
+		}
+		files[rel] = b
+		return nil
+	})
+	if walkErr != nil {
+		fail(dir, walkErr)
+	}
+	return files, unread, nil
 }

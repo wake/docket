@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
@@ -175,6 +176,31 @@ func TestListDirsMissing(t *testing.T) {
 	dirs, err = g.ListDirs("HEAD", "x")
 	if err != nil || len(dirs) != 2 || dirs[0] != "a" || dirs[1] != "b" {
 		t.Fatalf("ListDirs = %v, %v", dirs, err)
+	}
+}
+
+func TestListFiles(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Write("x/a.md", "1")
+	r.Write("x/deep/er/b.md", "2")
+	r.Write("x/z.md", "3")
+	r.Write("xx/other.md", "4")
+	if err := os.Symlink("a.md", filepath.Join(r.Dir, "x", "link.md")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	r.Commit("one", nil)
+	g := Git{Dir: r.Dir, Env: r.Env}
+	got, err := g.ListFiles("HEAD", "x")
+	want := []string{"x/a.md", "x/deep/er/b.md", "x/z.md"}
+	if err != nil || !slices.Equal(got, want) {
+		t.Fatalf("ListFiles = %v, %v, want %v", got, err, want)
+	}
+	got, err = g.ListFiles("HEAD", "nope")
+	if err != nil || len(got) != 0 {
+		t.Fatalf("ListFiles missing = %v, %v", got, err)
+	}
+	if _, err := g.ListFiles("no-such-rev", "x"); err == nil {
+		t.Fatal("unknown revision: want an error")
 	}
 }
 
