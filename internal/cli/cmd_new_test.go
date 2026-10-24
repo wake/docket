@@ -26,10 +26,10 @@ func newRepo(t *testing.T) *testutil.Repo {
 	t.Helper()
 	r := testutil.NewRepo(t)
 	r.Git("checkout", "-q", "-b", "main")
+	testutil.InstallSchema(t, r.Dir)
 	r.Commit("init", map[string]string{
-		"README.md":                                          "x\n",
-		"openspec/schemas/docket/schema.yaml":                "name: docket\n",
-		"openspec/changes/archive/.gitkeep":                  "",
+		"README.md":                         "x\n",
+		"openspec/changes/archive/.gitkeep": "",
 		"openspec/changes/archive/2025-01-02-add-x/.gitkeep": "",
 	})
 	return r
@@ -40,9 +40,9 @@ func cleanRepo(t *testing.T) *testutil.Repo {
 	t.Helper()
 	r := testutil.NewRepo(t)
 	r.Git("checkout", "-q", "-b", "main")
+	testutil.InstallSchema(t, r.Dir)
 	r.Commit("init", map[string]string{
-		"README.md":                           "x\n",
-		"openspec/schemas/docket/schema.yaml": "name: docket\n",
+		"README.md": "x\n",
 	})
 	return r
 }
@@ -264,9 +264,8 @@ func TestNewUnbornRepository(t *testing.T) {
 func TestNoMergeBase(t *testing.T) {
 	r := cleanRepo(t)
 	r.Git("checkout", "-q", "--orphan", "lone")
-	r.Commit("lone", map[string]string{
-		"openspec/schemas/docket/schema.yaml": "name: docket\n",
-	})
+	testutil.InstallSchema(t, r.Dir)
+	r.Commit("lone", nil)
 	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x")
 	if code != 1 || !hasRule(t, so, "no-merge-base") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
@@ -281,7 +280,8 @@ func TestNewInPathWithSpaces(t *testing.T) {
 	}
 	r := testutil.NewRepoAt(t, dir)
 	r.Git("checkout", "-q", "-b", "main")
-	r.Commit("init", map[string]string{"openspec/schemas/docket/schema.yaml": "name: docket\n"})
+	testutil.InstallSchema(t, r.Dir)
+	r.Commit("init", nil)
 	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "fix", "--source", "x")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
@@ -291,9 +291,9 @@ func TestNewInPathWithSpaces(t *testing.T) {
 func TestReservedNameRejected(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Git("checkout", "-q", "-b", "main")
+	testutil.InstallSchema(t, r.Dir)
 	r.Commit("init", map[string]string{
-		"README.md":                           "x\n",
-		"openspec/schemas/docket/schema.yaml": "name: docket\n",
+		"README.md": "x\n",
 		"openspec/changes/archive/2026-01-01-old/proposal.md": "old\n",
 	})
 	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "archive", "--kind", "feature", "--source", "x")
@@ -436,4 +436,14 @@ func TestOpenSpecFailureReportsCleanupFailure(t *testing.T) {
 	if code != 1 || !hasRule(t, so, "openspec-failed") || !strings.Contains(so, "fake failure") || !strings.Contains(so, "permission denied") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
+}
+
+func TestNewVersionCommandFails(t *testing.T) {
+	r := cleanRepo(t)
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=--version"}, "add-x", "--kind", "feature", "--source", "x")
+	if code != 4 || !strings.Contains(se, "DOCKET_OPENSPEC") || !strings.Contains(se, "fake failure") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	noChange(t, r.Dir)
 }

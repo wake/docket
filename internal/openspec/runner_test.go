@@ -242,3 +242,20 @@ func TestFailureCarriesStderr(t *testing.T) {
 		t.Fatalf("change folder should exist before failing: %v", err)
 	}
 }
+
+func TestVersionCommandFails(t *testing.T) {
+	fake, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+fake, "FAKE_OPENSPEC_FAIL=--version")
+	r, err := openspec.New(t.TempDir(), env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.Run("init", "--tools", "none")
+	var ue *openspec.UnavailableError
+	if !errors.As(err, &ue) {
+		t.Fatalf("err = %#v", err)
+	}
+	if !strings.Contains(err.Error(), "DOCKET_OPENSPEC") || !strings.Contains(err.Error(), "fake failure") {
+		t.Errorf("message = %q", err.Error())
+	}
+}
