@@ -36,7 +36,19 @@ func (g Git) UncommittedAdded(paths ...string) ([]string, error) {
 // Uncommitted lists the sorted paths with staged, unstaged or untracked
 // changes; ignored files are left out.
 func (g Git) Uncommitted() ([]string, error) {
-	recs, err := g.status("normal")
+	return g.changedPaths("normal")
+}
+
+// UncommittedUnder lists the sorted paths below paths with staged, unstaged
+// or untracked changes, untracked files one by one; ignored files are left out.
+func (g Git) UncommittedUnder(paths ...string) ([]string, error) {
+	return g.changedPaths("all", paths...)
+}
+
+// changedPaths returns the sorted paths of every git status record, whatever
+// its state.
+func (g Git) changedPaths(untracked string, paths ...string) ([]string, error) {
+	recs, err := g.status(untracked, paths...)
 	if err != nil {
 		return nil, err
 	}
