@@ -101,6 +101,7 @@ func (r *run) unreadable(source string, err error) {
 func Run(in Input) Report {
 	rep := Report{}
 	r := &run{in: in, rep: &rep}
+	checkRouting(r)
 	for _, slug := range r.scope() {
 		c, ok := r.load(slug)
 		if !ok {
