@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/delta"
 )
 
 // Finding is one problem found in a change. Change and File are empty and
@@ -78,6 +79,8 @@ type run struct {
 
 	known     map[string]string // placeholder map, read on first use
 	knownDone bool
+
+	specs map[string][]delta.Requirement // main specs read so far, by path
 }
 
 func (r *run) add(c *loaded, rule, file string, line int, format string, args ...any) {

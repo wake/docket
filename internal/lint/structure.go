@@ -35,11 +35,25 @@ func deltas(c *loaded) []capDelta {
 
 // mainSpec reads the requirements of openspec/specs/<capPath>/spec.md. A
 // missing file is not an error; an unreadable one is listed as unreadable.
+// Each file is read once per run, so it is listed once however many deltas
+// touch it.
 func (r *run) mainSpec(capPath string) []delta.Requirement {
 	p := path.Join("openspec/specs", capPath, "spec.md")
 	if !fs.ValidPath(p) || !strings.HasPrefix(p, "openspec/specs/") {
 		return nil
 	}
+	if reqs, done := r.specs[p]; done {
+		return reqs
+	}
+	reqs := r.readMainSpec(p)
+	if r.specs == nil {
+		r.specs = map[string][]delta.Requirement{}
+	}
+	r.specs[p] = reqs
+	return reqs
+}
+
+func (r *run) readMainSpec(p string) []delta.Requirement {
 	b, err := fs.ReadFile(r.in.Repo, p)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
