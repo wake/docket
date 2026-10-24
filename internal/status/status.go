@@ -44,7 +44,7 @@ type Progress struct {
 // holds the tasks some commit names.
 func Summarize(plan *change.Plan, named []change.NamedTask) (phase string, tasks []Task, progress Progress) {
 	tasks = []Task{}
-	if plan == nil || len(plan.Tasks) == 0 {
+	if plan == nil {
 		return Design, tasks, progress
 	}
 	commits := map[int][]string{}
@@ -96,9 +96,14 @@ func Summarize(plan *change.Plan, named []change.NamedTask) (phase string, tasks
 		tasks = append(tasks, t)
 	}
 	for _, c := range plan.Cancelled {
+		if c.Number == 0 {
+			continue // a bullet that names no task is a note, not a task
+		}
 		tasks = append(tasks, Task{Number: c.Number, Name: c.Name, State: Cancelled, Commits: []string{}})
 	}
 	switch {
+	case len(plan.Tasks) == 0:
+		phase = Design
 	case allDone:
 		phase = Done
 	case anyStarted:

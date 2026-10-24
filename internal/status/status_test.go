@@ -142,3 +142,24 @@ func TestDuplicatedHeadingListedOnce(t *testing.T) {
 		t.Fatalf("got %+v %+v", tasks, prog)
 	}
 }
+
+func TestCancelledEntryWithoutNumberLeftOut(t *testing.T) {
+	p := planOf([]bool{true})
+	p.Cancelled = []change.Cancelled{
+		{Number: 3, Name: "Old", Reason: "dropped", OK: true},
+		{Number: 4},
+		{},
+	}
+	_, tasks, _ := Summarize(p, nil)
+	if len(tasks) != 3 || tasks[1].Number != 3 || tasks[2].Number != 4 || states(tasks[1:]) != "cancelled,cancelled" {
+		t.Fatalf("got %+v", tasks)
+	}
+}
+
+func TestOnlyCancelledTasksIsDesign(t *testing.T) {
+	p := &change.Plan{Cancelled: []change.Cancelled{{Number: 1, Name: "Old", Reason: "dropped", OK: true}}}
+	phase, tasks, prog := Summarize(p, nil)
+	if phase != Design || len(tasks) != 1 || tasks[0].State != Cancelled || prog != (Progress{}) {
+		t.Fatalf("got %q %+v %+v", phase, tasks, prog)
+	}
+}
