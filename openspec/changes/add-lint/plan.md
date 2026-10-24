@@ -147,9 +147,9 @@
   - `func ParseProposal(b []byte) Proposal`
   - `func (p Proposal) Section(title string) (Section, bool)` — compares titles without regard to case.
   - `type Task struct { Number int; Name string; Line int; Scenarios []string; ScenariosLine int; Compensates []Ref }` — `Scenarios` holds the items of the task's `**Scenarios:**` line (split on `,`, trimmed, surrounding backticks removed; empty for `none`); `ScenariosLine` is 0 when the line is missing.
-  - `type Ref struct { Number int; Line int; OK bool }` — one `**Compensates:**` line; `OK` is false when the line is not exactly `**Compensates:** Task N`.
+  - `type Ref struct { Number int; Line int; OK bool }` — one `**Compensates:**` line; `OK` is false when the line, with surrounding whitespace ignored, is not exactly `**Compensates:** Task N`.
   - `type BadHeading struct { Text string; Level int; Line int }` — a heading whose text starts with `Task` and a number but is not `### Task N: <name>`.
-  - `type Cancelled struct { Number int; Name, Reason string; Line int; OK bool }` — one bullet under `## Cancelled Tasks`; `OK` is false when it is not `- Task N: <name> - <reason>` with a non-empty reason.
+  - `type Cancelled struct { Number int; Name, Reason string; Line int; OK bool }` — one top-level bullet (`-`, `*` or `+` at the start of the line; indented bullets are notes under it) under `## Cancelled Tasks`; `OK` is false when it is not `- Task N: <name> - <reason>` with a non-empty reason.
   - `type Plan struct { Tasks []Task; BadHeadings []BadHeading; Cancelled []Cancelled; ReuseLine int; Reuse *markdown.Table }` — `ReuseLine` is the `## Reuse` heading's line, 0 when there is none; `Reuse` its first table.
   - `func ParsePlan(b []byte) Plan`
 - Task headings match `^Task ([1-9][0-9]*): (\S.*)$` at level 3; any heading whose text matches `^Task\s+\d` and does not is a `BadHeading`. A task's lines run to the next heading of level 3 or above; nothing inside a fence counts anywhere.
