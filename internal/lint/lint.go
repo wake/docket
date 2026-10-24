@@ -59,6 +59,7 @@ type loaded struct {
 	bad   map[string]bool // unreadable files, relative paths
 
 	Proposal change.Proposal // zero value unless proposal.md was read
+	Plan     change.Plan     // zero value unless plan.md was read
 }
 
 // Has reports whether the change has a readable file.
@@ -105,6 +106,9 @@ func Run(in Input) Report {
 		rep.Changes = append(rep.Changes, slug)
 		checkProposal(r, c)
 		checkPlaceholders(r, c)
+		if c.Has(planFile) {
+			checkPlan(r, c)
+		}
 	}
 	sort.Strings(rep.Changes)
 	sort.SliceStable(rep.Findings, func(i, j int) bool {
@@ -210,6 +214,9 @@ func (r *run) load(slug string) (*loaded, bool) {
 	}
 	if b, ok := c.Files[proposalFile]; ok {
 		c.Proposal = change.ParseProposal(b)
+	}
+	if b, ok := c.Files[planFile]; ok {
+		c.Plan = change.ParsePlan(b)
 	}
 	return c, true
 }
