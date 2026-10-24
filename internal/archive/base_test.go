@@ -48,7 +48,7 @@ func modDelta(names ...string) string {
 
 func check(t *testing.T, e Env) ([]Drift, []Finding, []Unreadable, int) {
 	t.Helper()
-	c, f, u := loadChange(e, "add-y", false, true)
+	c, f, u := loadChange(e, "add-y", loadOpts{BaseIsCommit: true})
 	if c == nil {
 		t.Fatalf("load: %+v %+v", f, u)
 	}

@@ -41,10 +41,15 @@ func headOrNoCommits(e Env, slug string, finds *[]Finding) (head string, done bo
 	return head, false, nil
 }
 
-// loadChange reads openspec/changes/<slug>/. wantPlan asks for plan.md;
-// baseIsCommit requires x-base to name a commit. It returns nil together
-// with the findings and unreadable sources when the change cannot be used.
-func loadChange(e Env, slug string, wantPlan, baseIsCommit bool) (*loadedChange, []Finding, []Unreadable) {
+// loadOpts says what loadChange reads beyond the metadata: Plan reads
+// plan.md, BaseIsCommit requires x-base to name a commit, Deltas reads the
+// delta specs.
+type loadOpts struct{ Plan, BaseIsCommit, Deltas bool }
+
+// loadChange reads openspec/changes/<slug>/ as o asks. It returns nil
+// together with the findings and unreadable sources when the change cannot
+// be used.
+func loadChange(e Env, slug string, o loadOpts) (*loadedChange, []Finding, []Unreadable) {
 	var finds []Finding
 	var unread []Unreadable
 	dir := "openspec/changes/" + slug
@@ -95,7 +100,7 @@ func loadChange(e Env, slug string, wantPlan, baseIsCommit bool) (*loadedChange,
 			add("metadata-invalid", ".openspec.yaml", ".openspec.yaml has no x-base")
 		default:
 			c.Meta = m
-			if baseIsCommit {
+			if o.BaseIsCommit {
 				ok := !strings.HasPrefix(m.Base, "-")
 				if ok {
 					ok, err = e.Git.RefExists(m.Base + "^{commit}")
@@ -110,7 +115,7 @@ func loadChange(e Env, slug string, wantPlan, baseIsCommit bool) (*loadedChange,
 		}
 	}
 
-	if wantPlan {
+	if o.Plan {
 		b, err := fs.ReadFile(rfs, c.path("plan.md"))
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
@@ -124,6 +129,20 @@ func loadChange(e Env, slug string, wantPlan, baseIsCommit bool) (*loadedChange,
 	}
 
 	specs := c.path("specs")
+	if o.Deltas {
+		unread = append(unread, loadDeltas(rfs, specs, c)...)
+	}
+
+	if len(finds) > 0 || len(unread) > 0 {
+		sort.SliceStable(unread, func(i, j int) bool { return unread[i].Source < unread[j].Source })
+		return nil, finds, unread
+	}
+	return c, nil, nil
+}
+
+// loadDeltas reads every specs/**/spec.md below specs into c.Deltas.
+// It returns the sources it could not read.
+func loadDeltas(rfs fs.FS, specs string, c *loadedChange) (unread []Unreadable) {
 	_ = fs.WalkDir(rfs, specs, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
@@ -146,10 +165,5 @@ func loadChange(e Env, slug string, wantPlan, baseIsCommit bool) (*loadedChange,
 		c.Deltas[capPath] = delta.Parse(b)
 		return nil
 	})
-
-	if len(finds) > 0 || len(unread) > 0 {
-		sort.SliceStable(unread, func(i, j int) bool { return unread[i].Source < unread[j].Source })
-		return nil, finds, unread
-	}
-	return c, nil, nil
+	return unread
 }

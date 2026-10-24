@@ -30,7 +30,7 @@ func Rebase(e Env, slug string) (RebaseReport, error) {
 	if err != nil || done {
 		return rep, err
 	}
-	c, finds, unread := loadChange(e, slug, false, false)
+	c, finds, unread := loadChange(e, slug, loadOpts{Deltas: true})
 	if c == nil {
 		rep.Findings, rep.Unreadable = finds, unread
 		return rep, nil

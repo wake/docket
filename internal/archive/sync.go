@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"syscall"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
@@ -109,7 +108,7 @@ func Sync(e Env, slug string, check bool) (SyncReport, error) {
 	if err != nil || done {
 		return rep, err
 	}
-	c, finds, unread := loadChange(e, slug, true, true)
+	c, finds, unread := loadChange(e, slug, loadOpts{Plan: true, BaseIsCommit: true})
 	if c == nil {
 		rep.Findings, rep.Unreadable = finds, unread
 		return rep, nil
@@ -162,19 +161,53 @@ func writeOrRefuse(root, rel, slug string, b []byte) (*Finding, error) {
 	return nil, err
 }
 
-// writeFile replaces the content of an existing file below root, refusing a
-// link anywhere on its path.
-func writeFile(root, rel string, b []byte) error {
+// writeAll is the default writeTemp. Tests replace writeTemp to inject a
+// write failure.
+func writeAll(f *os.File, b []byte) error {
+	_, err := f.Write(b)
+	return err
+}
+
+var writeTemp = writeAll
+
+// writeFile replaces the content of an existing regular file below root,
+// refusing a link anywhere on its path. It writes a temporary file in the
+// same directory and renames it onto the target, so a failure leaves the
+// target untouched.
+func writeFile(root, rel string, b []byte) (err error) {
 	if err := safepath.Check(root, rel); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filepath.Join(root, filepath.FromSlash(rel)), os.O_WRONLY|os.O_TRUNC|syscall.O_NOFOLLOW, 0)
+	target := filepath.Join(root, filepath.FromSlash(rel))
+	fi, err := os.Lstat(target)
 	if err != nil {
 		return err
 	}
-	if _, err := f.Write(b); err != nil {
-		f.Close()
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", rel)
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".dkt-*")
+	if err != nil {
 		return err
 	}
-	return f.Close()
+	defer func() {
+		if err != nil {
+			_ = os.Remove(tmp.Name())
+		}
+	}()
+	if err = writeTemp(tmp, b); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	if err = os.Chmod(tmp.Name(), fi.Mode().Perm()); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), target)
 }
