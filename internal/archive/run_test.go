@@ -301,11 +301,37 @@ func TestOpenSpecUnavailableIsAnError(t *testing.T) {
 }
 
 func TestUnexpectedArchivedAs(t *testing.T) {
-	_, e, f := archRepo(t, "add-x")
-	f.archivedAs = map[string]string{"add-x": "2026-11-02-other"}
-	rep, _ := Archive(f.input(e, nil, "add-x"))
-	if !reflect.DeepEqual(ruleList(rep.Findings), []string{"evidence-failed"}) || rep.Stopped == nil || rep.Stopped.Step != "archive" {
-		t.Fatalf("%+v", rep)
+	for _, tc := range []struct {
+		name, as, folder string
+		hook             func(root string)
+	}{
+		{"no such folder", "2026-11-02-other", "", nil},
+		{"existing folder", "weird", "openspec/changes/archive/weird", func(root string) {
+			if err := os.MkdirAll(filepath.Join(root, "openspec/changes/archive/weird"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{"not a local name", "../escape", "", nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, e, f := archRepo(t, "add-x")
+			f.archivedAs = map[string]string{"add-x": tc.as}
+			if tc.hook != nil {
+				f.hooks = map[string]func(){"add-x": func() { tc.hook(f.root) }}
+			}
+			rep, _ := Archive(f.input(e, nil, "add-x"))
+			if !reflect.DeepEqual(ruleList(rep.Findings), []string{"evidence-failed"}) || rep.Stopped == nil || rep.Stopped.Step != "archive" {
+				t.Fatalf("%+v", rep)
+			}
+			msg := rep.Findings[0].Message
+			if !strings.Contains(msg, "OpenSpec archived the change") || !strings.Contains(msg, tc.as) || !strings.Contains(msg, "evidence.md was not written") {
+				t.Fatalf("message %q", msg)
+			}
+			want := []Archived{{Change: "add-x", Folder: tc.folder, Evidence: ""}}
+			if !reflect.DeepEqual(rep.Archived, want) {
+				t.Fatalf("archived %+v, want %+v", rep.Archived, want)
+			}
+		})
 	}
 }
 
