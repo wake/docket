@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -92,6 +93,33 @@ func TestStripComments(t *testing.T) {
 		if got := StripComments(tc.in); got != tc.want {
 			t.Errorf("StripComments(%q) = %q, want %q", tc.in, got, tc.want)
 		}
+	}
+}
+
+func TestTrim(t *testing.T) {
+	if got := Trim("\ufeff Why\u2028"); got != "Why" {
+		t.Fatalf("Trim = %q, want U+FEFF and U+2028 removed", got)
+	}
+	if got := Trim("\u0085x\u0085"); got != "\u0085x\u0085" {
+		t.Fatalf("Trim = %q, want U+0085 kept", got)
+	}
+	re := regexp.MustCompile("^" + Space + "$")
+	for r := rune(0); r <= 0x10ffff; r++ {
+		in := re.MatchString(string(r))
+		if in != isSpace(r) {
+			t.Fatalf("isSpace(%U) disagrees with Space", r)
+		}
+		if in && Trim("a"+string(r)) != "a" {
+			t.Fatalf("%U not trimmed", r)
+		}
+	}
+}
+
+func TestHeadingsTrimFEFF(t *testing.T) {
+	lines := []string{"## Why\ufeff"}
+	got := Headings(lines, FenceMask(lines))
+	if want := []Heading{{2, "Why", 0}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Headings = %+v, want %+v", got, want)
 	}
 }
 

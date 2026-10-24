@@ -100,6 +100,21 @@ func TestJavaScriptWhitespace(t *testing.T) {
 	}
 }
 
+func TestTrimIsJavaScriptTrim(t *testing.T) {
+	d := Parse([]byte("## ADDED Requirements\n### Requirement: X\ufeff\n"))
+	if !reflect.DeepEqual(names(d.Added), []string{"X"}) {
+		t.Fatalf("name = %q", names(d.Added))
+	}
+	d = Parse([]byte("## ADDED Requirements\n### Requirement: X\n#### Scenario: S\n\u0085\n"))
+	if len(d.Added) != 1 || len(d.Added[0].Scenarios) != 1 {
+		t.Fatalf("scenario with only U+0085 body dropped: %+v", d.Added)
+	}
+	d = Parse([]byte("## ADDED Requirements\n### Requirement: X\n#### Scenario: S\ufeff\nbody\n"))
+	if got := d.Added[0].Scenarios[0].Name; got != "S" {
+		t.Fatalf("scenario name = %q", got)
+	}
+}
+
 func TestRenamedPairs(t *testing.T) {
 	src := "## RENAMED Requirements\n- FROM: `### Requirement: A`\n- TO: `### Requirement: B`\n* FROM: ### Requirement: C\n* TO: ### Requirement: D\n+ FROM: ### Requirement: E\n+ TO: ### Requirement: F\nFROM: ### Requirement: G\nTO: ### Requirement: H\n"
 	d := Parse([]byte(src))

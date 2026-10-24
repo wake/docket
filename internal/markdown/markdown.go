@@ -21,6 +21,24 @@ func Lines(b []byte) []string {
 // Space is a Go regexp class for what JavaScript's \s matches, so ports of OpenSpec's regular expressions agree with it.
 const Space = `[\t\n\v\f\r \x{00a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}]`
 
+// isSpace reports whether r is in the set Space matches.
+func isSpace(r rune) bool {
+	switch {
+	case r >= '\t' && r <= '\r', r == ' ', r == 0x00a0, r == 0x1680,
+		r >= 0x2000 && r <= 0x200a, r == 0x2028, r == 0x2029,
+		r == 0x202f, r == 0x205f, r == 0x3000, r == 0xfeff:
+		return true
+	}
+	return false
+}
+
+// Trim removes leading and trailing characters that Space matches, as
+// JavaScript's String.prototype.trim does. strings.TrimSpace differs: it
+// keeps U+FEFF and removes U+0085.
+func Trim(s string) string {
+	return strings.TrimFunc(s, isSpace)
+}
+
 var fenceOpen = regexp.MustCompile("^" + Space + "*(`{3,}|~{3,})")
 var fenceClose = regexp.MustCompile("^" + Space + "*(`{3,}|~{3,})" + Space + "*$")
 
@@ -76,8 +94,8 @@ func parseHeading(line string, masked bool, index int) (Heading, bool) {
 	if m == nil {
 		return Heading{}, false
 	}
-	text := closingHashes.ReplaceAllString(strings.TrimSpace(m[2]), "")
-	return Heading{Level: len(m[1]), Text: strings.TrimSpace(text), Index: index}, true
+	text := closingHashes.ReplaceAllString(Trim(m[2]), "")
+	return Heading{Level: len(m[1]), Text: Trim(text), Index: index}, true
 }
 
 // Body returns the line range after h up to, not including, the next
