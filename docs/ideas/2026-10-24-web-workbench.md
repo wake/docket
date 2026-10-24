@@ -64,14 +64,13 @@ handling of the same change diverging across worktrees.
 
 ## Order
 
-Docket's own queue, as of 2026-10-24. Released: 1 to 3 in v0.1.0, 7 in v0.2.0.
+Docket's own queue, as of 2026-10-24. Released: 1 to 3 in v0.1.0, 7 in v0.2.0, 4 in v0.3.0.
 
 1. `add-init-and-new`
 2. `add-lint`
 3. `add-archive` (`sync`, `archive`, `rebase`), so every change can be
    closed properly
-4. `add-status`: the `status --json` feed the workbench reads (released in
-   the next version)
+4. `add-status`: the `status --json` feed the workbench reads
 5. This workbench, read-only first, with the daemon
 6. `add-index`: the generated capability index, across worktrees, with two
    checks built on it: every exported symbol a change adds maps to a `new`
