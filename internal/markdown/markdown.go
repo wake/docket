@@ -89,23 +89,50 @@ func Body(lines []string, mask []bool, h Heading) (from, to int) {
 	return from, len(lines)
 }
 
-// StripComments removes every <!-- ... --> span; an unclosed comment runs to
-// the end.
-func StripComments(s string) string {
-	var b strings.Builder
-	for {
-		i := strings.Index(s, "<!--")
-		if i < 0 {
-			b.WriteString(s)
-			return b.String()
+// BlankComments returns a copy of lines in which every byte of an HTML
+// comment outside masked (fenced) lines is replaced by a space, so line
+// count and byte offsets are kept. A comment opens on "<!--" and closes on
+// the first "-->" or "--!>" after it; an unclosed comment runs to the end.
+// Masked lines are returned unchanged and neither open nor close a comment.
+func BlankComments(lines []string, mask []bool) []string {
+	out := make([]string, len(lines))
+	open := false
+	for i, l := range lines {
+		if mask[i] {
+			out[i] = l
+			continue
 		}
-		b.WriteString(s[:i])
-		j := strings.Index(s[i+4:], "-->")
-		if j < 0 {
-			return b.String()
+		b := []byte(l)
+		for p := 0; p < len(b); {
+			if !open {
+				k := strings.Index(l[p:], "<!--")
+				if k < 0 {
+					break
+				}
+				p += k
+				open = true
+				for q := p; q < p+4; q++ {
+					b[q] = ' '
+				}
+				p += 4
+				continue
+			}
+			end := len(b)
+			j, k := strings.Index(l[p:], "-->"), strings.Index(l[p:], "--!>")
+			switch {
+			case j >= 0 && (k < 0 || j < k):
+				end, open = p+j+3, false
+			case k >= 0:
+				end, open = p+k+4, false
+			}
+			for q := p; q < end; q++ {
+				b[q] = ' '
+			}
+			p = end
 		}
-		s = s[i+4+j+3:]
+		out[i] = string(b)
 	}
+	return out
 }
 
 // CodeSpans returns the byte ranges [start, end) of the inline code spans on

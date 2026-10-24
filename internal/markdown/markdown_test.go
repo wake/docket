@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -69,16 +70,30 @@ func TestBody(t *testing.T) {
 	}
 }
 
-func TestStripComments(t *testing.T) {
-	tests := []struct{ in, want string }{
-		{"a<!-- x -->b", "ab"},
-		{"a<!--\nx\n-->b<!-- y --> c", "ab c"},
-		{"a<!-- open\nstill", "a"},
-		{"none", "none"},
+func TestBlankComments(t *testing.T) {
+	sp := func(n int) string { return strings.Repeat(" ", n) }
+	tests := []struct {
+		name string
+		in   []string
+		mask []bool
+		want []string
+	}{
+		{"single line", []string{"a<!-- x -->b"}, []bool{false}, []string{"a" + sp(10) + "b"}},
+		{"multi line", []string{"a<!--", "x", "-->b<!-- y --> c"}, []bool{false, false, false},
+			[]string{"a" + sp(4), sp(1), sp(3) + "b" + sp(10) + " c"}},
+		{"bang close", []string{"a<!-- x --!>b"}, []bool{false}, []string{"a" + sp(11) + "b"}},
+		{"unclosed", []string{"a<!-- open", "still", "more"}, []bool{false, false, false},
+			[]string{"a" + sp(9), sp(5), sp(4)}},
+		{"fence does not open", []string{"```", "<!--", "```", "text"}, []bool{true, true, true, false},
+			[]string{"```", "<!--", "```", "text"}},
+		{"fence inside comment", []string{"<!-- a", "```", "-->b"}, []bool{false, true, false},
+			[]string{sp(6), "```", sp(3) + "b"}},
+		{"offsets kept", []string{"é<!--é-->é"}, []bool{false}, []string{"é" + sp(9) + "é"}},
 	}
 	for _, tc := range tests {
-		if got := StripComments(tc.in); got != tc.want {
-			t.Errorf("StripComments(%q) = %q, want %q", tc.in, got, tc.want)
+		got := BlankComments(tc.in, tc.mask)
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: BlankComments = %q, want %q", tc.name, got, tc.want)
 		}
 	}
 }
