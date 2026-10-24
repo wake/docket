@@ -218,6 +218,31 @@ func TestSyncLoadFindings(t *testing.T) {
 	}
 }
 
+func TestSyncIgnoresUnreadableDeltaSpec(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads everything")
+	}
+	r, e := syncRepo(t, planText("\n"))
+	spec := filepath.Join(r.Dir, "openspec/changes/add-x/specs/x/spec.md")
+	if err := os.MkdirAll(filepath.Dir(spec), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(spec, []byte("## ADDED Requirements\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	work(r, "add-x", "2")
+	if err := os.Chmod(spec, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := Sync(e, "add-x", false)
+	if err != nil || len(rep.Unreadable) != 0 || len(rep.Ticked) != 1 {
+		t.Fatalf("%v %+v", err, rep)
+	}
+	if !strings.Contains(readPlan(t, r), "### Task 2: Two\n\n- [x]") {
+		t.Fatal("task 2 not ticked")
+	}
+}
+
 func TestSyncNoCommits(t *testing.T) {
 	r := testutil.NewRepo(t)
 	rep, err := Sync(Env{Git: gitx.Git{Dir: r.Dir, Env: r.Env}, Root: r.Dir}, "add-x", false)

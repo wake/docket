@@ -114,7 +114,7 @@ func Sync(e Env, slug string, check bool) (SyncReport, error) {
 			Message: "the repository has no commits; commit first"})
 		return rep, nil
 	}
-	c, finds, unread := loadChange(e, slug, true, true)
+	c, finds, unread := loadChange(e, slug, loadOpts{Plan: true, BaseIsCommit: true})
 	if c == nil {
 		rep.Findings, rep.Unreadable = finds, unread
 		return rep, nil
