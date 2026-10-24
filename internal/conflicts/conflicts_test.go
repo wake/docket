@@ -246,6 +246,20 @@ func TestEntrySourcesArePinnedPerSlug(t *testing.T) {
 	}
 }
 
+func TestEntriesDoNotShareSources(t *testing.T) {
+	a := chg("a", map[string]string{"c1": section("MODIFIED", "R"), "c2": section("MODIFIED", "S")})
+	a.Sources = []scan.Source{{Name: "/wt/a", Commit: "aaa"}}
+	b := chg("b", map[string]string{"c1": section("MODIFIED", "R"), "c2": section("MODIFIED", "S")})
+	got := Find([]Change{a, b})
+	if len(got) != 2 {
+		t.Fatalf("got %+v", got)
+	}
+	got[0].Changes[0].Sources[0].Name = "changed"
+	if name := got[1].Changes[0].Sources[0].Name; name != "/wt/a" {
+		t.Errorf("entry in the second overlap saw the edit: Name = %q", name)
+	}
+}
+
 func TestNilSourcesBecomeEmpty(t *testing.T) {
 	got := Find([]Change{one("a", section("MODIFIED", "Pay")), one("b", section("MODIFIED", "Pay"))})
 	for _, e := range got[0].Changes {

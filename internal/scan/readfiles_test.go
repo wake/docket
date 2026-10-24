@@ -82,6 +82,31 @@ func TestReadFilesWorktree(t *testing.T) {
 	}
 }
 
+func TestReadFilesDirNotAFolder(t *testing.T) {
+	outDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outDir, "x.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := baseRepo(t)
+	r.Commit("files", map[string]string{"f": "plain\n"})
+	if err := os.Symlink(outDir, filepath.Join(r.Dir, "l")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	g := newGit(r)
+	wt := scan.Source{Kind: scan.KindWorktree, Name: r.Dir, Commit: r.Git("rev-parse", "HEAD")}
+	for _, dir := range []string{"f", "l"} {
+		got, unread, err := scan.ReadFiles(g, wt, dir, keepAll)
+		if err != nil || len(got) != 0 || len(unread) != 1 || unread[0].Path != dir || unread[0].Reason == "" {
+			t.Fatalf("worktree dir %q = %v, %+v, %v; want one unreadable", dir, got, unread, err)
+		}
+	}
+	br := scan.Source{Kind: scan.KindLocalBranch, Name: "refs/heads/main", Commit: wt.Commit}
+	got, unread, err := scan.ReadFiles(g, br, "f", keepAll)
+	if err != nil || len(got) != 0 || len(unread) != 1 || unread[0].Path != "f" {
+		t.Fatalf("branch dir f = %v, %+v, %v; want one unreadable", got, unread, err)
+	}
+}
+
 func TestReadFilesBranch(t *testing.T) {
 	r := baseRepo(t)
 	r.Git("checkout", "-q", "-b", "feature")
