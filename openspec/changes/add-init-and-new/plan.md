@@ -42,6 +42,10 @@ Implementing Task 5 showed that "worktree first" lets the main checkout, which s
 
 The Task 7 review found that `dkt new archive` passed the slug rules, because the scan never lists `archive` as an active change, so a failed run's cleanup could remove `openspec/changes/archive/`. The `change-creation` delta now reserves the name, and cleanup removes the change folder only when it did not exist before `openspec new change` ran. Task 7 gains the scenario `change-creation#reserved-name-rejected`; no other task changes.
 
+## Revision 3 (2026-10-24): no writes through symbolic links; one `dkt new` at a time per worktree
+
+The PR review of Tasks 6 and 7 found that `dkt init` followed symbolic links under `openspec/`, so `--force` could overwrite AGENTS.md or a file outside the repository; that `dkt new` and its metadata write followed a symlinked `openspec/changes`; and that of two `dkt new` runs of one slug in one worktree, the one that failed could remove the folder the other had just created. `dkt init` and `dkt new` now check every existing path component under `openspec/` before writing and refuse a symbolic link with the finding `symlink-refused` (exit 1), through a new package `internal/safepath`. `dkt new` holds an exclusive `flock` on the worktree's `openspec/` directory from the moment it checks whether the change folder exists until its cleanup, and refuses with `slug-used` when the folder appeared in the meantime. Task 6 gains the scenario `project-setup#symlinked-schema-file-refused`; Task 7 gains `change-creation#symlinked-changes-folder-refused` and `change-creation#concurrent-runs-keep-the-first`; no other task changes.
+
 ## Reuse
 
 | Need | Existing (path:symbol) | Decision | Reason | Evidence |
@@ -57,6 +61,8 @@ The Task 7 review found that `dkt new archive` passed the slug rules, because th
 | Output envelope, exit codes, dispatch | none | new | The repository has no Go code | `git ls-files '*.go'` → empty |
 | Workspace scan | none | new | No code yet; no library discovers OpenSpec changes across git worktrees and refs | `git ls-files '*.go'` → empty |
 | OpenSpec runner with version gate | none | new | No code yet | `git ls-files '*.go'` → empty |
+| Refusing to write through a symbolic link under `openspec/` | none | new | `os.Root` keeps paths inside a directory but follows a link that stays inside it, such as one to AGENTS.md; nothing in the repository checks path components before a write | `rg -n "Lstat\|O_NOFOLLOW\|OpenRoot\|Flock" --type go` → `scan.ReadFile` (reads through `os.Root`), `cmd_new.go` (existence check), `gitx` (`.git` probe) only |
+| Running one `dkt new` at a time in a worktree | external: `syscall.Flock` | reuse | The kernel drops the lock when the process exits, so no lock file is ever left behind | flock(2) on macOS and Linux; checked 2026-10-24 that a second exclusive lock on the same directory blocks |
 
 Rows marked `external:` name a dependency outside the repository; there is no path to check.
 
@@ -240,7 +246,7 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
 
 ### Task 6: `dkt init`
 
-**Scenarios:** `project-setup#fresh-repository`, `project-setup#existing-openspec-project`, `project-setup#locally-edited-template`, `project-setup#re-run-with-no-differences`, `project-setup#routing-section-printed`, `cli-output#json-on-success`, `openspec-runtime#cli-missing`
+**Scenarios:** `project-setup#fresh-repository`, `project-setup#existing-openspec-project`, `project-setup#locally-edited-template`, `project-setup#re-run-with-no-differences`, `project-setup#routing-section-printed`, `project-setup#symlinked-schema-file-refused`, `cli-output#json-on-success`, `openspec-runtime#cli-missing`
 
 **Files:**
 - Create: `internal/setup/setup.go`, `internal/cli/cmd_init.go`
@@ -274,7 +280,7 @@ If the diff of Tasks 1–4 exceeds 800 lines or 20 files, open the first pull re
 
 ### Task 7: `dkt new`
 
-**Scenarios:** `change-creation#date-prefix-rejected`, `change-creation#uppercase-rejected`, `change-creation#reserved-name-rejected`, `change-creation#slug-active-in-another-worktree`, `change-creation#slug-archived`, `change-creation#unreadable-worktree-blocks-creation`, `change-creation#missing-source`, `change-creation#unknown-kind`, `change-creation#change-created`, `change-creation#schema-not-installed`, `cli-output#json-on-failure`, `cli-output#usage-error`, `cli-output#unreadable-source-with-other-findings`, `openspec-runtime#unsupported-version`, `openspec-runtime#openspec-command-fails`
+**Scenarios:** `change-creation#date-prefix-rejected`, `change-creation#uppercase-rejected`, `change-creation#reserved-name-rejected`, `change-creation#slug-active-in-another-worktree`, `change-creation#slug-archived`, `change-creation#unreadable-worktree-blocks-creation`, `change-creation#missing-source`, `change-creation#unknown-kind`, `change-creation#change-created`, `change-creation#schema-not-installed`, `change-creation#symlinked-changes-folder-refused`, `change-creation#concurrent-runs-keep-the-first`, `cli-output#json-on-failure`, `cli-output#usage-error`, `cli-output#unreadable-source-with-other-findings`, `openspec-runtime#unsupported-version`, `openspec-runtime#openspec-command-fails`
 
 **Files:**
 - Create: `internal/change/new.go`, `internal/cli/cmd_new.go`
