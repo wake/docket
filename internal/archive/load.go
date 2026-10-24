@@ -165,7 +165,8 @@ func loadDeltas(rfs fs.FS, specs string, c *loadedChange) (unread []Unreadable) 
 			}
 			return nil
 		}
-		if !d.Type().IsRegular() || path.Base(p) != "spec.md" {
+		capPath, ok := delta.CapabilityPath("specs/" + strings.TrimPrefix(p, specs+"/"))
+		if !d.Type().IsRegular() || !ok {
 			return nil
 		}
 		b, err := fs.ReadFile(rfs, p)
@@ -173,7 +174,6 @@ func loadDeltas(rfs fs.FS, specs string, c *loadedChange) (unread []Unreadable) 
 			unread = append(unread, Unreadable{Source: p, Reason: err.Error()})
 			return nil
 		}
-		capPath := strings.TrimSuffix(strings.TrimPrefix(p, specs+"/"), "/spec.md")
 		c.Deltas[capPath] = delta.Parse(b)
 		return nil
 	})
