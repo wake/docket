@@ -201,12 +201,13 @@ func writeFile(root, rel string, b []byte) error {
 	if err = w.Close(); err != nil {
 		return err
 	}
-	return swapIn(target, fi.Mode()&(os.ModePerm|os.ModeSetuid|os.ModeSetgid|os.ModeSticky), b)
+	return swapIn(target, fi.Mode()&(os.ModePerm|os.ModeSetuid|os.ModeSetgid|os.ModeSticky), b, os.Rename)
 }
 
 // createFile writes a new file below root, refusing a link anywhere on its
-// path and a file that already exists. Like writeFile it goes through a
-// temporary file and a rename.
+// path and a file that already exists. It goes through a temporary file that
+// is hard-linked into place, so a file created after the check is never
+// replaced. The up-front check only gives a clearer error.
 func createFile(root, rel string, b []byte) error {
 	if err := safepath.Check(root, rel); err != nil {
 		return err
@@ -217,13 +218,13 @@ func createFile(root, rel string, b []byte) error {
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	return swapIn(target, 0o644, b)
+	return swapIn(target, 0o644, b, linkNew)
 }
 
 // swapIn writes b to a temporary file next to target, gives it perm and
-// renames it onto target. On any failure the temporary file is removed and
-// target is left as it was.
-func swapIn(target string, perm os.FileMode, b []byte) (err error) {
+// puts it in place with place. On any failure the temporary file is removed
+// and target is left as it was.
+func swapIn(target string, perm os.FileMode, b []byte, place func(tmp, target string) error) (err error) {
 	tmp, err := os.CreateTemp(filepath.Dir(target), ".dkt-*")
 	if err != nil {
 		return err
@@ -247,5 +248,15 @@ func swapIn(target string, perm os.FileMode, b []byte) (err error) {
 	if err = os.Chmod(tmp.Name(), perm); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), target)
+	return place(tmp.Name(), target)
+}
+
+// linkNew hard-links tmp to target, which fails with EEXIST instead of
+// replacing a file that appeared in the meantime, then removes tmp.
+func linkNew(tmp, target string) error {
+	if err := os.Link(tmp, target); err != nil {
+		return err
+	}
+	_ = os.Remove(tmp)
+	return nil
 }
