@@ -82,7 +82,7 @@ type placed struct {
 }
 
 // checkDuplicates takes the main spec's requirements, drops those the delta
-// modifies or removes, adds the delta's ADDED and MODIFIED ones, and reports
+// modifies, removes or renames away, adds the delta's ADDED and MODIFIED ones, and reports
 // each scenario of the delta whose slug an earlier scenario already has.
 func checkDuplicates(r *run, c *loaded, d capDelta) {
 	dropped := map[string]bool{}
@@ -91,6 +91,9 @@ func checkDuplicates(r *run, c *loaded, d capDelta) {
 	}
 	for _, q := range d.Delta.Removed {
 		dropped[q.Name] = true
+	}
+	for _, rn := range d.Delta.Renamed {
+		dropped[rn.From] = true
 	}
 	var set []placed
 	mainFile := path.Join("openspec/specs", d.Cap, "spec.md")
