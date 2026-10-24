@@ -74,6 +74,9 @@ func (c *loaded) Path(name string) string { return path.Join(c.Dir, name) }
 type run struct {
 	in  Input
 	rep *Report
+
+	known     map[string]string // placeholder map, read on first use
+	knownDone bool
 }
 
 func (r *run) add(c *loaded, rule, file string, line int, format string, args ...any) {

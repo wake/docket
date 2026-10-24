@@ -40,10 +40,39 @@ func TestContractSubsectionMissing(t *testing.T) {
 }
 
 func TestEmptyFailureModes(t *testing.T) {
-	doc := strings.Replace(validProposal, "It fails loudly.", "<!-- What happens when things go wrong. -->", 1)
-	f := wantOne(t, lintProposal(t, doc), "proposal-section", lineOf(validProposal, "### Failure Modes"))
-	if !strings.Contains(f.Message, "Failure Modes") {
-		t.Fatalf("finding = %+v", f)
+	comment := templateLine(t, "<!-- What happens when things go wrong")
+	doc := strings.Replace(validProposal, "It fails loudly.", comment, 1)
+	r := lintProposal(t, doc)
+	if len(r.Findings) != 2 {
+		t.Fatalf("findings = %+v, want proposal-section and placeholder", r.Findings)
+	}
+	var sec, ph *Finding
+	for i := range r.Findings {
+		switch r.Findings[i].Rule {
+		case "proposal-section":
+			sec = &r.Findings[i]
+		case "placeholder":
+			ph = &r.Findings[i]
+		}
+	}
+	if sec == nil || ph == nil {
+		t.Fatalf("findings = %+v", r.Findings)
+	}
+	if sec.Line != lineOf(doc, "### Failure Modes") || !strings.Contains(sec.Message, "Failure Modes") {
+		t.Fatalf("section finding = %+v", sec)
+	}
+	if ph.Line != lineOf(doc, comment) {
+		t.Fatalf("placeholder finding = %+v", ph)
+	}
+}
+
+func TestNonGoalsEmpty(t *testing.T) {
+	for name, body := range map[string]string{"blank": "\n", "comment": "\n<!-- nothing yet -->\n"} {
+		doc := strings.Replace(validProposal, "\n- Not this.\n", body, 1)
+		f := wantOne(t, lintProposal(t, doc), "proposal-section", lineOf(doc, "## Non-Goals"))
+		if !strings.Contains(f.Message, "Non-Goals") {
+			t.Fatalf("%s: finding = %+v", name, f)
+		}
 	}
 }
 

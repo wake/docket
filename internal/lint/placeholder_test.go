@@ -10,16 +10,21 @@ import (
 
 func templateWhyComment(t *testing.T) string {
 	t.Helper()
+	return templateLine(t, "<!-- Explain the motivation")
+}
+
+func templateLine(t *testing.T, prefix string) string {
+	t.Helper()
 	b, err := fs.ReadFile(docket.Schema(), "templates/proposal.md")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, l := range strings.Split(string(b), "\n") {
-		if strings.HasPrefix(l, "<!-- Explain the motivation") {
+		if strings.HasPrefix(l, prefix) {
 			return l
 		}
 	}
-	t.Fatal("Why comment not found in template")
+	t.Fatalf("template line %q not found", prefix)
 	return ""
 }
 

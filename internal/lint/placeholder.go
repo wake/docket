@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"errors"
 	"io/fs"
 	"regexp"
 	"sort"
@@ -16,12 +17,29 @@ var angleRe = regexp.MustCompile(`<[A-Za-z][^<>\n]*>`)
 // first template (by name) that holds it. Angle placeholders inside a
 // comment belong to the comment.
 func (r *run) placeholders() map[string]string {
+	if !r.knownDone {
+		r.known = r.readPlaceholders()
+		r.knownDone = true
+	}
+	return r.known
+}
+
+// readPlaceholders reads the templates once per Run. Missing templates or a
+// glob error are listed as unreadable, once.
+func (r *run) readPlaceholders() map[string]string {
+	const source = "schema templates/*.md"
 	out := map[string]string{}
 	if r.in.Templates == nil {
+		r.unreadable(source, errors.New("no templates given"))
 		return out
 	}
 	names, err := fs.Glob(r.in.Templates, "templates/*.md")
 	if err != nil {
+		r.unreadable(source, err)
+		return out
+	}
+	if len(names) == 0 {
+		r.unreadable(source, errors.New("no template found"))
 		return out
 	}
 	sort.Strings(names)
