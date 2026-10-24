@@ -287,3 +287,121 @@ func TestInitVersionCommandFails(t *testing.T) {
 		t.Error("openspec directory was created")
 	}
 }
+
+// snapshot maps every path under dir except .git (links not followed) to its
+// content or link target.
+func snapshot(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	m := map[string]string{}
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, _ := filepath.Rel(dir, p)
+		if rel == ".git" {
+			return filepath.SkipDir
+		}
+		switch {
+		case d.Type()&fs.ModeSymlink != 0:
+			tgt, _ := os.Readlink(p)
+			m[rel] = "-> " + tgt
+		case d.IsDir():
+			m[rel] = "dir"
+		default:
+			b, _ := os.ReadFile(p)
+			m[rel] = string(b)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
+}
+
+func sameSnapshot(t *testing.T, before, after map[string]string) {
+	t.Helper()
+	for p, v := range after {
+		if w, ok := before[p]; !ok || w != v {
+			t.Errorf("%s changed or appeared", p)
+		}
+	}
+	for p := range before {
+		if _, ok := after[p]; !ok {
+			t.Errorf("%s vanished", p)
+		}
+	}
+}
+
+func TestSymlinkedSchemaFileRefused(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("AGENTS.md", "# agents\n")
+	r.Write("openspec/config.yaml", "schema: x\n")
+	rel := schemaDir + "templates/proposal.md"
+	if err := os.MkdirAll(filepath.Join(r.Dir, schemaDir, "templates"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(r.Dir, "AGENTS.md"), filepath.Join(r.Dir, rel)); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, r.Dir)
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--force", "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	fnds, _ := decode(t, so)["findings"].([]any)
+	if len(fnds) != 1 {
+		t.Fatalf("findings: %s", so)
+	}
+	f := fnds[0].(map[string]any)
+	if f["rule"] != "symlink-refused" || f["file"] != rel {
+		t.Errorf("finding: %v", f)
+	}
+	sameSnapshot(t, before, snapshot(t, r.Dir))
+}
+
+func TestSymlinkedSchemasDirectoryRefused(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/config.yaml", "schema: x\n")
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(r.Dir, "openspec/schemas")); err != nil {
+		t.Fatal(err)
+	}
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--force", "--json")
+	if code != 1 || !strings.Contains(so, "symlink-refused") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
+		t.Errorf("outside directory written: %v", ents)
+	}
+}
+
+func TestSymlinkedOpenSpecRefused(t *testing.T) {
+	r := committedRepo(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(r.Dir, "openspec")); err != nil {
+		t.Fatal(err)
+	}
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 1 || !strings.Contains(so, "symlink-refused") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
+		t.Errorf("outside directory written: %v", ents)
+	}
+}
+
+func TestPartialFailureKeepsResult(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/config.yaml", "schema: x\n")
+	// A regular file where a schema directory belongs fails the writes below
+	// it; the result of the files before it must still be reported.
+	r.Write(schemaDir+"templates", "not a directory\n")
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code == 0 {
+		t.Fatalf("exit 0\n%s\n%s", so, se)
+	}
+	if _, ok := decode(t, so)["result"].(map[string]any); !ok {
+		t.Errorf("result missing on partial failure: %s", so)
+	}
+}

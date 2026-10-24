@@ -86,3 +86,24 @@ func TestInitPropagatesOpenSpecError(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestInitReadOnlyUnchangedFile(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores file modes")
+	}
+	root := t.TempDir()
+	initOS := func() error { return os.MkdirAll(filepath.Join(root, "openspec"), 0o755) }
+	if _, err := Init(root, schema, false, initOS); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(root, schemaDir, "schema.yaml"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Init(root, schema, false, initOS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := statuses(r)[schemaDir+"/schema.yaml"]; s != Unchanged {
+		t.Fatalf("status = %s, want %s", s, Unchanged)
+	}
+}

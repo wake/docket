@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/openspec"
+	"github.com/wake/docket/internal/safepath"
 	"github.com/wake/docket/internal/scan"
 )
 
@@ -101,22 +103,49 @@ func newCommand() Command {
 			if err != nil {
 				return Outcome{}, envOrErr(err)
 			}
+			unlock, err := lockOpenSpec(c.Repo.Root)
+			if err != nil {
+				return Outcome{}, err
+			}
+			defer unlock()
 			dir := filepath.Join(c.Repo.Root, "openspec/changes", slug)
-			_, statErr := os.Lstat(dir)
-			existed := statErr == nil
+			metaRel := "openspec/changes/" + slug + "/.openspec.yaml"
+			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
+				return refuse(fail, err)
+			}
+			if _, err := os.Lstat(dir); err == nil {
+				return Outcome{Findings: []Finding{{Rule: "slug-used", Change: slug,
+					Message: fmt.Sprintf("slug %q is already used: %s exists", slug, dir)}}}, nil
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return Outcome{}, err
+			}
+			// The lock is held and dir did not exist, so whatever is there
+			// from here on was created by this run and is safe to remove,
+			// unless a link appeared on its path while OpenSpec ran.
+			cleanup := func(err error) error {
+				if lerr := safepath.Check(c.Repo.Root, "openspec/changes/"+slug); lerr != nil {
+					return errors.Join(err, fmt.Errorf("left in place: %w", lerr))
+				}
+				if rerr := os.RemoveAll(dir); rerr != nil {
+					return errors.Join(err, rerr)
+				}
+				return err
+			}
 			if _, err := r.Run("new", "change", slug, "--schema", "docket"); err != nil {
-				_ = cleanupIfCreated(dir, existed)
+				err = cleanup(err)
 				var fe *openspec.FailedError
 				if errors.As(err, &fe) {
-					return fail("openspec-failed", fe.Error())
+					return fail("openspec-failed", err.Error())
 				}
 				return Outcome{}, envOrErr(err)
 			}
+			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
+				// A link appeared while OpenSpec ran; removing dir now could
+				// follow it out of the repository, so leave everything as is.
+				return refuse(fail, err)
+			}
 			if err := change.AppendMetadata(filepath.Join(dir, ".openspec.yaml"), kind, source, base); err != nil {
-				if rerr := cleanupIfCreated(dir, existed); rerr != nil {
-					err = errors.Join(err, rerr)
-				}
-				return fail("metadata-failed", err.Error())
+				return fail("metadata-failed", cleanup(err).Error())
 			}
 			res := change.NewResult{Slug: slug, Path: dir, Kind: kind, Source: source, Base: base}
 			return Outcome{Result: res, Human: []string{"created " + dir}}, nil
@@ -124,13 +153,31 @@ func newCommand() Command {
 	}
 }
 
-// cleanupIfCreated removes dir only when this command created it; a folder
-// that existed before is never touched.
-func cleanupIfCreated(dir string, existed bool) error {
-	if existed {
-		return nil
+// lockOpenSpec takes an exclusive lock on <root>/openspec, blocking until it
+// is free, so two runs of dkt new cannot interleave. The returned function
+// releases it.
+func lockOpenSpec(root string) (func(), error) {
+	f, err := os.Open(filepath.Join(root, "openspec"))
+	if err != nil {
+		return nil, err
 	}
-	return os.RemoveAll(dir)
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		f.Close()
+		return nil, err
+	}
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		f.Close()
+	}, nil
+}
+
+// refuse turns a safepath error into a symlink-refused finding.
+func refuse(fail func(rule, msg string) (Outcome, error), err error) (Outcome, error) {
+	var sl *safepath.SymlinkError
+	if errors.As(err, &sl) {
+		return fail("symlink-refused", err.Error())
+	}
+	return Outcome{}, err
 }
 
 // envOrErr maps OpenSpec availability and version errors to an EnvError.

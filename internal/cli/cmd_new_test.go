@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/wake/docket/internal/testutil"
 )
@@ -307,22 +309,132 @@ func TestReservedNameRejected(t *testing.T) {
 	}
 }
 
-func TestCleanupIfCreated(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "add-x")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+func TestSymlinkedChangesFolderRefused(t *testing.T) {
+	r := cleanRepo(t)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(r.Dir, "openspec/changes")); err != nil {
 		t.Fatal(err)
 	}
-	if err := cleanupIfCreated(dir, true); err != nil {
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x")
+	if code != 1 || !hasRule(t, so, "symlink-refused") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if !strings.Contains(so, "openspec/changes") {
+		t.Errorf("path not named: %s", so)
+	}
+	b, _ := os.ReadFile(log)
+	for _, l := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(l, "new") {
+			t.Errorf("openspec new was run: %q", l)
+		}
+	}
+	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
+		t.Errorf("outside directory written: %v", ents)
+	}
+}
+
+func TestLinkMadeDuringOpenSpecIsNotFollowedByCleanup(t *testing.T) {
+	r := cleanRepo(t)
+	outside := t.TempDir()
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_LINK_CHANGES=" + outside}, "add-x", "--kind", "feature", "--source", "x")
+	if code != 1 || !hasRule(t, so, "symlink-refused") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "add-x", ".openspec.yaml")); err != nil {
+		t.Fatalf("cleanup followed the link out of the repository: %v", err)
+	}
+}
+
+func TestLinkMadeByFailingOpenSpecIsNotFollowedByCleanup(t *testing.T) {
+	r := cleanRepo(t)
+	outside := t.TempDir()
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	env := []string{"FAKE_OPENSPEC_LINK_CHANGES=" + outside, "FAKE_OPENSPEC_FAIL=new"}
+	code, so, se := runNew(t, r.Dir, cmd, env, "add-x", "--kind", "feature", "--source", "x")
+	if code != 1 || !hasRule(t, so, "openspec-failed") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if !strings.Contains(so, "left in place") {
+		t.Errorf("skipped cleanup not reported: %s", so)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "add-x", ".openspec.yaml")); err != nil {
+		t.Fatalf("cleanup followed the link out of the repository: %v", err)
+	}
+}
+
+func TestConcurrentRunsKeepTheFirst(t *testing.T) {
+	r := cleanRepo(t)
+	lockDir, err := os.Open(filepath.Join(r.Dir, "openspec"))
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(dir); err != nil {
-		t.Fatalf("pre-existing folder removed: %v", err)
-	}
-	if err := cleanupIfCreated(dir, false); err != nil {
+	defer lockDir.Close()
+	if err := syscall.Flock(int(lockDir.Fd()), syscall.LOCK_EX); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := os.Stat(dir); err == nil {
-		t.Fatal("folder created by the command was kept")
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	type result struct {
+		code   int
+		so, se string
+	}
+	done := make(chan result)
+	go func() {
+		code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x")
+		done <- result{code, so, se}
+	}()
+	// The version probe is logged just before the command waits for the lock.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if b, _ := os.ReadFile(log); len(b) > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	time.Sleep(300 * time.Millisecond)
+	marker := filepath.Join(r.Dir, "openspec/changes/add-x/marker.txt")
+	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker, []byte("first\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Flock(int(lockDir.Fd()), syscall.LOCK_UN); err != nil {
+		t.Fatal(err)
+	}
+	res := <-done
+	if res.code != 1 || !hasRule(t, res.so, "slug-used") {
+		t.Fatalf("exit %d\n%s\n%s", res.code, res.so, res.se)
+	}
+	if b, err := os.ReadFile(marker); err != nil || string(b) != "first\n" {
+		t.Errorf("first run's file damaged: %q %v", b, err)
+	}
+	b, _ := os.ReadFile(log)
+	for _, l := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(l, "new") {
+			t.Errorf("openspec new was run: %q", l)
+		}
+	}
+}
+
+func TestOpenSpecFailureReportsCleanupFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	r := cleanRepo(t)
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	t.Cleanup(func() {
+		_ = filepath.WalkDir(filepath.Join(r.Dir, "openspec/changes"), func(p string, d os.DirEntry, err error) error {
+			if err == nil && d.IsDir() {
+				_ = os.Chmod(p, 0o755)
+			}
+			return nil
+		})
+	})
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=new", "FAKE_OPENSPEC_LOCK_CHILD=1"}, "add-x", "--kind", "feature", "--source", "x")
+	if code != 1 || !hasRule(t, so, "openspec-failed") || !strings.Contains(so, "fake failure") || !strings.Contains(so, "permission denied") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 }
 
