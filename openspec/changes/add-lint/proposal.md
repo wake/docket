@@ -91,7 +91,8 @@ None.
   `change-lint#template-comment-left`.
 - Plan: `change-lint#plan-not-written-yet`, `change-lint#task-heading-at-the-wrong-level`,
   `change-lint#duplicate-task-number`, `change-lint#reuse-row-with-a-missing-path`,
-  `change-lint#new-row-without-a-reason`, `change-lint#empty-reuse-table`,
+  `change-lint#new-row-without-a-reason`, `change-lint#external-dependency-row`,
+  `change-lint#empty-reuse-table`,
   `change-lint#row-without-evidence`, `change-lint#cancelled-task-without-a-reason`,
   `change-lint#compensating-a-cancelled-task`.
 - Scenarios: `change-lint#scenario-nobody-claims`, `change-lint#reference-to-an-unknown-scenario`,
@@ -106,3 +107,4 @@ None.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-10-24 | self: writing the add-init-and-new plan | Reuse rows may name an outside dependency as `external: <name>`; lint skips the path check for them | One requirement sentence and one scenario; no task exists yet |

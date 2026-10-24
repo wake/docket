@@ -75,7 +75,7 @@ In plan.md, every heading whose text begins with the word Task followed by a num
 - **THEN** lint reports a `task-heading` finding naming both lines
 
 ### Requirement: Reuse table
-plan.md SHALL have a `## Reuse` section holding a table with the columns Need, Existing (path:symbol), Decision, Reason and Evidence, and at least one row. Decision SHALL be `reuse`, `extend` or `new`. For `reuse` and `extend`, the path before the first colon in Existing SHALL exist in the worktree; for `new`, Reason SHALL be non-empty. Every row SHALL have a non-empty Evidence.
+plan.md SHALL have a `## Reuse` section holding a table with the columns Need, Existing (path:symbol), Decision, Reason and Evidence, and at least one row. Decision SHALL be `reuse`, `extend` or `new`. For `reuse` and `extend`, the path before the first colon in Existing SHALL exist in the worktree, unless Existing starts with `external:`, which names a dependency outside the repository; for `new`, Reason SHALL be non-empty. Every row SHALL have a non-empty Evidence.
 
 #### Scenario: Reuse row with a missing path
 - **WHEN** a `reuse` row names `internal/gitx/run.go:Run` and that file does not exist
@@ -84,6 +84,10 @@ plan.md SHALL have a `## Reuse` section holding a table with the columns Need, E
 #### Scenario: New row without a reason
 - **WHEN** a `new` row has an empty Reason
 - **THEN** lint reports a `reuse-table` finding on that row
+
+#### Scenario: External dependency row
+- **WHEN** a `reuse` row's Existing is `external: git CLI`
+- **THEN** lint does not look for a path and reports nothing about that row
 
 #### Scenario: Empty reuse table
 - **WHEN** the Reuse table has its header and no rows

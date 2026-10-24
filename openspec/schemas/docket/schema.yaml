@@ -222,8 +222,9 @@ artifacts:
         `| Need | Existing (path:symbol) | Decision | Reason | Evidence |`,
         one row for every capability the plan needs. Decision is `reuse`,
         `extend` or `new`. A `reuse` or `extend` row names a path that exists
-        in the repository. A `new` row says in Reason why nothing that exists
-        fits. Evidence is the search or index lookup behind the decision, for
+        in the repository, or a dependency from outside it written as
+        `external: <name>` (a CLI, a library). A `new` row says in Reason why
+        nothing that exists fits. Evidence is the search or index lookup behind the decision, for
         example `rg -n "func Run" internal/` or `dkt index: gitx.Run`. This is
         the main reuse decision of the change: make it here, not during
         implementation.
