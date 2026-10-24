@@ -30,9 +30,12 @@ that it does not touch the shared requirement.
 
 ## Builds On
 
-- From `add-init-and-new`: the scan of worktrees and branches and the
-  reading of git objects (`workspace-scan`).
-- From `add-lint`: the delta reader. This change adds no parser of its own.
+- From `add-init-and-new`: the scan of worktrees and branches
+  (`scan.Scan`, `workspace-scan`) and reading a file from a scanned source
+  (`scan.ReadFile`), which this change extends to every file below a
+  folder.
+- From `add-lint`: the delta reader (`delta.Parse`). This change adds no
+  parser of its own.
 
 ## Capabilities
 
@@ -62,18 +65,22 @@ None.
 
 ### Interfaces
 
-- `dkt conflicts [<slug>] [--json]`
-- JSON `result.overlaps[]`: `capability`, `requirement`, and `changes[]`
-  with `slug`, `operation`, `sources[]` (each a worktree path or ref, with
-  its commit).
+- `dkt conflicts [<slug>] [--json] [--default-branch <name>]`
+- JSON `result.changes[]`: the slugs compared. `result.overlaps[]`:
+  `capability`, `requirement`, and `changes[]` with `slug`, `operations[]`
+  (`ADDED`, `MODIFIED`, `REMOVED`, `RENAMED-FROM`, `RENAMED-TO`) and
+  `sources[]` (`kind`, `name`: a worktree path or a full refname, and
+  `commit`).
+- Finding rules: `requirement-overlap` (one per overlap),
+  `change-not-active`, `slug-invalid`.
 
 ### Failure Modes
 
-- A source that cannot be read: reported as unreadable, exit 3; overlaps
-  found elsewhere are still listed.
-- A named slug that is not an active change: a finding, exit 1.
-- A delta that cannot be read: an `unparseable` finding naming the change
-  and source.
+- A source that cannot be read, or a delta spec in it: reported as
+  unreadable, exit 3; overlaps found elsewhere are still listed.
+- A named slug that is not an active change: `change-not-active`, exit 1.
+- A delta with problems is read as OpenSpec reads it; reporting the
+  problems is `dkt lint`'s job (see design.md).
 
 ### Acceptance Criteria
 
@@ -82,6 +89,7 @@ None.
   `conflict-detection#same-capability-different-requirements`,
   `conflict-detection#both-add-the-same-name`,
   `conflict-detection#overlap-with-another-worktree`,
+  `conflict-detection#archived-change-left-on-a-branch`,
   `conflict-detection#unrelated-overlap-hidden`,
   `conflict-detection#slug-not-active`,
   `conflict-detection#sources-listed`,
@@ -92,3 +100,4 @@ None.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-10-24 | self: writing the add-conflicts design and plan after add-archive | Each change in an overlap lists its operations, since one change can rename a requirement and modify it under the new name; there is no `unparseable` finding, since the delta reader cannot fail and text it drops is text OpenSpec drops; the finding rules and `result.changes` are named; a change archived anywhere is not compared even when a stale branch holds its folder; `x-base` moved to the first release with `dkt rebase` | One sentence in the Overlap report requirement and a new scenario, `conflict-detection#archived-change-left-on-a-branch`; no task exists yet |

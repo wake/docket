@@ -23,10 +23,10 @@ type capDelta struct {
 func deltas(c *loaded) []capDelta {
 	var out []capDelta
 	for name, b := range c.Files {
-		if !strings.HasPrefix(name, "specs/") || !strings.HasSuffix(name, "/spec.md") {
+		capPath, ok := delta.CapabilityPath(name)
+		if !ok {
 			continue
 		}
-		capPath := strings.TrimSuffix(strings.TrimPrefix(name, "specs/"), "/spec.md")
 		out = append(out, capDelta{Cap: capPath, File: name, Delta: delta.Parse(b)})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Cap < out[j].Cap })

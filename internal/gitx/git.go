@@ -300,3 +300,34 @@ func (g Git) ShowIfExists(rev, path string) ([]byte, bool, error) {
 func (g Git) Show(rev, path string) ([]byte, error) {
 	return g.output("show", rev+":"+path)
 }
+
+// ListFiles returns, sorted, the paths (relative to the repository root) of
+// the regular files below dir in rev's tree, at any depth. Links and
+// submodules are left out. A missing dir gives an empty list; a dir that is
+// an entry other than a folder (a file, a link, a submodule) is an error.
+func (g Git) ListFiles(rev, dir string) ([]string, error) {
+	dir = strings.TrimSuffix(dir, "/")
+	out, err := g.output("ls-tree", "-r", "-z", rev, "--", dir)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, entry := range splitNUL(string(out)) {
+		meta, path, ok := strings.Cut(entry, "\t")
+		if !ok {
+			return nil, fmt.Errorf("git ls-tree: unexpected entry %q", entry)
+		}
+		f := strings.Fields(meta)
+		if len(f) != 3 {
+			return nil, fmt.Errorf("git ls-tree: unexpected entry %q", entry)
+		}
+		if path == dir {
+			return nil, fmt.Errorf("%s is not a folder at %s", dir, rev)
+		}
+		if f[1] == "blob" && (f[0] == "100644" || f[0] == "100755") {
+			paths = append(paths, path)
+		}
+	}
+	slices.Sort(paths)
+	return paths, nil
+}
