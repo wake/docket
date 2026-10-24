@@ -86,14 +86,20 @@ type placed struct {
 // each scenario of the delta whose slug an earlier scenario already has.
 func checkDuplicates(r *run, c *loaded, d capDelta) {
 	dropped := map[string]bool{}
+	modified := map[string]bool{}
 	for _, q := range d.Delta.Modified {
 		dropped[q.Name] = true
+		modified[q.Name] = true
 	}
 	for _, q := range d.Delta.Removed {
 		dropped[q.Name] = true
 	}
 	for _, rn := range d.Delta.Renamed {
-		dropped[rn.From] = true
+		// A pure rename keeps the requirement and its scenarios; only a
+		// MODIFIED block under the new name replaces them.
+		if modified[rn.To] {
+			dropped[rn.From] = true
+		}
 	}
 	var set []placed
 	mainFile := path.Join("openspec/specs", d.Cap, "spec.md")
