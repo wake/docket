@@ -18,8 +18,11 @@ func Lines(b []byte) []string {
 	return strings.Split(string(b), "\n")
 }
 
-var fenceOpen = regexp.MustCompile("^\\s*(`{3,}|~{3,})")
-var fenceClose = regexp.MustCompile("^\\s*(`{3,}|~{3,})\\s*$")
+// Space is a Go regexp class for what JavaScript's \s matches, so ports of OpenSpec's regular expressions agree with it.
+const Space = `[\t\n\v\f\r \x{00a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}]`
+
+var fenceOpen = regexp.MustCompile("^" + Space + "*(`{3,}|~{3,})")
+var fenceClose = regexp.MustCompile("^" + Space + "*(`{3,}|~{3,})" + Space + "*$")
 
 // FenceMask reports, for every line, whether it belongs to a fenced code
 // block; the fence lines themselves are included. An unclosed fence runs to
@@ -51,7 +54,7 @@ type Heading struct {
 	Index int
 }
 
-var headingRe = regexp.MustCompile(`^(#{1,6})\s+(.+)$`)
+var headingRe = regexp.MustCompile(`^(#{1,6})` + Space + `+(.+)$`)
 var closingHashes = regexp.MustCompile(`[ \t]+#+[ \t]*$`)
 
 // Headings returns every unmasked heading line.

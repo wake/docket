@@ -19,7 +19,7 @@ type Table struct {
 	Index  int
 }
 
-var delimiterRe = regexp.MustCompile(`^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$`)
+var delimiterRe = regexp.MustCompile("^" + Space + `*\|?` + Space + `*:?-+:?` + Space + `*(\|` + Space + `*:?-+:?` + Space + `*)*\|?` + Space + `*$`)
 
 // FindTable returns the first table in lines[from:to] outside the mask.
 func FindTable(lines []string, mask []bool, from, to int) (Table, bool) {
