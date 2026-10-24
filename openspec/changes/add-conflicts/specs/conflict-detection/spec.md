@@ -35,6 +35,10 @@ other.
 - **WHEN** worktree A holds `add-x`, worktree B holds `add-y` uncommitted, both modify the same requirement, and the command runs in worktree A
 - **THEN** the overlap is reported with worktree B as the source of `add-y`
 
+#### Scenario: Archived change left on a branch
+- **WHEN** `add-x` is archived on the default branch tip, an unmerged branch still holds `openspec/changes/add-x/`, and `add-y` modifies a requirement that copy modifies
+- **THEN** the command reports no overlap
+
 ### Requirement: One change in focus
 With a slug, `dkt conflicts` SHALL report only the overlaps that involve that change. The slug SHALL be an active change.
 
@@ -47,7 +51,7 @@ With a slug, `dkt conflicts` SHALL report only the overlaps that involve that ch
 - **THEN** the command reports that `add-q` is not active and exits with 1
 
 ### Requirement: Overlap report
-Each overlap SHALL name the capability and the requirement, and for each change involved, its slug, its operation on that requirement, and every source it was found in with that source's commit. The command SHALL exit with 1 when it reports any overlap and with 0 when it reports none, except as `cli-output` requires for unreadable sources. It SHALL NOT require the OpenSpec CLI.
+Each overlap SHALL name the capability and the requirement, and for each change involved, its slug, every operation it applies to that requirement, and every source it was found in with that source's commit. The command SHALL exit with 1 when it reports any overlap and with 0 when it reports none, except as `cli-output` requires for unreadable sources. It SHALL NOT require the OpenSpec CLI.
 
 #### Scenario: Sources listed
 - **WHEN** `add-y` exists both in worktree B and on `refs/remotes/origin/add-y`
