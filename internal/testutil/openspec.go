@@ -33,6 +33,7 @@ fail() {
 }
 case "$1" in
 --version)
+  fail --version
   echo @VERSION@
   ;;
 init)
