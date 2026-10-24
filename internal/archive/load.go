@@ -41,6 +41,18 @@ func headOrNoCommits(e Env, slug string, finds *[]Finding) (head string, done bo
 	return head, false, nil
 }
 
+// loadAtHead returns the commit HEAD names and the change loaded as o asks.
+// A nil change comes with the findings and unreadable sources to report,
+// which include a no-commits finding in a repository without commits.
+func loadAtHead(e Env, slug string, o loadOpts) (head string, c *loadedChange, finds []Finding, unread []Unreadable, err error) {
+	head, done, err := headOrNoCommits(e, slug, &finds)
+	if err != nil || done {
+		return "", nil, finds, nil, err
+	}
+	c, finds, unread = loadChange(e, slug, o)
+	return head, c, finds, unread, nil
+}
+
 // loadOpts says what loadChange reads beyond the metadata: Plan reads
 // plan.md, BaseIsCommit requires x-base to name a commit, Deltas reads the
 // delta specs.
