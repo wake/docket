@@ -9,7 +9,8 @@ import (
 	"testing"
 )
 
-// Env returns the process environment plus a temporary HOME and a git
+// Env returns an allowlisted environment (PATH, TMPDIR and SYSTEMROOT from the
+// process, no inherited GIT_* variable) plus a temporary HOME and a git
 // configuration that is independent of the machine running the tests.
 func Env(t testing.TB) []string {
 	t.Helper()
@@ -20,7 +21,13 @@ func Env(t testing.TB) []string {
 	if err := os.WriteFile(cfg, []byte(content), 0o644); err != nil {
 		t.Fatalf("write git config: %v", err)
 	}
-	return append(os.Environ(), "HOME="+home, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+cfg)
+	var env []string
+	for _, k := range []string{"PATH", "TMPDIR", "SYSTEMROOT"} {
+		if v, ok := os.LookupEnv(k); ok {
+			env = append(env, k+"="+v)
+		}
+	}
+	return append(env, "HOME="+home, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+cfg)
 }
 
 // Repo is a git repository in a temporary directory.
