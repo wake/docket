@@ -94,33 +94,38 @@ func install(dst, rel string, want []byte, force bool) (FileStatus, error) {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return "", err
 	}
-	status := Overwritten
-	f, err := os.OpenFile(dst, os.O_RDWR|syscall.O_NOFOLLOW, 0)
-	if errors.Is(err, fs.ErrNotExist) {
-		status = Written
-		f, err = os.OpenFile(dst, os.O_RDWR|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+	status, flags := Written, os.O_WRONLY|os.O_CREATE|os.O_EXCL
+	got, err := readNoFollow(dst)
+	switch {
+	case err == nil && bytes.Equal(got, want):
+		return Unchanged, nil
+	case err == nil && !force:
+		return Differs, nil
+	case err == nil:
+		status, flags = Overwritten, os.O_WRONLY|os.O_TRUNC
+	case !errors.Is(err, fs.ErrNotExist):
+		return "", fmt.Errorf("read %s: %w", rel, err)
 	}
+	f, err := os.OpenFile(dst, flags|syscall.O_NOFOLLOW, 0o644)
 	if err != nil {
-		return "", fmt.Errorf("open %s: %w", rel, err)
+		return "", fmt.Errorf("write %s: %w", rel, err)
 	}
-	defer f.Close()
-	if status == Overwritten {
-		got, err := io.ReadAll(f)
-		if err != nil {
-			return "", fmt.Errorf("read %s: %w", rel, err)
-		}
-		if bytes.Equal(got, want) {
-			return Unchanged, nil
-		}
-		if !force {
-			return Differs, nil
-		}
-		if err := f.Truncate(0); err != nil {
-			return "", fmt.Errorf("write %s: %w", rel, err)
-		}
+	if _, err := f.Write(want); err != nil {
+		f.Close()
+		return "", fmt.Errorf("write %s: %w", rel, err)
 	}
-	if _, err := f.WriteAt(want, 0); err != nil {
+	if err := f.Close(); err != nil {
 		return "", fmt.Errorf("write %s: %w", rel, err)
 	}
 	return status, nil
+}
+
+// readNoFollow reads the file at p without following a link there.
+func readNoFollow(p string) ([]byte, error) {
+	f, err := os.OpenFile(p, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
 }
