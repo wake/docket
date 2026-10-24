@@ -11,7 +11,7 @@ import (
 	"github.com/wake/docket/internal/testutil"
 )
 
-var statusNow = time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
+var statusNow = time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 
 func runStatus(t *testing.T, dir string, asJSON bool, args ...string) (int, string, string) {
 	t.Helper()
