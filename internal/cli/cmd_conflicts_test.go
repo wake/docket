@@ -139,7 +139,7 @@ func TestConflictsSlugInvalid(t *testing.T) {
 func TestConflictsTwoSlugs(t *testing.T) {
 	r := cleanRepo(t)
 	code, so, se := runConflicts(t, r.Dir, true, "add-x", "add-y")
-	if code != 2 || !hasRule(t, so, "usage") {
+	if code != 2 || !hasRule(t, so, "usage") || !strings.Contains(so, "at most one slug") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 }
@@ -186,7 +186,14 @@ func TestConflictsSourcesListedInText(t *testing.T) {
 func TestConflictsWritesNothing(t *testing.T) {
 	r := overlapRepo(t)
 	before := snapshot(t, r.Dir)
-	runConflicts(t, r.Dir, true)
-	runConflicts(t, r.Dir, false, "add-x")
+	for _, c := range []struct {
+		json bool
+		args []string
+	}{{true, nil}, {false, []string{"add-x"}}} {
+		code, so, se := runConflicts(t, r.Dir, c.json, c.args...)
+		if code != 1 {
+			t.Fatalf("args %v: exit %d\n%s\n%s", c.args, code, so, se)
+		}
+	}
 	sameSnapshot(t, before, snapshot(t, r.Dir))
 }
