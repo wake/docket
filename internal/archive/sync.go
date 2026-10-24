@@ -159,7 +159,11 @@ func Sync(e Env, slug string, check bool) (SyncReport, error) {
 // writeOrRefuse writes like writeFile; a link on the path comes back as a
 // symlink-refused finding and nothing is written.
 func writeOrRefuse(root, rel, slug string, b []byte) (*Finding, error) {
-	err := writeFile(root, rel, b)
+	return refuseLink(slug, rel, writeFile(root, rel, b))
+}
+
+// refuseLink turns a symlink error into a symlink-refused finding.
+func refuseLink(slug, rel string, err error) (*Finding, error) {
 	var sl *safepath.SymlinkError
 	if errors.As(err, &sl) {
 		return &Finding{Rule: "symlink-refused", Change: slug, File: rel, Message: err.Error()}, nil
@@ -170,10 +174,20 @@ func writeOrRefuse(root, rel, slug string, b []byte) (*Finding, error) {
 // writeFile replaces the content of an existing file below root, refusing a
 // link anywhere on its path.
 func writeFile(root, rel string, b []byte) error {
+	return writeWith(root, rel, os.O_WRONLY|os.O_TRUNC, 0, b)
+}
+
+// createFile writes a new file below root, refusing a link anywhere on its
+// path and a file that already exists.
+func createFile(root, rel string, b []byte) error {
+	return writeWith(root, rel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644, b)
+}
+
+func writeWith(root, rel string, flags int, perm os.FileMode, b []byte) error {
 	if err := safepath.Check(root, rel); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filepath.Join(root, filepath.FromSlash(rel)), os.O_WRONLY|os.O_TRUNC|syscall.O_NOFOLLOW, 0)
+	f, err := os.OpenFile(filepath.Join(root, filepath.FromSlash(rel)), flags|syscall.O_NOFOLLOW, perm)
 	if err != nil {
 		return err
 	}
