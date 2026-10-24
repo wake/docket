@@ -20,6 +20,8 @@ fix them directly when they change no spec sentence.
   standard error (`gitx.ExitError`, `openspec.FailedError`).
 - The routing section is cut out of AGENTS.md by heading, so a `## ` line
   inside a code fence would end it early.
+- There is no `dkt --version`; the version only shows in `evidence.md` and
+  in JSON output.
 
 ## Behavior to revisit
 
