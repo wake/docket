@@ -4,7 +4,7 @@ English | [繁體中文](README.zh-TW.md)
 
 Docket is a small command-line tool that checks [OpenSpec](https://github.com/Fission-AI/OpenSpec) change folders and keeps their books. It is meant for projects that plan and execute work with [superpowers](https://github.com/obra/superpowers). Docket keeps no state of its own, and the command is `dkt`.
 
-> **Status: early.** `init`, `new`, `lint`, `conflicts`, `sync`, `archive` and `rebase` work, which completes the first milestone. The other commands below are a draft and will change. Docket is built with the workflow this README describes.
+> **Status: early.** `init`, `new`, `lint`, `conflicts`, `sync`, `archive`, `rebase` and `status` work; the first six of them completed the first milestone. The other commands below are a draft and will change. Docket is built with the workflow this README describes.
 
 ## Why
 
@@ -92,7 +92,7 @@ dkt conflicts [<slug>]            # requirements touched by more than one active
 dkt sync <slug> [--check]         # tick plan.md from commit trailers
 dkt archive <slug>...             # release step, on a branch made from the default branch
 dkt rebase <slug>                 # accept the newer specs as the change's base
-dkt status [--json]               # phase, tasks, worktree, owner, PR, idle days, acceptance round
+dkt status [<slug>...] [--json]   # phase, tasks and their commits, progress, last activity, uncommitted work
 dkt brief <slug> --task N         # brief for an implementing agent
 dkt check <slug>                  # scenario coverage and checkbox consistency (pull request gate)
 dkt accept <slug> --round N [--export html]

@@ -17,6 +17,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/archive` | Closes changes: `dkt sync`, `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, and `evidence.md` |
 | `internal/markdown` | Line, heading and table readers that skip code fences and comments |
 | `internal/delta` | Reads delta specs and main specs; makes scenario slugs |
+| `internal/status` | Summarizes each active change: phase, task states from commit trailers, progress, last activity |
 | `internal/conflicts` | Finds requirements that more than one active change touches |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
 | `internal/safepath` | Refuses a write path that passes through a symbolic link |
@@ -58,6 +59,11 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Load every active change's deltas | `conflicts.Load` |
 | Find requirements touched by more than one change | `conflicts.Find` |
 | Keep the overlaps that involve one change | `conflicts.Involving` |
+| Load every active change's status | `status.Load` |
+| Work out a change's phase, tasks and progress | `status.Summarize` |
+| Match commits to plan tasks by trailer | `change.NamedTasks` |
+| List uncommitted paths under given paths | `Git.UncommittedUnder` |
+| List commits with their times, limited to paths | `Git.Commits` (`Commit.Time`, `paths`) |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |
 | Stand in for OpenSpec | `testutil.FakeOpenSpec` |
@@ -66,6 +72,6 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 
 - Only `internal/openspec` starts OpenSpec.
 - Only `internal/gitx` starts git (test helpers excepted).
-- Nothing below `cmd/dkt` reads the process environment; it is passed in through `cli.Options` (test helpers excepted).
+- Nothing below `cmd/dkt` reads the process environment; it is passed in through `cli.Options`, the clock (`Options.Now`) included (test helpers excepted).
 - Readers take bytes, not paths, so that content can come from any revision.
 - Nothing writes through a symbolic link in the repository: check the path with `safepath.Check` first.
