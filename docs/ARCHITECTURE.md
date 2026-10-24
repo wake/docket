@@ -14,6 +14,9 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/scan` | Finds changes across worktrees and branches; resolves the default branch |
 | `internal/setup` | Installs the schema (`dkt init`) |
 | `internal/change` | Change-folder rules: slug validation, `.openspec.yaml` metadata |
+| `internal/markdown` | Line, heading and table readers that skip code fences and comments |
+| `internal/delta` | Reads delta specs and main specs; makes scenario slugs |
+| `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
 | `internal/safepath` | Refuses a write path that passes through a symbolic link |
 | `internal/testutil` | Test-only helpers: temporary repositories, a fake OpenSpec |
 
@@ -30,6 +33,12 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Record kind, source and base | `change.AppendMetadata` |
 | Install the schema | `setup.Init` |
 | Check a path before writing to it | `safepath.Check` |
+| Read Markdown lines, headings and tables | `markdown.Lines`, `markdown.Headings`, `markdown.FindTable` |
+| Read a delta or a main spec | `delta.Parse`, `delta.ParseSpec` |
+| Make a scenario slug | `delta.Slug` |
+| Read proposal.md or plan.md | `change.ParseProposal`, `change.ParsePlan` |
+| Lint change folders | `lint.Run` |
+| Files a branch adds | `Git.AddedFiles`, `Git.UncommittedAdded` |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |
 | Stand in for OpenSpec | `testutil.FakeOpenSpec` |
