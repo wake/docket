@@ -17,6 +17,7 @@ type Task struct {
 	Scenarios     []string
 	ScenariosLine int
 	Compensates   []Ref
+	Steps         []Step
 }
 
 // Ref is one Compensates line; OK is false when it is not exactly
@@ -112,6 +113,9 @@ func readTask(lines []string, mask []bool, head, to, number int, name string) Ta
 		case strings.HasPrefix(line, scenariosPrefix) && t.ScenariosLine == 0:
 			t.ScenariosLine = i + 1
 			t.Scenarios = splitScenarios(strings.TrimPrefix(line, scenariosPrefix))
+		case stepRe.MatchString(lines[i]):
+			m := stepRe.FindStringSubmatch(lines[i])
+			t.Steps = append(t.Steps, Step{Line: i + 1, Done: m[1] != " "})
 		case strings.HasPrefix(line, "**Compensates:**"):
 			r := Ref{Line: i + 1}
 			if m := compensatesRe.FindStringSubmatch(line); m != nil {
