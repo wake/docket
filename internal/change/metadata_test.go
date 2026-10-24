@@ -18,7 +18,7 @@ func TestParseMetadata(t *testing.T) {
 	if err != nil || m.Base != "" {
 		t.Fatalf("missing key: %+v, %v", m, err)
 	}
-	for _, bad := range []string{"schema: [\n", "- a\n- b\n"} {
+	for _, bad := range []string{"schema: [\n", "- a\n- b\n", "", "null\n", "abc\n", "- a\n"} {
 		if _, err := ParseMetadata([]byte(bad)); err == nil {
 			t.Errorf("%q: want error", bad)
 		}

@@ -20,8 +20,15 @@ type Metadata struct {
 // ParseMetadata reads .openspec.yaml. It fails when b is not YAML or not a
 // mapping.
 func ParseMetadata(b []byte) (Metadata, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(b, &doc); err != nil {
+		return Metadata{}, err
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
+		return Metadata{}, fmt.Errorf("not a YAML mapping")
+	}
 	var m Metadata
-	if err := yaml.Unmarshal(b, &m); err != nil {
+	if err := doc.Content[0].Decode(&m); err != nil {
 		return Metadata{}, err
 	}
 	return m, nil
