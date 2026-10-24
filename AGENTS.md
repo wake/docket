@@ -10,10 +10,11 @@ change folders in projects that plan and execute with superpowers. See
 README.md. It is a public repository: write everything in English, and never
 commit hostnames, customer names, personal paths or secrets.
 
-Status: milestone 1 is being built. Until `add-init-and-new` is merged, `dkt`
-does not exist: open changes with
-`openspec new change <slug> --schema docket`, add the `x-` keys to
-`.openspec.yaml` by hand, and check the lint rules by reading.
+Status: milestone 1 is being built. `dkt init` and `dkt new` exist; build them
+with `go install ./cmd/dkt`. `dkt lint`, `dkt sync` and `dkt archive` come with
+later changes (see the Order in `docs/ideas/`). Until each one exists, check
+the lint rules by reading, tick a plan's steps by hand from the `Task:`
+trailers of its commits, and leave merged changes unarchived.
 
 Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` for module
 boundaries and shared capabilities. Ideas that are not ready, and the order of
