@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -244,6 +247,68 @@ func TestInternalError(t *testing.T) {
 	f := decode(t, so)["findings"].([]any)
 	if code != 1 || len(f) != 1 || f[0].(map[string]any)["rule"] != "internal" {
 		t.Errorf("exit %d findings %v", code, f)
+	}
+}
+
+func TestLaterProbeFailureIsEnvironment(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("one", map[string]string{"a.txt": "a"})
+	realGit, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	script := "#!/bin/sh\nfor a in \"$@\"; do\n  if [ \"$a\" = symbolic-ref ]; then echo 'fatal: probe broken' >&2; exit 128; fi\ndone\nexec '" + realGit + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var so, se bytes.Buffer
+	env := append(testutil.Env(t), "PATH="+bin+":"+filepath.Dir(realGit)+":/usr/bin:/bin")
+	code := RunWith(Options{Args: []string{"probe", "--json"}, Dir: r.Dir, Env: env, Stdout: &so, Stderr: &se}, probeCmd(Outcome{}, nil, nil))
+	if code != 4 {
+		t.Fatalf("exit %d, want 4; stderr %s", code, se.String())
+	}
+	m := decode(t, so.String())
+	f, _ := m["findings"].([]any)
+	if m["repo"] != nil || len(f) != 1 || f[0].(map[string]any)["rule"] != "environment" {
+		t.Errorf("envelope = %s", so.String())
+	}
+}
+
+func TestDoubleDashEndsFlags(t *testing.T) {
+	r := testutil.NewRepo(t)
+	var got []string
+	code, so, _ := run(t, r.Dir, probeCmd(Outcome{}, nil, &got), "probe", "--", "--json")
+	if code != 0 || strings.Join(got, " ") != "--json" {
+		t.Fatalf("exit %d positionals %q", code, got)
+	}
+	if !strings.Contains(so, "dkt probe: ok") || strings.HasPrefix(so, "{") {
+		t.Errorf("want text output, got %q", so)
+	}
+	code, _, _ = run(t, r.Dir, probeCmd(Outcome{}, nil, &got), "probe", "--", "-x")
+	if code != 0 || strings.Join(got, " ") != "-x" {
+		t.Fatalf("exit %d positionals %q", code, got)
+	}
+	code, _, _ = run(t, r.Dir, probeCmd(Outcome{}, nil, &got), "probe", "a", "--", "-x", "--", "b")
+	if code != 0 || strings.Join(got, " ") != "a -x -- b" {
+		t.Fatalf("exit %d positionals %q", code, got)
+	}
+	code, so, _ = run(t, r.Dir, probeCmd(Outcome{}, nil, &got), "probe", "--", "a", "--json")
+	if code != 0 || strings.Join(got, " ") != "a --json" || strings.HasPrefix(so, "{") {
+		t.Fatalf("exit %d positionals %q", code, got)
+	}
+}
+
+func TestMarshalFailureStillWritesEnvelope(t *testing.T) {
+	r := testutil.NewRepo(t)
+	code, so, _ := run(t, r.Dir, probeCmd(Outcome{Result: make(chan int)}, nil, nil), "probe", "--json")
+	if code == 0 {
+		t.Fatalf("exit 0 despite marshal failure")
+	}
+	m := decode(t, so)
+	f, _ := m["findings"].([]any)
+	if m["ok"] != false || m["result"] != nil || len(f) != 1 || f[0].(map[string]any)["rule"] != "internal" {
+		t.Errorf("envelope = %s", so)
 	}
 }
 

@@ -89,12 +89,18 @@ func RunWith(o Options, cmds []func() Command) int {
 }
 
 // parse lets flags follow positionals: it parses, takes one positional, and
-// parses again until the arguments run out.
+// parses again until the arguments run out. A "--" ends flag parsing: every
+// token after it is a positional. (A flag value of exactly "--" is read as the
+// terminator too; no current flag accepts it, since branch names cannot start
+// with "-".)
 func parse(fs *flag.FlagSet, args []string) ([]string, error) {
 	var pos []string
 	for {
 		if err := fs.Parse(args); err != nil {
 			return nil, UsageError{Msg: err.Error()}
+		}
+		if n := len(args) - fs.NArg(); n > 0 && args[n-1] == "--" {
+			return append(pos, fs.Args()...), nil
 		}
 		if fs.NArg() == 0 {
 			return pos, nil
@@ -117,21 +123,25 @@ func identify(c *Context) (*Repo, error) {
 	c.Git = g
 	r := &Repo{Root: root}
 	if sha, ok, err := g.Head(); err != nil {
-		return nil, err
+		return nil, identifyError(err)
 	} else if ok {
 		r.Head = &sha
 	}
 	if name, ok, err := g.Branch(); err != nil {
-		return nil, err
+		return nil, identifyError(err)
 	} else if ok {
 		r.Branch = &name
 	}
 	if url, ok, err := g.RemoteURL("origin"); err != nil {
-		return nil, err
+		return nil, identifyError(err)
 	} else if ok {
 		r.Origin = &url
 	}
 	return r, nil
+}
+
+func identifyError(err error) error {
+	return EnvError{Msg: "cannot identify the repository: " + err.Error()}
 }
 
 func usage(w io.Writer, cmds []func() Command, msg string) {
