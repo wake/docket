@@ -89,7 +89,8 @@ None.
   `uncommitted-changes`, `behind-default-branch`, `change-not-merged`,
   `base-drift`, `name-taken`, `readings-disagree`, `openspec-failed`,
   `evidence-failed`, and the rules of `dkt lint` (archive); `no-merge-base`
-  (rebase).
+  (rebase); `symlink-refused` (any of the three, for a write through a
+  link).
 
 ### Failure Modes
 
