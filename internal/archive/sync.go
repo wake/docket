@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"regexp"
 	"slices"
 
@@ -168,7 +169,10 @@ var writeTemp = writeAll
 // writeFile replaces the content of an existing regular file below root,
 // refusing a link anywhere on its path. It writes a temporary file in the
 // same directory and renames it onto the target, so a failure leaves the
-// target untouched.
+// target untouched. The replacement gets the full mode (permission, setuid,
+// setgid and sticky bits); ownership, ACLs and extended attributes are not
+// carried over, since these files are tracked text that git does not record
+// them for. A target that cannot be opened for writing is refused.
 func writeFile(root, rel string, b []byte) (err error) {
 	if err := safepath.Check(root, rel); err != nil {
 		return err
@@ -180,6 +184,13 @@ func writeFile(root, rel string, b []byte) (err error) {
 	}
 	if !fi.Mode().IsRegular() {
 		return fmt.Errorf("%s is not a regular file", rel)
+	}
+	w, err := os.OpenFile(target, os.O_WRONLY|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return err
+	}
+	if err = w.Close(); err != nil {
+		return err
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(target), ".dkt-*")
 	if err != nil {
@@ -201,7 +212,7 @@ func writeFile(root, rel string, b []byte) (err error) {
 	if err = tmp.Close(); err != nil {
 		return err
 	}
-	if err = os.Chmod(tmp.Name(), fi.Mode().Perm()); err != nil {
+	if err = os.Chmod(tmp.Name(), fi.Mode()&(os.ModePerm|os.ModeSetuid|os.ModeSetgid|os.ModeSticky)); err != nil {
 		return err
 	}
 	return os.Rename(tmp.Name(), target)

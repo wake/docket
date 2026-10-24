@@ -296,6 +296,43 @@ func TestSyncReadOnlyDirectoryLeavesPlanAlone(t *testing.T) {
 	noTempFiles(t, dir)
 }
 
+func TestSyncReadOnlyTargetLeavesPlanAlone(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes everywhere")
+	}
+	r, e := syncRepo(t, planText("\n"))
+	work(r, "add-x", "2")
+	path := filepath.Join(r.Dir, planFile)
+	if err := os.Chmod(path, 0o444); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Sync(e, "add-x", false); err == nil {
+		t.Fatal("want an error")
+	}
+	if readPlan(t, r) != planText("\n") {
+		t.Error("plan.md changed")
+	}
+	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o444 {
+		t.Errorf("mode %v", fi.Mode())
+	}
+	noTempFiles(t, filepath.Dir(path))
+}
+
+func TestSyncKeepsMode(t *testing.T) {
+	r, e := syncRepo(t, planText("\n"))
+	work(r, "add-x", "2")
+	path := filepath.Join(r.Dir, planFile)
+	if err := os.Chmod(path, 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Sync(e, "add-x", false); err != nil {
+		t.Fatal(err)
+	}
+	if fi, _ := os.Stat(path); fi.Mode() != 0o640 {
+		t.Errorf("mode %v", fi.Mode())
+	}
+}
+
 func TestSyncNoCommits(t *testing.T) {
 	r := testutil.NewRepo(t)
 	rep, err := Sync(Env{Git: gitx.Git{Dir: r.Dir, Env: r.Env}, Root: r.Dir}, "add-x", false)
