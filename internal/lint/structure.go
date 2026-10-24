@@ -102,21 +102,21 @@ func checkDuplicates(r *run, c *loaded, d capDelta) {
 			set = append(set, placed{slug: delta.Slug(s.Name), where: mainFile + ":" + strconv.Itoa(s.Line)})
 		}
 	}
+	var fromDelta []placed
 	for _, list := range [][]delta.Requirement{d.Delta.Added, d.Delta.Modified} {
 		for _, q := range list {
 			for _, s := range q.Scenarios {
-				set = append(set, placed{
+				fromDelta = append(fromDelta, placed{
 					slug: delta.Slug(s.Name), where: c.Path(d.File) + ":" + strconv.Itoa(s.Line),
 					fromDelta: true, line: s.Line,
 				})
 			}
 		}
 	}
+	sort.SliceStable(fromDelta, func(i, j int) bool { return fromDelta[i].line < fromDelta[j].line })
+	set = append(set, fromDelta...)
 	first := map[string]placed{}
 	for _, p := range set {
-		if p.slug == "" {
-			continue
-		}
 		if prev, ok := first[p.slug]; ok {
 			if p.fromDelta {
 				r.add(c, "scenario-duplicate", d.File, p.line,
