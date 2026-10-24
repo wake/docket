@@ -2,6 +2,7 @@ package change
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -72,5 +73,18 @@ func TestReuseTable(t *testing.T) {
 	}
 	if q := ParsePlan([]byte("### Task 1: a\n")); q.ReuseLine != 0 || q.Reuse != nil {
 		t.Fatalf("no reuse = %+v", q)
+	}
+}
+
+func TestPlanCRLF(t *testing.T) {
+	src := "# Plan\n\n### Task 1: Parser\n\n**Scenarios:** `a#b`, c#d\n\n### Task 2: Fix\n\n**Compensates:** Task 1\n**Scenarios:** none\n\n## Cancelled Tasks\n\n- Task 5: Desk - moved to add-x\n- other\n\n## Reuse\n\n| A | B |\n|---|---|\n| x | y |\n"
+	crlf := "\xef\xbb\xbf" + strings.ReplaceAll(src, "\n", "\r\n")
+	want := ParsePlan([]byte(src))
+	got := ParsePlan([]byte(crlf))
+	if len(got.Tasks) != 2 || len(got.Cancelled) != 2 || got.Reuse == nil {
+		t.Fatalf("crlf plan = %+v", got)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("crlf = %+v\nlf   = %+v", got, want)
 	}
 }

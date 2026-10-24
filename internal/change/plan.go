@@ -66,14 +66,13 @@ const scenariosPrefix = "**Scenarios:**"
 func ParsePlan(b []byte) Plan {
 	lines := markdown.Lines(b)
 	mask := markdown.FenceMask(lines)
-	inComment := commentLines(lines)
 	var p Plan
 	for _, h := range markdown.Headings(lines, mask) {
 		m := taskHeadingRe.FindStringSubmatch(h.Text)
 		if h.Level == 3 && m != nil {
 			n, _ := strconv.Atoi(m[1])
 			_, to := markdown.Body(lines, mask, h)
-			p.Tasks = append(p.Tasks, readTask(lines, mask, inComment, h.Index, to, n, m[2]))
+			p.Tasks = append(p.Tasks, readTask(lines, mask, h.Index, to, n, m[2]))
 			continue
 		}
 		if taskLikeRe.MatchString(h.Text) {
@@ -87,7 +86,7 @@ func ParsePlan(b []byte) Plan {
 		switch {
 		case strings.EqualFold(h.Text, "Cancelled Tasks"):
 			for i := from; i < to; i++ {
-				if !mask[i] && !inComment[i] && strings.HasPrefix(lines[i], "- ") {
+				if !mask[i] && strings.HasPrefix(lines[i], "- ") {
 					p.Cancelled = append(p.Cancelled, readCancelled(lines[i], i+1))
 				}
 			}
@@ -101,10 +100,10 @@ func ParsePlan(b []byte) Plan {
 	return p
 }
 
-func readTask(lines []string, mask, inComment []bool, head, to, number int, name string) Task {
+func readTask(lines []string, mask []bool, head, to, number int, name string) Task {
 	t := Task{Number: number, Name: strings.TrimSpace(name), Line: head + 1}
 	for i := head + 1; i < to; i++ {
-		if mask[i] || inComment[i] {
+		if mask[i] {
 			continue
 		}
 		line := strings.TrimSpace(lines[i])
@@ -148,25 +147,4 @@ func readCancelled(line string, number int) Cancelled {
 		c.Number, _ = strconv.Atoi(m[1])
 	}
 	return c
-}
-
-// commentLines marks lines that start inside an HTML comment or hold only
-// comment text, so template placeholders are not read as content.
-func commentLines(lines []string) []bool {
-	out := make([]bool, len(lines))
-	open := false
-	for i, line := range lines {
-		if open {
-			out[i] = true
-			if strings.Contains(line, "-->") {
-				open = false
-			}
-			continue
-		}
-		if k := strings.Index(line, "<!--"); k >= 0 && !strings.Contains(line[k:], "-->") {
-			open = true
-			out[i] = k == 0
-		}
-	}
-	return out
 }
