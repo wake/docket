@@ -52,7 +52,10 @@ Docket reads a commit's time or knows the current time.
   committer time, read in the same `git log` call. Last activity is the
   newest commit of two lists over the same range: the commits whose
   trailers name the change, and the commits that change a file in its
-  folder (`Git.Commits` limited to that path). The committer date is when
+  folder (`Git.Commits` limited to that path, with full history: git's
+  default simplification drops a `--no-ff` merge that matches its second
+  parent on the path, and that merge is when a change reached the default
+  branch). The committer date is when
   the commit landed on the branch it is read from; the author date can
   be weeks older after a rebase and would overstate idleness.
 - **The run's start time comes in through `cli.Options`.** `cmd/dkt` sets

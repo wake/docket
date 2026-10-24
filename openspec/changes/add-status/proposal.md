@@ -100,7 +100,8 @@ None.
 ### Failure Modes
 
 - A source that cannot be read, or a file in a change folder: listed as
-  unreadable, exit 3; the other changes are still reported.
+  unreadable, exit 3; the other changes are still reported, and a change
+  with an unreadable file is reported from the files that could be read.
 - `.openspec.yaml` missing or unreadable as metadata: `metadata` is null,
   and so are the commit-derived fields; reporting it is `dkt lint`'s job.
 - `x-base` that is not a commit: commits and last activity are left out
