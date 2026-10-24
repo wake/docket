@@ -130,6 +130,9 @@ func splitScenarios(s string) []string {
 	if strings.EqualFold(s, "none") {
 		return nil
 	}
+	if s == "" {
+		return []string{""} // an empty value is not `none`; lint reports it
+	}
 	var out []string
 	for _, item := range strings.Split(s, ",") {
 		item = strings.Trim(strings.TrimSpace(item), "`")

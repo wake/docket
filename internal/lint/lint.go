@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/delta"
 )
 
 // Finding is one problem found in a change. Change and File are empty and
@@ -59,6 +60,7 @@ type loaded struct {
 	bad   map[string]bool // unreadable files, relative paths
 
 	Proposal change.Proposal // zero value unless proposal.md was read
+	Plan     change.Plan     // zero value unless plan.md was read
 }
 
 // Has reports whether the change has a readable file.
@@ -77,6 +79,8 @@ type run struct {
 
 	known     map[string]string // placeholder map, read on first use
 	knownDone bool
+
+	specs map[string][]delta.Requirement // main specs read so far, by path
 }
 
 func (r *run) add(c *loaded, rule, file string, line int, format string, args ...any) {
@@ -105,6 +109,14 @@ func Run(in Input) Report {
 		rep.Changes = append(rep.Changes, slug)
 		checkProposal(r, c)
 		checkPlaceholders(r, c)
+		if c.Has(planFile) {
+			checkPlan(r, c)
+		}
+		ds := deltas(c)
+		checkStructure(r, c, ds)
+		if c.Has(planFile) {
+			checkScenarios(r, c, ds)
+		}
 	}
 	sort.Strings(rep.Changes)
 	sort.SliceStable(rep.Findings, func(i, j int) bool {
@@ -228,6 +240,9 @@ func (r *run) load(slug string) (*loaded, bool) {
 	}
 	if b, ok := c.Files[proposalFile]; ok {
 		c.Proposal = change.ParseProposal(b)
+	}
+	if b, ok := c.Files[planFile]; ok {
+		c.Plan = change.ParsePlan(b)
 	}
 	return c, true
 }

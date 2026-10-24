@@ -66,11 +66,13 @@ func TestAnglePlaceholderLeft(t *testing.T) {
 }
 
 func TestPlaceholderInPlan(t *testing.T) {
+	plan := reusePlan("| Walk | none | new | nothing fits | rg Walk |\n")
+	plan = strings.Replace(plan, "Task 1: One", "Task 1: <name>", 1)
 	repo := repoWith(map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal,
-		"openspec/changes/add-x/plan.md":     "# Plan\n\n### Task 1: <name>\n",
+		"openspec/changes/add-x/plan.md":     plan,
 	})
-	f := wantOne(t, runOn(repo), "placeholder", 3)
+	f := wantOne(t, runOn(repo), "placeholder", lineOf(plan, "<name>"))
 	if f.File != "openspec/changes/add-x/plan.md" || !strings.Contains(f.Message, "<name>") {
 		t.Fatalf("finding = %+v", f)
 	}
