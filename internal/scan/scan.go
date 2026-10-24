@@ -291,7 +291,8 @@ func ReadFile(g gitx.Git, src Source, rel string) ([]byte, error) {
 // are neither read nor reported. A worktree is walked through os.Root, so
 // uncommitted and untracked files are read and links are neither read nor
 // followed; any other source is listed and read from its commit. A missing dir
-// gives an empty result. A kept file or a folder that cannot be read is
+// gives an empty result; a dir that exists but is not a folder (a file or a
+// link) is returned as Unreadable. A kept file or a folder that cannot be read is
 // returned as Unreadable with its Path, and the rest is still read.
 func ReadFiles(g gitx.Git, src Source, dir string, keep func(rel string) bool) (map[string][]byte, []Unreadable, error) {
 	if !filepath.IsLocal(dir) {
@@ -332,6 +333,8 @@ func ReadFiles(g gitx.Git, src Source, dir string, keep func(rel string) bool) (
 	if fi, err := root.Lstat(dir); err != nil || !fi.IsDir() {
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			fail(dir, err)
+		} else if err == nil {
+			fail(dir, errors.New("not a folder"))
 		}
 		return files, unread, nil
 	}

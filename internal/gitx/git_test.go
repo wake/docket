@@ -202,6 +202,12 @@ func TestListFiles(t *testing.T) {
 	if _, err := g.ListFiles("no-such-rev", "x"); err == nil {
 		t.Fatal("unknown revision: want an error")
 	}
+	if _, err := g.ListFiles("HEAD", "xx/other.md"); err == nil {
+		t.Fatal("dir that is a file: want an error")
+	}
+	if _, err := g.ListFiles("HEAD", "x/link.md"); err == nil {
+		t.Fatal("dir that is a link: want an error")
+	}
 }
 
 func TestShow(t *testing.T) {
