@@ -60,8 +60,9 @@ which compares them with OpenSpec's own reading before archiving.
   credited in the directory's README). A test reads each one with Docket and
   with `openspec show <change> --type change --json --deltas-only`, and
   compares capability, operation, requirement names and scenario names in
-  order. It runs when `DOCKET_OPENSPEC` is set, which the CI job does with
-  OpenSpec 1.14.3; it is skipped locally otherwise.
+  order. It runs when `DOCKET_TEST_OPENSPEC` is set, as for the other tests
+  that use the real CLI, which the CI job does with OpenSpec 1.14.3; it is
+  skipped locally otherwise.
 - **Routing check uses git.** Committed additions come from
   `git diff --name-status --diff-filter=A <merge-base> HEAD`, uncommitted
   ones from `git status --porcelain --untracked-files=all`, both limited to
