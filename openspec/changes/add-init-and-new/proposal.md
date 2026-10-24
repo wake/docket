@@ -127,6 +127,7 @@ None.
   `workspace-scan#change-only-on-a-remote-tracking-branch`,
   `workspace-scan#merged-branch-skipped`, `workspace-scan#origin-head-set`,
   `workspace-scan#no-default-branch`, `workspace-scan#merged-change-also-on-a-branch`,
+  `workspace-scan#worktree-with-unmerged-work-comes-first`,
   `workspace-scan#archived-slug-found`, `workspace-scan#worktree-on-an-unmounted-volume`,
   `workspace-scan#scan-offline`.
 - Setup: `project-setup#fresh-repository`, `project-setup#existing-openspec-project`,
@@ -142,3 +143,4 @@ None.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-10-24 | self: Task 5 implementer's report | Content precedence ranks a worktree by whether the default branch already contains its HEAD; the main checkout no longer shadows an unmerged branch. New scenario `workspace-scan#worktree-with-unmerged-work-comes-first` | Task 5 gets a fix round; no other task affected |
