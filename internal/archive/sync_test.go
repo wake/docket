@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -241,6 +242,58 @@ func TestSyncIgnoresUnreadableDeltaSpec(t *testing.T) {
 	if !strings.Contains(readPlan(t, r), "### Task 2: Two\n\n- [x]") {
 		t.Fatal("task 2 not ticked")
 	}
+}
+
+func noTempFiles(t *testing.T, dir string) {
+	t.Helper()
+	left, _ := filepath.Glob(filepath.Join(dir, ".dkt-*"))
+	if len(left) != 0 {
+		t.Errorf("temporary files left: %v", left)
+	}
+}
+
+func TestSyncWriteFailureLeavesPlanAlone(t *testing.T) {
+	r, e := syncRepo(t, planText("\n"))
+	work(r, "add-x", "2")
+	path := filepath.Join(r.Dir, planFile)
+	before, _ := os.Stat(path)
+	writeTemp = func(f *os.File, b []byte) error {
+		_, _ = f.Write(b[:len(b)/2])
+		return errors.New("disk full")
+	}
+	t.Cleanup(func() { writeTemp = writeAll })
+	_, err := Sync(e, "add-x", false)
+	if err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Fatalf("err = %v", err)
+	}
+	if readPlan(t, r) != planText("\n") {
+		t.Error("plan.md changed")
+	}
+	after, _ := os.Stat(path)
+	if after.Mode() != before.Mode() {
+		t.Errorf("mode %v, was %v", after.Mode(), before.Mode())
+	}
+	noTempFiles(t, filepath.Dir(path))
+}
+
+func TestSyncReadOnlyDirectoryLeavesPlanAlone(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes everywhere")
+	}
+	r, e := syncRepo(t, planText("\n"))
+	work(r, "add-x", "2")
+	dir := filepath.Dir(filepath.Join(r.Dir, planFile))
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if _, err := Sync(e, "add-x", false); err == nil {
+		t.Fatal("want an error")
+	}
+	if readPlan(t, r) != planText("\n") {
+		t.Error("plan.md changed")
+	}
+	noTempFiles(t, dir)
 }
 
 func TestSyncNoCommits(t *testing.T) {
