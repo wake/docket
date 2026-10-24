@@ -29,18 +29,23 @@ const (
 // refs/remotes/origin/HEAD, else main, else master. The tip is the origin
 // remote-tracking ref when it exists, else the local branch.
 func ResolveDefaultBranch(g gitx.Git, flag string) (DefaultBranch, error) {
-	name := flag
-	if name == "" {
-		target, ok, err := g.SymbolicRef(remotePrefix + "HEAD")
-		if err != nil {
+	if flag != "" {
+		return tip(g, flag)
+	}
+	target, ok, err := g.SymbolicRef(remotePrefix + "HEAD")
+	if err != nil {
+		return DefaultBranch{}, err
+	}
+	if ok && strings.HasPrefix(target, remotePrefix) {
+		// A target outside origin or one that no longer exists (dangling)
+		// falls through to main and master.
+		db, err := tip(g, strings.TrimPrefix(target, remotePrefix))
+		if err == nil {
+			return db, nil
+		}
+		if !errors.Is(err, ErrNoDefaultBranch) {
 			return DefaultBranch{}, err
 		}
-		if ok {
-			name = strings.TrimPrefix(target, remotePrefix)
-		}
-	}
-	if name != "" {
-		return tip(g, name)
 	}
 	for _, n := range []string{"main", "master"} {
 		db, err := tip(g, n)

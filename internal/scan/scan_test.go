@@ -162,6 +162,35 @@ func TestDefaultBranchFlagAndMaster(t *testing.T) {
 	}
 }
 
+func TestDanglingOriginHeadFallsBackToMain(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/gone")
+	db, err := scan.ResolveDefaultBranch(newGit(r), "")
+	if err != nil || db.Name != "main" || db.Ref != "refs/heads/main" {
+		t.Fatalf("db = %+v, %v", db, err)
+	}
+}
+
+func TestOriginHeadOutsideOriginNamespace(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("update-ref", "refs/remotes/upstream/main", "HEAD")
+	r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/upstream/main")
+	db, err := scan.ResolveDefaultBranch(newGit(r), "")
+	if err != nil || db.Name != "main" || db.Ref != "refs/heads/main" {
+		t.Fatalf("db = %+v, %v", db, err)
+	}
+}
+
+func TestDanglingOriginHeadNoFallbackBranch(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "dev")
+	r.Commit("init", map[string]string{"a": "b"})
+	r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/gone")
+	if _, err := scan.ResolveDefaultBranch(newGit(r), ""); !errors.Is(err, scan.ErrNoDefaultBranch) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestMergedChangeAlsoOnBranch(t *testing.T) {
 	r := baseRepo(t)
 	r.Commit("x", map[string]string{yamlPath("add-x"): "x-kind: feature\n"})
