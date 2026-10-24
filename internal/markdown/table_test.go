@@ -25,6 +25,11 @@ func TestFindTable(t *testing.T) {
 			t.Fatalf("rows = %+v", tb.Rows)
 		}
 	})
+	t.Run("nbsp padded delimiter", func(t *testing.T) {
+		if _, ok := find(t, []string{"A | B", "\u00a0|\u00a0---\u00a0|\u00a0---\u00a0|", "1 | 2"}); !ok {
+			t.Fatal("no table")
+		}
+	})
 	t.Run("escaped pipe", func(t *testing.T) {
 		tb, ok := find(t, []string{"A | B", "-|-", `a\|b | c`})
 		if !ok || !reflect.DeepEqual(tb.Rows[0].Cells, []string{"a|b", "c"}) {
