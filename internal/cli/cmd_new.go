@@ -55,11 +55,7 @@ func newCommand() Command {
 				}
 				return fail("schema-missing", "the docket schema is not installed; run dkt init")
 			}
-			db, err := resolveDefaultBranch(c)
-			if err != nil {
-				return Outcome{}, err
-			}
-			inv, err := scan.Scan(c.Git, db)
+			db, inv, err := scanDefaultBranch(c)
 			if err != nil {
 				return Outcome{}, err
 			}
@@ -76,13 +72,7 @@ func newCommand() Command {
 				out.Findings = append(out.Findings, Finding{Rule: "slug-used", Change: slug,
 					Message: fmt.Sprintf("slug %q is already used: %s", slug, strings.Join(parts, "; "))})
 			}
-			for _, u := range inv.Unreadable {
-				name := u.Source.Name
-				if u.Source.Kind == scan.KindWorktree {
-					name = "worktree:" + name
-				}
-				out.Unreadable = append(out.Unreadable, Unreadable{Source: name, Reason: u.Reason})
-			}
+			out.Unreadable = scanUnreadable(inv.Unreadable)
 			if len(out.Unreadable) > 0 || len(out.Findings) > 0 {
 				return out, nil
 			}
@@ -185,6 +175,17 @@ func resolveDefaultBranch(c *Context) (scan.DefaultBranch, error) {
 		return db, EnvError{Msg: err.Error()}
 	}
 	return db, err
+}
+
+// scanDefaultBranch resolves the default branch and scans every source
+// against it.
+func scanDefaultBranch(c *Context) (scan.DefaultBranch, scan.Inventory, error) {
+	db, err := resolveDefaultBranch(c)
+	if err != nil {
+		return db, scan.Inventory{}, err
+	}
+	inv, err := scan.Scan(c.Git, db)
+	return db, inv, err
 }
 
 // lockWithDefaultBranch resolves the default branch and takes the openspec/
