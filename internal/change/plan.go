@@ -56,7 +56,7 @@ var (
 	taskLikeRe    = regexp.MustCompile(`^Task\s+\d`)
 	compensatesRe = regexp.MustCompile(`^\*\*Compensates:\*\* Task ([1-9][0-9]*)$`)
 	cancelledRe   = regexp.MustCompile(`^- Task ([1-9][0-9]*): (\S.*?) - (\S.*)$`)
-	cancelledNum  = regexp.MustCompile(`^- Task ([1-9][0-9]*)\b`)
+	cancelledNum  = regexp.MustCompile(`^[-*+] Task ([1-9][0-9]*)\b`)
 )
 
 const scenariosPrefix = "**Scenarios:**"
@@ -70,10 +70,11 @@ func ParsePlan(b []byte) Plan {
 	for _, h := range markdown.Headings(lines, mask) {
 		m := taskHeadingRe.FindStringSubmatch(h.Text)
 		if h.Level == 3 && m != nil {
-			n, _ := strconv.Atoi(m[1])
-			_, to := markdown.Body(lines, mask, h)
-			p.Tasks = append(p.Tasks, readTask(lines, mask, h.Index, to, n, m[2]))
-			continue
+			if n, err := strconv.Atoi(m[1]); err == nil {
+				_, to := markdown.Body(lines, mask, h)
+				p.Tasks = append(p.Tasks, readTask(lines, mask, h.Index, to, n, m[2]))
+				continue
+			}
 		}
 		if taskLikeRe.MatchString(h.Text) {
 			p.BadHeadings = append(p.BadHeadings, BadHeading{Text: h.Text, Level: h.Level, Line: h.Index + 1})
@@ -86,7 +87,7 @@ func ParsePlan(b []byte) Plan {
 		switch {
 		case strings.EqualFold(h.Text, "Cancelled Tasks"):
 			for i := from; i < to; i++ {
-				if !mask[i] && strings.HasPrefix(lines[i], "- ") {
+				if !mask[i] && isTopLevelBullet(lines[i]) {
 					p.Cancelled = append(p.Cancelled, readCancelled(lines[i], i+1))
 				}
 			}
@@ -114,8 +115,9 @@ func readTask(lines []string, mask []bool, head, to, number int, name string) Ta
 		case strings.HasPrefix(line, "**Compensates:**"):
 			r := Ref{Line: i + 1}
 			if m := compensatesRe.FindStringSubmatch(line); m != nil {
-				r.Number, _ = strconv.Atoi(m[1])
-				r.OK = true
+				if n, err := strconv.Atoi(m[1]); err == nil {
+					r.Number, r.OK = n, true
+				}
 			}
 			t.Compensates = append(t.Compensates, r)
 		}
@@ -138,11 +140,16 @@ func splitScenarios(s string) []string {
 	return out
 }
 
+func isTopLevelBullet(line string) bool {
+	return len(line) >= 2 && strings.ContainsRune("-*+", rune(line[0])) && line[1] == ' '
+}
+
 func readCancelled(line string, number int) Cancelled {
 	c := Cancelled{Line: number}
 	if m := cancelledRe.FindStringSubmatch(strings.TrimRight(line, " \t")); m != nil {
-		c.Number, _ = strconv.Atoi(m[1])
-		c.Name, c.Reason, c.OK = m[2], m[3], true
+		if n, err := strconv.Atoi(m[1]); err == nil {
+			c.Number, c.Name, c.Reason, c.OK = n, m[2], m[3], true
+		}
 	} else if m := cancelledNum.FindStringSubmatch(line); m != nil {
 		c.Number, _ = strconv.Atoi(m[1])
 	}
