@@ -128,7 +128,7 @@ func checkReuse(r *run, c *loaded) {
 
 func checkExistingPath(r *run, c *loaded, line int, need, existing string) {
 	before, _, _ := strings.Cut(existing, ":")
-	p := strings.TrimSpace(before)
+	p := strings.TrimSuffix(strings.TrimSpace(before), "/")
 	if p == "" || !fs.ValidPath(p) {
 		r.add(c, "reuse-table", planFile, line,
 			"%q: Existing must start with a repository path or `external:`", need)

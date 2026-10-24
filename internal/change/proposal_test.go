@@ -1,6 +1,7 @@
 package change
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -53,5 +54,13 @@ func TestFencedHeadingsIgnored(t *testing.T) {
 	pl := ParsePlan([]byte("### Task 1: a\n\n```\n### Task 9: x\n```\n"))
 	if len(pl.Tasks) != 1 || len(pl.BadHeadings) != 0 {
 		t.Fatalf("plan = %+v", pl)
+	}
+}
+
+func TestFencedCommentOpenerDoesNotSwallowSection(t *testing.T) {
+	p := ParseProposal([]byte("## Why\n\n```\n<!--\n```\n\nreal text\n"))
+	s, ok := p.Section("Why")
+	if !ok || !strings.Contains(s.Body, "real text") {
+		t.Fatalf("section = %+v", s)
 	}
 }

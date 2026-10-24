@@ -50,7 +50,7 @@ func ParseProposal(b []byte) Proposal {
 
 func sectionOf(lines []string, mask []bool, h markdown.Heading) Section {
 	from, to := markdown.Body(lines, mask, h)
-	body := markdown.StripComments(strings.Join(lines[from:to], "\n"))
+	body := strings.Join(markdown.BlankComments(lines, mask)[from:to], "\n")
 	return Section{Title: h.Text, Line: h.Index + 1, Body: strings.TrimSpace(body)}
 }
 

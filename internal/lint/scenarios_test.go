@@ -151,6 +151,28 @@ func TestPunctuatedDuplicates(t *testing.T) {
 	}
 }
 
+func TestRenameThenModifyIsNotADuplicate(t *testing.T) {
+	main := "## Requirements\n\n### Requirement: Old\n\nx\n\n#### Scenario: Join when full\n\n- a\n"
+	d := "## RENAMED Requirements\n\n- FROM: `### Requirement: Old`\n- TO: `### Requirement: New`\n\n## MODIFIED Requirements\n\n### Requirement: New\n\nx\n\n#### Scenario: Join when full\n\n- a\n"
+	got := dupFindings(scenRepo(planWith("none"), map[string]string{
+		"openspec/specs/booking/spec.md": main, deltaAt("booking"): d,
+	}))
+	if len(got) != 0 {
+		t.Fatalf("dups = %+v", got)
+	}
+}
+
+func TestPureRenameKeepsScenarios(t *testing.T) {
+	main := "## Requirements\n\n### Requirement: Old\n\nx\n\n#### Scenario: Success\n\n- a\n"
+	d := "## RENAMED Requirements\n\n- FROM: `### Requirement: Old`\n- TO: `### Requirement: New`\n\n## ADDED Requirements\n\n### Requirement: Other\n\nx\n\n#### Scenario: Success\n\n- a\n"
+	got := dupFindings(scenRepo(planWith("none"), map[string]string{
+		"openspec/specs/booking/spec.md": main, deltaAt("booking"): d,
+	}))
+	if len(got) != 1 || got[0].Line != lineOf(d, "Success") || !strings.Contains(got[0].Message, "openspec/specs/booking/spec.md") {
+		t.Fatalf("dups = %+v", got)
+	}
+}
+
 func TestDuplicatesWithoutPlan(t *testing.T) {
 	d := "## ADDED Requirements\n\n### Requirement: A\n\nx\n\n#### Scenario: S\n\n- a\n\n#### Scenario: S\n\n- a\n"
 	r := runOn(repoWith(map[string]string{

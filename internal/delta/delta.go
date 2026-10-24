@@ -169,7 +169,7 @@ func Parse(b []byte) Delta {
 	add := func(line int, format string, args ...any) {
 		problems = append(problems, Problem{Line: line, Message: fmt.Sprintf(format, args...)})
 	}
-	comments := d.commentBlanked()
+	comments := markdown.BlankComments(d.lines, d.mask)
 	found := false
 	firstSection := len(d.lines)
 	if len(secs) > 0 {
@@ -292,56 +292,6 @@ func (d doc) renamed(s section) ([]Rename, []Problem) {
 		drop("FROM", pending.From, pending.Line)
 	}
 	return pairs, bad
-}
-
-// commentBlanked returns the lines with HTML comments outside fences
-// replaced by spaces; an unclosed comment runs to the end. Fenced lines keep
-// their text.
-func (d doc) commentBlanked() []string {
-	var b strings.Builder
-	for i, l := range d.lines {
-		if i > 0 {
-			b.WriteByte('\n')
-		}
-		if !d.mask[i] {
-			b.WriteString(l)
-		}
-	}
-	s := b.String()
-	var o strings.Builder
-	for {
-		i := strings.Index(s, "<!--")
-		if i < 0 {
-			o.WriteString(s)
-			break
-		}
-		o.WriteString(s[:i])
-		rest := s[i:]
-		n := len(rest)
-		body := rest[4:]
-		j, k := strings.Index(body, "-->"), strings.Index(body, "--!>")
-		switch {
-		case j >= 0 && (k < 0 || j < k):
-			n = 4 + j + 3
-		case k >= 0:
-			n = 4 + k + 4
-		}
-		for _, r := range rest[:n] {
-			if r == '\n' {
-				o.WriteByte('\n')
-			} else {
-				o.WriteByte(' ')
-			}
-		}
-		s = rest[n:]
-	}
-	out := strings.Split(o.String(), "\n")
-	for i := range out {
-		if d.mask[i] {
-			out[i] = d.lines[i]
-		}
-	}
-	return out
 }
 
 // ParseSpec reads the requirements in the first "## Requirements" section of

@@ -84,6 +84,13 @@ func TestReuseRowWithAMissingPath(t *testing.T) {
 	}
 }
 
+func TestReusePathWithATrailingSlash(t *testing.T) {
+	doc := reusePlan("| Run | `internal/foo/` | reuse | | rg Run |\n| Walk | `internal/foo/:Walk` | extend | | rg Walk |\n")
+	if r := runOn(planRepo(doc, "internal/foo/x.go")); len(r.Findings) != 0 {
+		t.Fatalf("findings = %+v", r.Findings)
+	}
+}
+
 func TestNewRowWithoutAReason(t *testing.T) {
 	doc := reusePlan("| Run | none | new | | rg Run |\n")
 	wantOne(t, lintPlan(doc), "reuse-table", lineOf(doc, "| Run |"))
