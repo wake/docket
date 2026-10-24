@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/scan"
 	"github.com/wake/docket/internal/testutil"
@@ -315,6 +316,43 @@ func TestBaseNotACommit(t *testing.T) {
 	c := mustFind(t, cs, "add-x")
 	if c.LastActivity != nil || len(unread) != 0 {
 		t.Fatalf("activity %+v unreadable %+v", c.LastActivity, unread)
+	}
+}
+
+func TestMetadataUnusable(t *testing.T) {
+	cases := []struct{ name, yaml string }{
+		{"not yaml", "schema: [unclosed\n  x-base: \"\n"},
+		{"empty base", "schema: docket\nx-kind: fix\nx-source: issue 7\nx-base: \"\"\n"},
+		{"dash base", "schema: docket\nx-kind: fix\nx-source: issue 7\nx-base: \"-x\"\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _ := baseRepo(t)
+			r.Git("checkout", "-q", "-b", "feat")
+			commitAt(r, day(1), "x", map[string]string{
+				folder("add-x", ".openspec.yaml"): tc.yaml,
+				folder("add-x", "plan.md"):        "### Task 1: One\n\n- [ ] **Step 1: a**\n",
+			}, "Change: add-x", "Task: 1")
+			cs, unread := loadAt(t, r, t0.AddDate(0, 0, 5))
+			if len(unread) != 0 {
+				t.Fatalf("unreadable = %+v", unread)
+			}
+			c := mustFind(t, cs, "add-x")
+			parsed, perr := change.ParseMetadata([]byte(tc.yaml))
+			if perr != nil {
+				if c.Metadata != nil {
+					t.Fatalf("metadata = %+v, want nil", c.Metadata)
+				}
+			} else if c.Metadata == nil || c.Metadata.Base != parsed.Base {
+				t.Fatalf("metadata = %+v, want base %q", c.Metadata, parsed.Base)
+			}
+			if c.Phase != Ready || len(c.Tasks) != 1 || c.Tasks[0].State != Pending || len(c.Tasks[0].Commits) != 0 {
+				t.Fatalf("phase %q tasks %+v", c.Phase, c.Tasks)
+			}
+			if c.LastActivity != nil {
+				t.Fatalf("last activity = %+v", c.LastActivity)
+			}
+		})
 	}
 }
 
