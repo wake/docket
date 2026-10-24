@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"time"
 
 	"github.com/wake/docket/internal/gitx"
 )
@@ -62,6 +63,7 @@ type Context struct {
 	DefaultBranch string
 	Git           gitx.Git
 	Repo          *Repo
+	Now           time.Time // the run's start time
 }
 
 // Command is one dkt subcommand.
@@ -77,6 +79,7 @@ type Options struct {
 	Dir            string
 	Env            []string
 	Stdout, Stderr io.Writer
+	Now            time.Time // the run's start time; zero means time.Now()
 }
 
 func asUsage(err error) bool {

@@ -4,7 +4,7 @@
 
 Docket 是一個小型命令列工具，負責檢查 [OpenSpec](https://github.com/Fission-AI/OpenSpec) 的 change 資料夾，並幫它們記帳。適用於用 [superpowers](https://github.com/obra/superpowers) 規劃與執行工作的專案。Docket 自己不存任何狀態，指令名稱是 `dkt`。
 
-> **狀態：早期。**`init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase` 已經能用，第一個里程碑完成。下面其餘的指令還是草案，之後會調整。Docket 本身就是照這份 README 描述的流程開發的。
+> **狀態：早期。**`init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`、`status` 已經能用，前面七個指令完成了第一個里程碑。下面其餘的指令還是草案，之後會調整。Docket 本身就是照這份 README 描述的流程開發的。
 
 ## 為什麼要有它
 
@@ -92,7 +92,7 @@ dkt conflicts [<slug>]            # 被多個進行中 change 碰到的需求
 dkt sync <slug> [--check]         # 依 commit trailer 勾 plan.md
 dkt archive <slug>...             # 發版步驟，在從預設分支開出的分支上
 dkt rebase <slug>                 # 把較新的規格接受為 change 的 base
-dkt status [--json]               # 階段、任務、worktree、負責人、PR、閒置天數、驗收輪
+dkt status [<slug>...] [--json]   # 階段、任務與其 commit、進度、最後活動、未提交的改動
 dkt brief <slug> --task N         # 給實作 agent 的 brief
 dkt check <slug>                  # scenario 覆蓋與勾選一致性（PR 閘門）
 dkt accept <slug> --round N [--export html]

@@ -57,12 +57,9 @@ func conflictsCommand() Command {
 					found = found || s == slug
 				}
 				if !found {
-					msg := fmt.Sprintf("%q is not an active change", slug)
-					_, archived := inv.Uses(slug)
-					for _, a := range archived {
-						msg += "; archived as " + a.Folder
+					if mayReportNotActive(inv, slug) {
+						out.Findings = append(out.Findings, notActiveFinding(inv, slug))
 					}
-					out.Findings = append(out.Findings, Finding{Rule: "change-not-active", Change: slug, Message: msg})
 					out.Result = ConflictsResult{Changes: slugs, Overlaps: []conflicts.Overlap{}}
 					return out, nil
 				}
@@ -89,6 +86,34 @@ func conflictsCommand() Command {
 			return out, nil
 		},
 	}
+}
+
+// notActiveFinding is the change-not-active finding for a valid slug that
+// names no active change; it says where the slug was archived, if it was.
+func notActiveFinding(inv scan.Inventory, slug string) Finding {
+	msg := fmt.Sprintf("%q is not an active change", slug)
+	_, archived := inv.Uses(slug)
+	for _, a := range archived {
+		msg += "; archived as " + a.Folder
+	}
+	return Finding{Rule: "change-not-active", Change: slug, Message: msg}
+}
+
+// mayReportNotActive reports whether a valid slug with no active use may get a
+// change-not-active finding. It may when the slug is archived somewhere
+// (known either way) or when every source was read; while a whole source
+// (an Unreadable with an empty Path) could not be read, that source may hold
+// the slug, and the unreadable entry reports the gap instead.
+func mayReportNotActive(inv scan.Inventory, slug string) bool {
+	if _, archived := inv.Uses(slug); len(archived) > 0 {
+		return true
+	}
+	for _, u := range inv.Unreadable {
+		if u.Path == "" {
+			return false
+		}
+	}
+	return true
 }
 
 func shortCommit(c string) string {

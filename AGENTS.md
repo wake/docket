@@ -11,7 +11,7 @@ README.md. It is a public repository: write everything in English, and never
 commit hostnames, customer names, personal paths or secrets.
 
 Status: milestone 1 is complete. `dkt init`, `dkt new`, `dkt lint`,
-`dkt conflicts`, `dkt sync`, `dkt archive` and `dkt rebase` exist; build them
+`dkt conflicts`, `dkt sync`, `dkt archive`, `dkt rebase` and `dkt status` exist; build them
 with `go install ./cmd/dkt`. Upcoming work is ordered in `docs/ideas/`.
 
 Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` for module
