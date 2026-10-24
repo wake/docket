@@ -299,6 +299,19 @@ func TestDoubleDashEndsFlags(t *testing.T) {
 	}
 }
 
+func TestDoubleDashAsFlagValue(t *testing.T) {
+	r := testutil.NewRepo(t)
+	var got []string
+	code, so, _ := run(t, r.Dir, probeCmd(Outcome{}, nil, &got), "probe", "--default-branch", "--", "arg", "--json")
+	if code != 0 || strings.Join(got, " ") != "arg" || !strings.HasPrefix(so, "{") {
+		t.Fatalf("exit %d positionals %q stdout %q", code, got, so)
+	}
+	code, so, _ = run(t, r.Dir, probeCmd(Outcome{}, nil, &got), "probe", "--default-branch", "--json", "--", "-x")
+	if code != 0 || strings.Join(got, " ") != "-x" || strings.HasPrefix(so, "{") {
+		t.Fatalf("exit %d positionals %q stdout %q", code, got, so)
+	}
+}
+
 func TestMarshalFailureStillWritesEnvelope(t *testing.T) {
 	r := testutil.NewRepo(t)
 	code, so, _ := run(t, r.Dir, probeCmd(Outcome{Result: make(chan int)}, nil, nil), "probe", "--json")
