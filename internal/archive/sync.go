@@ -6,16 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
-	"slices"
 	"syscall"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/safepath"
 )
-
-var taskNumberRe = regexp.MustCompile(`^[1-9][0-9]*$`)
 
 // taskWork is what the trailers say about one task of the plan.
 type taskWork struct {
@@ -53,50 +49,20 @@ func shortSHA(s string) string {
 // Change: <c.Slug> to c's plan.
 func computeSync(c *loadedChange, commits []gitx.Commit) syncResult {
 	var res syncResult
-	byNumber := map[int]*taskWork{}
-	for _, t := range c.Plan.Tasks {
-		if _, dup := byNumber[t.Number]; dup {
-			continue
-		}
-		w := &taskWork{Task: t}
-		for _, s := range t.Steps {
+	named, unknown, anyTrailer := change.NamedTasks(c.Plan, c.Slug, commits)
+	res.AnyTrailer = anyTrailer
+	for _, u := range unknown {
+		res.Findings = append(res.Findings, Finding{Rule: "task-unknown", Change: c.Slug, File: c.path("plan.md"),
+			Message: fmt.Sprintf("commit %s has trailer Task: %s, which is not a task of plan.md", shortSHA(u.Commit.SHA), u.Value)})
+	}
+	for _, nt := range named {
+		w := taskWork{Task: nt.Task, Commits: nt.Commits}
+		for _, s := range nt.Task.Steps {
 			if !s.Done {
 				w.Lines = append(w.Lines, s.Line)
 			}
 		}
-		byNumber[t.Number] = w
-	}
-	named := map[int]bool{}
-	for _, cm := range commits {
-		if !slices.Contains(cm.Change, c.Slug) {
-			continue
-		}
-		seen := map[string]bool{}
-		for _, v := range cm.Task {
-			res.AnyTrailer = true
-			if seen[v] {
-				continue
-			}
-			seen[v] = true
-			n := 0
-			if taskNumberRe.MatchString(v) {
-				_, _ = fmt.Sscanf(v, "%d", &n)
-			}
-			w := byNumber[n]
-			if w == nil {
-				res.Findings = append(res.Findings, Finding{Rule: "task-unknown", Change: c.Slug, File: c.path("plan.md"),
-					Message: fmt.Sprintf("commit %s has trailer Task: %s, which is not a task of plan.md", shortSHA(cm.SHA), v)})
-				continue
-			}
-			w.Commits = append(w.Commits, cm)
-			named[n] = true
-		}
-	}
-	for _, t := range c.Plan.Tasks {
-		if named[t.Number] {
-			res.Tasks = append(res.Tasks, *byNumber[t.Number])
-			named[t.Number] = false
-		}
+		res.Tasks = append(res.Tasks, w)
 	}
 	return res
 }
