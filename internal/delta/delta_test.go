@@ -151,6 +151,17 @@ func TestPurposeAndPreamble(t *testing.T) {
 	}
 }
 
+func TestCommentClosedByBangTerminator(t *testing.T) {
+	d := Parse([]byte("<!-- x --!> stray\n## ADDED Requirements\n### Requirement: A\n"))
+	if !reflect.DeepEqual(problemLines(d), []int{1}) {
+		t.Fatalf("%+v", d.Problems)
+	}
+	d = Parse([]byte("<!-- x --!>\n## ADDED Requirements\n### Requirement: A\n"))
+	if len(d.Problems) != 0 {
+		t.Fatalf("%+v", d.Problems)
+	}
+}
+
 func TestNoDeltaSection(t *testing.T) {
 	d := Parse([]byte("# Title\n\n## Purpose\nx\n"))
 	if !reflect.DeepEqual(problemLines(d), []int{1}) {

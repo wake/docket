@@ -315,10 +315,14 @@ func (d doc) commentBlanked() []string {
 		}
 		o.WriteString(s[:i])
 		rest := s[i:]
-		j := strings.Index(rest[4:], "-->")
 		n := len(rest)
-		if j >= 0 {
+		body := rest[4:]
+		j, k := strings.Index(body, "-->"), strings.Index(body, "--!>")
+		switch {
+		case j >= 0 && (k < 0 || j < k):
 			n = 4 + j + 3
+		case k >= 0:
+			n = 4 + k + 4
 		}
 		for _, r := range rest[:n] {
 			if r == '\n' {
