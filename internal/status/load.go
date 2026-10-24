@@ -78,6 +78,8 @@ func Load(g gitx.Git, inv scan.Inventory, now time.Time) ([]Change, []scan.Unrea
 		ch := Change{Slug: c.Slug, Sources: c.Sources, Documents: documentsOf(files)}
 		base := ""
 		if b, ok := files[".openspec.yaml"]; ok {
+			// A malformed .openspec.yaml leaves the change without metadata, so
+			// without base, commits and activity; dkt lint reports the file.
 			if m, err := change.ParseMetadata(b); err == nil {
 				ch.Metadata = &Metadata{Kind: m.Kind, Source: m.Source, Base: m.Base, Created: m.Created}
 				base = m.Base
@@ -92,6 +94,7 @@ func Load(g gitx.Git, inv scan.Inventory, now time.Time) ([]Change, []scan.Unrea
 		if b, ok := files["plan.md"]; ok {
 			p := change.ParsePlan(b)
 			plan = &p
+			// dkt status does not report unknown Task trailers; dkt sync does.
 			named, _, _ = change.NamedTasks(p, c.Slug, commits)
 		}
 		ch.Phase, ch.Tasks, ch.Progress = Summarize(plan, named)
