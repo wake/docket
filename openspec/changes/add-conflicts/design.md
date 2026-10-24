@@ -34,12 +34,14 @@ turns `specs/<capability>/spec.md` into a capability path.
   accepts, keyed by its path relative to `dir`, and lists the paths it
   could not read. Files `keep` rejects are not read, so an unreadable file
   that is not a delta spec never makes the command exit with 3. A worktree is
-  walked through `os.Root`, as `scan.ReadFile` already reads it, so neither
-  `..` nor a link leads out of it; links are skipped. A branch is listed
+  walked through `os.Root`, so inside the worktree neither `..` nor a link
+  leads out; the worktree's own path is opened as listed, as
+  `scan.ReadFile` does. Links inside are skipped. A branch is listed
   with `git ls-tree -r -z` at its commit (blobs with a regular file mode
   only, so links and submodules are skipped) and each file is read with
   `git show`. A folder that does not exist yields no files and no error,
-  because a change may have no `specs/` folder yet. The alternative, an
+  because a change may have no `specs/` folder yet; a `dir` that exists but
+  is not a folder is unreadable. The alternative, an
   `fs.FS` backed by a git tree, would let `lint` and `archive` keep their
   walkers unchanged, but it needs an open-file lifetime for worktrees and
   more code than one function, for no caller that needs it now.
