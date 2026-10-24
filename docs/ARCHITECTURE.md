@@ -17,6 +17,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/archive` | Closes changes: `dkt sync`, `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, and `evidence.md` |
 | `internal/markdown` | Line, heading and table readers that skip code fences and comments |
 | `internal/delta` | Reads delta specs and main specs; makes scenario slugs |
+| `internal/conflicts` | Finds requirements that more than one active change touches |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
 | `internal/safepath` | Refuses a write path that passes through a symbolic link |
 | `internal/testutil` | Test-only helpers: temporary repositories, a fake OpenSpec |
@@ -51,6 +52,12 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Check and archive changes, then record evidence | `archive.Archive` |
 | Compare Docket's reading of deltas with OpenSpec's | `archive.CrossCheck` |
 | Files a branch adds | `Git.AddedFiles`, `Git.UncommittedAdded` |
+| List the files under a directory at a revision | `Git.ListFiles` |
+| Read many files from a scanned source | `scan.ReadFiles` |
+| Map a delta spec path to its capability | `delta.CapabilityPath` |
+| Load every active change's deltas | `conflicts.Load` |
+| Find requirements touched by more than one change | `conflicts.Find` |
+| Keep the overlaps that involve one change | `conflicts.Involving` |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |
 | Stand in for OpenSpec | `testutil.FakeOpenSpec` |

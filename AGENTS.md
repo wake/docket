@@ -10,10 +10,9 @@ change folders in projects that plan and execute with superpowers. See
 README.md. It is a public repository: write everything in English, and never
 commit hostnames, customer names, personal paths or secrets.
 
-Status: milestone 1 is being built. `dkt init`, `dkt new`, `dkt lint`,
-`dkt sync`, `dkt archive` and `dkt rebase` exist; build them with
-`go install ./cmd/dkt`. `dkt conflicts` comes with `add-conflicts` (see the
-Order in `docs/ideas/`).
+Status: milestone 1 is complete. `dkt init`, `dkt new`, `dkt lint`,
+`dkt conflicts`, `dkt sync`, `dkt archive` and `dkt rebase` exist; build them
+with `go install ./cmd/dkt`. Upcoming work is ordered in `docs/ideas/`.
 
 Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` for module
 boundaries and shared capabilities. Ideas that are not ready, and the order of
