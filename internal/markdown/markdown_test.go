@@ -26,6 +26,9 @@ func TestFenceMask(t *testing.T) {
 		{"shorter does not", []string{"````", "x", "```", "y"}, []bool{true, true, true, true}},
 		{"other char does not", []string{"```", "x", "~~~", "y", "```", "z"}, []bool{true, true, true, true, true, false}},
 		{"closing with text does not", []string{"```", "``` x", "y"}, []bool{true, true, true}},
+		{"nbsp indent", []string{"\u00a0```", "x", "\u00a0```", "b"}, []bool{true, true, true, false}},
+		{"ideographic space indent", []string{"\u3000```", "x", "```", "b"}, []bool{true, true, true, false}},
+		{"closing with trailing nbsp", []string{"```", "x", "```\u00a0", "b"}, []bool{true, true, true, false}},
 		{"unclosed", []string{"a", "```", "b", "c"}, []bool{false, true, true, true}},
 	}
 	for _, tc := range tests {
@@ -41,6 +44,15 @@ func TestHeadings(t *testing.T) {
 	lines := []string{"## Why", "#NoSpace", "### Task 1: x ###", "```", "# fenced", "```", "####### seven", "# "}
 	got := Headings(lines, FenceMask(lines))
 	want := []Heading{{2, "Why", 0}, {3, "Task 1: x", 2}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Headings = %+v, want %+v", got, want)
+	}
+}
+
+func TestHeadingsJavaScriptSpace(t *testing.T) {
+	lines := []string{"##\u00a0Why"}
+	got := Headings(lines, FenceMask(lines))
+	want := []Heading{{2, "Why", 0}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Headings = %+v, want %+v", got, want)
 	}
