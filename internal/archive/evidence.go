@@ -2,6 +2,7 @@ package archive
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/wake/docket/internal/change"
@@ -35,7 +36,7 @@ func (ev evidence) render() string {
 	fmt.Fprintf(&b, "# Evidence: %s\n\n| Field | Value |\n|---|---|\n", ev.Slug)
 	for _, row := range [][2]string{
 		{"Date", ev.Date}, {"Docket", cell(ev.Docket)}, {"OpenSpec", cell(ev.OpenSpec)},
-		{"Repository", orNone(ev.Origin)}, {"HEAD", ev.Head}, {"x-base", cell(ev.Meta.Base)},
+		{"Repository", cell(evidenceOrigin(ev.Origin))}, {"HEAD", ev.Head}, {"x-base", cell(ev.Meta.Base)},
 		{"x-kind", orNone(ev.Meta.Kind)}, {"x-source", orNone(ev.Meta.Source)},
 	} {
 		fmt.Fprintf(&b, "| %s | %s |\n", row[0], row[1])
@@ -68,4 +69,35 @@ func firstLine(s string) string {
 		}
 	}
 	return ""
+}
+
+// evidenceOrigin makes the origin URL fit for a committed file: credentials
+// and local paths must not reach evidence.md.
+func evidenceOrigin(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" || strings.HasPrefix(s, "/") || strings.HasPrefix(s, ".") || strings.HasPrefix(s, "~") {
+		return "none"
+	}
+	if strings.Contains(s, "://") {
+		u, err := url.Parse(s)
+		if err != nil || u.Host == "" {
+			return "none"
+		}
+		switch strings.ToLower(u.Scheme) {
+		case "file":
+			return "none"
+		case "http", "https":
+			u.User = nil
+		default:
+			if u.User != nil {
+				u.User = url.User(u.User.Username())
+			}
+		}
+		return u.String()
+	}
+	colon, slash := strings.Index(s, ":"), strings.Index(s, "/")
+	if colon > 0 && (slash < 0 || colon < slash) {
+		return s
+	}
+	return "none"
 }
