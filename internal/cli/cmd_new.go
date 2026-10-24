@@ -120,8 +120,12 @@ func newCommand() Command {
 				return Outcome{}, err
 			}
 			// The lock is held and dir did not exist, so whatever is there
-			// from here on was created by this run and is safe to remove.
+			// from here on was created by this run and is safe to remove,
+			// unless a link appeared on its path while OpenSpec ran.
 			cleanup := func(err error) error {
+				if lerr := safepath.Check(c.Repo.Root, "openspec/changes/"+slug); lerr != nil {
+					return errors.Join(err, fmt.Errorf("left in place: %w", lerr))
+				}
 				if rerr := os.RemoveAll(dir); rerr != nil {
 					return errors.Join(err, rerr)
 				}

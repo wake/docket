@@ -347,6 +347,23 @@ func TestLinkMadeDuringOpenSpecIsNotFollowedByCleanup(t *testing.T) {
 	}
 }
 
+func TestLinkMadeByFailingOpenSpecIsNotFollowedByCleanup(t *testing.T) {
+	r := cleanRepo(t)
+	outside := t.TempDir()
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	env := []string{"FAKE_OPENSPEC_LINK_CHANGES=" + outside, "FAKE_OPENSPEC_FAIL=new"}
+	code, so, se := runNew(t, r.Dir, cmd, env, "add-x", "--kind", "feature", "--source", "x")
+	if code != 1 || !hasRule(t, so, "openspec-failed") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if !strings.Contains(so, "left in place") {
+		t.Errorf("skipped cleanup not reported: %s", so)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "add-x", ".openspec.yaml")); err != nil {
+		t.Fatalf("cleanup followed the link out of the repository: %v", err)
+	}
+}
+
 func TestConcurrentRunsKeepTheFirst(t *testing.T) {
 	r := cleanRepo(t)
 	lockDir, err := os.Open(filepath.Join(r.Dir, "openspec"))
