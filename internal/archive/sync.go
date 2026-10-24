@@ -105,14 +105,9 @@ func computeSync(c *loadedChange, commits []gitx.Commit) syncResult {
 // as plan-unsynced. The error is for failures not tied to the change.
 func Sync(e Env, slug string, check bool) (SyncReport, error) {
 	rep := SyncReport{Change: slug, Ticked: []TaskTicks{}}
-	head, ok, err := e.Git.Head()
-	if err != nil {
+	head, done, err := headOrNoCommits(e, slug, &rep.Findings)
+	if err != nil || done {
 		return rep, err
-	}
-	if !ok {
-		rep.Findings = append(rep.Findings, Finding{Rule: "no-commits", Change: slug,
-			Message: "the repository has no commits; commit first"})
-		return rep, nil
 	}
 	c, finds, unread := loadChange(e, slug, true, true)
 	if c == nil {

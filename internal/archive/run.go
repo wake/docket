@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/wake/docket/internal/gitx"
@@ -105,12 +106,11 @@ func (r *archiveRun) preconditions() error {
 	add := func(rule, slug, format string, args ...any) {
 		finds = append(finds, Finding{Rule: rule, Change: slug, Message: fmt.Sprintf(format, args...)})
 	}
-	head, ok, err := e.Git.Head()
+	head, done, err := headOrNoCommits(e, "", &finds)
 	if err != nil {
 		return err
 	}
-	if !ok {
-		add("no-commits", "", "the repository has no commits; commit first")
+	if done {
 		r.stop("", "preconditions", finds, nil)
 		return nil
 	}
@@ -306,13 +306,32 @@ func (r *archiveRun) archive(c *loadedChange) (folder, as string, finds []Findin
 	bad := json.Unmarshal([]byte(out), &res) != nil
 	as = res.Archive.ArchivedAs
 	if bad || !regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-`+regexp.QuoteMeta(c.Slug)+`$`).MatchString(as) {
-		return "", "", []Finding{{Rule: "evidence-failed", Change: c.Slug,
-			Message: fmt.Sprintf("`openspec archive` did not report an archive name for %q; cannot record evidence", c.Slug)}}, nil
+		return "", "", r.movedUnexpectedly(c.Slug, as, "reported the archive name "+strconv.Quote(as)), nil
 	}
 	folder = "openspec/changes/archive/" + as
-	if fi, err := os.Lstat(filepath.Join(e.Root, filepath.FromSlash(folder))); err != nil || !fi.IsDir() {
-		return "", "", []Finding{{Rule: "evidence-failed", Change: c.Slug, File: folder,
-			Message: "OpenSpec reported " + as + " but that folder does not exist"}}, nil
+	if !isDir(e.Root, folder) {
+		return "", "", r.movedUnexpectedly(c.Slug, as, "reported "+strconv.Quote(as)+" but that folder does not exist"), nil
 	}
 	return folder, as, nil, nil
+}
+
+// movedUnexpectedly records a change that OpenSpec archived although what it
+// reported cannot be used: the change appears in the report, with a folder
+// only when the reported name is a local directory under the archive, and
+// the returned finding says that no evidence was written.
+func (r *archiveRun) movedUnexpectedly(slug, as, what string) []Finding {
+	a := Archived{Change: slug}
+	if as != "" && as != "." && as != ".." && filepath.Base(as) == as {
+		if folder := "openspec/changes/archive/" + as; isDir(r.in.Env.Root, folder) {
+			a.Folder = folder
+		}
+	}
+	r.rep.Archived = append(r.rep.Archived, a)
+	return []Finding{{Rule: "evidence-failed", Change: slug, File: a.Folder,
+		Message: fmt.Sprintf("OpenSpec archived the change, but `openspec archive` %s; evidence.md was not written", what)}}
+}
+
+func isDir(root, rel string) bool {
+	fi, err := os.Lstat(filepath.Join(root, filepath.FromSlash(rel)))
+	return err == nil && fi.IsDir()
 }
