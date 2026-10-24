@@ -35,6 +35,9 @@ fix them directly when they change no spec sentence.
 - `dkt new --source "   "` is accepted; only an empty `--source` is refused.
 - Schema files and `.openspec.yaml` are rewritten in place, not written to a
   temporary file and renamed.
+- `change.SetBase` drops a trailing comment on the `x-base:` line.
+- `dkt sync` and `dkt rebase` rewrite `plan.md` and `.openspec.yaml` in place
+  (truncate, then write), not through a temporary file and a rename.
 
 ## Performance
 
