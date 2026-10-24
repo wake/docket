@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"time"
 
 	"github.com/wake/docket/internal/cli"
 )
@@ -31,6 +32,6 @@ func main() {
 	}
 	os.Exit(cli.Run(cli.Options{
 		Args: os.Args[1:], Dir: dir, Env: os.Environ(),
-		Stdout: os.Stdout, Stderr: os.Stderr,
+		Stdout: os.Stdout, Stderr: os.Stderr, Now: time.Now(),
 	}))
 }

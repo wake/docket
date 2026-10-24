@@ -57,12 +57,7 @@ func conflictsCommand() Command {
 					found = found || s == slug
 				}
 				if !found {
-					msg := fmt.Sprintf("%q is not an active change", slug)
-					_, archived := inv.Uses(slug)
-					for _, a := range archived {
-						msg += "; archived as " + a.Folder
-					}
-					out.Findings = append(out.Findings, Finding{Rule: "change-not-active", Change: slug, Message: msg})
+					out.Findings = append(out.Findings, notActiveFinding(inv, slug))
 					out.Result = ConflictsResult{Changes: slugs, Overlaps: []conflicts.Overlap{}}
 					return out, nil
 				}
@@ -89,6 +84,17 @@ func conflictsCommand() Command {
 			return out, nil
 		},
 	}
+}
+
+// notActiveFinding is the change-not-active finding for a valid slug that
+// names no active change; it says where the slug was archived, if it was.
+func notActiveFinding(inv scan.Inventory, slug string) Finding {
+	msg := fmt.Sprintf("%q is not an active change", slug)
+	_, archived := inv.Uses(slug)
+	for _, a := range archived {
+		msg += "; archived as " + a.Folder
+	}
+	return Finding{Rule: "change-not-active", Change: slug, Message: msg}
 }
 
 func shortCommit(c string) string {

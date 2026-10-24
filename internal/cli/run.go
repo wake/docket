@@ -7,12 +7,13 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/wake/docket/internal/gitx"
 )
 
 // commands is the real command set.
-var commands = []func() Command{initCommand, newCommand, lintCommand, syncCommand, rebaseCommand, archiveCommand, conflictsCommand}
+var commands = []func() Command{initCommand, newCommand, lintCommand, syncCommand, rebaseCommand, archiveCommand, conflictsCommand, statusCommand}
 
 // Run runs dkt with the real command set and returns the exit code.
 func Run(o Options) int { return RunWith(o, commands) }
@@ -45,6 +46,10 @@ func RunWith(o Options, cmds []func() Command) int {
 	}
 
 	ctx := &Context{Dir: o.Dir, Env: o.Env, JSON: preJSON, DefaultBranch: preBranch}
+	ctx.Now = o.Now
+	if ctx.Now.IsZero() {
+		ctx.Now = time.Now()
+	}
 	fs := flag.NewFlagSet(cmd.Name, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	if cmd.Define != nil {
