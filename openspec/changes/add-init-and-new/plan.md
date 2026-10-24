@@ -111,7 +111,7 @@ Rows marked `external:` name a dependency outside the repository; there is no pa
   - `func (g Git) ListDirs(rev, dir string) ([]string, error)` — names of the directories directly under `dir` in `rev`'s tree; a missing `dir` gives an empty list and no error.
   - `func (g Git) Show(rev, path string) ([]byte, error)` — the blob at `rev:path`, via `git show`.
 - Produces (package `testutil`, test helpers only):
-  - `func Env(t testing.TB) []string` — `os.Environ()` plus a temporary `HOME`, `GIT_CONFIG_NOSYSTEM=1`, and `GIT_CONFIG_GLOBAL` pointing to a temporary file with `user.name`, `user.email`, `init.defaultBranch=main`, `commit.gpgsign=false`.
+  - `func Env(t testing.TB) []string` — an allowlist, not `os.Environ()`: only `PATH` and `TMPDIR` from the process (plus `SYSTEMROOT` where it exists), never any inherited `GIT_*` variable, then a temporary `HOME`, `GIT_CONFIG_NOSYSTEM=1`, and `GIT_CONFIG_GLOBAL` pointing to a temporary file with `user.name`, `user.email`, `init.defaultBranch=main`, `commit.gpgsign=false`.
   - `type Repo struct { T testing.TB; Dir string; Env []string }`
   - `func NewRepo(t testing.TB) *Repo` (in a temporary directory), `func NewRepoAt(t testing.TB, dir string) *Repo`
   - `func (r *Repo) Git(args ...string) string` — fails the test on error.
