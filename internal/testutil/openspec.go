@@ -46,6 +46,10 @@ init)
 new)
   slug="$3"
   schema="$5"
+  if [ -n "$FAKE_OPENSPEC_LINK_CHANGES" ]; then
+    rm -rf openspec/changes
+    ln -s "$FAKE_OPENSPEC_LINK_CHANGES" openspec/changes
+  fi
   mkdir -p "openspec/changes/$slug"
   if [ "$FAKE_OPENSPEC_BAD_YAML" = "1" ]; then
     printf 'schema: [\n' > "openspec/changes/$slug/.openspec.yaml"
@@ -53,6 +57,11 @@ new)
     printf 'schema: %s\ncreated: 2026-01-02' "$schema" > "openspec/changes/$slug/.openspec.yaml"
   else
     printf 'schema: %s\ncreated: 2026-01-02\n' "$schema" > "openspec/changes/$slug/.openspec.yaml"
+  fi
+  if [ "$FAKE_OPENSPEC_LOCK_CHILD" = "1" ]; then
+    mkdir "openspec/changes/$slug/locked"
+    : > "openspec/changes/$slug/locked/f"
+    chmod 555 "openspec/changes/$slug/locked"
   fi
   fail new
   ;;
