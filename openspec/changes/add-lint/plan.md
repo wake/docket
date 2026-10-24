@@ -52,6 +52,10 @@
 | A CI job with Node.js and OpenSpec 1.14.3 | `.github/workflows/ci.yml` | reuse | The `openspec` job already runs `go test ./...` with `DOCKET_TEST_OPENSPEC` | `rg -n "DOCKET_TEST_OPENSPEC" .github/workflows/ci.yml` |
 | Running the lint rules | none | new | No rule engine exists | `rg -n "package lint" --type go` → none |
 
+## Revision 1 (2026-10-24): final review fixes
+
+The whole-branch review found a false `scenario-duplicate` when a delta renames and modifies one requirement, and comment handling that differed between proposals and deltas and ran over fenced text. `markdown.StripComments` (Task 1) is replaced by `markdown.BlankComments(lines, mask)`, which leaves fenced lines alone, closes a comment on `-->` or `--!>` and keeps line count and offsets; `change` and `delta` both use it. The duplicate check also drops the main spec's requirements that the delta renames. `Git.UncommittedAdded` skips files added and then deleted in the worktree, a Reuse path may end in `/`, and `lint.RoutedDirs` is the one list of routed folders. No spec sentence changes; no task is added.
+
 ---
 
 ### Task 1: Markdown lines, fences, headings and tables
@@ -74,11 +78,11 @@
   - `func StripComments(s string) string` — removes every `<!--` … `-->`; an unclosed comment runs to the end.
   - `func CodeSpans(line string) [][2]int` — byte ranges `[start, end)` of inline code spans on one line, delimiters included: a run of N backticks opens and the next run of exactly N backticks closes; an unmatched run is literal text.
 
-- [ ] **Step 1: Write the failing tests:** `TestLines` (`"﻿a\r\nb\rc\n"` → `["a","b","c",""]`); `TestFenceMask` (backticks, tildes, indented fence, a longer closing fence closes, a shorter or different-character one does not, unclosed runs to the end); `TestHeadings` (`## Why`, `### Task 1: x ###` → text `Task 1: x`, `#NoSpace` is not a heading, a heading inside a fence is skipped); `TestBody`; `TestFindTable` (header, delimiter with alignment colons, rows; `\|` inside a cell; a row with fewer cells; a table inside a fence is not found; a header with no delimiter is not a table); `TestStripComments` (multi-line, unclosed); `TestCodeSpans` (`` a `b` c ``, ``` ``x`y`` ```, unmatched backtick).
-- [ ] **Step 2: Run** `go test ./internal/markdown/` — expected: FAIL (package does not build).
-- [ ] **Step 3: Implement** the functions above.
-- [ ] **Step 4: Run** `go test ./internal/markdown/` — expected: PASS.
-- [ ] **Step 5: Commit** `feat(markdown): read lines, fences, headings and tables`.
+- [x] **Step 1: Write the failing tests:** `TestLines` (`"﻿a\r\nb\rc\n"` → `["a","b","c",""]`); `TestFenceMask` (backticks, tildes, indented fence, a longer closing fence closes, a shorter or different-character one does not, unclosed runs to the end); `TestHeadings` (`## Why`, `### Task 1: x ###` → text `Task 1: x`, `#NoSpace` is not a heading, a heading inside a fence is skipped); `TestBody`; `TestFindTable` (header, delimiter with alignment colons, rows; `\|` inside a cell; a row with fewer cells; a table inside a fence is not found; a header with no delimiter is not a table); `TestStripComments` (multi-line, unclosed); `TestCodeSpans` (`` a `b` c ``, ``` ``x`y`` ```, unmatched backtick).
+- [x] **Step 2: Run** `go test ./internal/markdown/` — expected: FAIL (package does not build).
+- [x] **Step 3: Implement** the functions above.
+- [x] **Step 4: Run** `go test ./internal/markdown/` — expected: PASS.
+- [x] **Step 5: Commit** `feat(markdown): read lines, fences, headings and tables`.
 
 ### Task 2: Delta and main spec reader
 
@@ -107,11 +111,11 @@
   - RENAMED pairs come per section from `FROM:` and `TO:` lines, each with an optional bullet (`-`, `*` or `+`) and a requirement header optionally wrapped in backticks (`parseRenamedPairs`). A FROM followed by a TO with no FROM in between is a pair; a FROM displaced by another FROM, a TO with no pending FROM, and a FROM still pending at the end of the section are problems.
   - `Problems`, one per occurrence, with messages naming the case: a requirement header outside the four delta sections, above the first `## ` line included; a `## ` section other than the four and `Purpose`; text, other than comments and `###` lines, before the first requirement of an ADDED or MODIFIED section; text, other than `# ` titles and comments, above the first `## ` line; each unpaired FROM or TO; and, on line 1, a file with none of the four sections.
 
-- [ ] **Step 1: Write the failing tests:** `TestParseAdded` (two requirements with scenarios; names and lines); `TestScenarioRules` (`#### Edge case` is a scenario, `#### Scenario: Changed ####` → `Changed`, an empty `#### Scenario: Empty` is dropped); `TestRequirementHeaderForms` (`###Requirement: X`, `### requirement: X`, `### Requirement: First ###` → `First`, `### Requirement: C#` keeps `C#`); `TestHeaderInsideACodeBlock` (fenced `### Requirement:` and `#### Scenario:` lines inside a requirement are neither read nor reported); `TestRemovedForms` (header, `-`, `*` and `+` bullets with and without backticks); `TestRenamedPairs` (pairs with `-`, `*`, `+` and no bullet); `TestUnpairedRename` (FROM with no TO → a problem on the FROM line; TO with no FROM; FROM, FROM, TO → the first FROM is a problem); `TestRequirementOutsideAnyDeltaSection` (`### Requirement: Cap` under `## Notes` → problems on the requirement line and on the `## Notes` line); `TestRepeatedSection`; `TestCaseOfSectionTitles` (`## added requirements` applies, `## ADDED  Requirements` with two spaces does not and is a problem); `TestNoDeltaSection` (problem on line 1); `TestCRLFAndBOM` (same result and line numbers as the LF file); `TestParseSpec` (a main spec with `## Purpose` and `## Requirements`); `TestSlug` (`Join when full` → `join-when-full`, `Join (when full)` → `join-when-full`, `需求 R1#3` → `需求-r1-3`, `  --A--  ` → `a`).
-- [ ] **Step 2: Run** `go test ./internal/delta/` — expected: FAIL.
-- [ ] **Step 3: Implement** `Parse`, `ParseSpec` and `Slug`.
-- [ ] **Step 4: Run** `go test ./internal/delta/` — expected: PASS.
-- [ ] **Step 5: Commit** `feat(delta): read deltas and main specs as OpenSpec 1.14 does`.
+- [x] **Step 1: Write the failing tests:** `TestParseAdded` (two requirements with scenarios; names and lines); `TestScenarioRules` (`#### Edge case` is a scenario, `#### Scenario: Changed ####` → `Changed`, an empty `#### Scenario: Empty` is dropped); `TestRequirementHeaderForms` (`###Requirement: X`, `### requirement: X`, `### Requirement: First ###` → `First`, `### Requirement: C#` keeps `C#`); `TestHeaderInsideACodeBlock` (fenced `### Requirement:` and `#### Scenario:` lines inside a requirement are neither read nor reported); `TestRemovedForms` (header, `-`, `*` and `+` bullets with and without backticks); `TestRenamedPairs` (pairs with `-`, `*`, `+` and no bullet); `TestUnpairedRename` (FROM with no TO → a problem on the FROM line; TO with no FROM; FROM, FROM, TO → the first FROM is a problem); `TestRequirementOutsideAnyDeltaSection` (`### Requirement: Cap` under `## Notes` → problems on the requirement line and on the `## Notes` line); `TestRepeatedSection`; `TestCaseOfSectionTitles` (`## added requirements` applies, `## ADDED  Requirements` with two spaces does not and is a problem); `TestNoDeltaSection` (problem on line 1); `TestCRLFAndBOM` (same result and line numbers as the LF file); `TestParseSpec` (a main spec with `## Purpose` and `## Requirements`); `TestSlug` (`Join when full` → `join-when-full`, `Join (when full)` → `join-when-full`, `需求 R1#3` → `需求-r1-3`, `  --A--  ` → `a`).
+- [x] **Step 2: Run** `go test ./internal/delta/` — expected: FAIL.
+- [x] **Step 3: Implement** `Parse`, `ParseSpec` and `Slug`.
+- [x] **Step 4: Run** `go test ./internal/delta/` — expected: PASS.
+- [x] **Step 5: Commit** `feat(delta): read deltas and main specs as OpenSpec 1.14 does`.
 
 ### Task 3: Contract test against OpenSpec
 
@@ -126,10 +130,10 @@
 - Each example directory is a change: a `proposal.md` with only `## Why` and `## What Changes`, and `specs/<capability-path>/spec.md` files. Examples: `basic` (two ADDED requirements); `every-operation` (ADDED, MODIFIED, REMOVED in header and `*` bullet form, RENAMED with `-`, `*` and `+`, with the sections out of the usual order — RENAMED first, REMOVED before MODIFIED — and MODIFIED twice; OpenSpec 1.14.3 reports each file grouped by operation in the order ADDED, MODIFIED, REMOVED, RENAMED, which this example pins); `fenced` (fenced requirement and scenario headers inside requirement text); `odd-forms` (`###Requirement:`, `### requirement:`, closing `###`, `#### Edge case`, an empty scenario, a repeated ADDED section, lower-case section titles); `nested` (`specs/area/cap/spec.md`). The README says what each example covers and credits OpenSpec (MIT) for any case adapted from its tests.
 - `TestDeltasAgreeWithOpenSpec` skips unless `DOCKET_TEST_OPENSPEC` is set. For each example, and for CRLF and BOM copies of `basic` that the test writes itself (git would normalize committed line endings), it copies the change to `<tmp>/openspec/changes/<name>/`, runs `show <name> --type change --json --deltas-only` through `openspec.New(<tmp>, append(testutil.Env(t), "DOCKET_OPENSPEC="+value))`, and compares, per capability, the sequence of (operation, requirement name, scenario names) for ADDED, MODIFIED and REMOVED and (from, to) for RENAMED with Docket's reading, which lists each file's Added, Modified, Removed and Renamed in that order. The JSON fields are `deltas[].spec`, `.operation`, `.requirement.name`, `.requirement.scenarios[].name` and `.rename.from` / `.rename.to`.
 
-- [ ] **Step 1: Write the examples and the test.**
-- [ ] **Step 2: Run** `DOCKET_TEST_OPENSPEC="npx -y @fission-ai/openspec@1.14.3" go test -run TestDeltasAgreeWithOpenSpec -v ./internal/delta/` — expected: PASS; any mismatch is fixed in `delta.Parse` (Task 2's tests gain the case), never by editing the example to avoid it.
-- [ ] **Step 3: Run** `go test ./internal/delta/` without the variable — expected: PASS with the contract test skipped.
-- [ ] **Step 4: Commit** `test(delta): compare the delta reader with OpenSpec 1.14.3`.
+- [x] **Step 1: Write the examples and the test.**
+- [x] **Step 2: Run** `DOCKET_TEST_OPENSPEC="npx -y @fission-ai/openspec@1.14.3" go test -run TestDeltasAgreeWithOpenSpec -v ./internal/delta/` — expected: PASS; any mismatch is fixed in `delta.Parse` (Task 2's tests gain the case), never by editing the example to avoid it.
+- [x] **Step 3: Run** `go test ./internal/delta/` without the variable — expected: PASS with the contract test skipped.
+- [x] **Step 4: Commit** `test(delta): compare the delta reader with OpenSpec 1.14.3`.
 
 ### Task 4: Proposal and plan readers
 
@@ -154,11 +158,11 @@
   - `func ParsePlan(b []byte) Plan`
 - Task headings match `^Task ([1-9][0-9]*): (\S.*)$` at level 3; any heading whose text matches `^Task\s+\d` and does not is a `BadHeading`. A task's lines run to the next heading of level 3 or above; nothing inside a fence counts anywhere.
 
-- [ ] **Step 1: Write the failing tests:** `TestParseProposalSections` (titles, bodies with the template comment stripped to empty, Contract subsections, Change Log table rows); `TestProposalCRLF` (Review Focus 2); `TestFencedHeadingsIgnored` (Review Focus 4: a fenced `## Non-Goals` is not a section, a fenced `### Task 9: x` is not a task); `TestParsePlanTasks` (numbers, names, lines, `**Scenarios:**` items with and without backticks, `none`, a missing line); `TestBadHeadings` (`## Task 3: Parser`, `### Task 0: x`, `### Task 2 Parser`); `TestCancelledBullets` (`- Task 5: Front desk screen - moved to add-x` ok, `- Task 5: Front desk screen` not ok); `TestCompensates`; `TestReuseTable` (Review Focus 1, an inline fixture in this repository's style: escaped `\|` in Evidence becomes `|`, backticked Existing cells such as `` `AGENTS.md`: "Change workflow" `` are kept as written).
-- [ ] **Step 2: Run** `go test ./internal/change/` — expected: FAIL.
-- [ ] **Step 3: Implement** `ParseProposal` and `ParsePlan`.
-- [ ] **Step 4: Run** `go test ./internal/change/` — expected: PASS.
-- [ ] **Step 5: Commit** `feat(change): read proposal.md and plan.md`.
+- [x] **Step 1: Write the failing tests:** `TestParseProposalSections` (titles, bodies with the template comment stripped to empty, Contract subsections, Change Log table rows); `TestProposalCRLF` (Review Focus 2); `TestFencedHeadingsIgnored` (Review Focus 4: a fenced `## Non-Goals` is not a section, a fenced `### Task 9: x` is not a task); `TestParsePlanTasks` (numbers, names, lines, `**Scenarios:**` items with and without backticks, `none`, a missing line); `TestBadHeadings` (`## Task 3: Parser`, `### Task 0: x`, `### Task 2 Parser`); `TestCancelledBullets` (`- Task 5: Front desk screen - moved to add-x` ok, `- Task 5: Front desk screen` not ok); `TestCompensates`; `TestReuseTable` (Review Focus 1, an inline fixture in this repository's style: escaped `\|` in Evidence becomes `|`, backticked Existing cells such as `` `AGENTS.md`: "Change workflow" `` are kept as written).
+- [x] **Step 2: Run** `go test ./internal/change/` — expected: FAIL.
+- [x] **Step 3: Implement** `ParseProposal` and `ParsePlan`.
+- [x] **Step 4: Run** `go test ./internal/change/` — expected: PASS.
+- [x] **Step 5: Commit** `feat(change): read proposal.md and plan.md`.
 
 ### Task 5: Lint engine, proposal and placeholder rules
 
@@ -182,11 +186,11 @@
 - `placeholder`: the placeholder strings are every HTML comment (as written, possibly across lines) and every match of `<[A-Za-z][^<>\n]*>` in `templates/*.md` of `Templates`. In each file of the change, with fenced lines and code spans blanked out (same offsets, newlines kept), each occurrence of a placeholder is a finding on the line where it starts; the message quotes the placeholder and names the template it came from.
 - Plan rules (Tasks 6 and 7) run only when `plan.md` exists.
 
-- [ ] **Step 1: Write the failing tests** (an `fstest.MapFS` per case; a helper writes a valid proposal that tests then break): `TestLintEveryActiveChange` (`add-x`, `add-y` and `archive/2026-01-01-add-z` → `Changes` is `[add-x add-y]`); `TestNamedChangeMissing` (`add-z` → one `change-missing` finding naming `add-z`; `../x` and `a/b` the same); `TestNonGoalsMissing`; `TestEmptyFailureModes` (only the template comment → finding on its heading line); `TestBuildsOnLeftEmpty`; `TestChangeLogRowWithoutSource` (finding on the row's line); `TestHeaderOnlyChangeLog` (no `change-log` finding); `TestTemplateCommentLeft` (the Why comment from `docket.Schema()` → a `placeholder` finding on its line; the same comment inside a fence or a code span → none); `TestPlaceholderInPlan` (`### Task 1: <name>` left in plan.md → finding); `TestPlanNotWrittenYet` (no plan.md → no plan-rule or `scenario-unclaimed` findings); `TestValidProposalIsClean` (a complete proposal in this repository's style, with Change Log rows → no findings); `TestCRLFProposal` (Review Focus 2); `TestUnreadableFile` (Review Focus 5: a mode-000 `plan.md` in a temporary directory passed as `os.DirFS` → unreadable entry, the other change still linted; skip as root); `TestUnreadableChangeDirectory` (a mode-000 change folder → unreadable entry naming it, the other change still linted; skip as root); `TestPlaceholderInOtherFile` (a template comment left in a non-Markdown file of the change → finding).
-- [ ] **Step 2: Run** `go test ./internal/lint/` — expected: FAIL.
-- [ ] **Step 3: Implement** `Run`, the scope rules and the three rules.
-- [ ] **Step 4: Run** `go test ./internal/lint/` — expected: PASS.
-- [ ] **Step 5: Commit** `feat(lint): lint proposals and leftover template text`.
+- [x] **Step 1: Write the failing tests** (an `fstest.MapFS` per case; a helper writes a valid proposal that tests then break): `TestLintEveryActiveChange` (`add-x`, `add-y` and `archive/2026-01-01-add-z` → `Changes` is `[add-x add-y]`); `TestNamedChangeMissing` (`add-z` → one `change-missing` finding naming `add-z`; `../x` and `a/b` the same); `TestNonGoalsMissing`; `TestEmptyFailureModes` (only the template comment → finding on its heading line); `TestBuildsOnLeftEmpty`; `TestChangeLogRowWithoutSource` (finding on the row's line); `TestHeaderOnlyChangeLog` (no `change-log` finding); `TestTemplateCommentLeft` (the Why comment from `docket.Schema()` → a `placeholder` finding on its line; the same comment inside a fence or a code span → none); `TestPlaceholderInPlan` (`### Task 1: <name>` left in plan.md → finding); `TestPlanNotWrittenYet` (no plan.md → no plan-rule or `scenario-unclaimed` findings); `TestValidProposalIsClean` (a complete proposal in this repository's style, with Change Log rows → no findings); `TestCRLFProposal` (Review Focus 2); `TestUnreadableFile` (Review Focus 5: a mode-000 `plan.md` in a temporary directory passed as `os.DirFS` → unreadable entry, the other change still linted; skip as root); `TestUnreadableChangeDirectory` (a mode-000 change folder → unreadable entry naming it, the other change still linted; skip as root); `TestPlaceholderInOtherFile` (a template comment left in a non-Markdown file of the change → finding).
+- [x] **Step 2: Run** `go test ./internal/lint/` — expected: FAIL.
+- [x] **Step 3: Implement** `Run`, the scope rules and the three rules.
+- [x] **Step 4: Run** `go test ./internal/lint/` — expected: PASS.
+- [x] **Step 5: Commit** `feat(lint): lint proposals and leftover template text`.
 
 ### Task 6: Plan rules
 
@@ -203,11 +207,11 @@
 - `cancelled-task`: each `Cancelled` with `OK` false.
 - `compensates`: each `Ref` with `OK` false, or whose number is not a task in `Tasks`, or is in `Cancelled` (the message says which).
 
-- [ ] **Step 1: Write the failing tests:** `TestTaskHeadingAtTheWrongLevel` (`## Task 3: Parser`); `TestDuplicateTaskNumber` (two `### Task 2:` headings, and a task numbered like a cancelled bullet); `TestReuseRowWithAMissingPath` (`reuse` naming `internal/gitx/run.go:Run` absent from `Repo`); `TestNewRowWithoutAReason`; `TestExternalDependencyRow` (`external: git CLI`, and `` external: `syscall.Flock` `` → no finding); `TestEmptyReuseTable`; `TestRowWithoutEvidence`; `TestCancelledTaskWithoutAReason` (`- Task 5: Front desk screen`); `TestCompensatingACancelledTask`; `TestCompensatingAMissingTask`; `TestFencedPlanContent` (Review Focus 4: a fenced `### Task 9: x` is not a task, a fenced `## Reuse` with a table does not stand in for a missing one, and a fenced `**Scenarios:** none` does not give a task its Scenarios line); `TestCRLFPlan` (Review Focus 2: a plan with CRLF line endings and a BOM gives the same findings on the same lines as its LF copy); `TestRepositoryStylePlan` (Review Focus 1: a plan with backticked Existing paths, an `AGENTS.md`: "…" cell, escaped `\|` in Evidence and backticked `external:` rows, all paths present in the `fstest.MapFS` → no plan-rule findings). The repository's real plans are linted in Task 9 and by the `lint` CI job; tests do not read them, since archiving moves them.
-- [ ] **Step 2: Run** `go test ./internal/lint/` — expected: FAIL.
-- [ ] **Step 3: Implement** the four rules.
-- [ ] **Step 4: Run** `go test ./internal/lint/` — expected: PASS.
-- [ ] **Step 5: Commit** `feat(lint): check task headings, the Reuse table and cancelled tasks`.
+- [x] **Step 1: Write the failing tests:** `TestTaskHeadingAtTheWrongLevel` (`## Task 3: Parser`); `TestDuplicateTaskNumber` (two `### Task 2:` headings, and a task numbered like a cancelled bullet); `TestReuseRowWithAMissingPath` (`reuse` naming `internal/gitx/run.go:Run` absent from `Repo`); `TestNewRowWithoutAReason`; `TestExternalDependencyRow` (`external: git CLI`, and `` external: `syscall.Flock` `` → no finding); `TestEmptyReuseTable`; `TestRowWithoutEvidence`; `TestCancelledTaskWithoutAReason` (`- Task 5: Front desk screen`); `TestCompensatingACancelledTask`; `TestCompensatingAMissingTask`; `TestFencedPlanContent` (Review Focus 4: a fenced `### Task 9: x` is not a task, a fenced `## Reuse` with a table does not stand in for a missing one, and a fenced `**Scenarios:** none` does not give a task its Scenarios line); `TestCRLFPlan` (Review Focus 2: a plan with CRLF line endings and a BOM gives the same findings on the same lines as its LF copy); `TestRepositoryStylePlan` (Review Focus 1: a plan with backticked Existing paths, an `AGENTS.md`: "…" cell, escaped `\|` in Evidence and backticked `external:` rows, all paths present in the `fstest.MapFS` → no plan-rule findings). The repository's real plans are linted in Task 9 and by the `lint` CI job; tests do not read them, since archiving moves them.
+- [x] **Step 2: Run** `go test ./internal/lint/` — expected: FAIL.
+- [x] **Step 3: Implement** the four rules.
+- [x] **Step 4: Run** `go test ./internal/lint/` — expected: PASS.
+- [x] **Step 5: Commit** `feat(lint): check task headings, the Reuse table and cancelled tasks`.
 
 ### Task 7: Scenario and delta structure rules
 
@@ -225,11 +229,11 @@
 - `scenario-duplicate`: per capability, take the main spec's requirements, drop those whose name the delta modifies or removes, add the delta's ADDED and MODIFIED requirements; two scenarios in that set with the same slug → one finding on the later one, naming both places.
 - `unparseable`: each `Problem` of each delta file, on its line, with its message.
 
-- [ ] **Step 1: Write the failing tests:** `TestScenarioNobodyClaims` (delta adds "Join when full" to `booking`, no task lists `booking#join-when-full` → finding naming it, on the scenario's line); `TestReferenceToAnUnknownScenario` (`booking#join-when-ful`); `TestScaffoldingTask` (`**Scenarios:** none` → nothing); `TestMissingScenariosLine`; `TestReferenceToMainSpec` (a reference to a scenario only in `openspec/specs/booking/spec.md` is known); `TestTwoScenariosNamedSuccess` (two delta requirements in `booking` each with "Success"; also a delta scenario that collides with a main-spec one, and a MODIFIED requirement that replaces the main one without colliding); `TestNonASCIISlugs` (Review Focus 3: `需求 R1#3` referenced as `booking#需求-r1-3`, and `Join (when full)` referenced as `booking#join-when-full`, are known); `TestPunctuatedDuplicates` (Review Focus 3: `Join (when full)` and `Join when full` in one capability, and `需求 R1#3` and `需求 r1 3`, are each reported as `scenario-duplicate`); `TestRequirementOutsideAnyDeltaSection`, `TestHeaderInsideACodeBlock`, `TestUnpairedRename` (each as an `unparseable` finding, or none for the fenced header, at the lint level).
-- [ ] **Step 2: Run** `go test ./internal/lint/` — expected: FAIL.
-- [ ] **Step 3: Implement** the four rules.
-- [ ] **Step 4: Run** `go test ./internal/lint/` — expected: PASS.
-- [ ] **Step 5: Commit** `feat(lint): check scenario claims, slugs and delta structure`.
+- [x] **Step 1: Write the failing tests:** `TestScenarioNobodyClaims` (delta adds "Join when full" to `booking`, no task lists `booking#join-when-full` → finding naming it, on the scenario's line); `TestReferenceToAnUnknownScenario` (`booking#join-when-ful`); `TestScaffoldingTask` (`**Scenarios:** none` → nothing); `TestMissingScenariosLine`; `TestReferenceToMainSpec` (a reference to a scenario only in `openspec/specs/booking/spec.md` is known); `TestTwoScenariosNamedSuccess` (two delta requirements in `booking` each with "Success"; also a delta scenario that collides with a main-spec one, and a MODIFIED requirement that replaces the main one without colliding); `TestNonASCIISlugs` (Review Focus 3: `需求 R1#3` referenced as `booking#需求-r1-3`, and `Join (when full)` referenced as `booking#join-when-full`, are known); `TestPunctuatedDuplicates` (Review Focus 3: `Join (when full)` and `Join when full` in one capability, and `需求 R1#3` and `需求 r1 3`, are each reported as `scenario-duplicate`); `TestRequirementOutsideAnyDeltaSection`, `TestHeaderInsideACodeBlock`, `TestUnpairedRename` (each as an `unparseable` finding, or none for the fenced header, at the lint level).
+- [x] **Step 2: Run** `go test ./internal/lint/` — expected: FAIL.
+- [x] **Step 3: Implement** the four rules.
+- [x] **Step 4: Run** `go test ./internal/lint/` — expected: PASS.
+- [x] **Step 5: Commit** `feat(lint): check scenario claims, slugs and delta structure`.
 
 ### Task 8: Routing and the `dkt lint` command
 
@@ -248,11 +252,11 @@
 - `routing` (package `lint`): each path in `Added` under `docs/superpowers/specs/` or `docs/superpowers/plans/` is a finding with that `file` and no `change`. A non-nil `AddedErr` adds `Unreadable{Source: "routing", Reason: AddedErr.Error()}` and every other rule still runs.
 - The `lint` command (positional slugs, no flags of its own): opens the repository root with `os.OpenRoot` and passes `Root.FS()`; computes `Added` for `docs/superpowers/specs` and `docs/superpowers/plans` as the union, sorted and deduplicated, of `AddedFiles(<merge base of HEAD and the default tip>)` when HEAD has a commit and `UncommittedAdded`; when the default branch cannot be resolved, or HEAD and the default tip share no history, `AddedErr` says so and suggests `--default-branch`. It maps each `lint.Finding` to `cli.Finding` and each `lint.Unreadable` to `cli.Unreadable`, and sets `Result` to `type LintResult struct { Changes []string }` (JSON `changes`). It never creates an OpenSpec runner.
 
-- [ ] **Step 1: Write the failing tests:** `gitx`: `TestAddedFiles` (a file added on the branch after the merge base is listed, one modified is not, one renamed into the path is listed); `TestUncommittedAdded` (untracked and staged-new files under the path are listed, files elsewhere are not, a path with a space is read correctly). `lint`: `TestRoutingFinding`, `TestRoutingUnreadable`. `cli` (through `RunWith` with `--json`, in `testutil` repositories): `TestDesignWrittenToTheSuperpowersFolder` (an untracked `docs/superpowers/specs/2026-10-25-x-design.md` → a `routing` finding naming it, exit 1); `TestNoDefaultBranchForRouting` (no `main`, `master` or origin, a change with a `proposal-section` problem → that finding, `unreadable` listing `routing`, exit 3); `TestNoOpenSpecInstalled` (`PATH` without `openspec` and no `DOCKET_OPENSPEC` → a clean change exits 0); `TestUnreadableFileExitsThree` (one change with a mode-000 `plan.md` and another with a `proposal-section` problem → both reported, exit 3; skip as root); `TestLintEveryActiveChangeJSON` (`result.changes` is `["add-x","add-y"]`); `TestLintNamedChanges` (`dkt lint add-x` lints only `add-x`); `TestLintCleanExit` (text output ends with `dkt lint: ok`).
-- [ ] **Step 2: Run** `go test ./internal/gitx/ ./internal/lint/ ./internal/cli/` — expected: FAIL.
-- [ ] **Step 3: Implement** the two `gitx` methods, the routing rule and the command.
-- [ ] **Step 4: Run** `go test ./...` — expected: PASS.
-- [ ] **Step 5: Commit** `feat: dkt lint checks change folders and where designs were written`.
+- [x] **Step 1: Write the failing tests:** `gitx`: `TestAddedFiles` (a file added on the branch after the merge base is listed, one modified is not, one renamed into the path is listed); `TestUncommittedAdded` (untracked and staged-new files under the path are listed, files elsewhere are not, a path with a space is read correctly). `lint`: `TestRoutingFinding`, `TestRoutingUnreadable`. `cli` (through `RunWith` with `--json`, in `testutil` repositories): `TestDesignWrittenToTheSuperpowersFolder` (an untracked `docs/superpowers/specs/2026-10-25-x-design.md` → a `routing` finding naming it, exit 1); `TestNoDefaultBranchForRouting` (no `main`, `master` or origin, a change with a `proposal-section` problem → that finding, `unreadable` listing `routing`, exit 3); `TestNoOpenSpecInstalled` (`PATH` without `openspec` and no `DOCKET_OPENSPEC` → a clean change exits 0); `TestUnreadableFileExitsThree` (one change with a mode-000 `plan.md` and another with a `proposal-section` problem → both reported, exit 3; skip as root); `TestLintEveryActiveChangeJSON` (`result.changes` is `["add-x","add-y"]`); `TestLintNamedChanges` (`dkt lint add-x` lints only `add-x`); `TestLintCleanExit` (text output ends with `dkt lint: ok`).
+- [x] **Step 2: Run** `go test ./internal/gitx/ ./internal/lint/ ./internal/cli/` — expected: FAIL.
+- [x] **Step 3: Implement** the two `gitx` methods, the routing rule and the command.
+- [x] **Step 4: Run** `go test ./...` — expected: PASS.
+- [x] **Step 5: Commit** `feat: dkt lint checks change folders and where designs were written`.
 
 ### Task 9: Lint this repository, architecture map and CI
 
@@ -262,9 +266,9 @@
 - Modify: `docs/ARCHITECTURE.md`, `AGENTS.md`, `.github/workflows/ci.yml`, and any change folder under `openspec/changes/` that `dkt lint` reports on
 - Test: the `lint` CI job
 
-- [ ] **Step 1: Run** `go run ./cmd/dkt lint --default-branch main` in this worktree. Fix each finding in the change folders it names, or, when the finding shows a defect in Docket, fix the defect in the task that owns the rule and add the case to its tests. Expected afterwards: `dkt lint: ok`.
-- [ ] **Step 2: Update `docs/ARCHITECTURE.md`:** codemap rows for `internal/markdown`, `internal/delta` and `internal/lint`; capability index rows "Read Markdown lines, headings and tables" → `markdown.Lines`, `markdown.Headings`, `markdown.FindTable`; "Read a delta or a main spec" → `delta.Parse`, `delta.ParseSpec`; "Make a scenario slug" → `delta.Slug`; "Read proposal.md or plan.md" → `change.ParseProposal`, `change.ParsePlan`; "Lint change folders" → `lint.Run`; "Files a branch adds" → `Git.AddedFiles`, `Git.UncommittedAdded`.
-- [ ] **Step 3: Update the Status paragraph of `AGENTS.md`:** `dkt lint` exists; drop "check the lint rules by reading". Leave the Change workflow section unchanged.
-- [ ] **Step 4: Add a `lint` job to `.github/workflows/ci.yml`:** `ubuntu-latest`; `actions/checkout@v7` with `fetch-depth: 0`; `actions/setup-go@v7` with `go-version: stable`; `go run ./cmd/dkt lint --default-branch main`.
-- [ ] **Step 5: Run** `gofmt -l . && go vet ./... && go test ./...` and `go run ./cmd/dkt lint --default-branch main` — expected: no output from gofmt, PASS, `dkt lint: ok`.
-- [ ] **Step 6: Commit** `docs: map the lint packages and run dkt lint in CI`.
+- [x] **Step 1: Run** `go run ./cmd/dkt lint --default-branch main` in this worktree. Fix each finding in the change folders it names, or, when the finding shows a defect in Docket, fix the defect in the task that owns the rule and add the case to its tests. Expected afterwards: `dkt lint: ok`.
+- [x] **Step 2: Update `docs/ARCHITECTURE.md`:** codemap rows for `internal/markdown`, `internal/delta` and `internal/lint`; capability index rows "Read Markdown lines, headings and tables" → `markdown.Lines`, `markdown.Headings`, `markdown.FindTable`; "Read a delta or a main spec" → `delta.Parse`, `delta.ParseSpec`; "Make a scenario slug" → `delta.Slug`; "Read proposal.md or plan.md" → `change.ParseProposal`, `change.ParsePlan`; "Lint change folders" → `lint.Run`; "Files a branch adds" → `Git.AddedFiles`, `Git.UncommittedAdded`.
+- [x] **Step 3: Update the Status paragraph of `AGENTS.md`:** `dkt lint` exists; drop "check the lint rules by reading". Leave the Change workflow section unchanged.
+- [x] **Step 4: Add a `lint` job to `.github/workflows/ci.yml`:** `ubuntu-latest`; `actions/checkout@v7` with `fetch-depth: 0`; `actions/setup-go@v7` with `go-version: stable`; `go run ./cmd/dkt lint --default-branch main`.
+- [x] **Step 5: Run** `gofmt -l . && go vet ./... && go test ./...` and `go run ./cmd/dkt lint --default-branch main` — expected: no output from gofmt, PASS, `dkt lint: ok`.
+- [x] **Step 6: Commit** `docs: map the lint packages and run dkt lint in CI`.

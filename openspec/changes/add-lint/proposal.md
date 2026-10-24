@@ -109,3 +109,4 @@ None.
 |---|---|---|---|
 | 2026-10-24 | self: writing the add-init-and-new plan | Reuse rows may name an outside dependency as `external: <name>`; lint skips the path check for them | One requirement sentence and one scenario; no task exists yet |
 | 2026-10-24 | self: writing the add-lint plan | The `.openspec.yaml` reader moves to `add-archive`, its first user, since no lint rule reads it; a missing named change is reported with the rule `change-missing`; the contract test runs in the existing `openspec` CI job, gated by `DOCKET_TEST_OPENSPEC` like the other real-CLI tests, and a new job runs `dkt lint` | No spec sentence changes |
+| 2026-10-24 | review: whole-branch review of add-lint | A delta that renames and modifies one requirement no longer reports its scenarios as duplicates; comments are read the same way in proposals and deltas and never across fenced code | No spec sentence changes; plan Revision 1 |

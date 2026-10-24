@@ -34,6 +34,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Install the schema | `setup.Init` |
 | Check a path before writing to it | `safepath.Check` |
 | Read Markdown lines, headings and tables | `markdown.Lines`, `markdown.Headings`, `markdown.FindTable` |
+| Blank out HTML comments outside fenced code | `markdown.BlankComments` |
 | Read a delta or a main spec | `delta.Parse`, `delta.ParseSpec` |
 | Make a scenario slug | `delta.Slug` |
 | Read proposal.md or plan.md | `change.ParseProposal`, `change.ParsePlan` |
