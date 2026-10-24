@@ -22,12 +22,25 @@ func problemLines(d Delta) []int {
 	return out
 }
 
+func TestRequirementText(t *testing.T) {
+	main := "## Purpose\r\nP\r\n\r\n## Requirements\r\n\r\n### Requirement: A\r\nText A.\r\n\r\n#### Scenario: s\r\n- **WHEN** w\r\n- **THEN** t\r\n\r\n\r\n### Requirement: B\r\nText B.\r\n\r\n## Other\r\nx\r\n"
+	got := ParseSpec([]byte(main))
+	if len(got) != 2 || got[0].Text != "### Requirement: A\nText A.\n\n#### Scenario: s\n- **WHEN** w\n- **THEN** t" ||
+		got[1].Text != "### Requirement: B\nText B." {
+		t.Fatalf("%q", got)
+	}
+	d := Parse([]byte("## ADDED Requirements\n\n### Requirement: C\nText C.\n\n"))
+	if len(d.Added) != 1 || d.Added[0].Text != "### Requirement: C\nText C." {
+		t.Fatalf("%q", d.Added)
+	}
+}
+
 func TestParseAdded(t *testing.T) {
 	src := "## ADDED Requirements\n\n### Requirement: One\ntext\n\n#### Scenario: a\n- WHEN x\n\n#### Scenario: b\n- THEN y\n\n### Requirement: Two\n\n#### Scenario: c\nbody\n"
 	d := Parse([]byte(src))
 	want := []Requirement{
-		{Name: "One", Line: 3, Scenarios: []Scenario{{"a", 6}, {"b", 9}}},
-		{Name: "Two", Line: 12, Scenarios: []Scenario{{"c", 14}}},
+		{Name: "One", Line: 3, Scenarios: []Scenario{{"a", 6}, {"b", 9}}, Text: "### Requirement: One\ntext\n\n#### Scenario: a\n- WHEN x\n\n#### Scenario: b\n- THEN y"},
+		{Name: "Two", Line: 12, Scenarios: []Scenario{{"c", 14}}, Text: "### Requirement: Two\n\n#### Scenario: c\nbody"},
 	}
 	if !reflect.DeepEqual(d.Added, want) {
 		t.Fatalf("got %+v", d.Added)
@@ -212,8 +225,8 @@ func TestParseSpec(t *testing.T) {
 	src := "# T\n\n## Purpose\n### Requirement: Not\n\n## requirements\n\n### Requirement: A\n\n#### Scenario: s\nbody\n\n### Requirement: B\n\n## Other\n### Requirement: C\n"
 	got := ParseSpec([]byte(src))
 	want := []Requirement{
-		{Name: "A", Line: 8, Scenarios: []Scenario{{"s", 10}}},
-		{Name: "B", Line: 13},
+		{Name: "A", Line: 8, Scenarios: []Scenario{{"s", 10}}, Text: "### Requirement: A\n\n#### Scenario: s\nbody"},
+		{Name: "B", Line: 13, Text: "### Requirement: B"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("%+v", got)
