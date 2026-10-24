@@ -26,11 +26,10 @@ type RebaseReport struct {
 // the change.
 func Rebase(e Env, slug string) (RebaseReport, error) {
 	rep := RebaseReport{Change: slug, Changed: []Drift{}}
-	head, done, err := headOrNoCommits(e, slug, &rep.Findings)
-	if err != nil || done {
+	head, c, finds, unread, err := loadAtHead(e, slug, loadOpts{Deltas: true})
+	if err != nil {
 		return rep, err
 	}
-	c, finds, unread := loadChange(e, slug, false, false)
 	if c == nil {
 		rep.Findings, rep.Unreadable = finds, unread
 		return rep, nil

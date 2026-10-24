@@ -43,6 +43,22 @@ func TestCommits(t *testing.T) {
 	}
 }
 
+func TestCommitsWithControlCharacters(t *testing.T) {
+	r := testutil.NewRepo(t)
+	base := r.Commit("base", map[string]string{"a": "1"})
+	r.Commit("sub\x1fject\n\nChange: add-x\nTask: 1\x1e2", map[string]string{"a": "2"})
+	g := Git{Dir: r.Dir, Env: r.Env}
+	got, err := g.Commits(base, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Subject != "sub\x1fject" ||
+		!reflect.DeepEqual(got[0].Change, []string{"add-x"}) ||
+		!reflect.DeepEqual(got[0].Task, []string{"1\x1e2"}) {
+		t.Fatalf("got %+v", got)
+	}
+}
+
 func TestUncommitted(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("init", map[string]string{"tracked": "1", ".gitignore": "ignored\n"})
