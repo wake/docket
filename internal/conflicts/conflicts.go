@@ -3,6 +3,7 @@
 package conflicts
 
 import (
+	"slices"
 	"sort"
 
 	"github.com/wake/docket/internal/delta"
@@ -88,7 +89,7 @@ func Find(changes []Change) []Overlap {
 		}
 		o := Overlap{Capability: k.capability, Requirement: k.requirement, Changes: []Entry{}}
 		for slug, set := range bySlug {
-			e := Entry{Slug: slug, Operations: []string{}, Sources: sources[slug]}
+			e := Entry{Slug: slug, Operations: []string{}, Sources: slices.Clone(sources[slug])}
 			for _, op := range operationOrder {
 				if set[op] {
 					e.Operations = append(e.Operations, op)
