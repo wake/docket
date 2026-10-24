@@ -18,10 +18,10 @@ type Commit struct {
 // Commits lists the commits in base..head, oldest first, with their committer
 // time (the instant comes from epoch seconds when the committer's zone is not
 // valid RFC 3339, as git allows) and the values of their Change and Task
-// trailers (keys are
-// case-insensitive, as in git). With paths, only commits that change a file
-// under them are listed; --full-history keeps a merge that brings such files
-// in, which git would otherwise drop when it matches its second parent only.
+// trailers (keys are case-insensitive, as in git). With paths, only commits
+// that change a file under them are listed; --full-history keeps a merge that
+// brings such files in, which git would otherwise drop when it matches its
+// second parent only.
 func (g Git) Commits(base, head string, paths ...string) ([]Commit, error) {
 	args := []string{"log", "-z", "--reverse", "--full-history",
 		"--format=%H%x00%s%x00%cI%x00%ct%x00%(trailers:key=Change,valueonly,unfold)%x00%(trailers:key=Task,valueonly,unfold)",
