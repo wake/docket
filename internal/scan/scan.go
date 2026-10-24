@@ -2,6 +2,8 @@ package scan
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -120,8 +122,12 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		}
 		rank := rankContainedWorktree
 		if !unbornHead(w.Head) {
-			// On error, assume unmerged work so that it is not hidden.
-			if contained, err := g.IsAncestor(w.Head, db.Commit); err != nil || !contained {
+			contained, err := g.IsAncestor(w.Head, db.Commit)
+			if err != nil {
+				inv.Unreadable = append(inv.Unreadable, Unreadable{src, err.Error()})
+				continue
+			}
+			if !contained {
 				rank = rankUnmergedWorktree
 			}
 		}
@@ -255,10 +261,25 @@ func (inv Inventory) Uses(slug string) (active *Change, archived []Archived) {
 	return active, archived
 }
 
-// ReadFile reads rel (relative to the repository root) from a source.
+// ReadFile reads rel (relative to the repository root) from a source. rel must
+// be a local path; a worktree file is read through os.Root, so neither ".." nor
+// a symlink can lead outside the worktree.
 func ReadFile(g gitx.Git, src Source, rel string) ([]byte, error) {
+	if !filepath.IsLocal(rel) {
+		return nil, fmt.Errorf("path %q is not a local path inside the repository", rel)
+	}
 	if src.Kind == KindWorktree {
-		return os.ReadFile(filepath.Join(src.Name, rel))
+		root, err := os.OpenRoot(src.Name)
+		if err != nil {
+			return nil, err
+		}
+		defer root.Close()
+		f, err := root.Open(rel)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		return io.ReadAll(f)
 	}
 	return g.Show(src.Commit, rel)
 }
