@@ -31,7 +31,7 @@ For each named change, in the order given, `dkt archive` SHALL run the plan chec
 - **THEN** `add-x` is archived in the working tree, `add-y` is untouched, the lint finding is reported, and the command exits with 1
 
 ### Requirement: Plan check
-The plan check SHALL fail when `dkt sync <slug> --check` would tick anything, or when any step of a `### Task` section in plan.md is unticked.
+The plan check SHALL fail when `dkt sync <slug> --check` would exit with 1, or when any step of a `### Task` section in plan.md is unticked.
 
 #### Scenario: Unticked task
 - **WHEN** Task 5 of `add-x` has an unticked step and no commit names it
@@ -64,7 +64,7 @@ Before running `openspec archive`, `dkt archive` SHALL compare Docket's reading 
 - **THEN** `dkt archive add-x` stops before `openspec archive` and reports both readings
 
 ### Requirement: Evidence
-After `openspec archive` succeeds, `dkt archive` SHALL write `evidence.md` in the archived change folder, recording the date, the Docket and OpenSpec versions, the repository and HEAD SHA, `x-base`, `x-kind`, `x-source`, for each task the commits whose trailers name it, and the results of the validate and base check steps.
+After `openspec archive` succeeds, `dkt archive` SHALL write `evidence.md` in the archived change folder, recording the date, the Docket and OpenSpec versions, the URL of the `origin` remote or none, the HEAD SHA, `x-base`, `x-kind`, `x-source`, for each task the commits whose trailers name it, and the results of the validate and base check steps.
 
 #### Scenario: Evidence written
 - **WHEN** `dkt archive add-x` succeeds on 2026-11-02

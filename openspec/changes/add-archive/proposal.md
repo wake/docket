@@ -20,6 +20,7 @@ to replace changed underneath it.
   then `openspec archive`, then writes `evidence.md`.
 - `dkt rebase <slug>`: moves a change's `x-base` forward after its author has
   brought the delta up to date, and lists what changed in between.
+- A reader for a change's `.openspec.yaml` (`x-base`, `x-kind`, `x-source`).
 
 ## Non-Goals
 
@@ -36,8 +37,10 @@ to replace changed underneath it.
 
 - From `add-init-and-new`: the scan, the OpenSpec runner, the default branch
   and merge base.
-- From `add-lint`: the proposal, delta and plan readers, and `dkt lint`
-  itself as the lint step of archiving.
+- From `add-lint`: the delta and plan readers, `dkt lint` itself as the lint
+  step of archiving, and the contract test's comparison with
+  `openspec show --json --deltas-only`, which becomes the reading
+  cross-check.
 - OpenSpec does the validation and the merge (`validate --strict`,
   `show --json`, `archive --json`); git parses commit trailers
   (`%(trailers)`).
@@ -80,6 +83,13 @@ None.
 - `dkt rebase <slug> [--json]`
 - Commit trailers `Change: <slug>` and `Task: <N>`, read as git reads trailers.
 - `evidence.md` in the archived change folder.
+- Rule identifiers in findings: `change-missing`, `metadata-invalid`,
+  `base-missing`, `no-commits`, `plan-missing`, `task-unknown` and
+  `plan-unsynced` (sync, and the plan check of archive); `plan-unticked`,
+  `uncommitted-changes`, `behind-default-branch`, `change-not-merged`,
+  `base-drift`, `name-taken`, `readings-disagree`, `openspec-failed`,
+  `evidence-failed`, and the rules of `dkt lint` (archive); `no-merge-base`
+  (rebase).
 
 ### Failure Modes
 
@@ -113,3 +123,4 @@ None.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-10-24 | self: writing the add-archive plan | The plan check also fails on a `Task:` trailer for an unknown task; `evidence.md` names the repository by its `origin` URL, not its local path; blocks are compared as OpenSpec compares them; the `.openspec.yaml` reader and the finding rules are named | Two requirement sentences in `change-archive` (Plan check, Evidence); no task exists yet |
