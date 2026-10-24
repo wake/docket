@@ -45,18 +45,20 @@ type Delta struct {
 	Problems                 []Problem
 }
 
+const sp = markdown.Space
+
 var (
-	requirementRe = regexp.MustCompile(`(?i)^###\s*Requirement:\s*(.+)\s*$`)
-	sectionRe     = regexp.MustCompile(`^(##)\s+(.+)$`)
-	topLevelRe    = regexp.MustCompile(`^##\s+`)
-	specSectionRe = regexp.MustCompile(`(?i)^##\s+Requirements\s*$`)
-	removedBullet = regexp.MustCompile("^\\s*[-*+]\\s*`?###\\s*Requirement:\\s*(.+?)`?\\s*$")
-	fromRe        = regexp.MustCompile("^\\s*[-*+]?\\s*FROM:\\s*`?###\\s*Requirement:\\s*(.+?)`?\\s*$")
-	toRe          = regexp.MustCompile("^\\s*[-*+]?\\s*TO:\\s*`?###\\s*Requirement:\\s*(.+?)`?\\s*$")
-	scenarioPre   = regexp.MustCompile(`(?i)^Scenario:\s*`)
+	requirementRe = regexp.MustCompile(`(?i)^###` + sp + `*Requirement:` + sp + `*(.+)` + sp + `*$`)
+	sectionRe     = regexp.MustCompile(`^(##)` + sp + `+(.+)$`)
+	topLevelRe    = regexp.MustCompile(`^##` + sp + `+`)
+	specSectionRe = regexp.MustCompile(`(?i)^##` + sp + `+Requirements` + sp + `*$`)
+	removedBullet = regexp.MustCompile("^" + sp + "*[-*+]" + sp + "*`?###" + sp + "*Requirement:" + sp + "*(.+?)`?" + sp + "*$")
+	fromRe        = regexp.MustCompile("^" + sp + "*[-*+]?" + sp + "*FROM:" + sp + "*`?###" + sp + "*Requirement:" + sp + "*(.+?)`?" + sp + "*$")
+	toRe          = regexp.MustCompile("^" + sp + "*[-*+]?" + sp + "*TO:" + sp + "*`?###" + sp + "*Requirement:" + sp + "*(.+?)`?" + sp + "*$")
+	scenarioPre   = regexp.MustCompile(`(?i)^Scenario:` + sp + `*`)
 	closingRun    = regexp.MustCompile(`[ \t]+#+[ \t]*$`)
-	heading3Re    = regexp.MustCompile(`^###\s`)
-	titleRe       = regexp.MustCompile(`^#\s`)
+	heading3Re    = regexp.MustCompile(`^###` + sp)
+	titleRe       = regexp.MustCompile(`^#` + sp)
 )
 
 type doc struct {

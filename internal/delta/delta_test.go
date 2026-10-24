@@ -84,6 +84,22 @@ func TestRemovedForms(t *testing.T) {
 	}
 }
 
+func TestJavaScriptWhitespace(t *testing.T) {
+	// OpenSpec's JavaScript \s also matches U+3000, U+00A0 and \v.
+	d := Parse([]byte("##　ADDED Requirements\n### Requirement: X\n"))
+	if !reflect.DeepEqual(names(d.Added), []string{"X"}) {
+		t.Fatalf("section or requirement header not read: %v", names(d.Added))
+	}
+	d = Parse([]byte("## RENAMED Requirements\nFROM:　### Requirement: A\nTO:　### Requirement: B\n"))
+	if !reflect.DeepEqual(d.Renamed, []Rename{{"A", "B", 2}}) || len(d.Problems) != 0 {
+		t.Fatalf("%+v %+v", d.Renamed, d.Problems)
+	}
+	d = Parse([]byte("## REMOVED Requirements\n-　### Requirement: Gone\n"))
+	if !reflect.DeepEqual(names(d.Removed), []string{"Gone"}) {
+		t.Fatalf("removed bullet not read: %v", names(d.Removed))
+	}
+}
+
 func TestRenamedPairs(t *testing.T) {
 	src := "## RENAMED Requirements\n- FROM: `### Requirement: A`\n- TO: `### Requirement: B`\n* FROM: ### Requirement: C\n* TO: ### Requirement: D\n+ FROM: ### Requirement: E\n+ TO: ### Requirement: F\nFROM: ### Requirement: G\nTO: ### Requirement: H\n"
 	d := Parse([]byte(src))
