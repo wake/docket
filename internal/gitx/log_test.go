@@ -61,6 +61,23 @@ func TestCommitsWithControlCharacters(t *testing.T) {
 	}
 }
 
+func TestCommitsZoneOutOfRange(t *testing.T) {
+	r := testutil.NewRepo(t)
+	base := r.Commit("base", map[string]string{"a": "1"})
+	odd := "@1700000000 +2500"
+	r.Env = append(r.Env, "GIT_COMMITTER_DATE="+odd, "GIT_AUTHOR_DATE="+odd)
+	r.Commit("odd zone\n\nChange: add-x", map[string]string{"a": "2"})
+	g := Git{Dir: r.Dir, Env: r.Env}
+	got, err := g.Commits(base, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Time.Unix() != 1700000000 ||
+		!reflect.DeepEqual(got[0].Change, []string{"add-x"}) {
+		t.Fatalf("got %+v", got)
+	}
+}
+
 func TestUncommitted(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("init", map[string]string{"tracked": "1", ".gitignore": "ignored\n"})
