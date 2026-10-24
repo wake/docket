@@ -54,7 +54,7 @@
 
 ## Revision 1 (2026-10-24): final review fixes
 
-The whole-branch review found a false `scenario-duplicate` when a delta renames and modifies one requirement, and comment handling that differed between proposals and deltas and ran over fenced text. `markdown.StripComments` (Task 1) is replaced by `markdown.BlankComments(lines, mask)`, which leaves fenced lines alone, closes a comment on `-->` or `--!>` and keeps line count and offsets; `change` and `delta` both use it. The duplicate check also drops the main spec's requirements that the delta renames. `Git.UncommittedAdded` skips files added and then deleted in the worktree, a Reuse path may end in `/`, and `lint.RoutedDirs` is the one list of routed folders. No spec sentence changes; no task is added.
+The whole-branch review found a false `scenario-duplicate` when a delta renames and modifies one requirement, and comment handling that differed between proposals and deltas and ran over fenced text. `markdown.StripComments` (Task 1) is replaced by `markdown.BlankComments(lines, mask)`, which leaves fenced lines alone, closes a comment on `-->` or `--!>` and keeps line count and offsets; `change` and `delta` both use it. The duplicate check also drops a main-spec requirement that the delta renames and then modifies under its new name; a rename alone keeps its scenarios. `Git.UncommittedAdded` skips files added and then deleted in the worktree, a Reuse path may end in `/`, and `lint.RoutedDirs` is the one list of routed folders. No spec sentence changes; no task is added.
 
 ---
 
