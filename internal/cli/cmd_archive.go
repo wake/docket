@@ -79,31 +79,38 @@ func archiveCommand() Command {
 				Readings: rep.Readings,
 			}}
 			addArchiveReport(&out, rep.Findings, rep.Unreadable)
-			for _, a := range rep.Archived {
-				out.Human = append(out.Human, fmt.Sprintf("archived %s as %s", a.Change, strings.TrimPrefix(a.Folder, "openspec/changes/archive/")))
-			}
-			if s := rep.Stopped; s != nil {
-				if s.Change == "" {
-					out.Human = append(out.Human, "stopped at "+s.Step)
-				} else {
-					out.Human = append(out.Human, fmt.Sprintf("stopped at %s for %s", s.Step, s.Change))
-				}
-			}
-			for _, d := range rep.Drifts {
-				out.Human = append(out.Human, fmt.Sprintf("%s / %s at x-base:", d.Capability, d.Requirement))
-				out.Human = append(out.Human, indented(d.Base)...)
-				out.Human = append(out.Human, "now:")
-				out.Human = append(out.Human, indented(d.Now)...)
-			}
-			if rd := rep.Readings; rd != nil {
-				out.Human = append(out.Human, "docket:")
-				out.Human = append(out.Human, indented(strings.Join(rd.Docket, "\n"))...)
-				out.Human = append(out.Human, "openspec:")
-				out.Human = append(out.Human, indented(strings.Join(rd.OpenSpec, "\n"))...)
-			}
+			out.Human = append(out.Human, archiveHuman(rep)...)
 			return out, nil
 		},
 	}
+}
+
+// archiveHuman builds the text-mode lines for a report.
+func archiveHuman(rep archive.ArchiveReport) []string {
+	var h []string
+	for _, a := range rep.Archived {
+		h = append(h, fmt.Sprintf("archived %s as %s", a.Change, strings.TrimPrefix(a.Folder, "openspec/changes/archive/")))
+	}
+	if s := rep.Stopped; s != nil {
+		if s.Change == "" {
+			h = append(h, "stopped at "+s.Step)
+		} else {
+			h = append(h, fmt.Sprintf("stopped at %s for %s", s.Step, s.Change))
+		}
+	}
+	for _, d := range rep.Drifts {
+		h = append(h, fmt.Sprintf("%s / %s at x-base:", d.Capability, d.Requirement))
+		h = append(h, indented(d.Base)...)
+		h = append(h, "now:")
+		h = append(h, indented(d.Now)...)
+	}
+	if rd := rep.Readings; rd != nil {
+		h = append(h, "docket:")
+		h = append(h, indented(strings.Join(rd.Docket, "\n"))...)
+		h = append(h, "openspec:")
+		h = append(h, indented(strings.Join(rd.OpenSpec, "\n"))...)
+	}
+	return h
 }
 
 // indented returns the lines of s indented by two spaces, or "  (absent)"

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wake/docket/internal/archive"
 	"github.com/wake/docket/internal/testutil"
 )
 
@@ -117,6 +118,48 @@ func TestArchiveHumanLines(t *testing.T) {
 	}
 }
 
+func TestArchiveHumanStoppedAtPreconditions(t *testing.T) {
+	r := archiveFixture(t)
+	r.Write("dirty.txt", "x\n")
+	code, so, se := runArchive(t, r, archiveEnv(t, r), "add-x")
+	if code != 1 || !strings.Contains(so, "stopped at preconditions") || strings.Contains(so, " for ") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+}
+
+func TestArchiveHumanStoppedAtCrossCheck(t *testing.T) {
+	r := archiveFixture(t)
+	env := archiveEnv(t, r)
+	show := filepath.Join(t.TempDir(), "other.json")
+	other := `{"deltas":[{"spec":"x","operation":"ADDED","requirement":{"name":"Do y","scenarios":[{"name":"Works"}]}}]}`
+	if err := os.WriteFile(show, []byte(other), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env = append(env, "FAKE_OPENSPEC_SHOW="+show)
+	code, so, se := runArchive(t, r, env, "add-x")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	for _, w := range []string{"stopped at cross-check for add-x", "\ndocket:\n  ", "\nopenspec:\n  "} {
+		if !strings.Contains(so, w) {
+			t.Errorf("output lacks %q:\n%s", w, so)
+		}
+	}
+}
+
+func TestArchiveHumanDriftAndReadings(t *testing.T) {
+	rep := archive.ArchiveReport{
+		Drifts:   []archive.Drift{{Capability: "x", Requirement: "Do x", Base: "", Now: "line1\nline2\n"}},
+		Readings: &archive.Readings{Docket: []string{"a", "b"}, OpenSpec: nil},
+	}
+	got := archiveHuman(rep)
+	want := []string{"x / Do x at x-base:", "  (absent)", "now:", "  line1", "  line2",
+		"docket:", "  a", "  b", "openspec:", "  (absent)"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}
+
 func TestArchiveNeedsOpenSpec(t *testing.T) {
 	r := archiveFixture(t)
 	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC=/nonexistent/openspec")
@@ -126,11 +169,38 @@ func TestArchiveNeedsOpenSpec(t *testing.T) {
 	}
 }
 
+// The OpenSpec check comes before the default-branch check: with both
+// unusable, the finding names OpenSpec.
+func TestArchiveVersionCheckComesFirst(t *testing.T) {
+	r := archiveFixture(t)
+	r.Git("branch", "-m", "trunk")
+	r.Git("remote", "remove", "origin")
+	old, _ := testutil.FakeOpenSpec(t, "1.13.0")
+	for name, cmd := range map[string]string{"missing": "/nonexistent/openspec", "old": old} {
+		env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
+		code, so, se := runArchive(t, r, env, "add-x", "--json")
+		if code != 4 || !hasRule(t, so, "environment") || !strings.Contains(strings.ToLower(so), "openspec") ||
+			strings.Contains(strings.ToLower(so), "default branch") {
+			t.Fatalf("%s: exit %d\n%s\n%s", name, code, so, se)
+		}
+	}
+	// control: with a usable OpenSpec the same repo fails on the branch.
+	code, so, se := runArchive(t, r, archiveEnv(t, r), "add-x", "--json")
+	if code != 4 || !strings.Contains(strings.ToLower(so), "default branch") {
+		t.Fatalf("control: exit %d\n%s\n%s", code, so, se)
+	}
+}
+
 func TestArchiveNeedsASlug(t *testing.T) {
 	r := archiveFixture(t)
-	code, so, se := runArchive(t, r, archiveEnv(t, r))
-	if code != 2 {
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
+	code, so, se := runArchive(t, r, env, "--json")
+	if code != 2 || !strings.Contains(so, "archive needs at least one slug") || !hasRule(t, so, "usage") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if b, err := os.ReadFile(log); err == nil && len(b) > 0 {
+		t.Fatalf("OpenSpec was called:\n%s", b)
 	}
 }
 
