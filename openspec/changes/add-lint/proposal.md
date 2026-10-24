@@ -11,9 +11,8 @@ rules into an error a person, CI job or agent can see.
 
 ## What Changes
 
-- Readers for a change folder: proposal.md, the delta specs, plan.md and
-  `.openspec.yaml`. The delta reader follows OpenSpec 1.14's own parsing
-  rules.
+- Readers for a change folder: proposal.md, the delta specs and plan.md.
+  The delta reader follows OpenSpec 1.14's own parsing rules.
 - `dkt lint [<slug>...]` with checks for proposal sections, the Change Log,
   leftover template text, task headings, the reuse table, scenario
   references, duplicate scenario names, cancelled and compensating tasks,
@@ -55,7 +54,8 @@ None.
 ## Impact
 
 - New readers that `add-conflicts` and `add-archive` reuse.
-- CI gains a job with Node.js and OpenSpec 1.14.3 for the contract test.
+- The contract test runs in the existing CI job that has Node.js and
+  OpenSpec 1.14.3; a new CI job runs `dkt lint` on this repository.
 - `dkt lint` needs no OpenSpec CLI at run time.
 
 ## Implementation Contract
@@ -72,7 +72,7 @@ None.
 - Rule identifiers in findings: `proposal-section`, `change-log`,
   `placeholder`, `task-heading`, `reuse-table`, `scenario-ref`,
   `scenario-unclaimed`, `scenario-duplicate`, `cancelled-task`,
-  `compensates`, `routing`, `unparseable`.
+  `compensates`, `routing`, `unparseable`, `change-missing`.
 - Scenario reference format: `<capability-path>#<scenario-slug>`.
 
 ### Failure Modes
@@ -108,3 +108,4 @@ None.
 | Date | Source | Change | Impact |
 |---|---|---|---|
 | 2026-10-24 | self: writing the add-init-and-new plan | Reuse rows may name an outside dependency as `external: <name>`; lint skips the path check for them | One requirement sentence and one scenario; no task exists yet |
+| 2026-10-24 | self: writing the add-lint plan | The `.openspec.yaml` reader moves to `add-archive`, its first user, since no lint rule reads it; a missing named change is reported with the rule `change-missing`; the contract test runs in the existing `openspec` CI job, and a new job runs `dkt lint` | No spec sentence changes |
