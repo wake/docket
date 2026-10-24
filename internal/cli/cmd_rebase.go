@@ -27,11 +27,7 @@ func rebaseCommand() Command {
 				return Outcome{}, UsageError{Msg: "rebase takes one slug"}
 			}
 			slug := args[0]
-			db, err := resolveDefaultBranch(c)
-			if err != nil {
-				return Outcome{}, err
-			}
-			unlock, err := lockOpenSpec(c.Repo.Root)
+			db, unlock, err := lockWithDefaultBranch(c)
 			if err != nil {
 				return Outcome{}, err
 			}

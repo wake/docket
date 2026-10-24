@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"github.com/wake/docket/internal/archive"
 	"github.com/wake/docket/internal/lint"
 	"github.com/wake/docket/internal/openspec"
-	"github.com/wake/docket/internal/scan"
 )
 
 // ArchiveResult is the result object of dkt archive.
@@ -29,6 +27,13 @@ func archiveCommand() Command {
 			if len(args) == 0 {
 				return Outcome{}, UsageError{Msg: "archive needs at least one slug"}
 			}
+			seen := map[string]bool{}
+			for _, s := range args {
+				if seen[s] {
+					return Outcome{}, UsageError{Msg: fmt.Sprintf("slug %q is given twice", s)}
+				}
+				seen[s] = true
+			}
 			r, err := openspec.New(c.Repo.Root, c.Env)
 			if err != nil {
 				return Outcome{}, envOrErr(err)
@@ -36,14 +41,7 @@ func archiveCommand() Command {
 			if _, err := r.CheckVersion(); err != nil {
 				return Outcome{}, envOrErr(err)
 			}
-			db, err := scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)
-			if err != nil {
-				if errors.Is(err, scan.ErrNoDefaultBranch) {
-					return Outcome{}, EnvError{Msg: err.Error()}
-				}
-				return Outcome{}, err
-			}
-			unlock, err := lockOpenSpec(c.Repo.Root)
+			db, unlock, err := lockWithDefaultBranch(c)
 			if err != nil {
 				return Outcome{}, err
 			}
@@ -69,20 +67,28 @@ func archiveCommand() Command {
 				Origin:  origin,
 				Slugs:   args,
 			})
+			out := archiveOutcome(rep)
 			if err != nil {
-				return Outcome{}, envOrErr(err)
+				// Keep what was archived before the failure.
+				return out, envOrErr(err)
 			}
-			out := Outcome{Result: ArchiveResult{
-				Archived: append([]archive.Archived{}, rep.Archived...),
-				Stopped:  rep.Stopped,
-				Drifts:   append([]archive.Drift{}, rep.Drifts...),
-				Readings: rep.Readings,
-			}}
-			addArchiveReport(&out, rep.Findings, rep.Unreadable)
-			out.Human = append(out.Human, archiveHuman(rep)...)
 			return out, nil
 		},
 	}
+}
+
+// archiveOutcome builds the result object, findings and text lines of a
+// report.
+func archiveOutcome(rep archive.ArchiveReport) Outcome {
+	out := Outcome{Result: ArchiveResult{
+		Archived: append([]archive.Archived{}, rep.Archived...),
+		Stopped:  rep.Stopped,
+		Drifts:   append([]archive.Drift{}, rep.Drifts...),
+		Readings: rep.Readings,
+	}}
+	addArchiveReport(&out, rep.Findings, rep.Unreadable)
+	out.Human = append(out.Human, archiveHuman(rep)...)
+	return out
 }
 
 // archiveHuman builds the text-mode lines for a report.

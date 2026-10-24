@@ -187,6 +187,17 @@ func resolveDefaultBranch(c *Context) (scan.DefaultBranch, error) {
 	return db, err
 }
 
+// lockWithDefaultBranch resolves the default branch and takes the openspec/
+// lock; the caller releases it with the returned function.
+func lockWithDefaultBranch(c *Context) (scan.DefaultBranch, func(), error) {
+	db, err := resolveDefaultBranch(c)
+	if err != nil {
+		return db, nil, err
+	}
+	unlock, err := lockOpenSpec(c.Repo.Root)
+	return db, unlock, err
+}
+
 // envOrErr maps OpenSpec availability and version errors to an EnvError.
 func envOrErr(err error) error {
 	var un *openspec.UnavailableError

@@ -204,6 +204,57 @@ func TestArchiveNeedsASlug(t *testing.T) {
 	}
 }
 
+func TestArchiveKeepsItsReportOnAnInfrastructureError(t *testing.T) {
+	r := archiveFixture(t)
+	base := r.Git("rev-parse", "HEAD~2")
+	r.Commit("add the second change", map[string]string{
+		"openspec/changes/add-y/.openspec.yaml":  "schema: docket\nx-base: " + base + "\n",
+		"openspec/changes/add-y/proposal.md":     lintProposal,
+		"openspec/changes/add-y/specs/x/spec.md": archiveDelta,
+		"openspec/changes/add-y/plan.md":         archivePlan,
+	})
+	r.Commit("more work\n\nChange: add-y\nTask: 1", map[string]string{"b.txt": "b\n"})
+	if code, so, se := runLint(t, r.Dir, r.Env, "add-y"); code != 0 {
+		t.Fatalf("second change does not lint clean: exit %d\n%s\n%s", code, so, se)
+	}
+	// A wrapper around the fake OpenSpec that loses its execute bit once it
+	// has archived, so the next OpenSpec call fails to start (not an exit
+	// failure).
+	fake, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	wrapper := filepath.Join(t.TempDir(), "openspec")
+	script := "#!/bin/sh\nout=$('" + fake + "' \"$@\")\nrc=$?\nprintf '%s\\n' \"$out\"\nif [ \"$1\" = archive ]; then chmod -x \"$0\"; fi\nexit $rc\n"
+	if err := os.WriteFile(wrapper, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	show := filepath.Join(t.TempDir(), "show.json")
+	if err := os.WriteFile(show, []byte(archiveShow), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+wrapper, "FAKE_OPENSPEC_SHOW="+show)
+	code, so, se := runArchive(t, r, env, "add-x", "add-y", "--json")
+	if code != 4 {
+		t.Fatalf("exit %d, want 4 (OpenSpec became unusable)\n%s\n%s", code, so, se)
+	}
+	res, _ := decode(t, so)["result"].(map[string]any)
+	archived, _ := res["archived"].([]any)
+	if len(archived) != 1 || archived[0].(map[string]any)["change"] != "add-x" {
+		t.Fatalf("result lost the archived change: %v\n%s", res, so)
+	}
+}
+
+func TestArchiveRefusesRepeatedSlugs(t *testing.T) {
+	r := archiveFixture(t)
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
+	code, so, se := runArchive(t, r, env, "add-x", "add-y", "add-x")
+	if code != 2 || !strings.Contains(se, `slug "add-x" is given twice`) {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if b, err := os.ReadFile(log); err == nil && len(b) > 0 {
+		t.Fatalf("OpenSpec was called:\n%s", b)
+	}
+}
+
 const realSpec = "# booking\n\n## Purpose\nBookings.\n\n## Requirements\n\n### Requirement: Cancel booking\nThe system SHALL cancel a booking.\n\n#### Scenario: Cancelled\n- **WHEN** a guest cancels\n- **THEN** it is cancelled\n"
 
 func realDelta(then string) string {
