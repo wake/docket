@@ -18,8 +18,6 @@ fix them directly when they change no spec sentence.
 - An internal error together with unreadable sources exits 1, not 3.
 - Messages end in a dangling `: ` when git or OpenSpec wrote nothing to
   standard error (`gitx.ExitError`, `openspec.FailedError`).
-- The routing section in AGENTS.md names `dkt sync`, `dkt lint` and
-  `dkt archive`, and `dkt init` prints it before those commands exist.
 - The routing section is cut out of AGENTS.md by heading, so a `## ` line
   inside a code fence would end it early.
 

@@ -13,7 +13,8 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/openspec` | Locates, version-checks and runs the OpenSpec CLI |
 | `internal/scan` | Finds changes across worktrees and branches; resolves the default branch |
 | `internal/setup` | Installs the schema (`dkt init`) |
-| `internal/change` | Change-folder rules: slug validation, `.openspec.yaml` metadata |
+| `internal/change` | Change-folder rules: slug validation, `.openspec.yaml` metadata, plan steps and ticking |
+| `internal/archive` | Closes changes: `dkt sync`, `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, and `evidence.md` |
 | `internal/markdown` | Line, heading and table readers that skip code fences and comments |
 | `internal/delta` | Reads delta specs and main specs; makes scenario slugs |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
@@ -39,6 +40,16 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Make a scenario slug | `delta.Slug` |
 | Read proposal.md or plan.md | `change.ParseProposal`, `change.ParsePlan` |
 | Lint change folders | `lint.Run` |
+| Read `.openspec.yaml` metadata | `change.ParseMetadata` |
+| Set the recorded base | `change.SetBase` |
+| Tick plan steps | `change.Tick` |
+| List commits between two revisions | `Git.Commits` |
+| List uncommitted paths | `Git.Uncommitted` |
+| Read a file at a revision if it exists | `Git.ShowIfExists` |
+| Tick a plan from commit trailers | `archive.Sync` |
+| Move a change's recorded base | `archive.Rebase` |
+| Check and archive changes, then record evidence | `archive.Archive` |
+| Compare Docket's reading of deltas with OpenSpec's | `archive.CrossCheck` |
 | Files a branch adds | `Git.AddedFiles`, `Git.UncommittedAdded` |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |
