@@ -26,7 +26,7 @@ func (g Git) UncommittedAdded(paths ...string) ([]string, error) {
 	}
 	var files []string
 	for _, rec := range splitNUL(string(out)) {
-		if len(rec) > 3 && strings.ContainsAny(rec[:2], "A?") {
+		if len(rec) > 3 && strings.ContainsAny(rec[:2], "A?") && rec[1] != 'D' {
 			files = append(files, rec[3:])
 		}
 	}

@@ -1,6 +1,8 @@
 package gitx
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -39,6 +41,26 @@ func TestAddedFiles(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %q, want %q", got, want)
+	}
+}
+
+func TestUncommittedAddedSkipsDeletedAdditions(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "main")
+	r.Commit("init", map[string]string{"docs/superpowers/specs/old.md": "old\n"})
+	r.Write("docs/superpowers/specs/gone.md", "g\n")
+	r.Git("add", "docs/superpowers/specs/gone.md")
+	if err := os.Remove(filepath.Join(r.Dir, "docs/superpowers/specs/gone.md")); err != nil {
+		t.Fatal(err)
+	}
+
+	g := Git{Dir: r.Dir, Env: r.Env}
+	got, err := g.UncommittedAdded("docs/superpowers/specs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("got %q, want none", got)
 	}
 }
 
