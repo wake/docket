@@ -64,7 +64,7 @@ handling of the same change diverging across worktrees.
 
 ## Order
 
-Docket's own queue, as of 2026-10-24:
+Docket's own queue, as of 2026-10-24. Released: 1 to 3 in v0.1.0, 7 in v0.2.0.
 
 1. `add-init-and-new`
 2. `add-lint`
