@@ -314,6 +314,54 @@ func TestReadFileWorktree(t *testing.T) {
 	}
 }
 
+func TestReadFileRejectsNonLocalPath(t *testing.T) {
+	r := baseRepo(t)
+	r.Write(yamlPath("add-w"), "hello\n")
+	if err := os.WriteFile(filepath.Join(filepath.Dir(r.Dir), "x"), []byte("outside\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	inv, g := scanOf(t, r)
+	c := find(inv, "add-w")
+	if c == nil {
+		t.Fatalf("inv = %+v", inv)
+	}
+	dbSrc := inv.Changes[0].Sources[len(c.Sources)-1]
+	for _, src := range []scan.Source{c.Sources[0], dbSrc} {
+		for _, rel := range []string{"../x", "a/../../x", filepath.Join(r.Dir, "README.md"), ""} {
+			if b, err := scan.ReadFile(g, src, rel); err == nil {
+				t.Fatalf("ReadFile(%s, %q) = %q, want error", src.Kind, rel, b)
+			}
+		}
+	}
+}
+
+func TestReadFileWorktreeSymlinks(t *testing.T) {
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	if err := os.WriteFile(outside, []byte("secret\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := baseRepo(t)
+	r.Write(yamlPath("add-w"), "hello\n")
+	if err := os.Symlink(outside, filepath.Join(r.Dir, "leak")); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := os.Symlink("README.md", filepath.Join(r.Dir, "inner")); err != nil {
+		t.Fatal(err)
+	}
+	inv, g := scanOf(t, r)
+	c := find(inv, "add-w")
+	if c == nil || c.Sources[0].Kind != scan.KindWorktree {
+		t.Fatalf("c = %+v", c)
+	}
+	if b, err := scan.ReadFile(g, c.Sources[0], "leak"); err == nil {
+		t.Fatalf("symlink out of the worktree read: %q", b)
+	}
+	b, err := scan.ReadFile(g, c.Sources[0], "inner")
+	if err != nil || string(b) != "x\n" {
+		t.Fatalf("inner symlink = %q, %v", b, err)
+	}
+}
+
 func TestUnreadableBranchTree(t *testing.T) {
 	r := baseRepo(t)
 	r.Commit("keep", map[string]string{yamlPath("add-keep"): "a: b\n"})
