@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -52,6 +53,40 @@ func TestEvidenceWriteFailures(t *testing.T) {
 		}
 		check(t, rep, "evidence-failed")
 	})
+	t.Run("write fails midway", func(t *testing.T) {
+		_, e, f := archRepo(t, "add-x")
+		writeTemp = func(f *os.File, b []byte) error {
+			_, _ = f.Write(b[:len(b)/2])
+			return errors.New("disk full")
+		}
+		t.Cleanup(func() { writeTemp = writeAll })
+		rep, err := Archive(f.input(e, nil, "add-x"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, rep, "evidence-failed")
+		if _, err := os.Stat(filepath.Join(e.Root, arch, "evidence.md")); !os.IsNotExist(err) {
+			t.Errorf("partial evidence.md left: %v", err)
+		}
+		noTempFiles(t, filepath.Join(e.Root, arch))
+	})
+	t.Run("evidence.md already exists", func(t *testing.T) {
+		_, e, f := archRepo(t, "add-x")
+		f.hooks = map[string]func(){"add-x": func() {
+			if err := os.WriteFile(filepath.Join(e.Root, arch, "evidence.md"), []byte("mine\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}}
+		rep, err := Archive(f.input(e, nil, "add-x"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		check(t, rep, "evidence-failed")
+		if b, _ := os.ReadFile(filepath.Join(e.Root, arch, "evidence.md")); string(b) != "mine\n" {
+			t.Errorf("evidence.md overwritten: %q", b)
+		}
+		noTempFiles(t, filepath.Join(e.Root, arch))
+	})
 	t.Run("evidence.md is a link", func(t *testing.T) {
 		_, e, f := archRepo(t, "add-x")
 		target := filepath.Join(t.TempDir(), "target.txt")
@@ -76,22 +111,35 @@ func TestEvidenceWriteFailures(t *testing.T) {
 
 func TestEvidenceOrigin(t *testing.T) {
 	for in, want := range map[string]string{
-		"":                         "none",
-		"https://TOKEN@host/x":     "https://host/x",
-		"https://user:pass@host/x": "https://host/x",
-		"http://user:pass@host/x":  "http://host/x",
-		"https://host/x":           "https://host/x",
-		"ssh://git:secret@host/x":  "ssh://git@host/x",
-		"ssh://git@host/x":         "ssh://git@host/x",
-		"git://host/x":             "git://host/x",
-		"file:///srv/repo":         "none",
-		"/srv/repo":                "none",
-		"./repo":                   "none",
-		"../repo":                  "none",
-		"~/repo":                   "none",
-		"repo":                     "none",
-		"git@host:org/repo.git":    "git@host:org/repo.git",
-		"host:org/repo.git":        "host:org/repo.git",
+		"":                                       "none",
+		"https://TOKEN@host/x":                   "https://host/x",
+		"https://user:pass@host/x":               "https://host/x",
+		"http://user:pass@host/x":                "http://host/x",
+		"https://host/x":                         "https://host/x",
+		"ssh://git:secret@host/x":                "ssh://git@host/x",
+		"ssh://git@host/x":                       "ssh://git@host/x",
+		"git://host/x":                           "git://host/x",
+		"file:///srv/repo":                       "none",
+		"/srv/repo":                              "none",
+		"./repo":                                 "none",
+		"../repo":                                "none",
+		"~/repo":                                 "none",
+		"repo":                                   "none",
+		"git@host:org/repo.git":                  "git@host:org/repo.git",
+		"host:org/repo.git":                      "none",
+		"git@github.com:wake/docket.git":         "git@github.com:wake/docket.git",
+		"https://host/x?access_token=SECRET":     "https://host/x",
+		"https://host/x#access_token=SECRET":     "https://host/x",
+		"https://host:8443/a/b?x=1#y":            "https://host:8443/a/b",
+		"ssh://git@host/x?token=SECRET":          "ssh://git@host/x",
+		"ssh://git@host/x#frag":                  "ssh://git@host/x",
+		"git+ssh://git:pw@host/x?token=SECRET#f": "git+ssh://git@host/x",
+		"ftp://host/x":                           "none",
+		"C:/Users/alice/repo":                    "none",
+		`C:\Users\alice\repo`:                    "none",
+		"git@host:org/repo?token=SECRET":         "none",
+		"git@host:org/repo#frag":                 "none",
+		"https:///x":                             "none",
 	} {
 		if got := evidenceOrigin(in); got != want {
 			t.Errorf("%q: got %q, want %q", in, got, want)

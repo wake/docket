@@ -202,9 +202,8 @@ func (r *archiveRun) change(slug string) (stopped bool, err error) {
 		msg := "Docket and OpenSpec read the delta specs differently"
 		if cerr != nil {
 			msg = cerr.Error()
-		} else {
-			r.rep.Readings = &rd
 		}
+		r.rep.Readings = &rd
 		return r.stop(slug, "cross-check", []Finding{{Rule: "readings-disagree", Change: slug, Message: msg}}, nil), nil
 	}
 
