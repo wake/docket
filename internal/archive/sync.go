@@ -3,11 +3,12 @@ package archive
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"syscall"
 	"regexp"
 	"slices"
+	"syscall"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
@@ -153,7 +154,11 @@ func Sync(e Env, slug string, check bool) (SyncReport, error) {
 // writeOrRefuse writes like writeFile; a link on the path comes back as a
 // symlink-refused finding and nothing is written.
 func writeOrRefuse(root, rel, slug string, b []byte) (*Finding, error) {
-	err := writeFile(root, rel, b)
+	return refuseLink(slug, rel, writeFile(root, rel, b))
+}
+
+// refuseLink turns a symlink error into a symlink-refused finding.
+func refuseLink(slug, rel string, err error) (*Finding, error) {
 	var sl *safepath.SymlinkError
 	if errors.As(err, &sl) {
 		return &Finding{Rule: "symlink-refused", Change: slug, File: rel, Message: err.Error()}, nil
@@ -177,7 +182,7 @@ var writeTemp = writeAll
 // setgid and sticky bits); ownership, ACLs and extended attributes are not
 // carried over, since these files are tracked text that git does not record
 // them for. A target that cannot be opened for writing is refused.
-func writeFile(root, rel string, b []byte) (err error) {
+func writeFile(root, rel string, b []byte) error {
 	if err := safepath.Check(root, rel); err != nil {
 		return err
 	}
@@ -196,6 +201,30 @@ func writeFile(root, rel string, b []byte) (err error) {
 	if err = w.Close(); err != nil {
 		return err
 	}
+	return swapIn(target, fi.Mode()&(os.ModePerm|os.ModeSetuid|os.ModeSetgid|os.ModeSticky), b, os.Rename)
+}
+
+// createFile writes a new file below root, refusing a link anywhere on its
+// path and a file that already exists. It goes through a temporary file that
+// is hard-linked into place, so a file created after the check is never
+// replaced. The up-front check only gives a clearer error.
+func createFile(root, rel string, b []byte) error {
+	if err := safepath.Check(root, rel); err != nil {
+		return err
+	}
+	target := filepath.Join(root, filepath.FromSlash(rel))
+	if _, err := os.Lstat(target); err == nil {
+		return &fs.PathError{Op: "create", Path: target, Err: fs.ErrExist}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return swapIn(target, 0o644, b, linkNew)
+}
+
+// swapIn writes b to a temporary file next to target, gives it perm and
+// puts it in place with place. On any failure the temporary file is removed
+// and target is left as it was.
+func swapIn(target string, perm os.FileMode, b []byte, place func(tmp, target string) error) (err error) {
 	tmp, err := os.CreateTemp(filepath.Dir(target), ".dkt-*")
 	if err != nil {
 		return err
@@ -216,8 +245,18 @@ func writeFile(root, rel string, b []byte) (err error) {
 	if err = tmp.Close(); err != nil {
 		return err
 	}
-	if err = os.Chmod(tmp.Name(), fi.Mode()&(os.ModePerm|os.ModeSetuid|os.ModeSetgid|os.ModeSticky)); err != nil {
+	if err = os.Chmod(tmp.Name(), perm); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), target)
+	return place(tmp.Name(), target)
+}
+
+// linkNew hard-links tmp to target, which fails with EEXIST instead of
+// replacing a file that appeared in the meantime, then removes tmp.
+func linkNew(tmp, target string) error {
+	if err := os.Link(tmp, target); err != nil {
+		return err
+	}
+	_ = os.Remove(tmp)
+	return nil
 }
