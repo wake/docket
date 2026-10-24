@@ -27,6 +27,18 @@ func TestParsePlanTasks(t *testing.T) {
 	}
 }
 
+func TestEmptyScenariosValueIsNotNone(t *testing.T) {
+	p := ParsePlan([]byte("# Plan\n\n### Task 1: A\n\n**Scenarios:**\n\n### Task 2: B\n\n**Scenarios:**   \n\n### Task 3: C\n\n**Scenarios:** NONE\n"))
+	for i := 0; i < 2; i++ {
+		if got := p.Tasks[i].Scenarios; !reflect.DeepEqual(got, []string{""}) {
+			t.Fatalf("task %d scenarios = %#v", i+1, got)
+		}
+	}
+	if len(p.Tasks[2].Scenarios) != 0 {
+		t.Fatalf("none = %#v", p.Tasks[2].Scenarios)
+	}
+}
+
 func TestBadHeadings(t *testing.T) {
 	p := ParsePlan([]byte("## Task 3: Parser\n\n### Task 0: x\n\n### Task 2 Parser\n\n### Task 1: ok\n"))
 	want := []BadHeading{{"Task 3: Parser", 2, 1}, {"Task 0: x", 3, 3}, {"Task 2 Parser", 3, 5}}
