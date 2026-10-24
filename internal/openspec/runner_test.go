@@ -84,6 +84,58 @@ func TestUnsupportedVersion(t *testing.T) {
 	if got := readLog(t, log); len(got) != 1 || got[0][0] != "--version" {
 		t.Fatalf("log = %q", got)
 	}
+	for _, want := range []string{"1.3.0", "1.14.x", "DOCKET_OPENSPEC"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message %q lacks %q", err.Error(), want)
+		}
+	}
+}
+
+func TestUnstartableProgramIsUnavailable(t *testing.T) {
+	dir := t.TempDir()
+	prog := filepath.Join(dir, "openspec")
+	if err := os.WriteFile(prog, []byte("#!/nonexistent/interpreter\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+prog)
+	r, err := openspec.New(dir, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.Run("--help")
+	var ue *openspec.UnavailableError
+	var fe *openspec.FailedError
+	if !errors.As(err, &ue) || errors.As(err, &fe) {
+		t.Fatalf("err = %#v, want only UnavailableError", err)
+	}
+	if !strings.Contains(err.Error(), "DOCKET_OPENSPEC") {
+		t.Errorf("message lacks DOCKET_OPENSPEC: %v", err)
+	}
+}
+
+func TestFailingVersionIsUnavailable(t *testing.T) {
+	fake, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+fake, "FAKE_OPENSPEC_FAIL=--version")
+	r, err := openspec.New(t.TempDir(), env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, call := range map[string]func() error{
+		"CheckVersion": func() error { _, err := r.CheckVersion(); return err },
+		"Run":          func() error { _, err := r.Run("--help"); return err },
+	} {
+		err := call()
+		var ue *openspec.UnavailableError
+		var fe *openspec.FailedError
+		if !errors.As(err, &ue) || errors.As(err, &fe) {
+			t.Fatalf("%s: err = %#v, want only UnavailableError", name, err)
+		}
+		for _, want := range []string{"fake failure", "3", "DOCKET_OPENSPEC"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: message %q lacks %q", name, err.Error(), want)
+			}
+		}
+	}
 }
 
 func TestVersionMatching(t *testing.T) {

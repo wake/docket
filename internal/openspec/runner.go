@@ -29,21 +29,23 @@ type Runner struct {
 }
 
 // UnavailableError reports that no usable OpenSpec program exists: it was not
-// found, or its --version check could not run (Detail says why).
-type UnavailableError struct{ Program, Detail string }
+// found, could not be started, or failed to report its version. Reason says
+// why when the program was not simply missing.
+type UnavailableError struct{ Program, Reason string }
 
 func (e *UnavailableError) Error() string {
-	if e.Detail != "" {
-		return fmt.Sprintf("OpenSpec CLI %q is not usable: %s; check DOCKET_OPENSPEC or install OpenSpec %s", e.Program, e.Detail, SupportedRange)
+	why := "not found"
+	if e.Reason != "" {
+		why = "is not usable: " + e.Reason
 	}
-	return fmt.Sprintf("OpenSpec CLI %q not found; install OpenSpec %s or set DOCKET_OPENSPEC to a command that runs it", e.Program, SupportedRange)
+	return fmt.Sprintf("OpenSpec CLI %q %s; install OpenSpec %s or set DOCKET_OPENSPEC to a command that runs it", e.Program, why, SupportedRange)
 }
 
 // UnsupportedError reports an OpenSpec version outside the supported range.
 type UnsupportedError struct{ Found, Range string }
 
 func (e *UnsupportedError) Error() string {
-	return fmt.Sprintf("OpenSpec version %q is not supported (need %s)", e.Found, e.Range)
+	return fmt.Sprintf("OpenSpec version %q is not supported (need %s); set DOCKET_OPENSPEC to a command that runs a supported OpenSpec", e.Found, e.Range)
 }
 
 // FailedError reports a non-zero exit of an OpenSpec command.
@@ -129,7 +131,7 @@ func (r *Runner) exec(args ...string) (string, error) {
 		if errors.As(err, &ee) {
 			return stdout.String(), &FailedError{Command: full, Code: ee.ExitCode(), Stderr: stderr.String()}
 		}
-		return stdout.String(), err
+		return stdout.String(), &UnavailableError{Program: full[0], Reason: err.Error()}
 	}
 	return stdout.String(), nil
 }
@@ -141,12 +143,11 @@ func (r *Runner) CheckVersion() (string, error) {
 	}
 	out, err := r.exec("--version")
 	if err != nil {
-		detail := err.Error()
 		var fe *FailedError
 		if errors.As(err, &fe) {
-			detail = fmt.Sprintf("%s exited with %d: %s", strings.Join(fe.Command, " "), fe.Code, strings.TrimSpace(fe.Stderr))
+			err = &UnavailableError{Program: r.Cmd[0], Reason: fmt.Sprintf("--version exited with %d: %s", fe.Code, strings.TrimSpace(fe.Stderr))}
 		}
-		return "", &UnavailableError{Program: r.Cmd[0], Detail: detail}
+		return "", err
 	}
 	v := strings.TrimSpace(out)
 	if !versionPattern.MatchString(v) {

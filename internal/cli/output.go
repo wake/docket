@@ -42,7 +42,17 @@ func writeJSON(w io.Writer, name string, repo *Repo, o Outcome, code int) error 
 	}
 	b, err := json.Marshal(e)
 	if err != nil {
-		return err
+		// Keep stdout one JSON object: report the failure in the envelope.
+		cause := err
+		e.OK, e.Result = false, nil
+		e.Findings = append(append([]Finding{}, e.Findings...), Finding{Rule: "internal", Message: cause.Error()})
+		if b, err = json.Marshal(e); err != nil {
+			return err
+		}
+		if _, err = fmt.Fprintf(w, "%s\n", b); err != nil {
+			return err
+		}
+		return fmt.Errorf("encoding result: %w", cause)
 	}
 	_, err = fmt.Fprintf(w, "%s\n", b)
 	return err
