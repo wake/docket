@@ -157,7 +157,7 @@ func (r *archiveRun) preconditions() error {
 // change runs the steps for one change; stopped says a step had findings.
 func (r *archiveRun) change(slug string) (stopped bool, err error) {
 	e := r.in.Env
-	c, finds, unread := loadChange(e, slug, true, true)
+	c, finds, unread := loadChange(e, slug, loadOpts{Plan: true, BaseIsCommit: true, Deltas: true})
 	if c == nil {
 		return r.stop(slug, "plan", finds, unread), nil
 	}

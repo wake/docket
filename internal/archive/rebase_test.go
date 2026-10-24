@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,6 +85,24 @@ func TestRebaseOldBaseMissing(t *testing.T) {
 	if len(rep.Changed) != 1 || rep.Changed[0].Base != "" || rep.Changed[0].Now == "" {
 		t.Fatalf("%+v", rep.Changed)
 	}
+}
+
+func TestRebaseWriteFailureLeavesMetadataAlone(t *testing.T) {
+	e, _, _ := movedRepo(t)
+	before := readMeta(t, e.Root)
+	writeTemp = func(f *os.File, b []byte) error {
+		_, _ = f.Write(b[:len(b)/2])
+		return errors.New("disk full")
+	}
+	t.Cleanup(func() { writeTemp = writeAll })
+	rep, err := Rebase(e, "add-y")
+	if err == nil || !strings.Contains(err.Error(), "disk full") || rep.Moved {
+		t.Fatalf("%v %+v", err, rep)
+	}
+	if got := readMeta(t, e.Root); got != before {
+		t.Fatalf("meta changed:\n%s", got)
+	}
+	noTempFiles(t, filepath.Dir(filepath.Join(e.Root, metaPath)))
 }
 
 func TestRebaseSymlinkedMetadataRefused(t *testing.T) {

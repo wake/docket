@@ -3,11 +3,11 @@ package archive
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
-	"syscall"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
@@ -105,11 +105,10 @@ func computeSync(c *loadedChange, commits []gitx.Commit) syncResult {
 // as plan-unsynced. The error is for failures not tied to the change.
 func Sync(e Env, slug string, check bool) (SyncReport, error) {
 	rep := SyncReport{Change: slug, Ticked: []TaskTicks{}}
-	head, done, err := headOrNoCommits(e, slug, &rep.Findings)
-	if err != nil || done {
+	head, c, finds, unread, err := loadAtHead(e, slug, loadOpts{Plan: true, BaseIsCommit: true})
+	if err != nil {
 		return rep, err
 	}
-	c, finds, unread := loadChange(e, slug, true, true)
 	if c == nil {
 		rep.Findings, rep.Unreadable = finds, unread
 		return rep, nil
@@ -166,29 +165,76 @@ func refuseLink(slug, rel string, err error) (*Finding, error) {
 	return nil, err
 }
 
-// writeFile replaces the content of an existing file below root, refusing a
-// link anywhere on its path.
+// writeAll is the default writeTemp. Tests replace writeTemp to inject a
+// write failure.
+func writeAll(f *os.File, b []byte) error {
+	_, err := f.Write(b)
+	return err
+}
+
+var writeTemp = writeAll
+
+// writeFile replaces the content of an existing regular file below root,
+// refusing a link anywhere on its path. It writes a temporary file in the
+// same directory and renames it onto the target, so a failure leaves the
+// target untouched.
 func writeFile(root, rel string, b []byte) error {
-	return writeWith(root, rel, os.O_WRONLY|os.O_TRUNC, 0, b)
-}
-
-// createFile writes a new file below root, refusing a link anywhere on its
-// path and a file that already exists.
-func createFile(root, rel string, b []byte) error {
-	return writeWith(root, rel, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644, b)
-}
-
-func writeWith(root, rel string, flags int, perm os.FileMode, b []byte) error {
 	if err := safepath.Check(root, rel); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(filepath.Join(root, filepath.FromSlash(rel)), flags|syscall.O_NOFOLLOW, perm)
+	target := filepath.Join(root, filepath.FromSlash(rel))
+	fi, err := os.Lstat(target)
 	if err != nil {
 		return err
 	}
-	if _, err := f.Write(b); err != nil {
-		f.Close()
+	if !fi.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", rel)
+	}
+	return swapIn(target, fi.Mode().Perm(), b)
+}
+
+// createFile writes a new file below root, refusing a link anywhere on its
+// path and a file that already exists. Like writeFile it goes through a
+// temporary file and a rename.
+func createFile(root, rel string, b []byte) error {
+	if err := safepath.Check(root, rel); err != nil {
 		return err
 	}
-	return f.Close()
+	target := filepath.Join(root, filepath.FromSlash(rel))
+	if _, err := os.Lstat(target); err == nil {
+		return &fs.PathError{Op: "create", Path: target, Err: fs.ErrExist}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return swapIn(target, 0o644, b)
+}
+
+// swapIn writes b to a temporary file next to target, gives it perm and
+// renames it onto target. On any failure the temporary file is removed and
+// target is left as it was.
+func swapIn(target string, perm os.FileMode, b []byte) (err error) {
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".dkt-*")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = os.Remove(tmp.Name())
+		}
+	}()
+	if err = writeTemp(tmp, b); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	if err = os.Chmod(tmp.Name(), perm); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), target)
 }
