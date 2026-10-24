@@ -71,9 +71,16 @@ func TestSyncCheckExitsOne(t *testing.T) {
 
 func TestSyncNeedsOneSlug(t *testing.T) {
 	r := syncFixture(t)
-	for _, args := range [][]string{{}, {"add-x", "add-y"}} {
-		if code, so, se := runSync(t, r, nil, args...); code != 2 {
-			t.Fatalf("%v: exit %d\n%s\n%s", args, code, so, se)
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{}, "sync needs a slug"},
+		{[]string{"add-x", "add-y"}, "sync takes one slug"},
+	} {
+		code, so, se := runSync(t, r, nil, tc.args...)
+		if code != 2 || !strings.Contains(se, tc.want) {
+			t.Fatalf("%v: exit %d, want 2 with %q\n%s\n%s", tc.args, code, tc.want, so, se)
 		}
 	}
 }

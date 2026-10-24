@@ -1,11 +1,9 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/wake/docket/internal/archive"
-	"github.com/wake/docket/internal/scan"
 )
 
 // RebaseResult is the result object of dkt rebase.
@@ -29,11 +27,8 @@ func rebaseCommand() Command {
 				return Outcome{}, UsageError{Msg: "rebase takes one slug"}
 			}
 			slug := args[0]
-			db, err := scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)
+			db, err := resolveDefaultBranch(c)
 			if err != nil {
-				if errors.Is(err, scan.ErrNoDefaultBranch) {
-					return Outcome{}, EnvError{Msg: err.Error()}
-				}
 				return Outcome{}, err
 			}
 			unlock, err := lockOpenSpec(c.Repo.Root)
