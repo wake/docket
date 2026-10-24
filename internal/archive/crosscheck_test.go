@@ -2,6 +2,7 @@ package archive
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/delta"
@@ -19,8 +20,7 @@ const showAll = `{"id":"x","deltas":[
  {"spec":"cap/a","operation":"ADDED","description":"d","requirement":{"name":"New","scenarios":[{"name":"s1"}]}},
  {"spec":"cap/a","operation":"MODIFIED","requirement":{"name":"Mod","scenarios":[]}},
  {"spec":"cap/a","operation":"REMOVED","requirement":{"name":"Old"}},
- {"spec":"cap/a","operation":"RENAMED","rename":{"from":"A","to":"B"}},
- {"spec":"cap/a","operation":"ADDED"}
+ {"spec":"cap/a","operation":"RENAMED","rename":{"from":"A","to":"B"}}
 ]}`
 
 func allDeltas() map[string]delta.Delta {
@@ -38,10 +38,10 @@ func TestCrossCheckAgrees(t *testing.T) {
 		t.Fatalf("ok=%v err=%v %+v", ok, err, r)
 	}
 	want := []string{
-		`cap/a: ADDED|New|["s1"]`,
-		`cap/a: MODIFIED|Mod|[]`,
-		`cap/a: REMOVED|Old|[]`,
-		`cap/a: RENAMED|A|B`,
+		`"cap/a": ADDED|"New"|["s1"]`,
+		`"cap/a": MODIFIED|"Mod"|[]`,
+		`"cap/a": REMOVED|"Old"|[]`,
+		`"cap/a": RENAMED|"A"|"B"`,
 	}
 	if !reflect.DeepEqual(r.Docket, want) || !reflect.DeepEqual(r.OpenSpec, want) {
 		t.Errorf("got %#v", r)
@@ -68,9 +68,54 @@ func TestCrossCheckScenarioNames(t *testing.T) {
 	}
 }
 
+// Two different renames must not read as the same line.
+func TestCrossCheckRenamesWithBarsAreDistinct(t *testing.T) {
+	show := `{"deltas":[{"spec":"c","operation":"RENAMED","rename":{"from":"A|B","to":"C"}}]}`
+	d := map[string]delta.Delta{"c": {Renamed: []delta.Rename{{From: "A", To: "B|C"}}}}
+	if _, ok, err := CrossCheck(d, show); err != nil || ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+}
+
 func TestCrossCheckBadJSON(t *testing.T) {
 	if _, _, err := CrossCheck(nil, "not json"); err == nil {
 		t.Fatal("want error")
+	}
+}
+
+func TestCrossCheckRejectsMalformedOutput(t *testing.T) {
+	for name, show := range map[string]string{
+		"null":                     `null`,
+		"empty object":             `{}`,
+		"null deltas":              `{"deltas":null}`,
+		"array":                    `[]`,
+		"unknown operation":        `{"deltas":[{"spec":"c","operation":"MOVED","requirement":{"name":"R"}}]}`,
+		"no operation":             `{"deltas":[{"spec":"c","requirement":{"name":"R"}}]}`,
+		"no spec":                  `{"deltas":[{"operation":"ADDED","requirement":{"name":"R"}}]}`,
+		"no payload":               `{"deltas":[{"spec":"c","operation":"ADDED"}]}`,
+		"both payloads":            `{"deltas":[{"spec":"c","operation":"RENAMED","requirement":{"name":"R"},"rename":{"from":"A","to":"B"}}]}`,
+		"rename without to":        `{"deltas":[{"spec":"c","operation":"RENAMED","rename":{"from":"A"}}]}`,
+		"renamed with requirement": `{"deltas":[{"spec":"c","operation":"RENAMED","requirement":{"name":"R"}}]}`,
+		"added with rename":        `{"deltas":[{"spec":"c","operation":"ADDED","rename":{"from":"A","to":"B"}}]}`,
+		"unnamed requirement":      `{"deltas":[{"spec":"c","operation":"ADDED","requirement":{"name":""}}]}`,
+	} {
+		d := map[string]delta.Delta{"c": {Added: []delta.Requirement{dreq("R")}}}
+		r, ok, err := CrossCheck(d, show)
+		if err == nil || ok {
+			t.Errorf("%s: ok=%v err=%v", name, ok, err)
+			continue
+		}
+		if len(r.Docket) != 1 || len(r.OpenSpec) != 0 {
+			t.Errorf("%s: readings on error: %#v", name, r)
+		}
+	}
+}
+
+func TestCrossCheckErrorNamesTheEntry(t *testing.T) {
+	show := `{"deltas":[{"spec":"c","operation":"ADDED","requirement":{"name":"R"}},{"spec":"c","operation":"ADDED"}]}`
+	_, _, err := CrossCheck(nil, show)
+	if err == nil || !strings.Contains(err.Error(), "deltas[1]") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
