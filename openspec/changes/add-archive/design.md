@@ -69,6 +69,15 @@ default branch tip and commits the result together with the version bump.
   the dated name, and takes the date from that name. The repository is
   recorded by its `origin` URL, never by its local path, because
   `evidence.md` is committed.
+- **Links refused before OpenSpec writes.** Docket cannot check OpenSpec's
+  own writes, so just before `openspec archive` it runs `safepath.Check` on
+  the change folder, `openspec/changes/archive` and the main spec of every
+  capability the change touches, and stops with `symlink-refused`.
+- **Evidence after the irreversible step.** With those paths checked, only
+  an I/O error can stop `evidence.md` from being written after OpenSpec
+  archived the change. Docket reports it as `evidence-failed` and leaves the
+  change archived: undoing OpenSpec's merge would need a rollback that
+  `git restore` already provides.
 - **Stop at first failure, keep earlier results.** Each archived change is
   a separate, already-complete result in the working tree; undoing them
   would need a rollback that `git restore` already provides. The report
@@ -81,10 +90,11 @@ default branch tip and commits the result together with the version bump.
 
 ## Risks / Trade-offs
 
-- [A pull request merged with squash loses per-commit trailers, so `sync`
-  and the plan check find no task commits] → AGENTS.md and the README state
-  that merges must use merge commits; the plan check then fails loudly
-  instead of archiving a plan that looks unfinished.
+- [A pull request merged with squash loses per-commit trailers, while
+  plan.md, ticked by `sync` before the pull request, looks finished] →
+  AGENTS.md and the README state that merges must use merge commits, and
+  the plan check fails when no commit since `x-base` carries a `Task:`
+  trailer for the change, instead of archiving with empty evidence.
 - [A task finished without any commit, such as a manual verification] → Its
   steps are ticked by hand; the plan check accepts ticks from either source.
 - [Release branches with uncommitted bump edits] → `archive` requires a

@@ -31,11 +31,15 @@ For each named change, in the order given, `dkt archive` SHALL run the plan chec
 - **THEN** `add-x` is archived in the working tree, `add-y` is untouched, the lint finding is reported, and the command exits with 1
 
 ### Requirement: Plan check
-The plan check SHALL fail when `dkt sync <slug> --check` would exit with 1, or when any step of a `### Task` section in plan.md is unticked.
+The plan check SHALL fail when `dkt sync <slug> --check` would exit with 1, when any step of a `### Task` section in plan.md is unticked, or when no commit reachable from HEAD and not from `x-base` carries both `Change: <slug>` and a `Task:` trailer.
 
 #### Scenario: Unticked task
 - **WHEN** Task 5 of `add-x` has an unticked step and no commit names it
 - **THEN** `dkt archive add-x` stops at the plan check and names Task 5
+
+#### Scenario: Squashed pull request
+- **WHEN** every step of `add-x` is ticked but no commit since its `x-base` carries `Change: add-x` with a `Task:` trailer
+- **THEN** `dkt archive add-x` stops at the plan check
 
 ### Requirement: Base check
 For every requirement the change modifies, removes or renames, the base check SHALL compare that requirement's block in the main spec at `x-base` with its block in the working tree, which includes changes archived earlier in the same run, and SHALL fail, showing the difference, when they differ. For every requirement the change adds, it SHALL fail when the working tree's main spec has a requirement of that name that the main spec at `x-base` did not.
