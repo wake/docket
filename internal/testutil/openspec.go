@@ -68,6 +68,22 @@ new)
   fi
   fail new
   ;;
+validate)
+  fail validate
+  echo "Change '$2' is valid"
+  ;;
+show)
+  fail show
+  cat "$FAKE_OPENSPEC_SHOW"
+  ;;
+archive)
+  fail archive
+  slug="$2"
+  as="2026-01-02-$slug"
+  mkdir -p openspec/changes/archive
+  mv "openspec/changes/$slug" "openspec/changes/archive/$as"
+  printf '{"archive":{"change":"%s","archivedAs":"%s","path":"%s/openspec/changes/archive/%s"}}\n' "$slug" "$as" "$PWD" "$as"
+  ;;
 esac
 `
 
