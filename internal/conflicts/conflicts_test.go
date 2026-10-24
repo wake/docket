@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/wake/docket/internal/delta"
+	"github.com/wake/docket/internal/scan"
 )
 
 func req(name string) string {
@@ -228,5 +229,28 @@ func TestInvolving(t *testing.T) {
 	}
 	if got := Involving(all, "nobody"); got == nil || len(got) != 0 {
 		t.Fatalf("got %#v", got)
+	}
+}
+
+func TestEntrySourcesArePinnedPerSlug(t *testing.T) {
+	sa := []scan.Source{{Name: "/wt/a", Commit: "aaa"}}
+	sb := []scan.Source{{Name: "/wt/b", Commit: "bbb"}, {Name: "refs/remotes/origin/b", Commit: "ccc"}}
+	a, b := one("a", section("MODIFIED", "Pay")), one("b", section("MODIFIED", "Pay"))
+	a.Sources, b.Sources = sa, sb
+	got := Find([]Change{b, a})
+	if len(got) != 1 || len(got[0].Changes) != 2 {
+		t.Fatalf("got %+v", got)
+	}
+	if !reflect.DeepEqual(got[0].Changes[0].Sources, sa) || !reflect.DeepEqual(got[0].Changes[1].Sources, sb) {
+		t.Errorf("sources mixed up: %+v", got[0].Changes)
+	}
+}
+
+func TestNilSourcesBecomeEmpty(t *testing.T) {
+	got := Find([]Change{one("a", section("MODIFIED", "Pay")), one("b", section("MODIFIED", "Pay"))})
+	for _, e := range got[0].Changes {
+		if e.Sources == nil || len(e.Sources) != 0 {
+			t.Errorf("%s: Sources = %#v, want empty non-nil", e.Slug, e.Sources)
+		}
 	}
 }

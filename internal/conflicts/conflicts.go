@@ -52,7 +52,7 @@ func Find(changes []Change) []Overlap {
 	sources := map[string][]scan.Source{}
 	for _, c := range changes {
 		if _, seen := sources[c.Slug]; !seen {
-			sources[c.Slug] = c.Sources
+			sources[c.Slug] = append([]scan.Source{}, c.Sources...)
 		}
 		for capability, d := range c.Deltas {
 			touch := func(name, op string) {
