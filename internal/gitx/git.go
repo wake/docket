@@ -279,6 +279,23 @@ func (g Git) ListDirs(rev, dir string) ([]string, error) {
 	return names, nil
 }
 
+// ShowIfExists returns the blob at rev:path; ok is false when rev has no such
+// path. An unknown revision is an error.
+func (g Git) ShowIfExists(rev, path string) ([]byte, bool, error) {
+	out, err := g.output("ls-tree", "-z", "--name-only", rev, "--", path)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(splitNUL(string(out))) == 0 {
+		return nil, false, nil
+	}
+	b, err := g.Show(rev, path)
+	if err != nil {
+		return nil, false, err
+	}
+	return b, true, nil
+}
+
 // Show returns the blob at rev:path.
 func (g Git) Show(rev, path string) ([]byte, error) {
 	return g.output("show", rev+":"+path)
