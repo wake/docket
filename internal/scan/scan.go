@@ -120,8 +120,12 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		}
 		rank := rankContainedWorktree
 		if !unbornHead(w.Head) {
-			// On error, assume unmerged work so that it is not hidden.
-			if contained, err := g.IsAncestor(w.Head, db.Commit); err != nil || !contained {
+			contained, err := g.IsAncestor(w.Head, db.Commit)
+			if err != nil {
+				inv.Unreadable = append(inv.Unreadable, Unreadable{src, err.Error()})
+				continue
+			}
+			if !contained {
 				rank = rankUnmergedWorktree
 			}
 		}
