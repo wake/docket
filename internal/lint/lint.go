@@ -109,6 +109,11 @@ func Run(in Input) Report {
 		if c.Has(planFile) {
 			checkPlan(r, c)
 		}
+		ds := deltas(c)
+		checkStructure(r, c, ds)
+		if c.Has(planFile) {
+			checkScenarios(r, c, ds)
+		}
 	}
 	sort.Strings(rep.Changes)
 	sort.SliceStable(rep.Findings, func(i, j int) bool {

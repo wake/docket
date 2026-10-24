@@ -29,7 +29,20 @@ func planRepo(plan string, extra ...string) fstest.MapFS {
 	return m
 }
 
-func lintPlan(plan string) Report { return runOn(planRepo(plan)) }
+// lintPlan runs the plan rules only: scenario-ref findings are dropped here
+// because the fixtures of these tests leave Scenarios lines out; the
+// scenario rules have their own tests in scenarios_test.go.
+func lintPlan(plan string) Report {
+	r := runOn(planRepo(plan))
+	kept := r.Findings[:0]
+	for _, f := range r.Findings {
+		if f.Rule != "scenario-ref" {
+			kept = append(kept, f)
+		}
+	}
+	r.Findings = kept
+	return r
+}
 
 func TestGoodPlanIsClean(t *testing.T) {
 	if r := lintPlan(goodPlan); len(r.Findings) != 0 {
