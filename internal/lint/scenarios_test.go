@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -54,6 +55,30 @@ func TestMalformedReference(t *testing.T) {
 	for _, item := range []string{"booking", "#x", "booking#"} {
 		r := scenRepo(planWith(item), nil)
 		wantOne(t, r, "scenario-ref", lineOf(planWith(item), "**Scenarios:**"))
+	}
+}
+
+func TestEmptyScenariosValueIsMalformed(t *testing.T) {
+	plan := planWith("")
+	wantOne(t, scenRepo(plan, nil), "scenario-ref", lineOf(plan, "**Scenarios:**"))
+}
+
+func TestEmptySlugDuplicates(t *testing.T) {
+	d := "## ADDED Requirements\n\n### Requirement: A\n\nx\n\n#### Scenario: !!!\n\n- a\n\n#### Scenario: ???\n\n- b\n"
+	got := dupFindings(scenRepo(planWith("none"), map[string]string{deltaAt("booking"): d}))
+	if len(got) != 1 || got[0].Line != lineOf(d, "???") {
+		t.Fatalf("dups = %+v", got)
+	}
+}
+
+func TestDuplicateModifiedBeforeAdded(t *testing.T) {
+	d := "## MODIFIED Requirements\n\n### Requirement: Old\n\nx\n\n#### Scenario: Success\n\n- a\n\n## ADDED Requirements\n\n### Requirement: New\n\nx\n\n#### Scenario: Success\n\n- b\n"
+	got := dupFindings(scenRepo(planWith("none"), map[string]string{deltaAt("booking"): d}))
+	if len(got) != 1 || got[0].Line != lineOf(d, "Success\n\n- b") {
+		t.Fatalf("dups = %+v", got)
+	}
+	if !strings.HasSuffix(got[0].Message, ":"+strconv.Itoa(lineOf(d, "Success\n\n- a"))) {
+		t.Fatalf("message = %q", got[0].Message)
 	}
 }
 

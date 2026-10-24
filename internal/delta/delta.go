@@ -45,18 +45,20 @@ type Delta struct {
 	Problems                 []Problem
 }
 
+const sp = markdown.Space
+
 var (
-	requirementRe = regexp.MustCompile(`(?i)^###\s*Requirement:\s*(.+)\s*$`)
-	sectionRe     = regexp.MustCompile(`^(##)\s+(.+)$`)
-	topLevelRe    = regexp.MustCompile(`^##\s+`)
-	specSectionRe = regexp.MustCompile(`(?i)^##\s+Requirements\s*$`)
-	removedBullet = regexp.MustCompile("^\\s*[-*+]\\s*`?###\\s*Requirement:\\s*(.+?)`?\\s*$")
-	fromRe        = regexp.MustCompile("^\\s*[-*+]?\\s*FROM:\\s*`?###\\s*Requirement:\\s*(.+?)`?\\s*$")
-	toRe          = regexp.MustCompile("^\\s*[-*+]?\\s*TO:\\s*`?###\\s*Requirement:\\s*(.+?)`?\\s*$")
-	scenarioPre   = regexp.MustCompile(`(?i)^Scenario:\s*`)
+	requirementRe = regexp.MustCompile(`(?i)^###` + sp + `*Requirement:` + sp + `*(.+)` + sp + `*$`)
+	sectionRe     = regexp.MustCompile(`^(##)` + sp + `+(.+)$`)
+	topLevelRe    = regexp.MustCompile(`^##` + sp + `+`)
+	specSectionRe = regexp.MustCompile(`(?i)^##` + sp + `+Requirements` + sp + `*$`)
+	removedBullet = regexp.MustCompile("^" + sp + "*[-*+]" + sp + "*`?###" + sp + "*Requirement:" + sp + "*(.+?)`?" + sp + "*$")
+	fromRe        = regexp.MustCompile("^" + sp + "*[-*+]?" + sp + "*FROM:" + sp + "*`?###" + sp + "*Requirement:" + sp + "*(.+?)`?" + sp + "*$")
+	toRe          = regexp.MustCompile("^" + sp + "*[-*+]?" + sp + "*TO:" + sp + "*`?###" + sp + "*Requirement:" + sp + "*(.+?)`?" + sp + "*$")
+	scenarioPre   = regexp.MustCompile(`(?i)^Scenario:` + sp + `*`)
 	closingRun    = regexp.MustCompile(`[ \t]+#+[ \t]*$`)
-	heading3Re    = regexp.MustCompile(`^###\s`)
-	titleRe       = regexp.MustCompile(`^#\s`)
+	heading3Re    = regexp.MustCompile(`^###` + sp)
+	titleRe       = regexp.MustCompile(`^#` + sp)
 )
 
 type doc struct {
@@ -72,7 +74,7 @@ func read(b []byte) doc {
 }
 
 func reqName(s string) string {
-	return strings.TrimSpace(closingRun.ReplaceAllString(s, ""))
+	return markdown.Trim(closingRun.ReplaceAllString(s, ""))
 }
 
 type section struct {
@@ -88,7 +90,7 @@ func (d doc) sections() []section {
 			continue
 		}
 		if m := sectionRe.FindStringSubmatch(l); m != nil {
-			out = append(out, section{title: strings.TrimSpace(m[2]), index: i, start: i + 1})
+			out = append(out, section{title: markdown.Trim(m[2]), index: i, start: i + 1})
 		}
 	}
 	for k := range out {
@@ -149,10 +151,10 @@ func (d doc) scenarios(req, end int) []Scenario {
 		if to > end {
 			to = end
 		}
-		if strings.TrimSpace(strings.Join(d.lines[from:to], "\n")) == "" {
+		if markdown.Trim(strings.Join(d.lines[from:to], "\n")) == "" {
 			continue
 		}
-		name := strings.TrimSpace(scenarioPre.ReplaceAllString(h.Text, ""))
+		name := markdown.Trim(scenarioPre.ReplaceAllString(h.Text, ""))
 		out = append(out, Scenario{Name: name, Line: h.Index + 1})
 	}
 	return out
@@ -174,7 +176,7 @@ func Parse(b []byte) Delta {
 		firstSection = secs[0].index
 	}
 	for i := 0; i < firstSection; i++ {
-		if strings.TrimSpace(comments[i]) != "" && !titleRe.MatchString(comments[i]) {
+		if markdown.Trim(comments[i]) != "" && !titleRe.MatchString(comments[i]) {
 			add(i+1, "text above the first \"## \" section is not read")
 			break
 		}
@@ -197,7 +199,7 @@ func Parse(b []byte) Delta {
 				}
 			}
 			for i := s.start; i < limit; i++ {
-				if strings.TrimSpace(comments[i]) != "" && !heading3Re.MatchString(comments[i]) {
+				if markdown.Trim(comments[i]) != "" && !heading3Re.MatchString(comments[i]) {
 					add(i+1, "text before the first requirement in \"## %s\" is not read", s.title)
 					break
 				}
@@ -223,7 +225,7 @@ func Parse(b []byte) Delta {
 			continue
 		}
 		if m := sectionRe.FindStringSubmatch(l); m != nil {
-			cur, inSection = strings.ToLower(strings.TrimSpace(m[2])), true
+			cur, inSection = strings.ToLower(markdown.Trim(m[2])), true
 			continue
 		}
 		if inSection {

@@ -167,17 +167,35 @@ func (r *run) scope() []string {
 			r.missing(slug)
 			continue
 		}
-		info, err := fs.Stat(r.in.Repo, path.Join(changesDir, slug))
+		entry, err := r.changeEntry(slug)
 		switch {
-		case errors.Is(err, fs.ErrNotExist) || (err == nil && !info.IsDir()):
-			r.missing(slug)
 		case err != nil:
-			r.unreadable(path.Join(changesDir, slug), err)
+			r.unreadable(changesDir, err)
+		case entry == nil || entry.Type()&fs.ModeSymlink != 0 || !entry.IsDir():
+			r.missing(slug)
 		default:
 			slugs = append(slugs, slug)
 		}
 	}
 	return slugs
+}
+
+// changeEntry finds slug among the entries of the changes directory, the
+// way an unnamed run does, so that a symbolic link is never a change.
+func (r *run) changeEntry(slug string) (fs.DirEntry, error) {
+	entries, err := fs.ReadDir(r.in.Repo, changesDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	for _, e := range entries {
+		if e.Name() == slug {
+			return e, nil
+		}
+	}
+	return nil, nil
 }
 
 func (r *run) missing(slug string) {

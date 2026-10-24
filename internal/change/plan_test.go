@@ -27,6 +27,18 @@ func TestParsePlanTasks(t *testing.T) {
 	}
 }
 
+func TestEmptyScenariosValueIsNotNone(t *testing.T) {
+	p := ParsePlan([]byte("# Plan\n\n### Task 1: A\n\n**Scenarios:**\n\n### Task 2: B\n\n**Scenarios:**   \n\n### Task 3: C\n\n**Scenarios:** NONE\n"))
+	for i := 0; i < 2; i++ {
+		if got := p.Tasks[i].Scenarios; !reflect.DeepEqual(got, []string{""}) {
+			t.Fatalf("task %d scenarios = %#v", i+1, got)
+		}
+	}
+	if len(p.Tasks[2].Scenarios) != 0 {
+		t.Fatalf("none = %#v", p.Tasks[2].Scenarios)
+	}
+}
+
 func TestBadHeadings(t *testing.T) {
 	p := ParsePlan([]byte("## Task 3: Parser\n\n### Task 0: x\n\n### Task 2 Parser\n\n### Task 1: ok\n"))
 	want := []BadHeading{{"Task 3: Parser", 2, 1}, {"Task 0: x", 3, 3}, {"Task 2 Parser", 3, 5}}
@@ -49,6 +61,41 @@ func TestCancelledBullets(t *testing.T) {
 	}
 	if c := p.Cancelled[1]; c.OK || c.Line != 4 || c.Number != 5 {
 		t.Fatalf("c1 = %+v", c)
+	}
+}
+
+func TestCancelledOtherBulletMarkers(t *testing.T) {
+	p := ParsePlan([]byte("## Cancelled Tasks\n\n* Task 5: Front desk screen - moved\n+ Task 6: x - y\n"))
+	if len(p.Cancelled) != 2 {
+		t.Fatalf("cancelled = %+v", p.Cancelled)
+	}
+	for i, c := range p.Cancelled {
+		if c.OK || c.Line != 3+i || c.Number != 5+i {
+			t.Fatalf("c%d = %+v", i, c)
+		}
+	}
+}
+
+func TestCancelledIndentedNote(t *testing.T) {
+	p := ParsePlan([]byte("## Cancelled Tasks\n\n- Task 5: Front desk screen - moved to add-x\n  - more detail\n"))
+	if len(p.Cancelled) != 1 || !p.Cancelled[0].OK {
+		t.Fatalf("cancelled = %+v", p.Cancelled)
+	}
+}
+
+func TestOverflowingNumbers(t *testing.T) {
+	p := ParsePlan([]byte("### Task 99999999999999999999: x\n\n### Task 1: ok\n\n**Compensates:** Task 99999999999999999999\n\n## Cancelled Tasks\n\n- Task 99999999999999999999: n - r\n"))
+	if len(p.BadHeadings) != 1 || p.BadHeadings[0].Line != 1 {
+		t.Fatalf("bad = %+v", p.BadHeadings)
+	}
+	if len(p.Tasks) != 1 || p.Tasks[0].Number != 1 {
+		t.Fatalf("tasks = %+v", p.Tasks)
+	}
+	if c := p.Tasks[0].Compensates; len(c) != 1 || c[0].OK || c[0].Line != 5 {
+		t.Fatalf("compensates = %+v", c)
+	}
+	if len(p.Cancelled) != 1 || p.Cancelled[0].OK || p.Cancelled[0].Line != 9 {
+		t.Fatalf("cancelled = %+v", p.Cancelled)
 	}
 }
 

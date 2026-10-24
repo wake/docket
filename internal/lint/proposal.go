@@ -34,9 +34,18 @@ func checkProposal(r *run, c *loaded) {
 		}
 		switch title {
 		case "Implementation Contract":
+			end := 0
+			for _, next := range p.Sections {
+				if next.Line > s.Line && (end == 0 || next.Line < end) {
+					end = next.Line
+				}
+			}
 			for _, sub := range contractSections {
 				found := false
 				for _, cs := range p.Contract {
+					if cs.Line < s.Line || (end != 0 && cs.Line >= end) {
+						continue
+					}
 					if !strings.EqualFold(cs.Title, sub) {
 						continue
 					}
