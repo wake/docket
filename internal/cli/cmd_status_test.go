@@ -202,6 +202,39 @@ func TestStatusSlugNotActive(t *testing.T) {
 	}
 }
 
+func TestStatusIdleDays(t *testing.T) {
+	r := cleanRepo(t)
+	w := statusChange(t, r, "add-x")
+	w.Write("openspec/changes/add-x/.openspec.yaml", statusMeta+"x-base: "+r.Git("rev-parse", "HEAD")+"\n")
+	w.Git("add", "-A")
+	when := statusNow.AddDate(0, 0, -5).Format(time.RFC3339)
+	env := w.Env
+	w.Env = append(append([]string{}, env...), "GIT_COMMITTER_DATE="+when)
+	w.Git("commit", "-q", "-m", "work", "--trailer", "Change: add-x", "--trailer", "Task: 1")
+	w.Env = env
+	code, so, se := runStatus(t, r.Dir, true)
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	act, _ := statusChanges(t, so)[0].(map[string]any)["last_activity"].(map[string]any)
+	if act == nil || act["idle_days"] != float64(5) {
+		t.Fatalf("last_activity = %v", act)
+	}
+	code, so, se = runStatus(t, r.Dir, false)
+	if code != 0 || !strings.Contains(so, "add-x  implementing  0/2 tasks  idle 5d  0 uncommitted\n") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+}
+
+func TestStatusSlugActiveAndArchived(t *testing.T) {
+	r := newRepo(t)
+	statusChange(t, r, "add-x")
+	code, so, se := runStatus(t, r.Dir, true, "add-x")
+	if code != 1 || !hasRule(t, so, "change-not-active") || len(statusChanges(t, so)) != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+}
+
 func TestStatusSlugInvalid(t *testing.T) {
 	r := cleanRepo(t)
 	statusChange(t, r, "add-y")

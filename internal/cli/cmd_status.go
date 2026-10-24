@@ -59,7 +59,7 @@ func statusCommand() Command {
 			if err != nil {
 				return Outcome{}, err
 			}
-			out.Unreadable = append(scanUnreadable(scanUnreadableSource(c, inv)), scanUnreadable(unread)...)
+			out.Unreadable = append(scanUnreadable(inv.Unreadable), scanUnreadable(unread)...)
 			for _, ch := range changes {
 				out.Human = append(out.Human, statusLine(ch))
 				for _, s := range ch.Sources {
@@ -71,8 +71,6 @@ func statusCommand() Command {
 		},
 	}
 }
-
-func scanUnreadableSource(_ *Context, inv scan.Inventory) []scan.Unreadable { return inv.Unreadable }
 
 func statusLine(ch status.Change) string {
 	idle := "no commits"
