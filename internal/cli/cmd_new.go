@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/openspec"
+	"github.com/wake/docket/internal/safepath"
 	"github.com/wake/docket/internal/scan"
 )
 
@@ -101,16 +103,37 @@ func newCommand() Command {
 			if err != nil {
 				return Outcome{}, envOrErr(err)
 			}
+			unlock, err := lockOpenSpec(c.Repo.Root)
+			if err != nil {
+				return Outcome{}, err
+			}
+			defer unlock()
 			dir := filepath.Join(c.Repo.Root, "openspec/changes", slug)
+			metaRel := "openspec/changes/" + slug + "/.openspec.yaml"
+			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
+				return refuse(fail, err)
+			}
 			_, statErr := os.Lstat(dir)
 			existed := statErr == nil
+			if existed {
+				return Outcome{Findings: []Finding{{Rule: "slug-used", Change: slug,
+					Message: fmt.Sprintf("slug %q is already used: %s exists", slug, dir)}}}, nil
+			}
 			if _, err := r.Run("new", "change", slug, "--schema", "docket"); err != nil {
-				_ = cleanupIfCreated(dir, existed)
+				if rerr := cleanupIfCreated(dir, existed); rerr != nil {
+					err = errors.Join(err, rerr)
+				}
 				var fe *openspec.FailedError
 				if errors.As(err, &fe) {
-					return fail("openspec-failed", fe.Error())
+					return fail("openspec-failed", err.Error())
 				}
 				return Outcome{}, envOrErr(err)
+			}
+			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
+				if rerr := cleanupIfCreated(dir, existed); rerr != nil {
+					err = errors.Join(err, rerr)
+				}
+				return refuse(fail, err)
 			}
 			if err := change.AppendMetadata(filepath.Join(dir, ".openspec.yaml"), kind, source, base); err != nil {
 				if rerr := cleanupIfCreated(dir, existed); rerr != nil {
@@ -122,6 +145,33 @@ func newCommand() Command {
 			return Outcome{Result: res, Human: []string{"created " + dir}}, nil
 		},
 	}
+}
+
+// lockOpenSpec takes an exclusive lock on <root>/openspec, blocking until it
+// is free, so two runs of dkt new cannot interleave. The returned function
+// releases it.
+func lockOpenSpec(root string) (func(), error) {
+	f, err := os.Open(filepath.Join(root, "openspec"))
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		f.Close()
+		return nil, err
+	}
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		f.Close()
+	}, nil
+}
+
+// refuse turns a safepath error into a symlink-refused finding.
+func refuse(fail func(rule, msg string) (Outcome, error), err error) (Outcome, error) {
+	var sl *safepath.SymlinkError
+	if errors.As(err, &sl) {
+		return fail("symlink-refused", sl.Error())
+	}
+	return Outcome{}, err
 }
 
 // cleanupIfCreated removes dir only when this command created it; a folder

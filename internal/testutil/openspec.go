@@ -54,6 +54,11 @@ new)
   else
     printf 'schema: %s\ncreated: 2026-01-02\n' "$schema" > "openspec/changes/$slug/.openspec.yaml"
   fi
+  if [ "$FAKE_OPENSPEC_LOCK_CHILD" = "1" ]; then
+    mkdir "openspec/changes/$slug/locked"
+    : > "openspec/changes/$slug/locked/f"
+    chmod 555 "openspec/changes/$slug/locked"
+  fi
   fail new
   ;;
 esac

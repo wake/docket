@@ -4,8 +4,10 @@ package change
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
+	"syscall"
 
 	"go.yaml.in/yaml/v3"
 )
@@ -47,7 +49,12 @@ func ValidateSlug(slug string) error {
 // AppendMetadata appends x-kind, x-source and x-base to the .openspec.yaml at
 // path, then parses the whole file and checks the three values read back.
 func AppendMetadata(path, kind, source, base string) error {
-	b, err := os.ReadFile(path)
+	f, err := os.OpenFile(path, os.O_RDWR|syscall.O_NOFOLLOW, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return err
 	}
@@ -73,5 +80,9 @@ func AppendMetadata(path, kind, source, base string) error {
 			return fmt.Errorf("%s: %s did not read back as %q", path, kv.key, kv.val)
 		}
 	}
-	return os.WriteFile(path, buf.Bytes(), 0o644)
+	if err := f.Truncate(0); err != nil {
+		return err
+	}
+	_, err = f.WriteAt(buf.Bytes(), 0)
+	return err
 }
