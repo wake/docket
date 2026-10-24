@@ -136,7 +136,9 @@ func newCommand() Command {
 				return Outcome{}, envOrErr(err)
 			}
 			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
-				return refuse(fail, cleanup(err))
+				// A link appeared while OpenSpec ran; removing dir now could
+				// follow it out of the repository, so leave everything as is.
+				return refuse(fail, err)
 			}
 			if err := change.AppendMetadata(filepath.Join(dir, ".openspec.yaml"), kind, source, base); err != nil {
 				return fail("metadata-failed", cleanup(err).Error())

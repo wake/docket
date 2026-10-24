@@ -1,4 +1,9 @@
 // Package safepath refuses to write through symbolic links.
+//
+// It guards against links that are part of the repository's content, such as
+// a committed link from a schema file to AGENTS.md. It does not defend against
+// a process that swaps a path for a link while Docket runs: such a process
+// already acts with the user's rights.
 package safepath
 
 import (
