@@ -100,7 +100,7 @@ dkt log <capability>
 dkt index                         # reuse index of existing capabilities
 ```
 
-The first milestone is `init`, `new`, `lint`, `conflicts`, `sync`, `archive` and `rebase`, built as four OpenSpec changes in `openspec/changes/`.
+The first milestone is `init`, `new`, `lint`, `conflicts`, `sync`, `archive` and `rebase`, built as four OpenSpec changes, now archived in `openspec/changes/archive/`.
 
 ## Design rules
 

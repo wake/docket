@@ -100,7 +100,7 @@ dkt log <capability>
 dkt index                         # 既有能力的複用索引
 ```
 
-第一個里程碑是 `init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`，拆成 `openspec/changes/` 底下的四個 OpenSpec change 來做。
+第一個里程碑是 `init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`，拆成四個 OpenSpec change 來做，現已封存在 `openspec/changes/archive/`。
 
 ## 設計守則
 
