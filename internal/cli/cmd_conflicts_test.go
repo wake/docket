@@ -115,6 +115,23 @@ func TestConflictsFocusShowsOwnOverlap(t *testing.T) {
 	}
 }
 
+func TestConflictsSlugInUnreadableSource(t *testing.T) {
+	r := newRepo(t)
+	addChange(t, r, "add-y", "booking", "MODIFIED", "Cancel booking")
+	gone := r.AddWorktree(filepath.Join(t.TempDir(), "wt-gone"), "gone")
+	if err := os.RemoveAll(gone.Dir); err != nil {
+		t.Fatal(err)
+	}
+	code, so, se := runConflicts(t, r.Dir, true, "add-q")
+	if code != 3 || hasRule(t, so, "change-not-active") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	u, _ := decode(t, so)["unreadable"].([]any)
+	if len(u) != 1 || !strings.HasSuffix(u[0].(map[string]any)["source"].(string), "wt-gone") {
+		t.Fatalf("unreadable = %v", u)
+	}
+}
+
 func TestConflictsSlugNotActive(t *testing.T) {
 	r := newRepo(t)
 	addChange(t, r, "add-y", "booking", "MODIFIED", "Cancel booking")

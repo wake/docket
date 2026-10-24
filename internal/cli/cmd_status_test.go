@@ -185,6 +185,23 @@ func TestStatusFocus(t *testing.T) {
 	}
 }
 
+func TestStatusSlugInUnreadableSource(t *testing.T) {
+	r := newRepo(t)
+	statusChange(t, r, "add-y")
+	gone := r.AddWorktree(filepath.Join(t.TempDir(), "wt-gone"), "gone")
+	if err := os.RemoveAll(gone.Dir); err != nil {
+		t.Fatal(err)
+	}
+	code, so, se := runStatus(t, r.Dir, true, "add-q")
+	if code != 3 || hasRule(t, so, "change-not-active") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	u, _ := decode(t, so)["unreadable"].([]any)
+	if len(u) != 1 || !strings.HasSuffix(u[0].(map[string]any)["source"].(string), "wt-gone") {
+		t.Fatalf("unreadable = %v", u)
+	}
+}
+
 func TestStatusSlugNotActive(t *testing.T) {
 	r := newRepo(t)
 	statusChange(t, r, "add-y")

@@ -42,7 +42,9 @@ func statusCommand() Command {
 					}
 					active, archived := inv.Uses(slug)
 					if active == nil || len(archived) > 0 {
-						out.Findings = append(out.Findings, notActiveFinding(inv, slug))
+						if mayReportNotActive(inv, slug) {
+							out.Findings = append(out.Findings, notActiveFinding(inv, slug))
+						}
 						continue
 					}
 					keep[slug] = true
