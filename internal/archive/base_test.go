@@ -1,6 +1,8 @@
 package archive
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -133,5 +135,17 @@ func TestCapabilityMissingAtBase(t *testing.T) {
 	e := Env{Git: gitx.Git{Dir: r.Dir, Env: r.Env}, Root: r.Dir}
 	if drifts, finds, unread, _ := check(t, e); len(drifts) != 0 || len(finds) != 0 || len(unread) != 0 {
 		t.Fatalf("%+v %+v %+v", drifts, finds, unread)
+	}
+}
+
+func TestBaseCheckReadsTheWorktreeNotHead(t *testing.T) {
+	r, e, _ := baseRepo(t, modDelta("Cancel booking"), req("Cancel booking", "old"))
+	if err := os.WriteFile(filepath.Join(r.Dir, specPath), []byte(mainSpec(req("Cancel booking", "edited"))), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	drifts, finds, _, n := check(t, e)
+	if n != 1 || len(drifts) != 1 || !strings.Contains(drifts[0].Now, "THEN** edited") ||
+		!reflect.DeepEqual(ruleList(finds), []string{"base-drift"}) {
+		t.Fatalf("%+v %+v %d", drifts, finds, n)
 	}
 }
