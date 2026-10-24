@@ -309,25 +309,6 @@ func TestReservedNameRejected(t *testing.T) {
 	}
 }
 
-func TestCleanupIfCreated(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "add-x")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := cleanupIfCreated(dir, true); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(dir); err != nil {
-		t.Fatalf("pre-existing folder removed: %v", err)
-	}
-	if err := cleanupIfCreated(dir, false); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(dir); err == nil {
-		t.Fatal("folder created by the command was kept")
-	}
-}
-
 func TestSymlinkedChangesFolderRefused(t *testing.T) {
 	r := cleanRepo(t)
 	outside := t.TempDir()

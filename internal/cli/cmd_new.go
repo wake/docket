@@ -113,16 +113,22 @@ func newCommand() Command {
 			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
 				return refuse(fail, err)
 			}
-			_, statErr := os.Lstat(dir)
-			existed := statErr == nil
-			if existed {
+			if _, err := os.Lstat(dir); err == nil {
 				return Outcome{Findings: []Finding{{Rule: "slug-used", Change: slug,
 					Message: fmt.Sprintf("slug %q is already used: %s exists", slug, dir)}}}, nil
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return Outcome{}, err
+			}
+			// The lock is held and dir did not exist, so whatever is there
+			// from here on was created by this run and is safe to remove.
+			cleanup := func(err error) error {
+				if rerr := os.RemoveAll(dir); rerr != nil {
+					return errors.Join(err, rerr)
+				}
+				return err
 			}
 			if _, err := r.Run("new", "change", slug, "--schema", "docket"); err != nil {
-				if rerr := cleanupIfCreated(dir, existed); rerr != nil {
-					err = errors.Join(err, rerr)
-				}
+				err = cleanup(err)
 				var fe *openspec.FailedError
 				if errors.As(err, &fe) {
 					return fail("openspec-failed", err.Error())
@@ -130,16 +136,10 @@ func newCommand() Command {
 				return Outcome{}, envOrErr(err)
 			}
 			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
-				if rerr := cleanupIfCreated(dir, existed); rerr != nil {
-					err = errors.Join(err, rerr)
-				}
-				return refuse(fail, err)
+				return refuse(fail, cleanup(err))
 			}
 			if err := change.AppendMetadata(filepath.Join(dir, ".openspec.yaml"), kind, source, base); err != nil {
-				if rerr := cleanupIfCreated(dir, existed); rerr != nil {
-					err = errors.Join(err, rerr)
-				}
-				return fail("metadata-failed", err.Error())
+				return fail("metadata-failed", cleanup(err).Error())
 			}
 			res := change.NewResult{Slug: slug, Path: dir, Kind: kind, Source: source, Base: base}
 			return Outcome{Result: res, Human: []string{"created " + dir}}, nil
@@ -169,18 +169,9 @@ func lockOpenSpec(root string) (func(), error) {
 func refuse(fail func(rule, msg string) (Outcome, error), err error) (Outcome, error) {
 	var sl *safepath.SymlinkError
 	if errors.As(err, &sl) {
-		return fail("symlink-refused", sl.Error())
+		return fail("symlink-refused", err.Error())
 	}
 	return Outcome{}, err
-}
-
-// cleanupIfCreated removes dir only when this command created it; a folder
-// that existed before is never touched.
-func cleanupIfCreated(dir string, existed bool) error {
-	if existed {
-		return nil
-	}
-	return os.RemoveAll(dir)
 }
 
 // envOrErr maps OpenSpec availability and version errors to an EnvError.
