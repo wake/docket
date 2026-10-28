@@ -39,3 +39,22 @@ func TestAgentsSection(t *testing.T) {
 		t.Error("section runs past its end")
 	}
 }
+
+func TestPlanTemplateReviewLine(t *testing.T) {
+	b, err := fs.ReadFile(Schema(), "templates/plan.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "**Review:** <checks|judgment>") {
+		t.Error("plan template lacks the **Review:** line")
+	}
+}
+
+func TestAgentsSectionReviewAtBothEnds(t *testing.T) {
+	s := AgentsSection()
+	for _, want := range []string{"**Review:** judgment", "dkt conflicts", "one pull request"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("section lacks %q", want)
+		}
+	}
+}

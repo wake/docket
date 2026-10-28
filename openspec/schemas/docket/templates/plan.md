@@ -15,6 +15,8 @@
 
 **Scenarios:** <capability-path>#<scenario-slug>
 
+**Review:** <checks|judgment>
+
 **Files:**
 - Create: `<path>`
 
