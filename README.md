@@ -50,9 +50,9 @@ Docket does **not**:
 superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it.
 
 1. **Triage with brainstorming.** superpowers brainstorming reads the project and talks the idea through. When several paths apply, take the heaviest:
-   - It changes a sentence in `openspec/specs/`: open a change and follow the steps below. So does a bug fix whose correct behavior no spec states and no existing behavior shows, since it defines behavior.
+   - It changes a sentence in `openspec/specs/`: open a change and follow the steps below. So does any edit that sets an expectation no spec states and no existing behavior shows, such as a bug fix with no specified answer or a test that asserts new behavior, since it defines behavior.
    - A bug fix that restores the specified behavior, or a restructuring that changes no behavior: write a regression test, see it fail before the fix, and have the diff reviewed once before merging. OpenSpec is not involved.
-   - Prompt text (the text agents act on, such as `AGENTS.md` and the schema's instructions) or tests alone: check prompts mechanically and tests by mutating the code they cover, and have the diff reviewed once before merging. OpenSpec is not involved.
+   - Prompt text (the text agents act on, such as `AGENTS.md` and the schema's instructions; list the paths in `AGENTS.md`), or tests that check behavior already specified or already shown: check prompts mechanically and tests by mutating the code they cover, and have the diff reviewed once before merging. OpenSpec is not involved.
    - Docs for people, version bumps and pure moves: no review beyond the automated checks. OpenSpec is not involved.
 2. **Open a change** in a git worktree with `dkt new <slug>`, which wraps `openspec new change`.
 3. **Write the proposal and the delta.**

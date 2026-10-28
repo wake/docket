@@ -22,17 +22,23 @@ upcoming work, are in `docs/ideas/`.
 
 - Triage first. When several paths apply, take the heaviest:
   - The work changes a sentence in `openspec/specs/`: open a change (below).
-    So does a bug fix whose correct behavior no spec states and no existing
-    behavior shows: it defines behavior, and the change adds that sentence.
+    So does any edit that sets an expectation no spec states and no
+    existing behavior shows, such as a bug fix with no specified answer or
+    a test that asserts new behavior: it defines behavior, and the change
+    adds the sentence.
   - A bug fix that restores the specified behavior, or a restructuring that
     changes no behavior (edits to comments alone are not code): no change.
     Write a regression test and see it fail before the fix, then have the
     whole diff reviewed once before merging.
-  - Prompt text, the text agents act on (list the project's prompt paths in
-    AGENTS.md), or tests alone: no change, and one review of the whole diff
-    before merging. Check prompts mechanically, not with tests that look for
-    strings: they still load, and every copy says the same. Check tests by
-    mutating the code they cover: they must fail.
+  - Prompt text, or tests that check behavior already specified or already
+    shown: no change, and one review of the whole diff before merging.
+    Prompt text is the text agents act on: files agents load by convention
+    (`AGENTS.md`, `CLAUDE.md`, skill and command files) and text a program
+    hands to an agent (embedded or printed instructions, templates). List
+    these paths in AGENTS.md, and update the list in the pull request that
+    adds, moves or removes one. Check prompts mechanically, not with tests
+    that look for strings: they still load, and every copy says the same.
+    Check tests by mutating the code they cover: they must fail.
   - Docs for people, version bumps and pure moves: no change and no review
     beyond the automated checks.
 
