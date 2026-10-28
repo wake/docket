@@ -20,10 +20,16 @@ upcoming work, are in `docs/ideas/`.
 
 ## Change workflow (superpowers × OpenSpec)
 
-- Triage first. If the work changes no sentence in `openspec/specs/`, do not
-  open a change: fix it directly (a bug fix comes with a regression test), or
-  edit the docs. An idea that is not ready goes to `docs/ideas/`.
-- Otherwise, in a git worktree, open a change:
+- Triage first, into one of three paths:
+  - The work changes a sentence in `openspec/specs/`: open a change (below).
+  - A bug fix that restores the specified behavior, or a restructuring that
+    changes no behavior: no change. Write a regression test and see it fail
+    before the fix, then have the whole diff reviewed once before merging.
+  - Docs, version bumps and pure moves: no change and no review beyond the
+    automated checks.
+
+  An idea that is not ready goes to `docs/ideas/`.
+- To open a change, in a git worktree, run
   `dkt new <slug> --kind feature|change-request|fix|baseline --source "<where the request came from>"`.
 - superpowers:brainstorming writes its design into the change folder, not
   `docs/superpowers/specs/`: `proposal.md`, delta specs under `specs/`, and
@@ -32,14 +38,45 @@ upcoming work, are in `docs/ideas/`.
   and rules.
 - superpowers:writing-plans writes `openspec/changes/<slug>/plan.md`, not
   `docs/superpowers/plans/`, following
-  `openspec instructions plan --change <slug>`. There is no tasks.md.
+  `openspec instructions plan --change <slug>`. There is no tasks.md. A task
+  is a slice that can be verified on its own; tightly coupled tasks are one
+  task. A task that needs a reviewer's judgment (an error path,
+  environment-dependent behavior, a public interface or output format) says
+  `**Review:** judgment`; the others say `**Review:** checks`.
 - Reuse is decided in the plan: every capability the change needs gets a row
   in the plan's Reuse table, with the search behind the decision. The
   proposal's Builds On names what already exists.
-- Execute with superpowers:subagent-driven-development. Each implementer gets
-  the Reuse rows for its task and reports every exported symbol it added,
-  with why no existing one fit. Every commit made for a task carries the
-  trailers `Change: <slug>` and `Task: <N>`.
+- Review costs most where it is repeated, so it sits at the two ends of a
+  change. Before any code, the plan is reviewed once together with the
+  proposal and deltas, preferably by a different model from the one that
+  wrote it.
+- Execute with superpowers:subagent-driven-development, with one exception:
+  only a `**Review:** judgment` task gets its own reviewer. Every task that
+  changes code gets the mechanical checks instead: its new tests are seen
+  failing before the code and passing after, and mutating the lines it
+  changed makes a test fail. A task that changes no code, such as one that
+  only edits docs, is checked by its own verification steps. Each
+  implementer gets the Reuse rows for its task and reports every exported
+  symbol it added, with why no existing one fit. Every commit made for a
+  task carries the trailers `Change: <slug>` and `Task: <N>`; structural
+  changes and behavior changes go in separate commits.
+- Before merging, the whole change is reviewed once, by two reviewers in
+  parallel: one on a different model, asked to attack (wrong results, edge
+  cases, partial failure, the same defect elsewhere in the code), and one in a
+  fresh context, checking the code against the proposal and deltas. After
+  fixes, only a large fix is reviewed again.
+- A change is one pull request; its commits show its layers. Split it only
+  when it mixes unrelated concerns, when a structural refactor is mixed with
+  behavior (the refactor goes first, in its own pull request), or when product
+  code and tests together run far past about 1000 lines. Do not stack pull
+  requests.
+- When sessions work in parallel, each change belongs to one session, and
+  the session that implements a change does not review it. Run
+  `dkt conflicts` and compare the plans' `**Files:**` blocks before starting;
+  overlapping changes run one after the other. A change that depends on
+  another waits for it to merge. Merge one change at a time: rebase it on the
+  default branch, run the full test suite, and review again only where the
+  rebase had conflicts.
 - Do not use OpenSpec's `/opsx:*` commands or skills.
 - When requirements change mid-way, follow the plan rules: cancelled tasks,
   compensating tasks, a Revision section, a Change Log row.

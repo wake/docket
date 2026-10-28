@@ -1,0 +1,6 @@
+schema: docket
+created: 2026-10-28
+x-kind: change-request
+x-source: Development process adopted 2026-10-28 (review at both ends, three review modes, one pull request per change)
+x-base: e967bbbe7a35168f8169fd29521ff8790ce54342
+skip_specs: true

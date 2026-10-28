@@ -239,9 +239,22 @@ artifacts:
         Every scenario under this change's ADDED and MODIFIED requirements is
         claimed by at least one task. A task that implements no scenario,
         such as scaffolding, writes `**Scenarios:** none`.
+      - A task is a slice that can be verified on its own. Tasks that are
+        tightly coupled are one task; split a task only where a reviewer
+        could reject one part and accept the other.
+      - Every task has a `**Review:**` line after its `**Scenarios:**` line:
+        `judgment` when the task needs a reviewer's judgment (an error path,
+        environment-dependent behavior, a public interface or output format),
+        otherwise `checks`. Only `judgment` tasks get their own reviewer.
+      - Every task's `**Files:**` block lists every file the task creates or
+        modifies, so parallel changes can be compared before they start.
       - Steps are `- [ ]` checkboxes. `dkt sync` ticks a task's steps from the
         `Change:` and `Task:` commit trailers; tick by hand only a task that
         was finished without any commit.
+
+      Before any code is written, have the plan reviewed once together with
+      the proposal, the delta specs and design.md, preferably by a different
+      model from the one that wrote it, and fix what the review finds.
 
       When requirements change after the plan is approved:
       - Leave completed tasks as written and ticked.
@@ -260,9 +273,23 @@ apply:
   requires: [ plan ]
   tracks: plan.md
   instruction: |
-    Execute plan.md with superpowers:subagent-driven-development. Give each
-    implementer the Reuse rows that concern its task. Each implementer's
-    report lists every exported symbol it added and, for each, why no
-    existing one fit. Every commit made for a task carries the trailers
-    `Change: <change-name>` and `Task: <N>`. Run `dkt sync <change-name>` before opening the pull request
-    so plan.md shows every task that has commits as done.
+    Start only after the plan has been reviewed (see the plan instruction).
+    Execute plan.md with superpowers:subagent-driven-development, with one
+    exception: only a task whose `**Review:**` line says `judgment` gets its
+    own reviewer. Every task that changes code gets the mechanical checks
+    instead: its new tests fail before the code and pass after, and mutating
+    the lines it changed makes a test fail. A task that changes no code, such
+    as one that only edits docs, is checked by its own verification steps.
+    Give each implementer the Reuse rows that concern its task. Each
+    implementer's report lists every exported symbol it added and, for each,
+    why no existing one fit. Every commit made for a task carries the
+    trailers `Change: <change-name>` and `Task: <N>`; structural changes and
+    behavior changes go in separate commits.
+
+    Before merging, review the whole change once, with two reviewers in
+    parallel: one on a different model, asked to attack (wrong results, edge
+    cases, partial failure, the same defect elsewhere in the code), and one
+    in a fresh context, checking the code against the proposal and deltas.
+    After fixes, review again only a large fix. The change is one pull
+    request. Run `dkt sync <change-name>` before opening it so plan.md shows
+    every task that has commits as done.

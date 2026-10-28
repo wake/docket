@@ -49,8 +49,10 @@ Docket **不會**：
 
 由 superpowers 開場。OpenSpec 從不主動啟動任何步驟，只在三個時間點被呼叫：建立 change 資料夾、驗證、封存。
 
-1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。
-   - 如果這件事不會改到 `openspec/specs/` 裡的任何一句話，就到此為止，走輕量路徑，完全不碰 OpenSpec。
+1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。這件事會走三條路之一：
+   - 會改到 `openspec/specs/` 裡的句子：開 change，照下面的步驟走。
+   - 讓程式回到規格行為的 bug 修正，或不改行為的重構：寫回歸測試，先看它在修正前失敗，合併前讓整份 diff 審一次。完全不碰 OpenSpec。
+   - 文件、版本號、純搬移：只跑自動檢查，不另外審查。完全不碰 OpenSpec。
 2. **開 change。**在 git worktree 裡執行 `dkt new <slug>`，它會呼叫 `openspec new change`。
 3. **寫提案與 delta。**
    - brainstorming 直接把 `proposal.md` 和 `specs/**/spec.md` 寫進 change 資料夾，需要時再加 `design.md`。
@@ -58,8 +60,11 @@ Docket **不會**：
 4. **驗證。**執行 `openspec validate --strict` 和 `dkt lint`。
 5. **寫計畫。**superpowers 的 writing-plans 把 `plan.md` 寫進 change 資料夾。
    - 這是唯一的任務清單，不另外寫 `tasks.md`。
+   - 需要審查者判斷的任務標 `**Review:** judgment`，其餘標 `**Review:** checks`。
+   - 動手寫程式之前，plan 連同提案與 delta 審一次。
 6. **實作與審查。**
-   - 用 superpowers 的 subagent-driven development 搭配 TDD。
+   - 用 superpowers 的 subagent-driven development 搭配 TDD，但只有標 `**Review:** judgment` 的任務另派審查者。
+   - 每個改程式碼的任務都改做機械檢查：新測試在程式寫好前失敗、寫好後通過，而且改動它動過的那幾行會讓某個測試失敗。只改文件的任務，用它自己的驗證步驟檢查。
    - 每個任務的 commit 都帶 trailer：
 
      ```
@@ -67,7 +72,7 @@ Docket **不會**：
      Task: 3
      ```
 
-   - 審查 pull request，`dkt check` 必須通過。
+   - 一個 change 就是一個 pull request。合併前整個審一次，兩個審查者平行：一個用不同的模型專門挑錯，一個在全新的 context 裡對照提案與 delta 核對。`dkt check` 必須通過。
    - 用 merge commit 合併，不要 squash，每個 commit 的 trailer 才留得下來。
 7. **封存。**在發版步驟，從預設分支最新版開出的分支上執行 `dkt archive <slug>...`。
 
