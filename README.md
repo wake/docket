@@ -64,7 +64,7 @@ superpowers starts the work. OpenSpec never starts a step on its own; it is call
    - Before any code, the plan is reviewed once together with the proposal and the delta.
 6. **Implement and review.**
    - Use superpowers subagent-driven development with TDD, but only `**Review:** judgment` tasks get their own reviewer.
-   - Every task gets the mechanical checks instead: its new tests fail before the code and pass after, and mutating the lines it changed makes a test fail.
+   - Every task that changes code gets the mechanical checks instead: its new tests fail before the code and pass after, and mutating the lines it changed makes a test fail. A task that only edits docs is checked by its own verification steps.
    - Every task's commit carries trailers:
 
      ```
