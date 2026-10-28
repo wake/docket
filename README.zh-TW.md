@@ -49,10 +49,11 @@ Docket **不會**：
 
 由 superpowers 開場。OpenSpec 從不主動啟動任何步驟，只在三個時間點被呼叫：建立 change 資料夾、驗證、封存。
 
-1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。這件事會走三條路之一：
-   - 會改到 `openspec/specs/` 裡的句子：開 change，照下面的步驟走。
+1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。同時符合好幾條時，取最重的：
+   - 會改到 `openspec/specs/` 裡的句子：開 change，照下面的步驟走。說不出「原本該怎樣」的 bug 也一樣：規格沒寫、也沒有既有行為可對照，修它就是在定義行為。
    - 讓程式回到規格行為的 bug 修正，或不改行為的重構：寫回歸測試，先看它在修正前失敗，合併前讓整份 diff 審一次。完全不碰 OpenSpec。
-   - 文件、版本號、純搬移：只跑自動檢查，不另外審查。完全不碰 OpenSpec。
+   - prompt 文字（agent 讀了會照做的文字，例如 `AGENTS.md`、schema 裡的說明），或只改測試：prompt 用機械方式檢查，測試用突變它所測的程式碼來檢查，合併前讓整份 diff 審一次。完全不碰 OpenSpec。
+   - 給人讀的文件、版本號、純搬移：只跑自動檢查，不另外審查。完全不碰 OpenSpec。
 2. **開 change。**在 git worktree 裡執行 `dkt new <slug>`，它會呼叫 `openspec new change`。
 3. **寫提案與 delta。**
    - brainstorming 直接把 `proposal.md` 和 `specs/**/spec.md` 寫進 change 資料夾，需要時再加 `design.md`。

@@ -20,13 +20,21 @@ upcoming work, are in `docs/ideas/`.
 
 ## Change workflow (superpowers × OpenSpec)
 
-- Triage first, into one of three paths:
+- Triage first. When several paths apply, take the heaviest:
   - The work changes a sentence in `openspec/specs/`: open a change (below).
+    So does a bug fix whose correct behavior no spec states and no existing
+    behavior shows: it defines behavior, and the change adds that sentence.
   - A bug fix that restores the specified behavior, or a restructuring that
-    changes no behavior: no change. Write a regression test and see it fail
-    before the fix, then have the whole diff reviewed once before merging.
-  - Docs, version bumps and pure moves: no change and no review beyond the
-    automated checks.
+    changes no behavior (edits to comments alone are not code): no change.
+    Write a regression test and see it fail before the fix, then have the
+    whole diff reviewed once before merging.
+  - Prompt text, the text agents act on (list the project's prompt paths in
+    AGENTS.md), or tests alone: no change, and one review of the whole diff
+    before merging. Check prompts mechanically, not with tests that look for
+    strings: they still load, and every copy says the same. Check tests by
+    mutating the code they cover: they must fail.
+  - Docs for people, version bumps and pure moves: no change and no review
+    beyond the automated checks.
 
   An idea that is not ready goes to `docs/ideas/`.
 - To open a change, in a git worktree, run
@@ -93,4 +101,9 @@ upcoming work, are in `docs/ideas/`.
 - OpenSpec CLI pinned to 1.14.x. To use a pinned copy without installing it:
   `DOCKET_OPENSPEC="npx -y @fission-ai/openspec@1.14.3"`.
 - `openspec/schemas/docket/` is the schema Docket ships (embedded with
-  `go:embed`). Change it only through a change, like any other behavior.
+  `go:embed`). Edits to it follow the same triage as any other file; its
+  instructions and templates are prompts shipped to other projects.
+- Prompt paths, the text agents act on: `AGENTS.md`, `CLAUDE.md`, `context`
+  in `openspec/config.yaml`, and `openspec/schemas/docket/`. `dkt init`
+  ships the "Change workflow" section of `AGENTS.md` and
+  `openspec/schemas/docket/` to other projects.
