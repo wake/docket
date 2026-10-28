@@ -49,8 +49,10 @@ Docket does **not**:
 
 superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it.
 
-1. **Triage with brainstorming.** superpowers brainstorming reads the project and talks the idea through.
-   - If the work will not change any sentence in `openspec/specs/`, stop here and take the light path. OpenSpec is not involved.
+1. **Triage with brainstorming.** superpowers brainstorming reads the project and talks the idea through. The work takes one of three paths:
+   - It changes a sentence in `openspec/specs/`: open a change and follow the steps below.
+   - A bug fix that restores the specified behavior, or a restructuring that changes no behavior: write a regression test, see it fail before the fix, and have the diff reviewed once before merging. OpenSpec is not involved.
+   - Docs, version bumps and pure moves: no review beyond the automated checks. OpenSpec is not involved.
 2. **Open a change** in a git worktree with `dkt new <slug>`, which wraps `openspec new change`.
 3. **Write the proposal and the delta.**
    - brainstorming writes `proposal.md` and `specs/**/spec.md` straight into the change folder, plus `design.md` when needed.
@@ -58,8 +60,11 @@ superpowers starts the work. OpenSpec never starts a step on its own; it is call
 4. **Validate** with `openspec validate --strict` and `dkt lint`.
 5. **Plan.** superpowers writing-plans writes `plan.md` into the change folder.
    - This is the only task list. There is no `tasks.md`.
+   - Each task says `**Review:** judgment` when it needs a reviewer's judgment, and `**Review:** checks` otherwise.
+   - Before any code, the plan is reviewed once together with the proposal and the delta.
 6. **Implement and review.**
-   - Use superpowers subagent-driven development with TDD.
+   - Use superpowers subagent-driven development with TDD, but only `**Review:** judgment` tasks get their own reviewer.
+   - Every task gets the mechanical checks instead: its new tests fail before the code and pass after, and mutating the lines it changed makes a test fail.
    - Every task's commit carries trailers:
 
      ```
@@ -67,7 +72,7 @@ superpowers starts the work. OpenSpec never starts a step on its own; it is call
      Task: 3
      ```
 
-   - Review the pull request. `dkt check` must pass.
+   - A change is one pull request. Before merging, it is reviewed once, by two reviewers in parallel: one on a different model attacks it, one in a fresh context checks it against the proposal and the delta. `dkt check` must pass.
    - Merge with a merge commit, not squash, so every commit keeps its trailers.
 7. **Archive** in the release step, on a branch made from the default branch tip, with `dkt archive <slug>...`.
 
