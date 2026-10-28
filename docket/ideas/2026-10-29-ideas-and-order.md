@@ -21,10 +21,10 @@ be read by hand.
   `to: record:<slug>` once work starts; `dropped: true` for an idea that
   will not be done; `needs:` for the ideas it depends on. The body says what
   the idea is and why.
-- `docket/order.md` holds the order of upcoming work and nothing else: a
-  numbered list from 1 with no gaps, each line a checkbox and one
-  repository-root path in backticks to an idea. No titles, versions,
-  dependencies or notes.
+- `docket/order.md` holds the order of upcoming work and nothing else: the
+  heading `# Order`, then a numbered list from 1 with no gaps, each line a
+  checkbox and one repository-root path in backticks to an idea. No idea
+  titles, versions, dependencies or notes.
 - The first unticked line is the next piece of work. `dkt sync` ticks a
   line when the change or record its idea points to merges, and
   `dkt sync --check` reports a line out of step. Finished lines stay.
