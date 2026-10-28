@@ -47,11 +47,11 @@
 - Modify: `openspec/schemas/docket/templates/plan.md`
 - Test: `schema_test.go`
 
-- [ ] **Step 1: Write the failing tests.** In `schema_test.go`: `TestPlanTemplateReviewLine` reads `templates/plan.md` from `Schema()` and requires `**Review:** <checks|judgment>`; `TestAgentsSectionReviewAtBothEnds` requires the section to contain `**Review:** judgment`, `dkt conflicts` and `one pull request`.
-- [ ] **Step 2: Run them and see them fail.** `go test -run 'TestPlanTemplateReviewLine|TestAgentsSectionReviewAtBothEnds' .` fails on both.
-- [ ] **Step 3: Edit the text.** The AGENTS.md section: three triage paths, plan review before code, per-task review only for `**Review:** judgment`, mechanical checks on every task, one review of the whole change before merging, one pull request per change and when to split, parallel sessions. The `plan` instruction: slices, merging coupled tasks, the `**Review:**` line, the `**Files:**` block. The `apply` instruction: the same review rules. The plan template: the `**Review:**` line.
-- [ ] **Step 4: Run the tests.** `go test ./...` passes; `openspec instructions plan --change update-workflow` and `openspec instructions apply --change update-workflow` print the new text; `dkt init` in a temporary repository prints the new section.
-- [ ] **Step 5: Commit** with the trailers `Change: update-workflow` and `Task: 1`.
+- [x] **Step 1: Write the failing tests.** In `schema_test.go`: `TestPlanTemplateReviewLine` reads `templates/plan.md` from `Schema()` and requires `**Review:** <checks|judgment>`; `TestAgentsSectionReviewAtBothEnds` requires the section to contain `**Review:** judgment`, `dkt conflicts` and `one pull request`.
+- [x] **Step 2: Run them and see them fail.** `go test -run 'TestPlanTemplateReviewLine|TestAgentsSectionReviewAtBothEnds' .` fails on both.
+- [x] **Step 3: Edit the text.** The AGENTS.md section: three triage paths, plan review before code, per-task review only for `**Review:** judgment`, mechanical checks on every task, one review of the whole change before merging, one pull request per change and when to split, parallel sessions. The `plan` instruction: slices, merging coupled tasks, the `**Review:**` line, the `**Files:**` block. The `apply` instruction: the same review rules. The plan template: the `**Review:**` line.
+- [x] **Step 4: Run the tests.** `go test ./...` passes; `openspec instructions plan --change update-workflow` and `openspec instructions apply --change update-workflow` print the new text; `dkt init` in a temporary repository prints the new section.
+- [x] **Step 5: Commit** with the trailers `Change: update-workflow` and `Task: 1`.
 
 ### Task 2: READMEs and follow-ups
 
@@ -63,6 +63,6 @@
 - Modify: `README.md`, `README.zh-TW.md` (the workflow steps)
 - Create: `docs/ideas/2026-10-28-workflow-followups.md`
 
-- [ ] **Step 1: Edit both READMEs.** Triage names the three paths; "Implement and review" names the mechanical checks, the judgment-only task review and the single review before merging; one pull request per change.
-- [ ] **Step 2: Write the follow-up note.** A lint rule for the `**Review:**` line and the `**Files:**` block; a file-overlap check for parallel changes; review findings and sizes recorded in `evidence.md`.
-- [ ] **Step 3: Commit** with the trailers `Change: update-workflow` and `Task: 2`.
+- [x] **Step 1: Edit both READMEs.** Triage names the three paths; "Implement and review" names the mechanical checks, the judgment-only task review and the single review before merging; one pull request per change.
+- [x] **Step 2: Write the follow-up note.** A lint rule for the `**Review:**` line and the `**Files:**` block; a file-overlap check for parallel changes; review findings and sizes recorded in `evidence.md`.
+- [x] **Step 3: Commit** with the trailers `Change: update-workflow` and `Task: 2`.
