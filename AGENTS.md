@@ -27,20 +27,37 @@ upcoming work, are in `docs/ideas/`.
     a test that asserts new behavior: it defines behavior, and the change
     adds the sentence.
   - A bug fix that restores the specified behavior, or a restructuring that
-    changes no behavior (edits to comments alone are not code): no change.
-    Write a regression test and see it fail before the fix, then have the
-    whole diff reviewed once before merging.
-  - Prompt text, or tests that check behavior already specified or already
-    shown: no change, and one review of the whole diff before merging.
+    changes no behavior (moving code is one): no change. For a fix, write
+    a regression test and see it fail before the fix. For a restructuring,
+    the tests that cover the code pass before and after, and mutating the
+    changed lines makes one fail; when none fails, first add the tests as
+    a test-only edit. Then have the whole diff reviewed once before
+    merging. A comment that changes how the code builds or runs, such as a
+    compiler directive (`//go:build`) or an annotation, is code.
+  - Prompt text, tests that check behavior already specified or already
+    shown, and check settings such as CI configuration: no change, and one
+    review of the whole diff before merging.
     Prompt text is the text agents act on: files agents load by convention
     (`AGENTS.md`, `CLAUDE.md`, skill and command files) and text a program
     hands to an agent (embedded or printed instructions, templates). List
     these paths in AGENTS.md, and update the list in the pull request that
     adds, moves or removes one. Check prompts mechanically, not with tests
     that look for strings: they still load, and every copy says the same.
-    Check tests by mutating the code they cover: they must fail.
-  - Docs for people, version bumps and pure moves: no change and no review
-    beyond the automated checks.
+    Check tests by mutating the code they cover: they must fail. Check
+    settings are the files that decide which checks run; check them by
+    running them, since the pull request's own CI run uses the new
+    settings, and have the review look for a check that got weaker.
+  - Docs for people (moves and typos in them included), edits that only
+    change comments or whitespace in code or test files (these are not
+    edits to code or tests, so the paths above do not apply), version bumps,
+    and dependency upgrades that touch only the dependency manifests (such
+    as `go.mod` and `go.sum`): no change and no review beyond the automated
+    checks. Sort an edit by what it touches: a typo in a prompt is prompt
+    text, and moving code is a restructuring. When the edit touches a code
+    or test file, have a fresh agent, given only the diff and these
+    definitions, confirm before merging that every changed line is a
+    comment or whitespace and that no comment changes how the code builds
+    or runs. If it does not confirm, triage again.
 
   An idea that is not ready goes to `docs/ideas/`.
 - To open a change, in a git worktree, run
