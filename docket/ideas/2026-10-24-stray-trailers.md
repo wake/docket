@@ -1,6 +1,8 @@
-# Idea: find task commits whose trailers git cannot read
+---
+title: Find task commits whose trailers git cannot read
+---
 
-Status: idea, not designed. Recorded 2026-10-24 at the first release.
+Recorded 2026-10-24 at the first release.
 
 ## Problem
 

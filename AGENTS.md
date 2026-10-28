@@ -12,11 +12,12 @@ commit hostnames, customer names, personal paths or secrets.
 
 Status: milestone 1 is complete. `dkt init`, `dkt new`, `dkt lint`,
 `dkt conflicts`, `dkt sync`, `dkt archive`, `dkt rebase` and `dkt status` exist; build them
-with `go install ./cmd/dkt`. Upcoming work is ordered in `docs/ideas/`.
+with `go install ./cmd/dkt`. Upcoming work is ordered in `docket/order.md`.
 
 Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` for module
-boundaries and shared capabilities. Ideas that are not ready, and the order of
-upcoming work, are in `docs/ideas/`.
+boundaries and shared capabilities. Ideas are in `docket/ideas/`, one per
+file; `docket/order.md` lists the ones queued, in order, and the first
+unticked line is the next piece of work.
 
 ## Change workflow (superpowers × OpenSpec)
 
@@ -59,7 +60,7 @@ upcoming work, are in `docs/ideas/`.
     comment or whitespace and that no comment changes how the code builds
     or runs. If it does not confirm, triage again.
 
-  An idea that is not ready goes to `docs/ideas/`.
+  An idea that is not ready goes to `docket/ideas/`, one file per idea.
 - To open a change, in a git worktree, run
   `dkt new <slug> --kind feature|change-request|fix|baseline --source "<where the request came from>"`.
 - superpowers:brainstorming writes its design into the change folder, not
