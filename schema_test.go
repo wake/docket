@@ -52,7 +52,7 @@ func TestPlanTemplateReviewLine(t *testing.T) {
 
 func TestAgentsSectionReviewAtBothEnds(t *testing.T) {
 	s := AgentsSection()
-	for _, want := range []string{"**Review:** judgment", "dkt conflicts", "one pull request"} {
+	for _, want := range []string{"into one of three paths", "Before merging", "**Review:** judgment", "dkt conflicts", "one pull request"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("section lacks %q", want)
 		}

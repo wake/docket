@@ -252,6 +252,10 @@ artifacts:
         `Change:` and `Task:` commit trailers; tick by hand only a task that
         was finished without any commit.
 
+      Before any code is written, have the plan reviewed once together with
+      the proposal, the delta specs and design.md, preferably by a different
+      model from the one that wrote it, and fix what the review finds.
+
       When requirements change after the plan is approved:
       - Leave completed tasks as written and ticked.
       - Move a task that is cancelled before it is done out of the task list
@@ -269,15 +273,18 @@ apply:
   requires: [ plan ]
   tracks: plan.md
   instruction: |
+    Start only after the plan has been reviewed (see the plan instruction).
     Execute plan.md with superpowers:subagent-driven-development, with one
     exception: only a task whose `**Review:**` line says `judgment` gets its
-    own reviewer. Every task gets the mechanical checks instead: its new
-    tests fail before the code and pass after, and mutating the lines it
-    changed makes a test fail. Give each implementer the Reuse rows that
-    concern its task. Each implementer's report lists every exported symbol
-    it added and, for each, why no existing one fit. Every commit made for a
-    task carries the trailers `Change: <change-name>` and `Task: <N>`;
-    structural changes and behavior changes go in separate commits.
+    own reviewer. Every task that changes code gets the mechanical checks
+    instead: its new tests fail before the code and pass after, and mutating
+    the lines it changed makes a test fail. A task that changes no code, such
+    as one that only edits docs, is checked by its own verification steps.
+    Give each implementer the Reuse rows that concern its task. Each
+    implementer's report lists every exported symbol it added and, for each,
+    why no existing one fit. Every commit made for a task carries the
+    trailers `Change: <change-name>` and `Task: <N>`; structural changes and
+    behavior changes go in separate commits.
 
     Before merging, review the whole change once, with two reviewers in
     parallel: one on a different model, asked to attack (wrong results, edge

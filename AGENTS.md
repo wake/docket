@@ -51,13 +51,15 @@ upcoming work, are in `docs/ideas/`.
   proposal and deltas, preferably by a different model from the one that
   wrote it.
 - Execute with superpowers:subagent-driven-development, with one exception:
-  only a `**Review:** judgment` task gets its own reviewer. Every task gets
-  the mechanical checks instead: its new tests are seen failing before the
-  code and passing after, and mutating the lines it changed makes a test
-  fail. Each implementer gets the Reuse rows for its task and reports every
-  exported symbol it added, with why no existing one fit. Every commit made
-  for a task carries the trailers `Change: <slug>` and `Task: <N>`;
-  structural changes and behavior changes go in separate commits.
+  only a `**Review:** judgment` task gets its own reviewer. Every task that
+  changes code gets the mechanical checks instead: its new tests are seen
+  failing before the code and passing after, and mutating the lines it
+  changed makes a test fail. A task that changes no code, such as one that
+  only edits docs, is checked by its own verification steps. Each
+  implementer gets the Reuse rows for its task and reports every exported
+  symbol it added, with why no existing one fit. Every commit made for a
+  task carries the trailers `Change: <slug>` and `Task: <N>`; structural
+  changes and behavior changes go in separate commits.
 - Before merging, the whole change is reviewed once, by two reviewers in
   parallel: one on a different model, asked to attack (wrong results, edge
   cases, partial failure, the same defect elsewhere in the code), and one in a
