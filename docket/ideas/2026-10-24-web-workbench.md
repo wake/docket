@@ -1,7 +1,8 @@
-# Idea: a web workbench in Docket (`dkt serve`)
+---
+title: A web workbench in Docket (dkt serve)
+---
 
-Status: idea, not designed. Recorded 2026-10-24. Brainstorm it into changes
-when it reaches the front of the queue (see Order below).
+Recorded 2026-10-24.
 
 ## Problem
 
@@ -61,20 +62,3 @@ handling of the same change diverging across worktrees.
 - Work that is not pushed on another machine: one server per machine with
   an aggregating view, or pushed branches only.
 - Whether the UI ships in this repository or as a separate one.
-
-## Order
-
-Docket's own queue, as of 2026-10-24. Released: 1 to 3 in v0.1.0, 7 in v0.2.0, 4 in v0.3.0.
-
-1. `add-init-and-new`
-2. `add-lint`
-3. `add-archive` (`sync`, `archive`, `rebase`), so every change can be
-   closed properly
-4. `add-status`: the `status --json` feed the workbench reads
-5. This workbench, read-only first, with the daemon
-6. `add-index`: the generated capability index, across worktrees, with two
-   checks built on it: every exported symbol a change adds maps to a `new`
-   or `extend` row of its Reuse table, and a new symbol whose name matches
-   or nearly matches one elsewhere in the index is flagged
-7. `add-conflicts`, which can run in parallel with 4 to 6
-8. Workbench editing and commands
