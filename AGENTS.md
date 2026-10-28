@@ -43,9 +43,13 @@ upcoming work, are in `docs/ideas/`.
     these paths in AGENTS.md, and update the list in the pull request that
     adds, moves or removes one. Check prompts mechanically, not with tests
     that look for strings: they still load, and every copy says the same.
-    Check tests by mutating the code they cover: they must fail.
+    Check tests by mutating the code they cover: they must fail. Check
+    settings are the files that decide which checks run; check them by
+    running them, since the pull request's own CI run uses the new
+    settings, and have the review look for a check that got weaker.
   - Docs for people (moves and typos in them included), edits that only
-    change comments or whitespace in code or test files, version bumps,
+    change comments or whitespace in code or test files (these are not
+    edits to code or tests, so the paths above do not apply), version bumps,
     and dependency upgrades that touch only the dependency manifests (such
     as `go.mod` and `go.sum`): no change and no review beyond the automated
     checks. Sort an edit by what it touches: a typo in a prompt is prompt
