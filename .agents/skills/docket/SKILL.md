@@ -81,8 +81,9 @@ An idea that is not ready goes to `docket/ideas/`, one file per idea.
 7. Before merging, review the whole change once, by two reviewers in
    parallel: one on a different model, asked to attack (wrong results, edge
    cases, partial failure, the same defect elsewhere in the code), and one in
-   a fresh context, checking the code against the proposal and deltas. After
-   fixes, only a large fix is reviewed again.
+   a fresh context, checking the code against the proposal and deltas (see
+   Reviews when no other model is available). After fixes, only a large fix
+   is reviewed again.
 8. Before opening the pull request, run `dkt sync <slug>` and
    `dkt lint <slug>`, and commit plan.md.
 9. A change is one pull request; its commits show its layers. Split it only
