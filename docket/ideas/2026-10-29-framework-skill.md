@@ -1,5 +1,5 @@
 ---
-title: Ship the framework as a skill, and no workflow
+title: Ship the framework as a skill, with workflow templates
 ---
 
 Recorded 2026-10-29. The points below were decided with the maintainer; the
@@ -7,72 +7,87 @@ change that takes this idea turns them into a proposal and deltas.
 
 ## Problem
 
-`dkt init` ships two kinds of guidance mixed together, in the "Change
-workflow" section of `AGENTS.md` and in the instructions of
-`openspec/schemas/docket/schema.yaml`:
-
-- the framework: the files and fields `dkt` reads or checks, and how to use
-  the commands;
-- a development workflow: how work is triaged, when a change is opened,
-  which reviews run when and on which model, mutation checks, pull request
-  size.
-
-The workflow is one maintainer's practice. It assumes tools another project
-may not have, such as a second model for reviews, so it does not belong in
-what Docket ships. And `AGENTS.md` is loaded in every session, so agents
-apply the workflow to every task, questions and investigations included.
+`dkt init` ships its guidance in the "Change workflow" section of
+`AGENTS.md` and in the instructions of `openspec/schemas/docket/schema.yaml`.
+Agents load `AGENTS.md` in every session, so they triage every task,
+questions and investigations included. And the guidance describes one way of
+working: a user who already has tools and habits of their own has no place
+to bring them in.
 
 ## Decided
 
-- Docket ships the framework only. It ships no workflow, not even an
-  optional default: each project writes its own.
-- The boundary: what `dkt` reads or checks is framework; what only an agent
-  reads, to decide who reviews what and when, is workflow.
-  - Framework: the change folder and `docket.yaml`; `proposal.md`, the delta
-    specs and `plan.md` with its task headings, `**Scenarios:**` lines and
-    checkboxes; the `Change:` and `Task:` trailers, and merge commits
-    because `dkt sync` reads them; the `## Reuse` table while `dkt lint`
-    checks it; the commands themselves.
-  - Workflow: triage into paths, `**Review:** judgment|checks` and which
-    tasks get a reviewer, tests seen failing first and mutation checks,
-    the plan review and the reviews before merging, a different model,
-    pull request size, parallel sessions.
-- The framework ships as a skill that `dkt init` installs. Agents that do
-  not read skills are not supported: the shipped `AGENTS.md` keeps no
-  pointer or summary for them.
+- Two layers:
+  - The **framework**, shipped by Docket: the triage of work into four paths
+    (full review, light review, check, direct merge) and the kinds of work
+    behind them, what `dkt` reads or checks, and a **template** for each
+    path. Templates are written in capabilities, such as "cross-model
+    review" or "a fresh agent", never a product name; the text shipped today
+    is their starting point.
+  - The **user's workflow**: the tools and habits a user already has, kept
+    where the user keeps them, for example their global agent instructions.
+    Docket does not copy it into the repository.
+- The **materialized workflow** joins the two: for each path, the template
+  brought as close as the user's workflow and tools allow. It is neither the
+  template verbatim nor the user's workflow verbatim. It lives at the user
+  level, never in the project repository, in one of two modes chosen at
+  setup:
+  - reference: written into the user's own global workflow, which Docket
+    refers to, so a change there applies everywhere;
+  - fixed: a workflow used by Docket only.
+- Setup: when `dkt init` finds no materialized workflow, the agent checks
+  the environment, reads the templates, guides the user, and shows the
+  result before writing it. `dkt` itself only reports facts and checks
+  structure: whether the materialized workflow exists, and which template
+  version it was made from, so a changed template shows it is out of date.
+- Review fallback in the templates: a cross-model review; else a subagent
+  review (same model, fresh context); else the work is recorded as having no
+  independent review and a person reviews the pull request. A self-review is
+  not a review step.
+- Lookup order: a project template (optional, committed, for a team) before
+  Docket's template; a materialized workflow is always at the user level.
+  The first version builds only Docket's template and the user-level
+  materialized workflow.
+- A `docket doctor` skill checks the setup, among other things the review
+  workflow: whether the materialized workflow covers every path, which
+  review fallback applies in this environment, and conflicts with the
+  framework, such as squash merges, which drop the trailers `dkt sync`
+  reads.
+- The framework ships as a skill that `dkt init` installs. The triage moves
+  out of always-loaded instructions into it, so it applies only to work on
+  a Docket project. Agents that do not read skills are not supported:
+  `AGENTS.md` keeps no pointer or summary for them.
 - Docket supports a repository only after `dkt init`, with OpenSpec and
-  superpowers installed.
-- The workflow leaves what is shipped: the triage, review and pull request
-  rules of the "Change workflow" section, and in `schema.yaml` the plan
-  instruction's `**Review:**` rule and plan review and the apply
-  instruction's execution and review rules.
+  superpowers installed. Docket's own repository is set up like any other.
 
 ## Open questions
 
-- Where the skill is installed (the project's `.claude/skills/`, or a
-  plugin), how `dkt init --force` updates it, and whether `dkt init` checks
-  that superpowers is installed.
-- Where a project's own workflow plugs in: its own skill, its `AGENTS.md`,
-  or `rules` in `openspec/config.yaml` for extra plan fields.
-- Whether the `## Reuse` table and the `**Files:**` block are framework:
-  deciding reuse in the plan is a workflow choice, and nothing reads
-  `**Files:**` yet.
-- Where Docket's own workflow lives once the shipped section holds the
-  framework only.
-- Queued ideas that build the workflow into `dkt`, each to be kept,
-  reworked or dropped: `2026-10-29-records.md` (kinds named after the light
-  review path), `2026-10-29-commit-gate.md` (the triage and direct-merge
-  commit types), `2026-10-28-lint-review-and-files.md` (the `**Review:**`
-  line).
+- Where the framework skill is installed (the project's `.claude/skills/`
+  or a plugin), and how `dkt init --force` updates it.
+- Where the materialized workflow lives for each agent: Claude Code reads
+  user skills from `~/.claude/skills`, Codex from `~/.agents/skills`.
+- Whether the `## Reuse` table stays in the framework.
+- The checks `docket doctor` runs, and which of them `dkt` can do without
+  judgment.
+- Queued ideas written before this split, to update when each is taken up:
+  `2026-10-29-records.md` keeps its mechanism and kinds, without its review
+  sections; `2026-10-29-commit-gate.md` keeps its checks that work lands in
+  the right container; `2026-10-28-lint-review-and-files.md` becomes a check
+  of fields a project declares, or is dropped.
 
-## Notes for the skill
+## Notes
 
-- The description is what an agent sees before it loads the skill: it says
-  when to use the skill, not what the skill says, or the agent follows the
-  summary instead. The description and `when_to_use` together are cut at
-  1,536 characters.
-- After compaction only the first 5,000 tokens of each loaded skill are
-  kept, so what an agent needs on every turn goes first and details go in
-  referenced files.
-- Check loading with prompts that should and should not load the skill,
-  each run a few times in a fresh session.
+- Prior art for the setup: spec-kit's constitution command (the agent asks
+  or infers, then writes one file) and Claude Code's interactive `/init`
+  (it shows a proposal before writing). No tool found both detects an
+  existing workflow and proposes one from the user's habits.
+- Generated context files can lower agents' success and raise cost, and long
+  instruction files are followed less: keep the materialized workflow short
+  and have the user review it.
+- A git worktree does not carry git-ignored files, so a materialized
+  workflow kept ignored in the project would be missing in every new
+  worktree.
+- The skill's description says when to use it, not what it says, or the
+  agent follows the summary instead; the description and `when_to_use` are
+  cut at 1,536 characters together. After compaction only the first 5,000
+  tokens of a loaded skill are kept. Check loading with prompts that should
+  and should not load it.
