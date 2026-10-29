@@ -25,7 +25,7 @@ func TestParseMetadata(t *testing.T) {
 	}
 }
 
-func TestSetBase(t *testing.T) {
+func TestSetKey(t *testing.T) {
 	tests := []struct {
 		name, in, want string
 		wantErr        bool
@@ -39,7 +39,7 @@ func TestSetBase(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := SetBase([]byte(tt.in), "new")
+			got, err := SetKey([]byte(tt.in), "x-base", "new")
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("err = %v", err)
 			}
@@ -50,9 +50,9 @@ func TestSetBase(t *testing.T) {
 	}
 }
 
-func TestSetBaseKeepsInput(t *testing.T) {
+func TestSetKeyKeepsInput(t *testing.T) {
 	in := []byte("x-base: old\n")
-	if _, err := SetBase(in, "new"); err != nil || !strings.HasPrefix(string(in), "x-base: old") {
+	if _, err := SetKey(in, "x-base", "new"); err != nil || !strings.HasPrefix(string(in), "x-base: old") {
 		t.Fatalf("input changed or error: %q %v", in, err)
 	}
 }

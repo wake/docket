@@ -82,7 +82,7 @@ func Rebase(e Env, slug string) (RebaseReport, error) {
 	if err != nil {
 		return rep, err
 	}
-	out, err := change.SetBase(b, nb)
+	out, err := change.SetKey(b, "x-base", nb)
 	if err != nil {
 		return rep, err
 	}

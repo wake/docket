@@ -34,44 +34,44 @@ func ParseMetadata(b []byte) (Metadata, error) {
 	return m, nil
 }
 
-// SetBase replaces the value of the one top-level `x-base:` line and keeps
+// SetKey replaces the value of the one top-level `key:` line and keeps
 // every other byte, including the line ending. It fails when there is not
-// exactly one such line, or when the result does not read back as base.
-func SetBase(b []byte, base string) ([]byte, error) {
-	const key = "x-base:"
+// exactly one such line, or when the result does not read back as value.
+func SetKey(b []byte, key, value string) ([]byte, error) {
+	prefix := key + ":"
 	at := -1
 	for off := 0; off < len(b); {
 		end := len(b)
 		if i := bytes.IndexByte(b[off:], '\n'); i >= 0 {
 			end = off + i + 1
 		}
-		if bytes.HasPrefix(b[off:end], []byte(key)) {
+		if bytes.HasPrefix(b[off:end], []byte(prefix)) {
 			if at >= 0 {
-				return nil, fmt.Errorf("more than one %s line", key)
+				return nil, fmt.Errorf("more than one %s line", prefix)
 			}
 			at = off
 		}
 		off = end
 	}
 	if at < 0 {
-		return nil, fmt.Errorf("no %s line", key)
+		return nil, fmt.Errorf("no %s line", prefix)
 	}
-	start := at + len(key)
+	start := at + len(prefix)
 	end := start
 	for end < len(b) && b[end] != '\n' && b[end] != '\r' {
 		end++
 	}
-	out := make([]byte, 0, len(b)+len(base))
+	out := make([]byte, 0, len(b)+len(value))
 	out = append(out, b[:start]...)
 	out = append(out, ' ')
-	out = append(out, base...)
+	out = append(out, value...)
 	out = append(out, b[end:]...)
-	m, err := ParseMetadata(out)
-	if err != nil {
+	var m map[string]any
+	if err := yaml.Unmarshal(out, &m); err != nil {
 		return nil, fmt.Errorf("result is not valid YAML: %w", err)
 	}
-	if m.Base != base {
-		return nil, fmt.Errorf("%s did not read back as %q", key, base)
+	if got, ok := m[key].(string); !ok || got != value {
+		return nil, fmt.Errorf("%s did not read back as %q", prefix, value)
 	}
 	return out, nil
 }
