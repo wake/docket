@@ -10,7 +10,7 @@ func TestParseMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Metadata{Schema: "docket", Created: "2026-01-02", Kind: "fix", Source: "a: b", Base: "abc123"}
+	want := Metadata{Created: "2026-01-02", Kind: "fix", Source: "a: b", Base: "abc123", File: OpenSpecFile}
 	if m != want {
 		t.Fatalf("got %+v, want %+v", m, want)
 	}
@@ -34,7 +34,7 @@ func TestSetKey(t *testing.T) {
 		{"crlf", "schema: docket\r\nx-base: old\r\nx-kind: fix\r\n", "schema: docket\r\nx-base: new\r\nx-kind: fix\r\n", false},
 		{"quoted", "x-base: \"abc\"\n", "x-base: new\n", false},
 		{"no final newline", "schema: docket\nx-base: old", "schema: docket\nx-base: new", false},
-		{"missing", "schema: docket\n", "", true},
+		{"missing appends", "schema: docket\n", "schema: docket\nx-base: new\n", false},
 		{"twice", "x-base: a\nx-base: b\n", "", true},
 	}
 	for _, tt := range tests {
