@@ -211,6 +211,14 @@ func (r *archiveRun) change(slug string) (stopped bool, err error) {
 	if err != nil || r.stop(slug, "archive", finds, nil) {
 		return err == nil, err
 	}
+	finds, unread, err = r.specTitles(c, folder)
+	if err != nil {
+		return false, err
+	}
+	if len(finds) > 0 || len(unread) > 0 {
+		r.rep.Archived = append(r.rep.Archived, Archived{Change: slug, Folder: folder})
+		return r.stop(slug, "spec-title", finds, unread), nil
+	}
 	a := Archived{Change: slug, Folder: folder}
 	evPath := path.Join(folder, "evidence.md")
 	ev := evidence{Slug: slug, Date: as[:10], Docket: r.in.Version, OpenSpec: r.version, Origin: r.in.Origin, Head: r.head,
