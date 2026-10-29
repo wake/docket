@@ -66,16 +66,16 @@
 **Interfaces:**
 - Produces: `docket.Skill() fs.FS` (files of `.agents/skills/docket`, paths relative to it, e.g. `SKILL.md`); `docket.Block() string` (the block as defined in Global Constraints; panics when `AGENTS.md` has no single well-formed block).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `TestSkillFrontmatter`: `SKILL.md` from `Skill()` starts with `---\n`, its frontmatter parses with `yaml.v3`, `name == "docket"`, `description` is non-empty and `len(description) <= 1024`. `TestBlock`: `Block()` starts with `<!-- docket:start -->\n`, ends with `\n<!-- docket:end -->`, and contains each marker once.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 Run: `go test -run 'TestSkillFrontmatter|TestBlock' .`
 Expected: FAIL (undefined `Skill`, `Block`).
 
-- [ ] **Step 3: Write `.agents/skills/docket/SKILL.md`**
+- [x] **Step 3: Write `.agents/skills/docket/SKILL.md`**
 
 Frontmatter: `name: docket`; `description:` the text under "The skill's text" in design.md, as one folded string. Body: the "Change workflow" section of `AGENTS.md` rewritten around four named paths, in this order:
 1. One paragraph: these are the rules for development work in this repository; where another skill says otherwise, these win.
@@ -86,20 +86,20 @@ Frontmatter: `name: docket`; `description:` the text under "The skill's text" in
 
 Name capabilities, never products ("a reviewer on a different model", "a fresh agent given only the diff"). At most 2,000 words. Every rule of the current section must have a home; nothing from the user's own global instructions is added.
 
-- [ ] **Step 4: Append the block to `AGENTS.md`**
+- [x] **Step 4: Append the block to `AGENTS.md`**
 
 Append, by the appending rule in Global Constraints, the block exactly as shown under "The block's text" in design.md.
 
-- [ ] **Step 5: Implement `Skill()` and `Block()` in `schema.go`**
+- [x] **Step 5: Implement `Skill()` and `Block()` in `schema.go`**
 
 `//go:embed .agents/skills/docket` and `fs.Sub`, like `Schema()`. `Block()` scans the embedded `AGENTS.md` for marker lines as defined in Global Constraints.
 
-- [ ] **Step 6: Run the tests to see them pass**
+- [x] **Step 6: Run the tests to see them pass**
 
 Run: `go test .`
 Expected: PASS (`TestAgentsSection` still passes; the section is still there).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add .agents/skills/docket/SKILL.md AGENTS.md schema.go schema_test.go
@@ -120,7 +120,7 @@ git commit -F <message with Change: add-framework-skill / Task: 1>
 **Interfaces:**
 - Produces: `FindBlock(b []byte) (from, to int, found bool, err error)`: `b[from:to]` is the block as defined in Global Constraints; `found` is false with a nil error when there is no marker; `err` is `errMalformed` otherwise. `placeBlock(cur []byte, block string, force bool) (next []byte, status FileStatus, err error)`, built on `FindBlock`: a missing file is passed as nil `cur`; `next` is nil when nothing is to be written. `errMalformed` (an `error` whose message says which case: no end marker, end marker first, more than one block). `importsAgents(b []byte) bool`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Table test `TestPlaceBlock`, with `block = "<!-- docket:start -->\nB\n<!-- docket:end -->"`:
 
@@ -143,23 +143,23 @@ Table test `TestPlaceBlock`, with `block = "<!-- docket:start -->\nB\n<!-- docke
 
 `TestImportsAgents`: true for `"@AGENTS.md\n"`, `"# x\n  @./AGENTS.md\t\n"`; false for `"See @AGENTS.md here\n"`, `"@AGENTS.md.bak\n"`, `""`.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 Run: `go test ./internal/setup -run 'TestPlaceBlock|TestImportsAgents'`
 Expected: FAIL (undefined).
 
-- [ ] **Step 3: Implement `placeBlock` and `importsAgents` in `internal/setup/block.go`**
+- [x] **Step 3: Implement `placeBlock` and `importsAgents` in `internal/setup/block.go`**
 
 Scan lines keeping byte offsets; a marker line is compared after dropping one trailing `\r` (so the CRLF case finds its markers, then differs on bytes).
 
-- [ ] **Step 4: Run them to see them pass**
+- [x] **Step 4: Run them to see them pass**
 
 Run: `go test ./internal/setup`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
-- [ ] **Step 6: Make `docket.Block()` use `setup.FindBlock`**
+- [x] **Step 6: Make `docket.Block()` use `setup.FindBlock`**
 
 A separate structural commit: `Block()` calls `setup.FindBlock([]byte(agentsMD))` and panics on an error or when no block is found, replacing its own scan. Run `go test ./...`; expected PASS with no test changed.
 
@@ -179,27 +179,27 @@ A separate structural commit: `Block()` calls `setup.FindBlock([]byte(agentsMD))
 
 Init order: check `openspec` for a link; list targets (schema files under `openspec/schemas/docket/`, then the skill under `.claude/skills/docket/`, then under `.agents/skills/docket/`); for each, `safepath.Check` (a `SymlinkError` is `ProblemSymlink`, any other error `ProblemUnreadable`) and `readNoFollow` (an error other than not-exist is `ProblemUnreadable`) to decide its status; if any problem, return `Result{Files: []}` and `*Refused` listing all of them; else run `initOpenSpec` when `openspec/` is missing; then write. The decision logic of `install` splits into deciding (check phase) and writing (write phase).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 setup: `TestInitInstallsSkill` (both `SKILL.md` written, statuses `written`, kinds right; second run all `unchanged`); `TestInitLeavesUserSkillFiles` (`.claude/skills/docket/notes.md` written before init is unchanged and not in `Files`); `TestInitRefusesBeforeWriting` (a link at `.agents/skills/docket` and an unreadable schema file (mode 000, skipped as root): `*Refused` with both problems, no file written, `initOpenSpec` not called).
 setup: `TestInitWriteFailureThenRerun` (skipped as root): an empty `.agents/skills/docket/` with mode 0555 passes the checks and fails the write; `Init` returns an error with the schema and `.claude/skills/docket/` files already written and listed; after restoring the mode, a second `Init` writes the `.agents` copy and reports the earlier files `unchanged`.
 cli: `TestFreshRepositoryGetsTheSkill` (both files equal `docket.Skill()`, exit 0); `TestEditedSkillFile` (edit `.agents/skills/docket/SKILL.md`, exit 1, one finding `skill-differs` with that `file`, file kept; with `--force` exit 0 and status `overwritten`); `TestSymlinkedSkillDirectoryRefused` (`.claude/skills/docket` linked to an outside directory, `--force --json`: exit 1, `symlink-refused` naming `.claude/skills/docket`, `sameSnapshot` of the repository, outside directory empty); `TestUnreadableSkillFile` (mode 000: exit 3, the file in `unreadable`, nothing written); `TestLinkAndUnreadableTogether` (a link at `.claude/skills/docket` and an unreadable schema file: exit 3, the `symlink-refused` finding and the `unreadable` entry both present, nothing written). Rework `TestPartialFailureKeepsResult`: its regular file in place of a directory is now refused before any write, so it builds the write failure of `TestInitWriteFailureThenRerun` instead and asserts exit 1, a `result` listing the files written before the failure, and that a re-run after restoring the mode exits 0. Keep `TestSymlinkedSchemaFileRefused` passing; its snapshot already shows no skill file appeared.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 Run: `go test ./internal/setup ./internal/cli -run 'Skill|Refuses|Unreadable|Symlinked|Together|WriteFailure|PartialFailure'`
 Expected: FAIL
 
-- [ ] **Step 3: Implement the check-then-write `Init` and the CLI mapping**
+- [x] **Step 3: Implement the check-then-write `Init` and the CLI mapping**
 
 `cmd_init.go`: `setup.Assets{Schema: docket.Schema(), Skill: docket.Skill()}`; `*Refused` problems map to `symlink-refused` findings (message from the link error) and `Unreadable{Source: path, Reason: err}`; `Differs` maps by `Kind` to `schema-differs` or `skill-differs` ("differs from the shipped skill; use --force to overwrite"). The printed section stays until Task 4.
 
-- [ ] **Step 4: Run the package tests**
+- [x] **Step 4: Run the package tests**
 
 Run: `go test ./internal/setup ./internal/cli`
 Expected: PASS, including every existing init test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ### Task 4: The Docket block in AGENTS.md and CLAUDE.md
 
@@ -218,7 +218,7 @@ Expected: PASS, including every existing init test.
 
 After the skill targets, Init adds `AGENTS.md` (checked with `safepath.Check`, read, `placeBlock`) and then `CLAUDE.md`: `os.Lstat`; a link whose cleaned target is `AGENTS.md` is `unchanged`, any other link is `ProblemSymlink`; a regular file that `importsAgents` is `unchanged`; a missing one is written as `@AGENTS.md\n` (`written`); otherwise `placeBlock`. `errMalformed` is `ProblemMalformed`. Both files are listed in `Files` with `KindBlock`. A missing file is created with `O_EXCL`, an existing one rewritten with `O_TRUNC`, both `O_NOFOLLOW`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 cli, each with a committed repository and `--json` where the result is read:
 - `TestBlockAddedToExistingAgentsMD`: `AGENTS.md` = `"# agents\n"`; exit 0; it becomes `"# agents\n\n" + docket.Block() + "\n"`.
@@ -234,21 +234,21 @@ cli, each with a committed repository and `--json` where the result is read:
 - `TestOtherConfigurationUnchanged` (replaces `TestRoutingSectionPrinted`): `.claude/settings.json`, `.claude/skills/mine/SKILL.md` and `openspec/config.yaml` byte-for-byte unchanged; human output lacks `Add this section`; JSON `result` has no `agents_section` key.
 - `TestRerunNoDifferences`: extend to every file in `files` (schema, skill, `AGENTS.md`, `CLAUDE.md`): all `unchanged`, no mtime moved.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 Run: `go test ./internal/cli -run 'Block|AgentsMD|AgentsFiles|ClaudeMD|OtherConfiguration|Rerun'`
 Expected: FAIL
 
-- [ ] **Step 3: Implement the block targets and the CLI changes**
+- [x] **Step 3: Implement the block targets and the CLI changes**
 
 `cmd_init.go`: `Assets.Block = docket.Block()`; `Differs` with `KindBlock` maps to `agents-block-differs` ("the Docket block differs from the shipped one; use --force to replace it"); `ProblemMalformed` to `agents-block-malformed` (message from `errMalformed`); drop the printed section and `AgentsSection`.
 
-- [ ] **Step 4: Run all tests**
+- [x] **Step 4: Run all tests**
 
 Run: `go vet ./... && go test ./...`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ### Task 5: Docket's own repository and docs
 
@@ -261,34 +261,34 @@ Expected: PASS
 - Modify: `AGENTS.md`, `schema_test.go`, `README.md`, `README.zh-TW.md`, `docs/ARCHITECTURE.md`, `docket/ideas/2026-10-29-framework-skill.md`, `docket/ideas/2026-10-24-atomic-writes.md` (init now writes through a temporary file; the metadata writes remain)
 - Delete: `docket/ideas/2026-10-24-routing-section-fence.md`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `TestInstalledSkillMatchesShipped` in `schema_test.go`: every file of `Skill()` equals the file at the same path under `.claude/skills/docket/` in the repository.
 
-- [ ] **Step 2: Run it to see it fail**
+- [x] **Step 2: Run it to see it fail**
 
 Run: `go test -run TestInstalledSkillMatchesShipped .`
 Expected: FAIL (file missing)
 
-- [ ] **Step 3: Set up Docket's repository with its own `dkt init`**
+- [x] **Step 3: Set up Docket's repository with its own `dkt init`**
 
 Run: `go install ./cmd/dkt && dkt init --json` (`openspec/` exists, so no OpenSpec CLI is needed)
 Expected: exit 0; `.claude/skills/docket/SKILL.md` `written`; every other file `unchanged`.
 
-- [ ] **Step 4: Edit AGENTS.md**
+- [x] **Step 4: Edit AGENTS.md**
 
 Delete the "Change workflow (superpowers × OpenSpec)" section. In "Development", the prompt paths become `AGENTS.md`, `CLAUDE.md`, `context` in `openspec/config.yaml`, `openspec/schemas/docket/`, `.claude/skills/docket/` and `.agents/skills/docket/`, and the last sentence says `dkt init` ships `openspec/schemas/docket/`, the `docket` skill and the Docket block of `AGENTS.md` to other projects. The Docket block stays as it is.
 
-- [ ] **Step 5: Edit the docs**
+- [x] **Step 5: Edit the docs**
 
 Both READMEs: "What Docket is not" says it never touches `.claude/settings.json` and writes only the marked Docket block in `AGENTS.md` and `CLAUDE.md`, creating either when missing; the workflow section says the `docket` skill carries these rules and `dkt init` installs it; `init` in the command list and in "The commands that write files" names the schema, the skill and the block; "Upgrading" gains this release: run `dkt init`, delete a "Change workflow" section pasted from an earlier release, commit the new files. `docs/ARCHITECTURE.md`: the `schema.go` and `internal/setup` rows name the skill and the block. The framework-skill idea records what this change settled (project skill, block, Reuse table stays in the framework) and keeps the two changes that remain.
 
-- [ ] **Step 6: Run the checks**
+- [x] **Step 6: Run the checks**
 
 Run: `go vet ./... && go test ./... && dkt lint add-framework-skill`
 Expected: PASS, `dkt lint: ok`
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ### Task 6: Trial of the skill in a set-up project
 
@@ -301,22 +301,22 @@ Expected: PASS, `dkt lint: ok`
 
 The lead runs this task. Transcripts and a results table go in the scratchpad; the summary goes in the pull request.
 
-- [ ] **Step 1: Set up a scratch project**
+- [x] **Step 1: Set up a scratch project**
 
 A new git repository outside this one with a small Go program (`main.go` printing `hello`, a README), committed; then the branch's `dkt init` (with the pinned OpenSpec) and a commit.
 
-- [ ] **Step 2: Isolate from the user's own instructions**
+- [x] **Step 2: Isolate from the user's own instructions**
 
 Run `claude -p` with `--setting-sources project,local` and `--plugin-dir` pointing at the installed superpowers, asking it to list the instruction files and skills it was given. Expected: superpowers' skills and `docket` are listed, and nothing from the user's global instructions appears. If isolation cannot be had without editing user files, stop and report.
 
-- [ ] **Step 3: Run the load prompts**
+- [x] **Step 3: Run the load prompts**
 
 With `--output-format stream-json --verbose --max-turns 3`, once on each of two models (the session's default and Sonnet): should load: "Add a --name flag to hello.", "hello prints a trailing space; fix it.", "Fix the typo in the README."; should not: "What does main.go do?", "Why might go test be slow in this repo?". Expected: a `Skill` call for `docket` in every should-load run, before any brainstorming skill; none in the should-not runs.
 
-- [ ] **Step 4: Follow one feature into its design**
+- [x] **Step 4: Follow one feature into its design**
 
 "Add a --name flag to hello. Skip the questions: I approve the design you propose. Write the design down and stop before the plan." with edits and `dkt`/`git` commands allowed and `--max-turns 30`. Expected: the design lands in `openspec/changes/<slug>/`, and nothing is written under `docs/superpowers/`.
 
-- [ ] **Step 5: Adjust and re-run on failure**
+- [x] **Step 5: Adjust and re-run on failure**
 
 When a run fails its expectation, change the description or block wording, copy it to every place it lives, run `go test ./...`, and re-run every prompt. Commit any change.
