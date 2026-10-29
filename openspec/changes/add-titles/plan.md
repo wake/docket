@@ -39,14 +39,15 @@
 | Read the `x-` keys of an older change | internal/change/metadata.go:ParseMetadata | extend | becomes the legacy branch of `ReadMetadata`; unexported once no caller is left (Task 7) | `rg -n "ParseMetadata" internal/` |
 | Set one key's value, keeping every other byte | internal/change/metadata.go:SetBase | extend | generalized to `SetKey(b, key, value)`, which also appends a missing key | `rg -n "SetBase" internal/` |
 | Write `docket.yaml` when a change is created | internal/change/new.go:AppendMetadata | new | it appends to a file OpenSpec wrote; `docket.yaml` is a new file created exclusively, so `CreateDocket` replaces it and it is deleted | `rg -n "AppendMetadata\|O_EXCL" internal/` |
-| Title form check | none | new | nothing validates free text in Docket | `rg -n "TrimSpace\(.*\) == \"\"" internal/` |
+| Title form check | none | new | the only blank-text check, `indented` in `internal/cli/cmd_archive.go`, formats output and does not reject line breaks | `rg -n "TrimSpace\(.*\) == \"\"" internal/` |
 | Refuse a link on a write path | internal/safepath:Check | reuse | required before every write | `dkt index: safepath.Check` |
 | Lock, create and clean up in `dkt new` | internal/cli/cmd_new.go:newCommand (cleanup, lockOpenSpec) | reuse | the docket.yaml write takes the place of AppendMetadata inside the same cleanup | `rg -n "cleanup\|lockOpenSpec" internal/cli/cmd_new.go` |
 | Per-change lint rules | internal/lint/lint.go:Run | extend | one more rule in the loop, plus a main-spec pass when no slug is named | `rg -n "checkStructure\(r, c" internal/lint/lint.go` |
 | Know whether a main spec exists | internal/lint/structure.go:(*run).mainSpec | new | `mainSpec` returns nil both for a missing file and for one with no requirements; the title rule needs `fs.Stat` | `rg -n "func \(r \*run\) mainSpec" -A 12 internal/lint/structure.go` |
 | Map a spec path to its capability | internal/delta/capability.go:CapabilityPath | reuse | works on `specs/<cap>/spec.md`, for main specs after trimming `openspec/` | `dkt index: delta.CapabilityPath` |
 | Load a change's metadata for archive, sync and rebase | internal/archive/load.go:loadChange | extend | reads `docket.yaml` and `.openspec.yaml`, then `change.ReadMetadata` | `rg -n "ParseMetadata" internal/archive/load.go` |
-| Create a file or replace one without following links | internal/archive/sync.go:createFile, writeFile, writeOrRefuse | reuse | the title step creates or replaces a main spec's `docket.yaml` | `rg -n "func (createFile\|writeFile\|writeOrRefuse)" internal/archive/` |
+| Create a file or replace one without following links | internal/archive/sync.go:createFile, writeFile, writeOrRefuse | reuse | the title step creates or replaces a main spec's `docket.yaml`; `createFile` needs its folder to exist | `rg -n "func (createFile\|writeFile\|writeOrRefuse)" internal/archive/` |
+| Create a missing capability folder | external: os.MkdirAll | reuse | after `safepath.Check` of the folder; nothing in `internal/archive` creates folders, and `setup.install` is unexported and specific to the schema | `rg -n "MkdirAll" internal/archive internal/setup internal/change` |
 | Archive step sequence | internal/archive/run.go:(*archiveRun).change | extend | the title step runs between `r.archive` and the evidence step | `rg -n "evPath :=" internal/archive/run.go` |
 | Evidence rows | internal/archive/evidence.go:evidence.render | extend | rows renamed and Title added | `rg -n "x-kind" internal/archive/evidence.go` |
 | Move the base | internal/archive/rebase.go:Rebase | extend | writes the file `ReadMetadata` read the base from | `rg -n "SetBase" internal/archive/rebase.go` |
@@ -122,7 +123,8 @@ Rename `SetBase(b, base)` to `SetKey(b, key, value)` with the same behavior for 
 - `TestReadMetadataLegacy`: only `.openspec.yaml` with `x-kind`, `x-source`, `x-base` → those values, `Title == ""`, `File == ".openspec.yaml"`.
 - `TestReadMetadataBothFiles`: `docket.yaml` base `aaa…`, `.openspec.yaml` `x-base: bbb…` → `Base` is `aaa…`.
 - `TestReadMetadataErrors`: `docket.yaml` = `- a\n` → error, `File == "docket.yaml"`; no files → error, `File == "docket.yaml"`; only `.openspec.yaml` = `schema: [\n` → error, `File == ".openspec.yaml"`.
-- `TestParseDocketTitleForm`: `title: "a\nb"` → `Title == ""`; `title: "   "` → `""`; `title: 預約候補` → `"預約候補"`; `title: [a]` → error.
+- `TestParseDocketTitleForm`: a block scalar `title: |\n  a\n  b\n` (decodes to `"a\nb\n"`) → `Title == ""`; a double-quoted `title: "a\rb"` with the YAML escape `\r` → `""`; `title: "   "` → `""`; `title: 預約候補` → `"預約候補"`; `title: [a]` → error.
+- `TestValidTitle`: `""`, `"   "`, `"a\nb"`, `"a\rb"` → false; `"Booking waitlist"`, `"預約候補"` → true.
 - `TestCreateDocketRoundTrip`: for titles `Booking: waitlist #2`, `'quoted'`, `- dash`, `預約候補`, `CreateDocket` then `ParseDocket` gives the same `Docket`; the file starts with `title:` and has the keys in order title, kind, source, base; a second `CreateDocket` on the same path fails with `fs.ErrExist`; a symbolic link at the path is not followed.
 - `TestSetKeyAppend`: `SetKey([]byte("a: 1"), "title", "T")` → `"a: 1\ntitle: T\n"`; `SetKey([]byte("a: 1\r\n"), "title", "T")` → `"a: 1\r\ntitle: T\r\n"`; `SetKey([]byte("title: Old\nb: 2\n"), "title", "Booking: x")` → `"title: 'Booking: x'\nb: 2\n"`; two `title:` lines → error.
 
@@ -157,9 +159,9 @@ Expected: PASS.
 - [ ] **Step 1: Write the failing tests**
 
 - `TestNewMissingTitle`: `dkt new add-x --kind feature --source x` → exit 2, finding rule `usage`, no `openspec/changes/add-x/`, and the fake OpenSpec log has no `new` call.
-- `TestNewBlankTitle`: `--title "   "` and `--title $'a\nb'` → exit 2, nothing created.
+- `TestNewBlankTitle`: `--title "   "`, `--title "a\nb"` and `--title "a\rb"` (Go strings with a real line feed and carriage return) → exit 2, nothing created.
 - `TestNewWritesDocketYAML`: `dkt new add-x --kind feature --source "issue 12" --title "Booking waitlist"` → `ParseDocket` of `openspec/changes/add-x/docket.yaml` is `{Booking waitlist, feature, issue 12, <merge base>}`; `.openspec.yaml` is byte for byte `schema: docket\ncreated: 2026-01-02\n`, as the fake wrote it; the JSON `result.title` is `Booking waitlist`.
-- `TestNewDocketYAMLFails`: with `FAKE_OPENSPEC_DOCKET_YAML=1` (the fake's `new` also writes `docket.yaml`), → finding `metadata-failed`, exit 1, `openspec/changes/add-x/` removed.
+- `TestNewDocketYAMLFails`: with `FAKE_OPENSPEC_DOCKET_YAML=1` (the fake's `new` also writes `docket.yaml`), → finding `metadata-failed`, exit 1, `openspec/changes/add-x/` removed. Every `CreateDocket` error takes this one branch, so this test covers cleanup for write failures too.
 - Existing `dkt new` tests: add `--title X` to every invocation that is not about the title, so each still checks what it did (slug rules, slug reuse, unreadable worktree, concurrency, schema missing, symlink refusal, JSON output, unsupported version, OpenSpec failure). The OpenSpec failure test asserts no `docket.yaml` exists.
 
 - [ ] **Step 2: Run the tests to see them fail**
@@ -196,7 +198,7 @@ Expected: PASS.
 Rules (findings' `File` is repository-relative):
 - The change: `docket.yaml` absent and not unreadable → `title-missing` on `openspec/changes/<slug>/docket.yaml`, message saying the change has no title and that a change made by an older dkt moves `x-kind`, `x-source` and `x-base` there as `kind`, `source` and `base`. Present: a `ParseDocket` error → `metadata-invalid` on it; a `""` title → `title-missing` on it.
 - Each delta: a `docket.yaml` beside it is checked the same way. Absent, and `fs.Stat` of `openspec/specs/<cap>/spec.md` says it does not exist → `title-missing` on `openspec/changes/<slug>/specs/<cap>/docket.yaml`, naming the capability. Any other `Stat` error → unreadable.
-- Main specs, only when `in.Slugs` is empty: walk `openspec/specs`; for every regular `spec.md` that `CapabilityPath` maps, check the `docket.yaml` beside it as above, with no change on the finding. A missing `openspec/specs` is no finding; a walk error is unreadable.
+- Main specs, only when `in.Slugs` is empty: walk `openspec/specs`; for every regular `spec.md` that `CapabilityPath` maps, check the `docket.yaml` beside it as above, with no change on the finding. A missing `openspec/specs` is no finding; a walk error, or a `docket.yaml` that exists but cannot be read, is unreadable and gets no `title-missing`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -206,7 +208,8 @@ One test per scenario in `titles_test.go`, on `fstest.MapFS` repositories (`repo
 - `TestNoDeltaTitleForExistingCapability`: same with `openspec/specs/booking/spec.md` present → no `title-missing` for booking.
 - `TestTitleMissingOnMainSpec`: `openspec/specs/booking/spec.md` without `docket.yaml`, `runOn(repo)` → `title-missing` on `openspec/specs/booking/docket.yaml` with `Change == ""`.
 - `TestNamedChangeSkipsMainSpecs`: same main spec, `add-x` with a title, `runOn(repo, "add-x")` → no finding on `openspec/specs/`.
-- `TestBrokenDocketYAML`: `openspec/changes/add-x/docket.yaml` = `- a\n` → `metadata-invalid` on that file; a delta `docket.yaml` = `- a\n` → `metadata-invalid` on it.
+- `TestBrokenDocketYAML`: `openspec/changes/add-x/docket.yaml` = `- a\n` → `metadata-invalid` on that file; a delta `docket.yaml` = `- a\n` → `metadata-invalid` on it; `openspec/specs/booking/docket.yaml` = `- a\n` with `runOn(repo)` → `metadata-invalid` on it, and no `title-missing` for it.
+- `TestUnreadableMainSpecTitle` (on `osRepo`, as `TestUnreadableFile` does): `openspec/specs/booking/docket.yaml` with mode 0 → listed in `Unreadable`, no `title-missing` for booking; `openspec/specs/booking/` with mode 0 → `openspec/specs/booking` listed in `Unreadable`.
 - `TestBlankTitle`: `title: "  "` → `title-missing`.
 - Fixtures in other lint and command tests that assert a clean report gain a `docket.yaml` with a title, so they keep testing what they tested (`lint-every-active-change`, `named-change-missing` and `no-openspec-installed` are the existing tests, kept green).
 
@@ -281,9 +284,12 @@ Expected: PASS.
 
 **Interfaces:**
 - Consumes: `change.ParseDocket`, `change.Docket.Marshal`, `change.SetKey` (Task 2); `createFile`, `writeFile`, `safepath.Check`
-- Produces: `func (r *archiveRun) specTitles(c *loadedChange, folder string) *Finding`, unexported.
+- Produces: `func (r *archiveRun) specTitles(c *loadedChange, folder string) ([]Finding, []Unreadable, error)`, unexported.
 
-Behavior: for each capability of `sortedCaps(c)`, read `<folder>/specs/<cap>/docket.yaml` (the archived folder). Absent: skip. Otherwise the target is `openspec/specs/<cap>/docket.yaml`: `safepath.Check` it; create its folder when missing; when the target does not exist, `createFile` with `Docket{Title: t}.Marshal()`; when it does, `SetKey(b, "title", t)` and `writeFile`. A delta `docket.yaml` that does not parse or has no valid title, a link, or any read or write error is `spec-title-failed` on the target, naming the capability and the reason; the step stops at the first one. In `change`, the step runs after `r.archive`; on a finding the change is listed in `Archived` with `Evidence: ""`, the run stops at step `spec-title`, and no `evidence.md` is written.
+Behavior: for each capability of `sortedCaps(c)`, read `<folder>/specs/<cap>/docket.yaml` (the archived folder). Absent: skip. Otherwise the target is `openspec/specs/<cap>/docket.yaml`: `safepath.Check` it; when its folder is missing, `os.MkdirAll` it (the folder path passed `safepath.Check`); when the target does not exist, `createFile` with `Docket{Title: t}.Marshal()`; when it does, read it, `SetKey(b, "title", t)` and `writeFile`.
+- A delta `docket.yaml` or a target that exists but cannot be read is listed as unreadable (exit 3), as the proposal's failure modes say.
+- A delta `docket.yaml` that does not parse or has no valid title, a link, `SetKey` failing, or a failure creating the folder or writing the file is `spec-title-failed` on the target, naming the capability and the reason (exit 1).
+- The step stops at the first capability with either. In `change`, the step runs after `r.archive`; when it stops, the change is listed in `Archived` with `Evidence: ""`, the run stops at step `spec-title`, no `evidence.md` is written, and the archived folder stays in the working tree.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -291,12 +297,16 @@ Behavior: for each capability of `sortedCaps(c)`, read `<folder>/specs/<cap>/doc
 - `TestTitleReplacedOnExistingSpec`: `openspec/specs/booking/docket.yaml` = `title: Bookings\nowner: x\n`, delta `docket.yaml` `title: Booking` → file is `title: Booking\nowner: x\n`.
 - `TestNoDeltaTitleLeavesSpecAlone`: no delta `docket.yaml` → main spec `docket.yaml` bytes unchanged, none created.
 - `TestTitleNestedCapability`: capability `booking/waitlist` → `openspec/specs/booking/waitlist/docket.yaml` created with its folder.
-- `TestTitleTargetIsLink`: `openspec/specs/booking/docket.yaml` is a symbolic link to a file outside the repository → `Stopped.Step == "spec-title"`, finding `spec-title-failed`, the outside file unchanged, `Archived[0].Evidence == ""`, no `evidence.md`.
-- `TestStepsInOrder`: the existing two-change test still stops `add-y` at `lint` with `add-x` archived; assert `add-x`'s spec title was set before its evidence was written (the title file exists when `evidence.md` does).
+Every failure test below asserts the same outcome, through one helper: `Stopped == {Change: "add-x", Step: "spec-title"}`, `Archived[0].Folder` exists, `Archived[0].Evidence == ""`, no `evidence.md` in it, and the target's bytes as before the run. These also pin the order: evidence comes after the title step.
+- `TestTitleTargetIsLink`: `openspec/specs/booking/docket.yaml` is a symbolic link to a file outside the repository → `spec-title-failed`, the outside file unchanged.
+- `TestTitleDeltaInvalid`: delta `docket.yaml` = `- a\n`, and another = `title: "  "` → `spec-title-failed`.
+- `TestTitleWriteFails`: existing target and `writeTemp` replaced by a failing one (as `rebase_test.go` does) → `spec-title-failed`.
+- `TestTitleTargetUnreadable`: existing target with mode 0 (skipped as root, like the lint test) → `Unreadable` names `openspec/specs/booking/docket.yaml`, no finding.
+- The existing two-change test still stops `add-y` at `lint` with `add-x` archived and its evidence written.
 
 - [ ] **Step 2: Run the tests to see them fail**
 
-Run: `go test ./internal/archive/ -run 'Title|StepsInOrder'`
+Run: `go test ./internal/archive/ -run 'Title'`
 Expected: FAIL.
 
 - [ ] **Step 3: Implement `specTitles` and call it from `change`**
