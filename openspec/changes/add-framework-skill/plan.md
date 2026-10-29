@@ -38,14 +38,14 @@
 |---|---|---|---|---|
 | Embed shipped files | schema.go:Schema | extend | `Skill()` embeds `.agents/skills/docket` the same way; `go:embed` accepts the dotted path (tried in a scratch module) | `rg -n "go:embed" --type go` |
 | Cut Docket's text out of `AGENTS.md` | schema.go:AgentsSection | extend | becomes `Block()`, cut at the markers instead of a heading; `AgentsSection` is removed in Task 4 | `rg -n "AgentsSection" --type go` |
-| Write an embedded file without following links, keeping an identical one and reporting a differing one | internal/setup/setup.go:install | reuse | skill files are installed exactly as schema files | `rg -n "func install" internal/setup` |
+| Write an embedded file without following links, keeping an identical one and reporting a differing one | internal/setup/setup.go:install | extend | split into deciding a status (check phase) and writing (write phase), so every check runs before the first write; schema and skill files both go through it | `rg -n "func install\|MkdirAll\|OpenFile" internal/setup/setup.go` |
 | Read without following a link | internal/setup/setup.go:readNoFollow | reuse | the check phase reads every target with it | `rg -n "readNoFollow" internal/setup` |
 | Refuse a link on a write path | internal/safepath/safepath.go:Check | reuse | before every write, including `AGENTS.md` and `CLAUDE.md` | `rg -n "func Check" internal/safepath` |
 | Init's walk, checks and writes | internal/setup/setup.go:Init | extend | becomes check-everything-then-write over schema, skill and block targets | `rg -n "func Init" internal/setup` |
 | Find marker lines and place the block | none | new | nothing finds marker lines with byte offsets; `markdown.Lines` rewrites CR and LF, so offsets into the original bytes are lost | `rg -n "func Lines" internal/markdown` |
 | Findings, unreadable entries and exit codes | internal/cli/envelope.go:Outcome, Unreadable, ExitCode | reuse | unreadable already wins over findings | `rg -n "func ExitCode" -A 14 internal/cli/envelope.go` |
 | Map init's result to output | internal/cli/cmd_init.go:initCommand | extend | new rules, no printed section | `rg -n "schema-differs" internal/cli` |
-| Parse the skill's frontmatter in a test | external: go.yaml.in/yaml/v3 | reuse | already a dependency; no frontmatter parser exists | `rg -n "frontmatter" --type go` |
+| Parse the skill's frontmatter in a test | external: go.yaml.in/yaml/v3 | reuse | already a dependency (`go.mod`); no frontmatter parser exists in the repository | `rg -n "yaml/v3" go.mod`, `rg -n -i "frontmatter" --type go` |
 | Test repositories and OpenSpec | internal/testutil/repo.go:NewRepo, internal/testutil/openspec.go:OpenSpecCmd, FakeOpenSpec | reuse | as the existing init tests do | `rg -n "func (NewRepo\|OpenSpecCmd\|FakeOpenSpec)" internal/testutil` |
 | Whole-tree snapshot for "nothing written" | internal/cli/cmd_init_test.go:snapshot, sameSnapshot | reuse | already used by the symlink tests | `rg -n "func snapshot" internal/cli` |
 
@@ -175,11 +175,12 @@ Init order: check `openspec` for a link; list targets (schema files under `opens
 - [ ] **Step 1: Write the failing tests**
 
 setup: `TestInitInstallsSkill` (both `SKILL.md` written, statuses `written`, kinds right; second run all `unchanged`); `TestInitLeavesUserSkillFiles` (`.claude/skills/docket/notes.md` written before init is unchanged and not in `Files`); `TestInitRefusesBeforeWriting` (a link at `.agents/skills/docket` and an unreadable schema file (mode 000, skipped as root): `*Refused` with both problems, no file written, `initOpenSpec` not called).
-cli: `TestFreshRepositoryGetsTheSkill` (both files equal `docket.Skill()`, exit 0); `TestEditedSkillFile` (edit `.agents/skills/docket/SKILL.md`, exit 1, one finding `skill-differs` with that `file`, file kept; with `--force` exit 0 and status `overwritten`); `TestSymlinkedSkillDirectoryRefused` (`.claude/skills/docket` linked to an outside directory, `--force --json`: exit 1, `symlink-refused` naming `.claude/skills/docket`, `sameSnapshot` of the repository, outside directory empty); `TestUnreadableSkillFile` (mode 000: exit 3, the file in `unreadable`, nothing written). Extend `TestSymlinkedSchemaFileRefused` to assert no skill file appeared (its snapshot check already covers this; keep it passing).
+setup: `TestInitWriteFailureThenRerun` (skipped as root): an empty `.agents/skills/docket/` with mode 0555 passes the checks and fails the write; `Init` returns an error with the schema and `.claude/skills/docket/` files already written and listed; after restoring the mode, a second `Init` writes the `.agents` copy and reports the earlier files `unchanged`.
+cli: `TestFreshRepositoryGetsTheSkill` (both files equal `docket.Skill()`, exit 0); `TestEditedSkillFile` (edit `.agents/skills/docket/SKILL.md`, exit 1, one finding `skill-differs` with that `file`, file kept; with `--force` exit 0 and status `overwritten`); `TestSymlinkedSkillDirectoryRefused` (`.claude/skills/docket` linked to an outside directory, `--force --json`: exit 1, `symlink-refused` naming `.claude/skills/docket`, `sameSnapshot` of the repository, outside directory empty); `TestUnreadableSkillFile` (mode 000: exit 3, the file in `unreadable`, nothing written); `TestLinkAndUnreadableTogether` (a link at `.claude/skills/docket` and an unreadable schema file: exit 3, the `symlink-refused` finding and the `unreadable` entry both present, nothing written). Rework `TestPartialFailureKeepsResult`: its regular file in place of a directory is now refused before any write, so it builds the write failure of `TestInitWriteFailureThenRerun` instead and asserts exit 1, a `result` listing the files written before the failure, and that a re-run after restoring the mode exits 0. Keep `TestSymlinkedSchemaFileRefused` passing; its snapshot already shows no skill file appeared.
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `go test ./internal/setup ./internal/cli -run 'Skill|Refuses|Unreadable|Symlinked'`
+Run: `go test ./internal/setup ./internal/cli -run 'Skill|Refuses|Unreadable|Symlinked|Together|WriteFailure|PartialFailure'`
 Expected: FAIL
 
 - [ ] **Step 3: Implement the check-then-write `Init` and the CLI mapping**
@@ -216,7 +217,9 @@ cli, each with a committed repository and `--json` where the result is read:
 - `TestBlockAddedToExistingAgentsMD`: `AGENTS.md` = `"# agents\n"`; exit 0; it becomes `"# agents\n\n" + docket.Block() + "\n"`.
 - `TestAgentsMDCreated`: no `AGENTS.md`; it becomes `docket.Block() + "\n"`.
 - `TestEditedBlock`: after a first init, replace the line after the start marker in `AGENTS.md` with `edited`; exit 1, finding `agents-block-differs` with `file` `AGENTS.md`, file unchanged; with `--force`, exit 0, status `overwritten`, block restored, text before and after it unchanged.
-- `TestMalformedBlock`: `AGENTS.md` = `"<!-- docket:start -->\n"`; exit 1, finding `agents-block-malformed` for `AGENTS.md`, `sameSnapshot` of the repository.
+- `TestMalformedBlock`, one subtest per case: `AGENTS.md` with a start marker and no end marker, with the end marker first, with two blocks, and `CLAUDE.md` (with `AGENTS.md` absent) with a start marker and no end marker. Each: exit 1, one finding `agents-block-malformed` naming that file, `sameSnapshot` of the repository (no schema, skill or block file written).
+- `TestUnreadableAgentsFiles`, skipped as root, one subtest each for `AGENTS.md` and `CLAUDE.md` with mode 000: exit 3, the file in `unreadable`, `sameSnapshot` of the repository.
+- `TestClaudeMDLinkedElsewhereRefused`: `CLAUDE.md` a link to `README.md`: exit 1, `symlink-refused` naming `CLAUDE.md`, `sameSnapshot` of the repository, `README.md` unchanged.
 - `TestClaudeMDImportsAgentsMD`: `CLAUDE.md` = `"@AGENTS.md\n"`; unchanged, status `unchanged`; `AGENTS.md` holds the block.
 - `TestClaudeMDLinkedToAgentsMD`: `CLAUDE.md` a link to `AGENTS.md`, no `AGENTS.md`; link kept, `AGENTS.md` created with the block.
 - `TestClaudeMDCreated`: no `CLAUDE.md`; it becomes `"@AGENTS.md\n"`.
@@ -226,7 +229,7 @@ cli, each with a committed repository and `--json` where the result is read:
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run: `go test ./internal/cli -run 'Block|AgentsMD|ClaudeMD|OtherConfiguration|Rerun'`
+Run: `go test ./internal/cli -run 'Block|AgentsMD|AgentsFiles|ClaudeMD|OtherConfiguration|Rerun'`
 Expected: FAIL
 
 - [ ] **Step 3: Implement the block targets and the CLI changes**
