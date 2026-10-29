@@ -12,28 +12,27 @@ func TestPlaceBlock(t *testing.T) {
 	cases := []struct {
 		name   string
 		cur    []byte
-		exists bool
 		force  bool
 		next   []byte
 		status FileStatus
 		err    bool
 	}{
-		{"missing", nil, false, false, []byte(testBlock + "\n"), Written, false},
-		{"empty file", []byte(""), true, false, []byte(testBlock + "\n"), Written, false},
-		{"no final newline", []byte("# A"), true, false, []byte("# A\n\n" + testBlock + "\n"), Written, false},
-		{"ends with newline", []byte("# A\n"), true, false, []byte("# A\n\n" + testBlock + "\n"), Written, false},
-		{"identical", []byte("# A\n\n" + testBlock + "\nmore\n"), true, false, nil, Unchanged, false},
-		{"differs", []byte(old), true, false, nil, Differs, false},
-		{"differs, force", []byte(old), true, true, []byte("# A\n" + testBlock + "\nafter\n"), Overwritten, false},
-		{"no end", []byte("<!-- docket:start -->\nx\n"), true, false, nil, "", true},
-		{"end first", []byte("<!-- docket:end -->\n<!-- docket:start -->\n"), true, false, nil, "", true},
-		{"two blocks", []byte(testBlock + "\n" + testBlock + "\n"), true, false, nil, "", true},
-		{"indented marker", []byte("  <!-- docket:start -->\n"), true, false, []byte("  <!-- docket:start -->\n\n" + testBlock + "\n"), Written, false},
-		{"CRLF copy of the block", []byte("<!-- docket:start -->\r\nB\r\n<!-- docket:end -->\r\n"), true, false, nil, Differs, false},
+		{"missing", nil, false, []byte(testBlock + "\n"), Written, false},
+		{"empty file", []byte(""), false, []byte(testBlock + "\n"), Written, false},
+		{"no final newline", []byte("# A"), false, []byte("# A\n\n" + testBlock + "\n"), Written, false},
+		{"ends with newline", []byte("# A\n"), false, []byte("# A\n\n" + testBlock + "\n"), Written, false},
+		{"identical", []byte("# A\n\n" + testBlock + "\nmore\n"), false, nil, Unchanged, false},
+		{"differs", []byte(old), false, nil, Differs, false},
+		{"differs, force", []byte(old), true, []byte("# A\n" + testBlock + "\nafter\n"), Overwritten, false},
+		{"no end", []byte("<!-- docket:start -->\nx\n"), false, nil, "", true},
+		{"end first", []byte("<!-- docket:end -->\n<!-- docket:start -->\n"), false, nil, "", true},
+		{"two blocks", []byte(testBlock + "\n" + testBlock + "\n"), false, nil, "", true},
+		{"indented marker", []byte("  <!-- docket:start -->\n"), false, []byte("  <!-- docket:start -->\n\n" + testBlock + "\n"), Written, false},
+		{"CRLF copy of the block", []byte("<!-- docket:start -->\r\nB\r\n<!-- docket:end -->\r\n"), false, nil, Differs, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			next, status, err := placeBlock(c.cur, c.exists, testBlock, c.force)
+			next, status, err := placeBlock(c.cur, testBlock, c.force)
 			if c.err {
 				if !errors.Is(err, errMalformed) {
 					t.Fatalf("err = %v, want errMalformed", err)
@@ -61,9 +60,11 @@ func TestFindBlock(t *testing.T) {
 		t.Fatalf("no marker: found=%v err=%v", found, err)
 	}
 	for name, in := range map[string]string{
-		"no end":    "<!-- docket:start -->\n",
-		"end first": "<!-- docket:end -->\n<!-- docket:start -->\n",
-		"two":       testBlock + "\n" + testBlock + "\n",
+		"no end":     "<!-- docket:start -->\n",
+		"end first":  "<!-- docket:end -->\n<!-- docket:start -->\n",
+		"two":        testBlock + "\n" + testBlock + "\n",
+		"two starts": "<!-- docket:start -->\n<!-- docket:start -->\n<!-- docket:end -->\n",
+		"two ends":   "<!-- docket:start -->\n<!-- docket:end -->\n<!-- docket:end -->\n",
 	} {
 		if _, _, _, err := FindBlock([]byte(in)); !errors.Is(err, errMalformed) {
 			t.Errorf("%s: err = %v", name, err)

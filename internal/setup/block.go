@@ -63,11 +63,11 @@ func FindBlock(b []byte) (from, to int, found bool, err error) {
 	return start, end, true, nil
 }
 
-// placeBlock returns the bytes to write for a file holding cur (exists says
-// whether the file is there) so that it carries block. next is nil when
+// placeBlock returns the bytes to write for a file holding cur (nil when the
+// file is missing) so that it carries block. next is nil when
 // nothing is to be written. A block that differs is left alone (Differs)
 // unless force is set (Overwritten).
-func placeBlock(cur []byte, exists bool, block string, force bool) (next []byte, status FileStatus, err error) {
+func placeBlock(cur []byte, block string, force bool) (next []byte, status FileStatus, err error) {
 	from, to, found, err := FindBlock(cur)
 	if err != nil {
 		return nil, "", err
