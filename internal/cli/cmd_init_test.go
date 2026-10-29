@@ -652,6 +652,7 @@ func TestMalformedBlock(t *testing.T) {
 		{"end first", "AGENTS.md", "<!-- docket:end -->\n<!-- docket:start -->\n"},
 		{"two blocks", "AGENTS.md", "<!-- docket:start -->\n<!-- docket:end -->\n<!-- docket:start -->\n<!-- docket:end -->\n"},
 		{"claude no end", "CLAUDE.md", "<!-- docket:start -->\nx\n"},
+		{"claude imports and no end", "CLAUDE.md", "@AGENTS.md\n<!-- docket:start -->\n"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

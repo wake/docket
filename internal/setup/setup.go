@@ -237,6 +237,10 @@ func decideBlock(d decided, got []byte, block string, force bool) (decided, *Pro
 		d.status, d.data = Written, []byte("@AGENTS.md\n")
 		return d, nil
 	case d.rel == claudeFile && importsAgents(got):
+		// Markers still have to form a block or none at all.
+		if _, _, _, err := FindBlock(got); err != nil {
+			return d, &Problem{Path: d.rel, Kind: ProblemMalformed, Err: err}
+		}
 		d.status = Unchanged
 		return d, nil
 	}
