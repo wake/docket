@@ -4,6 +4,8 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 func TestSchemaHasSchemaFile(t *testing.T) {
@@ -37,6 +39,50 @@ func TestAgentsSection(t *testing.T) {
 	}
 	if strings.Contains(s, "## Development") {
 		t.Error("section runs past its end")
+	}
+}
+
+func TestSkillFrontmatter(t *testing.T) {
+	b, err := fs.ReadFile(Skill(), "SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	if !strings.HasPrefix(s, "---\n") {
+		t.Fatal("SKILL.md does not start with frontmatter")
+	}
+	rest := s[len("---\n"):]
+	end := strings.Index(rest, "\n---\n")
+	if end < 0 {
+		t.Fatal("frontmatter is not closed")
+	}
+	var fm struct {
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+	}
+	if err := yaml.Unmarshal([]byte(rest[:end]), &fm); err != nil {
+		t.Fatal(err)
+	}
+	if fm.Name != "docket" {
+		t.Errorf("name = %q", fm.Name)
+	}
+	if fm.Description == "" || len(fm.Description) > 1024 {
+		t.Errorf("description length %d", len(fm.Description))
+	}
+}
+
+func TestBlock(t *testing.T) {
+	b := Block()
+	if !strings.HasPrefix(b, "<!-- docket:start -->\n") {
+		t.Errorf("bad start: %q", b)
+	}
+	if !strings.HasSuffix(b, "\n<!-- docket:end -->") {
+		t.Errorf("bad end: %q", b)
+	}
+	for _, m := range []string{"<!-- docket:start -->", "<!-- docket:end -->"} {
+		if n := strings.Count(b, m); n != 1 {
+			t.Errorf("%s appears %d times", m, n)
+		}
 	}
 }
 

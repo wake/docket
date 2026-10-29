@@ -133,3 +133,19 @@ unticked line is the next piece of work.
   in `openspec/config.yaml`, and `openspec/schemas/docket/`. `dkt init`
   ships the "Change workflow" section of `AGENTS.md` and
   `openspec/schemas/docket/` to other projects.
+
+<!-- docket:start -->
+## Docket
+
+At the start of any development work in this repository (a new feature, a
+behavior change, a bug fix, a refactor, or edits to prompts, tests, docs or
+CI), use the `docket` skill before brainstorming, planning or editing.
+
+Where the `docket` skill and another skill disagree, follow the `docket`
+skill. In particular: brainstorming writes its design into the change
+folder, not `docs/superpowers/specs/`; plans go to
+`openspec/changes/<slug>/plan.md`, not `docs/superpowers/plans/`; only
+tasks marked `**Review:** judgment` get their own reviewer; and OpenSpec's
+`/opsx:*` commands are not used. This block does not override the user's
+own instructions.
+<!-- docket:end -->
