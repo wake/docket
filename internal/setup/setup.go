@@ -262,48 +262,40 @@ func write(root string, d decided) error {
 		return fmt.Errorf("write %s: %w", d.rel, err)
 	}
 	if d.existed {
-		return replace(dst, d.data, d.rel)
+		info, err := os.Lstat(dst)
+		if err != nil {
+			return fmt.Errorf("write %s: %w", d.rel, err)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("write %s: not a regular file", d.rel)
+		}
+		return install(dst, d.data, info.Mode().Perm(), true, d.rel)
 	}
-	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
-	if err != nil {
-		return fmt.Errorf("write %s: %w", d.rel, err)
-	}
-	if _, err := f.Write(d.data); err != nil {
-		f.Close()
-		return fmt.Errorf("write %s: %w", d.rel, err)
-	}
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("write %s: %w", d.rel, err)
-	}
-	return nil
+	return install(dst, d.data, 0o644, false, d.rel)
 }
 
 // rename is os.Rename; tests replace it to make the last step fail.
 var rename = os.Rename
 
-// replace rewrites the existing file dst through a temporary file beside it,
-// so a failed write leaves the old file whole. The new file keeps the old
-// permission bits.
-func replace(dst string, data []byte, rel string) (err error) {
-	fail := func(err error) error { return fmt.Errorf("write %s: %w", rel, err) }
-	info, err := os.Lstat(dst)
-	if err != nil {
-		return fail(err)
-	}
-	if !info.Mode().IsRegular() {
-		return fail(fmt.Errorf("not a regular file"))
-	}
+// install writes data to a temporary file beside dst and renames it over dst,
+// so a failed write leaves dst as it was (or missing). An existing file's
+// permission bits are kept exactly (keepMode); a new file gets perm subject
+// to the umask.
+func install(dst string, data []byte, perm os.FileMode, keepMode bool, rel string) (err error) {
 	tmp := fmt.Sprintf("%s.docket-tmp-%d", dst, os.Getpid())
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, info.Mode().Perm())
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, perm)
 	if err != nil {
-		return fail(err)
+		return fmt.Errorf("write %s: %w", rel, err)
 	}
 	defer func() {
 		if err != nil {
 			os.Remove(tmp)
 		}
 	}()
-	if err = f.Chmod(info.Mode().Perm()); err == nil {
+	if keepMode {
+		err = f.Chmod(perm)
+	}
+	if err == nil {
 		_, err = f.Write(data)
 	}
 	if cerr := f.Close(); err == nil {
@@ -313,7 +305,7 @@ func replace(dst string, data []byte, rel string) (err error) {
 		err = rename(tmp, dst)
 	}
 	if err != nil {
-		return fail(err)
+		return fmt.Errorf("write %s: %w", rel, err)
 	}
 	return nil
 }
