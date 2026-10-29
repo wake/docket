@@ -1,0 +1,4 @@
+title: Review at both ends of a change
+kind: change-request
+source: Development process adopted 2026-10-28 (review at both ends, three review modes, one pull request per change)
+base: e967bbbe7a35168f8169fd29521ff8790ce54342
