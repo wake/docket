@@ -6,6 +6,8 @@ import (
 	"embed"
 	"io/fs"
 	"strings"
+
+	"github.com/wake/docket/internal/setup"
 )
 
 //go:embed openspec/schemas/docket
@@ -29,11 +31,6 @@ func Schema() fs.FS {
 //go:embed .agents/skills/docket
 var skillFS embed.FS
 
-const (
-	blockStart = "<!-- docket:start -->"
-	blockEnd   = "<!-- docket:end -->"
-)
-
 // Skill returns the files of .agents/skills/docket, with paths relative to
 // that directory (SKILL.md, ...).
 func Skill() fs.FS {
@@ -48,31 +45,14 @@ func Skill() fs.FS {
 // holding the start marker through the end of the end marker, without the
 // newline after it. It panics unless AGENTS.md holds exactly one block.
 func Block() string {
-	lines := strings.SplitAfter(agentsMD, "\n")
-	start, end, offset := -1, -1, 0
-	startOff, endOff := 0, 0
-	for _, l := range lines {
-		switch strings.TrimRight(l, "\r\n") {
-		case blockStart:
-			if start >= 0 {
-				panic("AGENTS.md has more than one " + blockStart)
-			}
-			start, startOff = 1, offset
-		case blockEnd:
-			if start < 0 {
-				panic("AGENTS.md has " + blockEnd + " before " + blockStart)
-			}
-			if end >= 0 {
-				panic("AGENTS.md has more than one " + blockEnd)
-			}
-			end, endOff = 1, offset+len(strings.TrimRight(l, "\r\n"))
-		}
-		offset += len(l)
+	from, to, found, err := setup.FindBlock([]byte(agentsMD))
+	if err != nil {
+		panic("AGENTS.md: " + err.Error())
 	}
-	if start < 0 || end < 0 {
-		panic("AGENTS.md has no complete docket block")
+	if !found {
+		panic("AGENTS.md has no docket block")
 	}
-	return agentsMD[startOff:endOff]
+	return agentsMD[from:to]
 }
 
 // AgentsSection returns the AGENTS.md section that starts at the change
