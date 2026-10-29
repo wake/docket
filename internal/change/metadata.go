@@ -22,9 +22,9 @@ type openspecFile struct {
 	Base    string `yaml:"x-base"`
 }
 
-// ParseMetadata reads .openspec.yaml. It fails when b is not YAML or not a
+// parseMetadata reads .openspec.yaml. It fails when b is not YAML or not a
 // mapping.
-func ParseMetadata(b []byte) (Metadata, error) {
+func parseMetadata(b []byte) (Metadata, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(b, &doc); err != nil {
 		return Metadata{}, err
@@ -49,7 +49,7 @@ func ReadMetadata(files map[string][]byte) (Metadata, error) {
 	var legacy Metadata
 	var legacyErr error
 	if hasOpenSpec {
-		legacy, legacyErr = ParseMetadata(ob)
+		legacy, legacyErr = parseMetadata(ob)
 	}
 	db, hasDocket := files[DocketFile]
 	if !hasDocket {

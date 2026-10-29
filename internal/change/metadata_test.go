@@ -6,7 +6,7 @@ import (
 )
 
 func TestParseMetadata(t *testing.T) {
-	m, err := ParseMetadata([]byte("schema: docket\ncreated: 2026-01-02\nx-kind: fix\nx-source: \"a: b\"\nx-base: abc123\n"))
+	m, err := parseMetadata([]byte("schema: docket\ncreated: 2026-01-02\nx-kind: fix\nx-source: \"a: b\"\nx-base: abc123\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -14,12 +14,12 @@ func TestParseMetadata(t *testing.T) {
 	if m != want {
 		t.Fatalf("got %+v, want %+v", m, want)
 	}
-	m, err = ParseMetadata([]byte("schema: docket\n"))
+	m, err = parseMetadata([]byte("schema: docket\n"))
 	if err != nil || m.Base != "" {
 		t.Fatalf("missing key: %+v, %v", m, err)
 	}
 	for _, bad := range []string{"schema: [\n", "- a\n- b\n", "", "null\n", "abc\n", "- a\n"} {
-		if _, err := ParseMetadata([]byte(bad)); err == nil {
+		if _, err := parseMetadata([]byte(bad)); err == nil {
 			t.Errorf("%q: want error", bad)
 		}
 	}
