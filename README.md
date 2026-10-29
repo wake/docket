@@ -34,7 +34,7 @@ Docket reads the files in the repository and the git history. It does four kinds
 | Assemble | `brief`, `accept --export` | Gathers pieces from several files into a brief for an implementing agent, or into a page a client can review |
 | Wrap | `init`, `new`, `archive`, `rebase` | Installs the schema, runs the OpenSpec CLI and the checks above in a fixed order, and records the base commit and the evidence |
 
-The commands that write files are `init` (the schema), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus `evidence.md`) and `rebase` (one line of `.openspec.yaml`). None of them commits.
+The commands that write files are `init` (the schema), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus `evidence.md`) and `rebase` (one line of `docket.yaml`). None of them commits.
 
 ## What Docket is not
 
@@ -92,7 +92,7 @@ We found no public project that uses a single list this way; most keep both file
 
 ```
 dkt init [--force]                # install the docket schema
-dkt new <slug> --kind feature|change-request|fix|baseline --source "<origin>"
+dkt new <slug> --kind feature|change-request|fix|baseline --source "<origin>" --title "<title>"
 dkt lint [<slug>...]              # document rules
 dkt conflicts [<slug>]            # requirements touched by more than one active change
 dkt sync <slug> [--check]         # tick plan.md from commit trailers
@@ -123,6 +123,10 @@ go install github.com/wake/docket/cmd/dkt@latest
 ```
 
 `dkt init` and `dkt new` need the OpenSpec CLI 1.14.x on `PATH`, or set `DOCKET_OPENSPEC` to the command to run.
+
+### Upgrading
+
+Changes made by an older dkt still work: their kind, source and base are read from `x-kind`, `x-source` and `x-base` in `.openspec.yaml`. `dkt lint` asks for a `docket.yaml` with a title for each of them, and each main spec needs a `docket.yaml` with its title too.
 
 ## Requirements (planned)
 

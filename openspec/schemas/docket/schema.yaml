@@ -217,7 +217,9 @@ artifacts:
       plan.md instead of that skill's default location. There is no tasks.md:
       plan.md is the only task list, and OpenSpec tracks its checkboxes.
 
-      Keep the writing-plans header and task structure, with these additions:
+      Keep the writing-plans header and task structure, except that the
+      heading is `# Implementation Plan`, since the change's title names the
+      work. Add:
       - Right after the header, a `## Reuse` table:
         `| Need | Existing (path:symbol) | Decision | Reason | Evidence |`,
         one row for every capability the plan needs. Decision is `reuse`,

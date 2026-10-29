@@ -13,7 +13,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/openspec` | Locates, version-checks and runs the OpenSpec CLI |
 | `internal/scan` | Finds changes across worktrees and branches; resolves the default branch |
 | `internal/setup` | Installs the schema (`dkt init`) |
-| `internal/change` | Change-folder rules: slug validation, `.openspec.yaml` metadata, plan steps and ticking |
+| `internal/change` | Change-folder rules: slug validation, `docket.yaml` metadata, plan steps and ticking |
 | `internal/archive` | Closes changes: `dkt sync`, `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, and `evidence.md` |
 | `internal/markdown` | Line, heading and table readers that skip code fences and comments |
 | `internal/delta` | Reads delta specs and main specs; makes scenario slugs |
@@ -33,7 +33,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Read a file from a scanned source | `scan.ReadFile` |
 | Start OpenSpec | `openspec.Runner.Run` (build with `openspec.New`) |
 | Validate a slug | `change.ValidateSlug` |
-| Record kind, source and base | `change.AppendMetadata` |
+| Record kind, source and base | `change.CreateDocket` |
 | Install the schema | `setup.Init` |
 | Check a path before writing to it | `safepath.Check` |
 | Read Markdown lines, headings and tables | `markdown.Lines`, `markdown.Headings`, `markdown.FindTable` |
@@ -42,8 +42,8 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Make a scenario slug | `delta.Slug` |
 | Read proposal.md or plan.md | `change.ParseProposal`, `change.ParsePlan` |
 | Lint change folders | `lint.Run` |
-| Read `.openspec.yaml` metadata | `change.ParseMetadata` |
-| Set the recorded base | `change.SetBase` |
+| Read change metadata (`docket.yaml`, or `.openspec.yaml` of an older change) | `change.ReadMetadata`, `change.ParseDocket` |
+| Set one recorded key, such as the base | `change.SetKey` |
 | Tick plan steps | `change.Tick` |
 | List commits between two revisions | `Git.Commits` |
 | List uncommitted paths | `Git.Uncommitted` |

@@ -34,7 +34,7 @@ Docket 讀 repo 裡的檔案和 git 紀錄，做四種工作：
 | 組裝 | `brief`、`accept --export` | 把散在多個檔案的內容拼成給實作 agent 的 brief，或拼成給客戶確認的頁面 |
 | 流程包裝 | `init`、`new`、`archive`、`rebase` | 安裝 schema，依固定順序呼叫 OpenSpec CLI 和上面的檢查，並記下 base commit 與證據 |
 
-會寫檔的指令有：`init`（schema）、`new`（change 資料夾）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 `evidence.md`）、`rebase`（`.openspec.yaml` 的一行）。它們都不會 commit。
+會寫檔的指令有：`init`（schema）、`new`（change 資料夾）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 `evidence.md`）、`rebase`（`docket.yaml` 的一行）。它們都不會 commit。
 
 ## Docket 不是什麼
 
@@ -92,7 +92,7 @@ Docket **不會**：
 
 ```
 dkt init [--force]                # 安裝 docket schema
-dkt new <slug> --kind feature|change-request|fix|baseline --source "<出處>"
+dkt new <slug> --kind feature|change-request|fix|baseline --source "<出處>" --title "<標題>"
 dkt lint [<slug>...]              # 文件規則
 dkt conflicts [<slug>]            # 被多個進行中 change 碰到的需求
 dkt sync <slug> [--check]         # 依 commit trailer 勾 plan.md
@@ -123,6 +123,10 @@ go install github.com/wake/docket/cmd/dkt@latest
 ```
 
 `dkt init` 和 `dkt new` 需要 OpenSpec CLI 1.14.x 在 `PATH` 上，或用 `DOCKET_OPENSPEC` 指定要執行的指令。
+
+### 升級
+
+舊版 dkt 建立的 change 仍可使用：它們的 kind、source、base 會從 `.openspec.yaml` 的 `x-kind`、`x-source`、`x-base` 讀取。`dkt lint` 會要求為每一個補上帶 title 的 `docket.yaml`，每份主 spec 也各需要一個帶 title 的 `docket.yaml`。
 
 ## 需求（規劃中）
 
