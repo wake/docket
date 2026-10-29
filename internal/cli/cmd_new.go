@@ -17,13 +17,14 @@ import (
 )
 
 func newCommand() Command {
-	var kind, source string
+	var kind, source, title string
 	return Command{
 		Name:  "new",
-		Usage: "new <slug> --kind <" + strings.Join(change.Kinds, "|") + "> --source <text>",
+		Usage: "new <slug> --kind <" + strings.Join(change.Kinds, "|") + "> --source <text> --title <text>",
 		Define: func(fs *flag.FlagSet) {
 			fs.StringVar(&kind, "kind", "", "kind of change: "+strings.Join(change.Kinds, ", "))
 			fs.StringVar(&source, "source", "", "where the request came from")
+			fs.StringVar(&title, "title", "", "one-line title of the change")
 		},
 		Run: func(c *Context, args []string) (Outcome, error) {
 			switch {
@@ -37,6 +38,8 @@ func newCommand() Command {
 				return Outcome{}, UsageError{Msg: fmt.Sprintf("unknown kind %q; use one of %s", kind, strings.Join(change.Kinds, ", "))}
 			case source == "":
 				return Outcome{}, UsageError{Msg: "new needs a non-empty --source"}
+			case !change.ValidTitle(title):
+				return Outcome{}, UsageError{Msg: "new needs --title: one line of text that is not blank"}
 			}
 			slug := args[0]
 			fail := func(rule, msg string) (Outcome, error) {
@@ -96,7 +99,7 @@ func newCommand() Command {
 			}
 			defer unlock()
 			dir := filepath.Join(c.Repo.Root, "openspec/changes", slug)
-			metaRel := "openspec/changes/" + slug + "/.openspec.yaml"
+			metaRel := "openspec/changes/" + slug + "/" + change.DocketFile
 			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
 				return refuse(fail, err)
 			}
@@ -131,10 +134,10 @@ func newCommand() Command {
 				// follow it out of the repository, so leave everything as is.
 				return refuse(fail, err)
 			}
-			if err := change.AppendMetadata(filepath.Join(dir, ".openspec.yaml"), kind, source, base); err != nil {
+			if err := change.CreateDocket(filepath.Join(dir, change.DocketFile), change.Docket{Title: title, Kind: kind, Source: source, Base: base}); err != nil {
 				return fail("metadata-failed", cleanup(err).Error())
 			}
-			res := change.NewResult{Slug: slug, Path: dir, Kind: kind, Source: source, Base: base}
+			res := change.NewResult{Slug: slug, Title: title, Path: dir, Kind: kind, Source: source, Base: base}
 			return Outcome{Result: res, Human: []string{"created " + dir}}, nil
 		},
 	}

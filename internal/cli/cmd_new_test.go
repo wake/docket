@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/testutil"
 )
 
@@ -75,7 +76,7 @@ func hasRule(t *testing.T, so, rule string) bool {
 
 func TestDatePrefixRejected(t *testing.T) {
 	r := cleanRepo(t)
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "2026-10-24-add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "2026-10-24-add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "slug-invalid") || !strings.Contains(so, "archiv") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -83,14 +84,14 @@ func TestDatePrefixRejected(t *testing.T) {
 
 func TestUppercaseRejected(t *testing.T) {
 	r := cleanRepo(t)
-	if code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "Add-X", "--kind", "feature", "--source", "x"); code != 1 || !hasRule(t, so, "slug-invalid") {
+	if code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "Add-X", "--kind", "feature", "--source", "x", "--title", "X"); code != 1 || !hasRule(t, so, "slug-invalid") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 }
 
 func TestJSONOnFailure(t *testing.T) {
 	r := cleanRepo(t)
-	code, so, _ := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "Bad_Slug", "--kind", "feature", "--source", "x")
+	code, so, _ := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "Bad_Slug", "--kind", "feature", "--source", "x", "--title", "X")
 	m := decode(t, so)
 	if code != 1 || m["ok"] != false || !hasRule(t, so, "slug-invalid") || !strings.Contains(so, "Bad_Slug") {
 		t.Fatalf("exit %d: %s", code, so)
@@ -113,10 +114,10 @@ func TestUsageError(t *testing.T) {
 func TestMissingSource(t *testing.T) {
 	r := cleanRepo(t)
 	for _, args := range [][]string{
-		{"add-x", "--kind", "feature"},
-		{"add-x", "--kind", "feature", "--source", ""},
-		{"add-x", "--source", "x"},
-		{"a", "b", "--kind", "feature", "--source", "x"},
+		{"add-x", "--kind", "feature", "--title", "X"},
+		{"add-x", "--kind", "feature", "--source", "", "--title", "X"},
+		{"add-x", "--source", "x", "--title", "X"},
+		{"a", "b", "--kind", "feature", "--source", "x", "--title", "X"},
 	} {
 		if code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, args...); code != 2 {
 			t.Errorf("%v: exit %d\n%s\n%s", args, code, so, se)
@@ -126,7 +127,7 @@ func TestMissingSource(t *testing.T) {
 
 func TestUnknownKind(t *testing.T) {
 	r := cleanRepo(t)
-	code, _, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "chore", "--source", "x")
+	code, _, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "chore", "--source", "x", "--title", "X")
 	if code != 2 {
 		t.Fatalf("exit %d", code)
 	}
@@ -141,7 +142,7 @@ func TestSlugActiveInAnotherWorktree(t *testing.T) {
 	r := cleanRepo(t)
 	b := r.AddWorktree(filepath.Join(t.TempDir(), "wt-b"), "b")
 	b.Write("openspec/changes/add-x/.openspec.yaml", "schema: docket\n")
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "slug-used") || !strings.Contains(so, b.Dir) {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -150,7 +151,7 @@ func TestSlugActiveInAnotherWorktree(t *testing.T) {
 
 func TestSlugArchived(t *testing.T) {
 	r := newRepo(t)
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !strings.Contains(so, "2025-01-02-add-x") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -163,7 +164,7 @@ func TestUnreadableWorktreeBlocksCreation(t *testing.T) {
 	if err := os.RemoveAll(b.Dir); err != nil {
 		t.Fatal(err)
 	}
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 3 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -178,7 +179,7 @@ func TestUnreadableSourceWithOtherFindings(t *testing.T) {
 	if err := os.RemoveAll(c.Dir); err != nil {
 		t.Fatal(err)
 	}
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 3 || !hasRule(t, so, "slug-used") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -193,30 +194,73 @@ func TestChangeCreated(t *testing.T) {
 	r := cleanRepo(t)
 	r.Git("checkout", "-q", "-b", "topic")
 	r.Commit("work", map[string]string{"y.txt": "y\n"})
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "issue 12")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "issue 12", "--title", "Booking waitlist")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
-	b, err := os.ReadFile(filepath.Join(r.Dir, "openspec/changes/add-x/.openspec.yaml"))
+	base := r.Git("merge-base", "HEAD", "main")
+	res := resultOf(t, so)
+	if res["slug"] != "add-x" || res["title"] != "Booking waitlist" || res["kind"] != "feature" || res["source"] != "issue 12" || res["base"] != base || res["path"] == "" {
+		t.Errorf("result = %v", res)
+	}
+}
+
+func TestNewWritesDocketYAML(t *testing.T) {
+	r := cleanRepo(t)
+	r.Git("checkout", "-q", "-b", "topic")
+	r.Commit("work", map[string]string{"y.txt": "y\n"})
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
+	code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "issue 12", "--title", "Booking waitlist")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	b, err := os.ReadFile(filepath.Join(r.Dir, "openspec/changes/add-x/docket.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	base := r.Git("merge-base", "HEAD", "main")
-	for _, want := range []string{"schema: docket\n", "created: ", "x-kind: feature\n", "x-source: issue 12\n", "x-base: " + base + "\n"} {
-		if !strings.Contains(string(b), want) {
-			t.Errorf("missing %q in\n%s", want, b)
-		}
+	d, err := change.ParseDocket(b)
+	want := change.Docket{Title: "Booking waitlist", Kind: "feature", Source: "issue 12", Base: r.Git("merge-base", "HEAD", "main")}
+	if err != nil || d != want {
+		t.Errorf("docket = %+v (%v), want %+v", d, err, want)
 	}
-	res := resultOf(t, so)
-	if res["slug"] != "add-x" || res["kind"] != "feature" || res["source"] != "issue 12" || res["base"] != base || res["path"] == "" {
-		t.Errorf("result = %v", res)
+	m, err := os.ReadFile(filepath.Join(r.Dir, "openspec/changes/add-x/.openspec.yaml"))
+	if err != nil || string(m) != "schema: docket\ncreated: 2026-01-02\n" {
+		t.Errorf(".openspec.yaml = %q (%v)", m, err)
+	}
+	if resultOf(t, so)["title"] != "Booking waitlist" {
+		t.Errorf("result = %s", so)
+	}
+}
+
+func TestNewMissingTitle(t *testing.T) {
+	r := cleanRepo(t)
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x")
+	if code != 2 || !hasRule(t, so, "usage") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	noChange(t, r.Dir)
+	b, _ := os.ReadFile(log)
+	if strings.Contains(string(b), "new") {
+		t.Errorf("openspec new was run: %q", b)
+	}
+}
+
+func TestNewBlankTitle(t *testing.T) {
+	r := cleanRepo(t)
+	for _, title := range []string{"   ", "a\nb", "a\rb"} {
+		code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", title)
+		if code != 2 || !hasRule(t, so, "usage") {
+			t.Errorf("%q: exit %d\n%s\n%s", title, code, so, se)
+		}
+		noChange(t, r.Dir)
 	}
 }
 
 func TestSchemaNotInstalled(t *testing.T) {
 	r := committedRepo(t)
 	r.Git("branch", "-M", "main")
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !strings.Contains(so, "dkt init") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -226,7 +270,7 @@ func TestSchemaNotInstalled(t *testing.T) {
 func TestUnsupportedVersion(t *testing.T) {
 	r := cleanRepo(t)
 	cmd, _ := testutil.FakeOpenSpec(t, "1.3.0")
-	code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 4 || !strings.Contains(se, "1.3.0") || !strings.Contains(se, "1.14.x") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -236,17 +280,20 @@ func TestUnsupportedVersion(t *testing.T) {
 func TestOpenSpecCommandFails(t *testing.T) {
 	r := cleanRepo(t)
 	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
-	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=new"}, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=new"}, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "openspec-failed") || !strings.Contains(so, "exited with 3") || !strings.Contains(so, "fake failure") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 	noChange(t, r.Dir)
+	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/changes/add-x/docket.yaml")); err == nil {
+		t.Error("docket.yaml exists")
+	}
 }
 
-func TestMetadataFailureRollsBack(t *testing.T) {
+func TestNewDocketYAMLFails(t *testing.T) {
 	r := cleanRepo(t)
 	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
-	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_BAD_YAML=1"}, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_DOCKET_YAML=1"}, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "metadata-failed") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -255,7 +302,7 @@ func TestMetadataFailureRollsBack(t *testing.T) {
 
 func TestNewUnbornRepository(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "no-commits") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -266,7 +313,7 @@ func TestNoMergeBase(t *testing.T) {
 	r.Git("checkout", "-q", "--orphan", "lone")
 	testutil.InstallSchema(t, r.Dir)
 	r.Commit("lone", nil)
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "no-merge-base") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -282,7 +329,7 @@ func TestNewInPathWithSpaces(t *testing.T) {
 	r.Git("checkout", "-q", "-b", "main")
 	testutil.InstallSchema(t, r.Dir)
 	r.Commit("init", nil)
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "fix", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "fix", "--source", "x", "--title", "X")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -296,7 +343,7 @@ func TestReservedNameRejected(t *testing.T) {
 		"README.md": "x\n",
 		"openspec/changes/archive/2026-01-01-old/proposal.md": "old\n",
 	})
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "archive", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "archive", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "slug-invalid") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -316,7 +363,7 @@ func TestSymlinkedChangesFolderRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
-	code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "symlink-refused") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -338,7 +385,7 @@ func TestLinkMadeDuringOpenSpecIsNotFollowedByCleanup(t *testing.T) {
 	r := cleanRepo(t)
 	outside := t.TempDir()
 	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
-	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_LINK_CHANGES=" + outside}, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_LINK_CHANGES=" + outside}, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "symlink-refused") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -352,7 +399,7 @@ func TestLinkMadeByFailingOpenSpecIsNotFollowedByCleanup(t *testing.T) {
 	outside := t.TempDir()
 	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
 	env := []string{"FAKE_OPENSPEC_LINK_CHANGES=" + outside, "FAKE_OPENSPEC_FAIL=new"}
-	code, so, se := runNew(t, r.Dir, cmd, env, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, cmd, env, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "openspec-failed") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -381,7 +428,7 @@ func TestConcurrentRunsKeepTheFirst(t *testing.T) {
 	}
 	done := make(chan result)
 	go func() {
-		code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x")
+		code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 		done <- result{code, so, se}
 	}()
 	// The version probe is logged just before the command waits for the lock.
@@ -432,7 +479,7 @@ func TestOpenSpecFailureReportsCleanupFailure(t *testing.T) {
 			return nil
 		})
 	})
-	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=new", "FAKE_OPENSPEC_LOCK_CHILD=1"}, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=new", "FAKE_OPENSPEC_LOCK_CHILD=1"}, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 1 || !hasRule(t, so, "openspec-failed") || !strings.Contains(so, "fake failure") || !strings.Contains(so, "permission denied") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -441,7 +488,7 @@ func TestOpenSpecFailureReportsCleanupFailure(t *testing.T) {
 func TestNewVersionCommandFails(t *testing.T) {
 	r := cleanRepo(t)
 	cmd, _ := testutil.FakeOpenSpec(t, "1.14.3")
-	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=--version"}, "add-x", "--kind", "feature", "--source", "x")
+	code, so, se := runNew(t, r.Dir, cmd, []string{"FAKE_OPENSPEC_FAIL=--version"}, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 4 || !strings.Contains(se, "DOCKET_OPENSPEC") || !strings.Contains(se, "fake failure") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
