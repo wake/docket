@@ -33,31 +33,44 @@ func initCommand() Command {
 				_, err = r.Run("init", "--tools", "none")
 				return err
 			}
-			res, err := setup.Init(c.Repo.Root, docket.Schema(), force, initOpenSpec)
-			if err != nil {
-				var sl *safepath.SymlinkError
-				if errors.As(err, &sl) {
-					return Outcome{Result: res, Findings: []Finding{{Rule: "symlink-refused", Message: sl.Error(), File: sl.Path}}}, nil
+			res, err := setup.Init(c.Repo.Root, setup.Assets{Schema: docket.Schema(), Skill: docket.Skill(), Block: docket.Block()}, force, initOpenSpec)
+			var ref *setup.Refused
+			if errors.As(err, &ref) {
+				out := Outcome{Result: res}
+				for _, p := range ref.Problems {
+					var sl *safepath.SymlinkError
+					switch {
+					case p.Kind == setup.ProblemSymlink && errors.As(p.Err, &sl):
+						out.Findings = append(out.Findings, Finding{Rule: "symlink-refused", Message: sl.Error(), File: sl.Path})
+					case p.Kind == setup.ProblemMalformed:
+						out.Findings = append(out.Findings, Finding{Rule: "agents-block-malformed", Message: p.Err.Error(), File: p.Path})
+					default:
+						out.Unreadable = append(out.Unreadable, Unreadable{Source: p.Path, Reason: p.Err.Error()})
+					}
 				}
+				return out, nil
+			}
+			if err != nil {
 				var fe *openspec.FailedError
 				if errors.As(err, &fe) {
 					return Outcome{Result: res, Findings: []Finding{{Rule: "openspec-failed", Message: fe.Error()}}}, nil
 				}
 				return Outcome{Result: res}, envOrErr(err)
 			}
-			res.AgentsSection = docket.AgentsSection()
 			out := Outcome{Result: res}
 			for _, f := range res.Files {
 				out.Human = append(out.Human, fmt.Sprintf("%-11s %s", f.Status, f.Path))
 				if f.Status == setup.Differs {
-					out.Findings = append(out.Findings, Finding{
-						Rule:    "schema-differs",
-						Message: "differs from the shipped schema; use --force to overwrite",
-						File:    f.Path,
-					})
+					rule, msg := "schema-differs", "differs from the shipped schema; use --force to overwrite"
+					switch f.Kind {
+					case setup.KindSkill:
+						rule, msg = "skill-differs", "differs from the shipped skill; use --force to overwrite"
+					case setup.KindBlock:
+						rule, msg = "agents-block-differs", "the Docket block differs from the shipped one; use --force to replace it"
+					}
+					out.Findings = append(out.Findings, Finding{Rule: rule, Message: msg, File: f.Path})
 				}
 			}
-			out.Human = append(out.Human, "", "Add this section to AGENTS.md:", "", res.AgentsSection)
 			return out, nil
 		},
 	}
