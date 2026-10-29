@@ -1,7 +1,9 @@
 package setup
 
 import (
+	"errors"
 	"os"
+	"syscall"
 	"path/filepath"
 	"testing"
 )
@@ -9,12 +11,14 @@ import (
 const oldBlock = "<!-- docket:start -->\nold\n<!-- docket:end -->\n"
 
 func TestRewriteKeepsModeAndLeavesNoTemporaryFile(t *testing.T) {
+	old := syscall.Umask(0o022)
+	t.Cleanup(func() { syscall.Umask(old) })
 	root := t.TempDir()
 	p := filepath.Join(root, "AGENTS.md")
-	if err := os.WriteFile(p, []byte(oldBlock), 0o600); err != nil {
+	if err := os.WriteFile(p, []byte(oldBlock), 0o664); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chmod(p, 0o600); err != nil {
+	if err := os.Chmod(p, 0o664); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Init(root, assets, true, openspecDir(t, root)); err != nil {
@@ -24,7 +28,7 @@ func TestRewriteKeepsModeAndLeavesNoTemporaryFile(t *testing.T) {
 	if string(b) != assets.Block+"\n" {
 		t.Errorf("AGENTS.md = %q", b)
 	}
-	if i, err := os.Stat(p); err != nil || i.Mode().Perm() != 0o600 {
+	if i, err := os.Stat(p); err != nil || i.Mode().Perm() != 0o664 {
 		t.Errorf("mode %v err %v", i.Mode(), err)
 	}
 	ents, _ := os.ReadDir(root)
@@ -73,5 +77,25 @@ func TestFailedRewriteKeepsTheFile(t *testing.T) {
 		default:
 			t.Errorf("stray file %s", e.Name())
 		}
+	}
+}
+
+func TestFailedRenameRemovesTheTemporaryFile(t *testing.T) {
+	old := rename
+	rename = func(string, string) error { return errors.New("rename refused") }
+	t.Cleanup(func() { rename = old })
+	root := t.TempDir()
+	p := filepath.Join(root, "AGENTS.md")
+	if err := os.WriteFile(p, []byte(oldBlock), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Init(root, assets, true, openspecDir(t, root)); err == nil {
+		t.Fatal("Init succeeded although rename failed")
+	}
+	if b, _ := os.ReadFile(p); string(b) != oldBlock {
+		t.Errorf("AGENTS.md = %q", b)
+	}
+	if m, _ := filepath.Glob(filepath.Join(root, "*.docket-tmp-*")); len(m) != 0 {
+		t.Errorf("temporary files left: %v", m)
 	}
 }

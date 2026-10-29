@@ -278,6 +278,9 @@ func write(root string, d decided) error {
 	return nil
 }
 
+// rename is os.Rename; tests replace it to make the last step fail.
+var rename = os.Rename
+
 // replace rewrites the existing file dst through a temporary file beside it,
 // so a failed write leaves the old file whole. The new file keeps the old
 // permission bits.
@@ -307,7 +310,7 @@ func replace(dst string, data []byte, rel string) (err error) {
 		err = cerr
 	}
 	if err == nil {
-		err = os.Rename(tmp, dst)
+		err = rename(tmp, dst)
 	}
 	if err != nil {
 		return fail(err)
