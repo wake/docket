@@ -118,7 +118,7 @@ git commit -F <message with Change: add-framework-skill / Task: 1>
 - Modify: `schema.go` (structural: `Block()` calls `setup.FindBlock`)
 
 **Interfaces:**
-- Produces: `FindBlock(b []byte) (from, to int, found bool, err error)`: `b[from:to]` is the block as defined in Global Constraints; `found` is false with a nil error when there is no marker; `err` is `errMalformed` otherwise. `placeBlock(cur []byte, exists bool, block string, force bool) (next []byte, status FileStatus, err error)`, built on `FindBlock`: `next` is nil when nothing is to be written. `errMalformed` (an `error` whose message says which case: no end marker, end marker first, more than one block). `importsAgents(b []byte) bool`.
+- Produces: `FindBlock(b []byte) (from, to int, found bool, err error)`: `b[from:to]` is the block as defined in Global Constraints; `found` is false with a nil error when there is no marker; `err` is `errMalformed` otherwise. `placeBlock(cur []byte, block string, force bool) (next []byte, status FileStatus, err error)`, built on `FindBlock`: a missing file is passed as nil `cur`; `next` is nil when nothing is to be written. `errMalformed` (an `error` whose message says which case: no end marker, end marker first, more than one block). `importsAgents(b []byte) bool`.
 
 - [ ] **Step 1: Write the failing tests**
 
