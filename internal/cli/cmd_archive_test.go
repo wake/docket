@@ -281,11 +281,12 @@ func TestArchiveWithOpenSpec(t *testing.T) {
 	for i, slug := range []string{"add-x", "add-y"} {
 		then := []string{"it is cancelled at once", "it is cancelled late"}[i]
 		r.Commit("add "+slug, map[string]string{
-			"openspec/changes/" + slug + "/.openspec.yaml":        "schema: docket\nx-base: " + base + "\n",
-			"openspec/changes/" + slug + "/proposal.md":           strings.Replace(lintProposal, "`x`", "`booking`", 1),
-			"openspec/changes/" + slug + "/docket.yaml":           "title: " + slug + "\n",
-			"openspec/changes/" + slug + "/specs/booking/spec.md": realDelta(then),
-			"openspec/changes/" + slug + "/plan.md":               plan,
+			"openspec/changes/" + slug + "/.openspec.yaml":            "schema: docket\n",
+			"openspec/changes/" + slug + "/proposal.md":               strings.Replace(lintProposal, "`x`", "`booking`", 1),
+			"openspec/changes/" + slug + "/docket.yaml":               "title: " + slug + "\nkind: feature\nsource: x\nbase: " + base + "\n",
+			"openspec/changes/" + slug + "/specs/booking/spec.md":     realDelta(then),
+			"openspec/changes/" + slug + "/specs/booking/docket.yaml": "title: Booking\n",
+			"openspec/changes/" + slug + "/plan.md":                   plan,
 		})
 		r.Commit("work\n\nChange: "+slug+"\nTask: 1", map[string]string{slug + ".txt": "a\n"})
 	}
@@ -310,6 +311,9 @@ func TestArchiveWithOpenSpec(t *testing.T) {
 	spec, _ := os.ReadFile(filepath.Join(r.Dir, "openspec/specs/booking/spec.md"))
 	if !strings.Contains(string(spec), "it is cancelled at once") {
 		t.Fatalf("specs not merged:\n%s", spec)
+	}
+	if title, _ := os.ReadFile(filepath.Join(r.Dir, "openspec/specs/booking/docket.yaml")); string(title) != "title: Booking\n" {
+		t.Fatalf("spec title = %q", title)
 	}
 	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/changes/add-y/plan.md")); err != nil {
 		t.Fatalf("add-y touched: %v", err)
