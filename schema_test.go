@@ -2,6 +2,8 @@ package docket
 
 import (
 	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -80,5 +82,29 @@ func TestPlanTemplateReviewLine(t *testing.T) {
 	}
 	if !strings.Contains(string(b), "**Review:** <checks|judgment>") {
 		t.Error("plan template lacks the **Review:** line")
+	}
+}
+
+func TestInstalledSkillMatchesShipped(t *testing.T) {
+	err := fs.WalkDir(Skill(), ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		want, err := fs.ReadFile(Skill(), p)
+		if err != nil {
+			return err
+		}
+		got, err := os.ReadFile(filepath.Join(".claude", "skills", "docket", filepath.FromSlash(p)))
+		if err != nil {
+			t.Errorf("%s: %v", p, err)
+			return nil
+		}
+		if string(got) != string(want) {
+			t.Errorf("%s differs from the shipped copy", p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
