@@ -43,9 +43,9 @@ func rebaseCommand() Command {
 				return out, nil
 			}
 			if rep.Moved {
-				out.Human = append(out.Human, fmt.Sprintf("x-base: %s -> %s", shortBase(rep.From), shortBase(rep.To)))
+				out.Human = append(out.Human, fmt.Sprintf("base: %s -> %s", shortBase(rep.From), shortBase(rep.To)))
 			} else {
-				out.Human = append(out.Human, "x-base is already "+shortBase(rep.To))
+				out.Human = append(out.Human, "base is already "+shortBase(rep.To))
 			}
 			for _, d := range rep.Changed {
 				out.Human = append(out.Human, fmt.Sprintf("changed since the old base: %s / %s", d.Capability, d.Requirement))

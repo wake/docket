@@ -275,7 +275,7 @@ func planFindings(c *loadedChange, res syncResult) []Finding {
 	}
 	if !res.AnyTrailer {
 		finds = append(finds, Finding{Rule: "no-task-commits", Change: c.Slug, File: file,
-			Message: "no commit since x-base carries Change: " + c.Slug + " with a Task: trailer; was the pull request squashed?"})
+			Message: "no commit since the base carries Change: " + c.Slug + " with a Task: trailer; was the pull request squashed?"})
 	}
 	return finds
 }

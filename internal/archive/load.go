@@ -24,6 +24,14 @@ type loadedChange struct {
 	Deltas    map[string]delta.Delta
 }
 
+// baseKey is the key that holds the base in the file m was read from.
+func baseKey(m change.Metadata) string {
+	if m.File == change.OpenSpecFile {
+		return "x-base"
+	}
+	return "base"
+}
+
 func (c *loadedChange) path(name string) string { return path.Join(c.Dir, name) }
 
 // headOrNoCommits returns the commit HEAD names. When the repository has no
@@ -54,7 +62,7 @@ func loadAtHead(e Env, slug string, o loadOpts) (head string, c *loadedChange, f
 }
 
 // loadOpts says what loadChange reads beyond the metadata: Plan reads
-// plan.md, BaseIsCommit requires x-base to name a commit, Deltas reads the
+// plan.md, BaseIsCommit requires the base to name a commit, Deltas reads the
 // delta specs.
 type loadOpts struct{ Plan, BaseIsCommit, Deltas bool }
 
@@ -97,19 +105,24 @@ func loadChange(e Env, slug string, o loadOpts) (*loadedChange, []Finding, []Unr
 	rfs := root.FS()
 	c := &loadedChange{Slug: slug, Dir: dir, Deltas: map[string]delta.Delta{}}
 
-	b, err := fs.ReadFile(rfs, c.path(".openspec.yaml"))
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		add("metadata-invalid", ".openspec.yaml", ".openspec.yaml is missing")
-	case err != nil:
-		unread = append(unread, Unreadable{Source: c.path(".openspec.yaml"), Reason: err.Error()})
-	default:
-		m, perr := change.ParseMetadata(b)
+	files := map[string][]byte{}
+	for _, name := range []string{change.DocketFile, change.OpenSpecFile} {
+		b, rerr := fs.ReadFile(rfs, c.path(name))
 		switch {
-		case perr != nil:
-			add("metadata-invalid", ".openspec.yaml", ".openspec.yaml is not valid YAML: %v", perr)
+		case errors.Is(rerr, fs.ErrNotExist):
+		case rerr != nil:
+			unread = append(unread, Unreadable{Source: c.path(name), Reason: rerr.Error()})
+		default:
+			files[name] = b
+		}
+	}
+	if len(unread) == 0 {
+		m, merr := change.ReadMetadata(files)
+		switch {
+		case merr != nil:
+			add("metadata-invalid", m.File, "%v", merr)
 		case m.Base == "":
-			add("metadata-invalid", ".openspec.yaml", ".openspec.yaml has no x-base")
+			add("metadata-invalid", m.File, "%s has no %s", m.File, baseKey(m))
 		default:
 			c.Meta = m
 			if o.BaseIsCommit {
@@ -121,7 +134,7 @@ func loadChange(e Env, slug string, o loadOpts) (*loadedChange, []Finding, []Unr
 					}
 				}
 				if !ok {
-					add("base-missing", ".openspec.yaml", "x-base %q is not a commit in this repository", m.Base)
+					add("base-missing", m.File, "the base %q in %s is not a commit in this repository", m.Base, m.File)
 				}
 			}
 		}

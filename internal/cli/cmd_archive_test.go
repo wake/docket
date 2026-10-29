@@ -35,9 +35,9 @@ func archiveFixture(t *testing.T) *testutil.Repo {
 	r.Commit("code", map[string]string{"internal/x.go": "package x\n", "openspec/config.yaml": "schema: docket\n"})
 	base := r.Git("rev-parse", "HEAD")
 	r.Commit("add the change", map[string]string{
-		"openspec/changes/add-x/.openspec.yaml":      "schema: docket\nx-base: " + base + "\n",
+		"openspec/changes/add-x/.openspec.yaml":      "schema: docket\n",
 		"openspec/changes/add-x/proposal.md":         lintProposal,
-		"openspec/changes/add-x/docket.yaml":         "title: X\n",
+		"openspec/changes/add-x/docket.yaml":         "title: X\nkind: feature\nsource: test\nbase: " + base + "\n",
 		"openspec/changes/add-x/specs/x/docket.yaml": "title: X\n",
 		"openspec/changes/add-x/specs/x/spec.md":     archiveDelta,
 		"openspec/changes/add-x/plan.md":             archivePlan,
@@ -155,7 +155,7 @@ func TestArchiveHumanDriftAndReadings(t *testing.T) {
 		Readings: &archive.Readings{Docket: []string{"a", "b"}, OpenSpec: nil},
 	}
 	got := archiveHuman(rep)
-	want := []string{"x / Do x at x-base:", "  (absent)", "now:", "  line1", "  line2",
+	want := []string{"x / Do x at the base:", "  (absent)", "now:", "  line1", "  line2",
 		"docket:", "  a", "  b", "openspec:", "  (absent)"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %q\nwant %q", got, want)
@@ -210,9 +210,9 @@ func TestArchiveKeepsItsReportOnAnInfrastructureError(t *testing.T) {
 	r := archiveFixture(t)
 	base := r.Git("rev-parse", "HEAD~2")
 	r.Commit("add the second change", map[string]string{
-		"openspec/changes/add-y/.openspec.yaml":      "schema: docket\nx-base: " + base + "\n",
+		"openspec/changes/add-y/.openspec.yaml":      "schema: docket\n",
 		"openspec/changes/add-y/proposal.md":         lintProposal,
-		"openspec/changes/add-y/docket.yaml":         "title: Y\n",
+		"openspec/changes/add-y/docket.yaml":         "title: Y\nkind: feature\nsource: test\nbase: " + base + "\n",
 		"openspec/changes/add-y/specs/x/docket.yaml": "title: Y\n",
 		"openspec/changes/add-y/specs/x/spec.md":     archiveDelta,
 		"openspec/changes/add-y/plan.md":             archivePlan,

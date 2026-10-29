@@ -9,7 +9,7 @@ import (
 	"github.com/wake/docket/internal/change"
 )
 
-// RebaseReport is the outcome of Rebase. From is the old x-base and To the
+// RebaseReport is the outcome of Rebase. From is the old base and To the
 // new one; when nothing moves both are the current base.
 type RebaseReport struct {
 	Change     string
@@ -20,7 +20,7 @@ type RebaseReport struct {
 	Unreadable []Unreadable
 }
 
-// Rebase moves x-base of a change to the merge base of HEAD and the default
+// Rebase moves the base of a change to the merge base of HEAD and the default
 // branch and lists every requirement the change touches whose block differs
 // between the old and the new base. The error is for failures not tied to
 // the change.
@@ -72,7 +72,7 @@ func Rebase(e Env, slug string) (RebaseReport, error) {
 		}
 	}
 
-	metaRel := c.path(".openspec.yaml")
+	metaRel := c.path(c.Meta.File)
 	root, err := os.OpenRoot(e.Root)
 	if err != nil {
 		return rep, err
@@ -82,7 +82,7 @@ func Rebase(e Env, slug string) (RebaseReport, error) {
 	if err != nil {
 		return rep, err
 	}
-	out, err := change.SetKey(b, "x-base", nb)
+	out, err := change.SetKey(b, baseKey(c.Meta), nb)
 	if err != nil {
 		return rep, err
 	}
