@@ -201,9 +201,6 @@ func TestRoutingSectionPrinted(t *testing.T) {
 			t.Errorf("%s changed", f)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(r.Dir, ".claude")); err == nil {
-		t.Error(".claude created")
-	}
 	_, so, _ = runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
 	if got := resultOf(t, so)["agents_section"]; got != docket.AgentsSection() {
 		t.Errorf("agents_section = %v", got)
@@ -392,16 +389,179 @@ func TestSymlinkedOpenSpecRefused(t *testing.T) {
 }
 
 func TestPartialFailureKeepsResult(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores file modes")
+	}
 	r := committedRepo(t)
 	r.Write("openspec/config.yaml", "schema: x\n")
-	// A regular file where a schema directory belongs fails the writes below
-	// it; the result of the files before it must still be reported.
-	r.Write(schemaDir+"templates", "not a directory\n")
-	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
-	if code == 0 {
-		t.Fatalf("exit 0\n%s\n%s", so, se)
+	// An empty, read-only skill directory passes the checks and fails its
+	// write; the files written before it must still be reported.
+	dir := filepath.Join(r.Dir, ".agents/skills/docket")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	if _, ok := decode(t, so)["result"].(map[string]any); !ok {
-		t.Errorf("result missing on partial failure: %s", so)
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, 0o755) })
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	files, _ := resultOf(t, so)["files"].([]any)
+	if len(files) < 2 {
+		t.Errorf("files missing on partial failure: %s", so)
+	}
+	if err := os.Chmod(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json"); code != 0 {
+		t.Fatalf("rerun exit %d\n%s\n%s", code, so, se)
+	}
+}
+
+const skillRels = ".claude/skills/docket/SKILL.md .agents/skills/docket/SKILL.md"
+
+func TestFreshRepositoryGetsTheSkill(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	want, err := fs.ReadFile(docket.Skill(), "SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range strings.Fields(skillRels) {
+		got, err := os.ReadFile(filepath.Join(r.Dir, rel))
+		if err != nil || !bytes.Equal(got, want) {
+			t.Errorf("%s differs (err %v)", rel, err)
+		}
+	}
+}
+
+func TestEditedSkillFile(t *testing.T) {
+	r := committedRepo(t)
+	cmd := testutil.OpenSpecCmd(t)
+	if code, so, se := runInit(t, r.Dir, cmd); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	const rel = ".agents/skills/docket/SKILL.md"
+	p := filepath.Join(r.Dir, rel)
+	if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, so, _ := runInit(t, r.Dir, cmd, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+	fnds, _ := decode(t, so)["findings"].([]any)
+	if len(fnds) != 1 {
+		t.Fatalf("findings: %s", so)
+	}
+	if f := fnds[0].(map[string]any); f["rule"] != "skill-differs" || f["file"] != rel {
+		t.Errorf("finding: %v", f)
+	}
+	if b, _ := os.ReadFile(p); string(b) != "mine\n" {
+		t.Error("file changed")
+	}
+	code, so, _ = runInit(t, r.Dir, cmd, "--force", "--json")
+	if code != 0 {
+		t.Fatalf("force exit %d\n%s", code, so)
+	}
+	found := false
+	for _, f := range resultOf(t, so)["files"].([]any) {
+		m := f.(map[string]any)
+		if m["path"] == rel {
+			found = m["status"] == "overwritten"
+		}
+	}
+	if !found {
+		t.Errorf("not overwritten: %s", so)
+	}
+}
+
+func TestSymlinkedSkillDirectoryRefused(t *testing.T) {
+	r := committedRepo(t)
+	outside := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(r.Dir, ".claude/skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(r.Dir, ".claude/skills/docket")); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, r.Dir)
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--force", "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	fnds, _ := decode(t, so)["findings"].([]any)
+	if len(fnds) != 1 {
+		t.Fatalf("findings: %s", so)
+	}
+	if f := fnds[0].(map[string]any); f["rule"] != "symlink-refused" || f["file"] != ".claude/skills/docket" {
+		t.Errorf("finding: %v", f)
+	}
+	sameSnapshot(t, before, snapshot(t, r.Dir))
+	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
+		t.Errorf("outside directory written: %v", ents)
+	}
+}
+
+func TestUnreadableSkillFile(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores file modes")
+	}
+	r := committedRepo(t)
+	r.Write(".agents/skills/docket/SKILL.md", "x\n")
+	p := filepath.Join(r.Dir, ".agents/skills/docket/SKILL.md")
+	if err := os.Chmod(p, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(p, 0o644) })
+	before := snapshot(t, r.Dir)
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 3 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	un, _ := decode(t, so)["unreadable"].([]any)
+	if len(un) != 1 || un[0].(map[string]any)["source"] != ".agents/skills/docket/SKILL.md" {
+		t.Errorf("unreadable: %s", so)
+	}
+	sameSnapshot(t, before, snapshot(t, r.Dir))
+}
+
+func TestLinkAndUnreadableTogether(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores file modes")
+	}
+	r := committedRepo(t)
+	r.Write("openspec/config.yaml", "schema: x\n")
+	r.Write(schemaDir+"schema.yaml", "x\n")
+	bad := filepath.Join(r.Dir, schemaDir, "schema.yaml")
+	if err := os.Chmod(bad, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(bad, 0o644) })
+	outside := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(r.Dir, ".claude/skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(r.Dir, ".claude/skills/docket")); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, r.Dir)
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 3 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	env := decode(t, so)
+	fnds, _ := env["findings"].([]any)
+	un, _ := env["unreadable"].([]any)
+	if len(fnds) != 1 || fnds[0].(map[string]any)["rule"] != "symlink-refused" || len(un) != 1 {
+		t.Errorf("envelope: %s", so)
+	}
+	sameSnapshot(t, before, snapshot(t, r.Dir))
+	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
+		t.Errorf("outside written")
 	}
 }

@@ -33,12 +33,21 @@ func initCommand() Command {
 				_, err = r.Run("init", "--tools", "none")
 				return err
 			}
-			res, err := setup.Init(c.Repo.Root, docket.Schema(), force, initOpenSpec)
-			if err != nil {
-				var sl *safepath.SymlinkError
-				if errors.As(err, &sl) {
-					return Outcome{Result: res, Findings: []Finding{{Rule: "symlink-refused", Message: sl.Error(), File: sl.Path}}}, nil
+			res, err := setup.Init(c.Repo.Root, setup.Assets{Schema: docket.Schema(), Skill: docket.Skill()}, force, initOpenSpec)
+			var ref *setup.Refused
+			if errors.As(err, &ref) {
+				out := Outcome{Result: res}
+				for _, p := range ref.Problems {
+					var sl *safepath.SymlinkError
+					if p.Kind == setup.ProblemSymlink && errors.As(p.Err, &sl) {
+						out.Findings = append(out.Findings, Finding{Rule: "symlink-refused", Message: sl.Error(), File: sl.Path})
+					} else {
+						out.Unreadable = append(out.Unreadable, Unreadable{Source: p.Path, Reason: p.Err.Error()})
+					}
 				}
+				return out, nil
+			}
+			if err != nil {
 				var fe *openspec.FailedError
 				if errors.As(err, &fe) {
 					return Outcome{Result: res, Findings: []Finding{{Rule: "openspec-failed", Message: fe.Error()}}}, nil
@@ -50,9 +59,13 @@ func initCommand() Command {
 			for _, f := range res.Files {
 				out.Human = append(out.Human, fmt.Sprintf("%-11s %s", f.Status, f.Path))
 				if f.Status == setup.Differs {
+					rule, what := "schema-differs", "schema"
+					if f.Kind == setup.KindSkill {
+						rule, what = "skill-differs", "skill"
+					}
 					out.Findings = append(out.Findings, Finding{
-						Rule:    "schema-differs",
-						Message: "differs from the shipped schema; use --force to overwrite",
+						Rule:    rule,
+						Message: "differs from the shipped " + what + "; use --force to overwrite",
 						File:    f.Path,
 					})
 				}

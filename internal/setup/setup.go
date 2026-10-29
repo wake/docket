@@ -1,4 +1,4 @@
-// Package setup installs the docket schema into a repository.
+// Package setup installs the docket schema and skill into a repository.
 package setup
 
 import (
@@ -15,7 +15,7 @@ import (
 	"github.com/wake/docket/internal/safepath"
 )
 
-// FileStatus says what init did with one schema file.
+// FileStatus says what init did with one installed file.
 type FileStatus string
 
 const (
@@ -25,10 +25,20 @@ const (
 	Overwritten FileStatus = "overwritten"
 )
 
-// File is one schema file; Path is relative to the repository root.
+// FileKind says which part of the installation a file belongs to.
+type FileKind string
+
+const (
+	KindSchema FileKind = "schema"
+	KindSkill  FileKind = "skill"
+)
+
+// File is one installed file; Path is relative to the repository root. Kind
+// is for callers and is not part of the JSON output.
 type File struct {
 	Path   string     `json:"path"`
 	Status FileStatus `json:"status"`
+	Kind   FileKind   `json:"-"`
 }
 
 // Result is what Init reports.
@@ -38,16 +48,83 @@ type Result struct {
 	AgentsSection       string `json:"agents_section"`
 }
 
+// Assets are the files Init installs.
+type Assets struct {
+	Schema fs.FS // installed under schemaDir
+	Skill  fs.FS // installed under each of skillDirs
+}
+
+// ProblemKind says why a path stopped Init.
+type ProblemKind string
+
+const (
+	ProblemSymlink    ProblemKind = "symlink"
+	ProblemUnreadable ProblemKind = "unreadable"
+)
+
+// Problem is one path that failed a check.
+type Problem struct {
+	Path string // relative to the repository root
+	Kind ProblemKind
+	Err  error
+}
+
+// Refused is returned when a check failed; nothing was written.
+type Refused struct{ Problems []Problem }
+
+func (r *Refused) Error() string {
+	msg := "init refused:"
+	for _, p := range r.Problems {
+		msg += fmt.Sprintf(" %s: %v;", p.Path, p.Err)
+	}
+	return msg
+}
+
 // schemaDir is where the schema lives, relative to the repository root.
 const schemaDir = "openspec/schemas/docket"
 
-// Init writes the files of schema under <root>/openspec/schemas/docket. When
-// <root>/openspec does not exist it first calls initOpenSpec. A differing file
-// is left alone (Differs) unless force is set (Overwritten).
-func Init(root string, schema fs.FS, force bool, initOpenSpec func() error) (Result, error) {
+// skillDirs are the directories that receive the skill.
+var skillDirs = []string{".claude/skills/docket", ".agents/skills/docket"}
+
+// target is one file Init installs.
+type target struct {
+	rel  string
+	want []byte
+	kind FileKind
+}
+
+// decided is a target with the status the check phase gave it.
+type decided struct {
+	target
+	status FileStatus
+}
+
+// Init installs the schema and the skill under root. It first decides the
+// status of every file and checks every path; only when all checks pass does
+// it call initOpenSpec (when <root>/openspec is missing) and write. A refused
+// run writes nothing and returns *Refused. A differing file is left alone
+// (Differs) unless force is set (Overwritten).
+func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result, error) {
 	res := Result{Files: []File{}}
 	if err := safepath.Check(root, "openspec"); err != nil {
+		return res, &Refused{Problems: []Problem{problemFor("openspec", err)}}
+	}
+	targets, err := targetsOf(a)
+	if err != nil {
 		return res, err
+	}
+	var problems []Problem
+	plan := make([]decided, 0, len(targets))
+	for _, t := range targets {
+		status, p := decide(root, t, force)
+		if p != nil {
+			problems = append(problems, *p)
+			continue
+		}
+		plan = append(plan, decided{t, status})
+	}
+	if len(problems) > 0 {
+		return res, &Refused{Problems: problems}
 	}
 	if _, err := os.Lstat(filepath.Join(root, "openspec")); errors.Is(err, fs.ErrNotExist) {
 		if err := initOpenSpec(); err != nil {
@@ -57,67 +134,98 @@ func Init(root string, schema fs.FS, force bool, initOpenSpec func() error) (Res
 	} else if err != nil {
 		return res, err
 	}
-	var names []string
-	err := fs.WalkDir(schema, ".", func(p string, d fs.DirEntry, err error) error {
-		if err == nil && !d.IsDir() {
-			names = append(names, p)
-		}
-		return err
-	})
-	if err != nil {
-		return res, err
-	}
-	// Refuse links before writing anything.
-	for _, p := range names {
-		if err := safepath.Check(root, path.Join(schemaDir, p)); err != nil {
+	for _, d := range plan {
+		if err := write(root, d); err != nil {
 			return res, err
 		}
-	}
-	for _, p := range names {
-		want, err := fs.ReadFile(schema, p)
-		if err != nil {
-			return res, err
-		}
-		rel := path.Join(schemaDir, p)
-		status, err := install(filepath.Join(root, filepath.FromSlash(rel)), rel, want, force)
-		if err != nil {
-			return res, err
-		}
-		res.Files = append(res.Files, File{Path: rel, Status: status})
+		res.Files = append(res.Files, File{Path: d.rel, Status: d.status, Kind: d.kind})
 	}
 	return res, nil
 }
 
-// install writes want to dst unless it is there already, never following a
-// link at dst.
-func install(dst, rel string, want []byte, force bool) (FileStatus, error) {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return "", err
+// targetsOf lists every file to install: the schema, then the skill in each
+// of skillDirs.
+func targetsOf(a Assets) ([]target, error) {
+	var out []target
+	add := func(src fs.FS, dir string, kind FileKind) error {
+		return fs.WalkDir(src, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			want, err := fs.ReadFile(src, p)
+			if err != nil {
+				return err
+			}
+			out = append(out, target{rel: path.Join(dir, p), want: want, kind: kind})
+			return nil
+		})
 	}
-	status, flags := Written, os.O_WRONLY|os.O_CREATE|os.O_EXCL
-	got, err := readNoFollow(dst)
+	if err := add(a.Schema, schemaDir, KindSchema); err != nil {
+		return nil, err
+	}
+	for _, dir := range skillDirs {
+		if err := add(a.Skill, dir, KindSkill); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// problemFor classifies a safepath.Check error.
+func problemFor(rel string, err error) Problem {
+	var sl *safepath.SymlinkError
+	if errors.As(err, &sl) {
+		return Problem{Path: rel, Kind: ProblemSymlink, Err: err}
+	}
+	return Problem{Path: rel, Kind: ProblemUnreadable, Err: err}
+}
+
+// decide checks t's path and reads the file there to say what a write would
+// do. It changes nothing.
+func decide(root string, t target, force bool) (FileStatus, *Problem) {
+	if err := safepath.Check(root, t.rel); err != nil {
+		p := problemFor(t.rel, err)
+		return "", &p
+	}
+	got, err := readNoFollow(filepath.Join(root, filepath.FromSlash(t.rel)))
 	switch {
-	case err == nil && bytes.Equal(got, want):
+	case err == nil && bytes.Equal(got, t.want):
 		return Unchanged, nil
 	case err == nil && !force:
 		return Differs, nil
 	case err == nil:
-		status, flags = Overwritten, os.O_WRONLY|os.O_TRUNC
-	case !errors.Is(err, fs.ErrNotExist):
-		return "", fmt.Errorf("read %s: %w", rel, err)
+		return Overwritten, nil
+	case errors.Is(err, fs.ErrNotExist):
+		return Written, nil
+	}
+	return "", &Problem{Path: t.rel, Kind: ProblemUnreadable, Err: err}
+}
+
+// write carries out a decision, never following a link at the destination.
+func write(root string, d decided) error {
+	if d.status == Unchanged || d.status == Differs {
+		return nil
+	}
+	dst := filepath.Join(root, filepath.FromSlash(d.rel))
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("write %s: %w", d.rel, err)
+	}
+	flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
+	if d.status == Overwritten {
+		flags = os.O_WRONLY | os.O_TRUNC
 	}
 	f, err := os.OpenFile(dst, flags|syscall.O_NOFOLLOW, 0o644)
 	if err != nil {
-		return "", fmt.Errorf("write %s: %w", rel, err)
+		return fmt.Errorf("write %s: %w", d.rel, err)
 	}
-	if _, err := f.Write(want); err != nil {
+	if _, err := f.Write(d.want); err != nil {
 		f.Close()
-		return "", fmt.Errorf("write %s: %w", rel, err)
+		return fmt.Errorf("write %s: %w", d.rel, err)
 	}
 	if err := f.Close(); err != nil {
-		return "", fmt.Errorf("write %s: %w", rel, err)
+		return fmt.Errorf("write %s: %w", d.rel, err)
 	}
-	return status, nil
+	return nil
 }
 
 // readNoFollow reads the file at p without following a link there.
