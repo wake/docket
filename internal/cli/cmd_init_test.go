@@ -167,13 +167,24 @@ func TestRerunNoDifferences(t *testing.T) {
 	if err != nil || len(times) == 0 {
 		t.Fatalf("walk: %v", err)
 	}
+	for _, rel := range append(strings.Fields(skillRels), "AGENTS.md", "CLAUDE.md") {
+		i, err := os.Stat(filepath.Join(r.Dir, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		times[filepath.Join(r.Dir, rel)] = i.ModTime().UnixNano()
+	}
 	code, so, _ := runInit(t, r.Dir, cmd, "--json")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s", code, so)
 	}
-	for _, f := range resultOf(t, so)["files"].([]any) {
+	files := resultOf(t, so)["files"].([]any)
+	if len(files) != len(times) {
+		t.Errorf("%d files listed, %d tracked", len(files), len(times))
+	}
+	for _, f := range files {
 		if s := f.(map[string]any)["status"]; s != "unchanged" {
-			t.Errorf("status %v", s)
+			t.Errorf("status %v: %v", s, f)
 		}
 	}
 	for p, want := range times {
@@ -181,29 +192,6 @@ func TestRerunNoDifferences(t *testing.T) {
 		if err != nil || i.ModTime().UnixNano() != want {
 			t.Errorf("%s mtime changed (err %v)", p, err)
 		}
-	}
-}
-
-func TestRoutingSectionPrinted(t *testing.T) {
-	r := committedRepo(t)
-	r.Write("AGENTS.md", "# agents\n")
-	r.Write("CLAUDE.md", "# claude\n")
-	r.Write("openspec/config.yaml", "schema: x\n")
-	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t))
-	if code != 0 {
-		t.Fatalf("exit %d\n%s", code, se)
-	}
-	if !strings.Contains(so, "Add this section to AGENTS.md:") || !strings.Contains(so, docket.AgentsSection()) {
-		t.Errorf("section missing:\n%s", so)
-	}
-	for f, want := range map[string]string{"AGENTS.md": "# agents\n", "CLAUDE.md": "# claude\n", "openspec/config.yaml": "schema: x\n"} {
-		if b, _ := os.ReadFile(filepath.Join(r.Dir, f)); string(b) != want {
-			t.Errorf("%s changed", f)
-		}
-	}
-	_, so, _ = runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
-	if got := resultOf(t, so)["agents_section"]; got != docket.AgentsSection() {
-		t.Errorf("agents_section = %v", got)
 	}
 }
 
@@ -409,8 +397,12 @@ func TestPartialFailureKeepsResult(t *testing.T) {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 	files, _ := resultOf(t, so)["files"].([]any)
-	if len(files) < 2 {
-		t.Errorf("files missing on partial failure: %s", so)
+	listed := map[string]bool{}
+	for _, f := range files {
+		listed[f.(map[string]any)["path"].(string)] = true
+	}
+	if !listed[schemaDir+"schema.yaml"] || listed[".agents/skills/docket/SKILL.md"] {
+		t.Errorf("wrong files on partial failure: %s", so)
 	}
 	if err := os.Chmod(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -563,5 +555,261 @@ func TestLinkAndUnreadableTogether(t *testing.T) {
 	sameSnapshot(t, before, snapshot(t, r.Dir))
 	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
 		t.Errorf("outside written")
+	}
+}
+
+func fileStatus(t *testing.T, so, rel string) string {
+	t.Helper()
+	for _, f := range resultOf(t, so)["files"].([]any) {
+		m := f.(map[string]any)
+		if m["path"] == rel {
+			return m["status"].(string)
+		}
+	}
+	t.Fatalf("%s not listed: %s", rel, so)
+	return ""
+}
+
+func readFile(t *testing.T, dir, rel string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, rel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestBlockAddedToExistingAgentsMD(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("AGENTS.md", "# agents\n")
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got, want := readFile(t, r.Dir, "AGENTS.md"), "# agents\n\n"+docket.Block()+"\n"; got != want {
+		t.Errorf("AGENTS.md = %q", got)
+	}
+	if s := fileStatus(t, so, "AGENTS.md"); s != "written" {
+		t.Errorf("status %s", s)
+	}
+}
+
+func TestAgentsMDCreated(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := readFile(t, r.Dir, "AGENTS.md"); got != docket.Block()+"\n" {
+		t.Errorf("AGENTS.md = %q", got)
+	}
+}
+
+func TestEditedBlock(t *testing.T) {
+	r := committedRepo(t)
+	cmd := testutil.OpenSpecCmd(t)
+	r.Write("AGENTS.md", "before\n")
+	if code, so, se := runInit(t, r.Dir, cmd); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	lines := strings.Split(readFile(t, r.Dir, "AGENTS.md"), "\n")
+	for i, l := range lines {
+		if l == "<!-- docket:start -->" {
+			lines[i+1] = "edited"
+		}
+	}
+	edited := strings.Join(lines, "\n") + "after\n"
+	r.Write("AGENTS.md", edited)
+	code, so, _ := runInit(t, r.Dir, cmd, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+	fnds, _ := decode(t, so)["findings"].([]any)
+	if len(fnds) != 1 {
+		t.Fatalf("findings: %s", so)
+	}
+	f := fnds[0].(map[string]any)
+	if f["rule"] != "agents-block-differs" || f["file"] != "AGENTS.md" {
+		t.Errorf("finding: %v", f)
+	}
+	if got := readFile(t, r.Dir, "AGENTS.md"); got != edited {
+		t.Errorf("AGENTS.md changed: %q", got)
+	}
+	code, so, _ = runInit(t, r.Dir, cmd, "--force", "--json")
+	if code != 0 {
+		t.Fatalf("force exit %d\n%s", code, so)
+	}
+	if s := fileStatus(t, so, "AGENTS.md"); s != "overwritten" {
+		t.Errorf("status %s", s)
+	}
+	if got, want := readFile(t, r.Dir, "AGENTS.md"), "before\n\n"+docket.Block()+"\nafter\n"; got != want {
+		t.Errorf("AGENTS.md = %q", got)
+	}
+}
+
+func TestMalformedBlock(t *testing.T) {
+	cases := []struct{ name, file, body string }{
+		{"no end", "AGENTS.md", "<!-- docket:start -->\nx\n"},
+		{"end first", "AGENTS.md", "<!-- docket:end -->\n<!-- docket:start -->\n"},
+		{"two blocks", "AGENTS.md", "<!-- docket:start -->\n<!-- docket:end -->\n<!-- docket:start -->\n<!-- docket:end -->\n"},
+		{"claude no end", "CLAUDE.md", "<!-- docket:start -->\nx\n"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := committedRepo(t)
+			r.Write(c.file, c.body)
+			before := snapshot(t, r.Dir)
+			code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+			if code != 1 {
+				t.Fatalf("exit %d\n%s\n%s", code, so, se)
+			}
+			fnds, _ := decode(t, so)["findings"].([]any)
+			if len(fnds) != 1 {
+				t.Fatalf("findings: %s", so)
+			}
+			f := fnds[0].(map[string]any)
+			if f["rule"] != "agents-block-malformed" || f["file"] != c.file {
+				t.Errorf("finding: %v", f)
+			}
+			sameSnapshot(t, before, snapshot(t, r.Dir))
+		})
+	}
+}
+
+func TestUnreadableAgentsFiles(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores file modes")
+	}
+	for _, name := range []string{"AGENTS.md", "CLAUDE.md"} {
+		t.Run(name, func(t *testing.T) {
+			r := committedRepo(t)
+			r.Write(name, "x\n")
+			p := filepath.Join(r.Dir, name)
+			if err := os.Chmod(p, 0o000); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { os.Chmod(p, 0o644) })
+			before := snapshot(t, r.Dir)
+			code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+			if code != 3 {
+				t.Fatalf("exit %d\n%s\n%s", code, so, se)
+			}
+			un, _ := decode(t, so)["unreadable"].([]any)
+			if len(un) != 1 || un[0].(map[string]any)["source"] != name {
+				t.Errorf("unreadable: %s", so)
+			}
+			sameSnapshot(t, before, snapshot(t, r.Dir))
+		})
+	}
+}
+
+func TestClaudeMDLinkedElsewhereRefused(t *testing.T) {
+	r := committedRepo(t)
+	if err := os.Symlink("README.md", filepath.Join(r.Dir, "CLAUDE.md")); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, r.Dir)
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	fnds, _ := decode(t, so)["findings"].([]any)
+	if len(fnds) != 1 || fnds[0].(map[string]any)["rule"] != "symlink-refused" || fnds[0].(map[string]any)["file"] != "CLAUDE.md" {
+		t.Errorf("findings: %s", so)
+	}
+	sameSnapshot(t, before, snapshot(t, r.Dir))
+	if got := readFile(t, r.Dir, "README.md"); got != "x\n" {
+		t.Errorf("README.md = %q", got)
+	}
+}
+
+func TestClaudeMDImportsAgentsMD(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("CLAUDE.md", "@AGENTS.md\n")
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := readFile(t, r.Dir, "CLAUDE.md"); got != "@AGENTS.md\n" {
+		t.Errorf("CLAUDE.md = %q", got)
+	}
+	if s := fileStatus(t, so, "CLAUDE.md"); s != "unchanged" {
+		t.Errorf("status %s", s)
+	}
+	if got := readFile(t, r.Dir, "AGENTS.md"); got != docket.Block()+"\n" {
+		t.Errorf("AGENTS.md = %q", got)
+	}
+}
+
+func TestClaudeMDLinkedToAgentsMD(t *testing.T) {
+	r := committedRepo(t)
+	link := filepath.Join(r.Dir, "CLAUDE.md")
+	if err := os.Symlink("AGENTS.md", link); err != nil {
+		t.Fatal(err)
+	}
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if tgt, err := os.Readlink(link); err != nil || tgt != "AGENTS.md" {
+		t.Errorf("link: %q %v", tgt, err)
+	}
+	if got := readFile(t, r.Dir, "AGENTS.md"); got != docket.Block()+"\n" {
+		t.Errorf("AGENTS.md = %q", got)
+	}
+	if s := fileStatus(t, so, "CLAUDE.md"); s != "unchanged" {
+		t.Errorf("status %s", s)
+	}
+}
+
+func TestClaudeMDCreated(t *testing.T) {
+	r := committedRepo(t)
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := readFile(t, r.Dir, "CLAUDE.md"); got != "@AGENTS.md\n" {
+		t.Errorf("CLAUDE.md = %q", got)
+	}
+	if s := fileStatus(t, so, "CLAUDE.md"); s != "written" {
+		t.Errorf("status %s", s)
+	}
+}
+
+func TestClaudeMDWithoutTheImport(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("CLAUDE.md", "# claude\n")
+	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got, want := readFile(t, r.Dir, "CLAUDE.md"), "# claude\n\n"+docket.Block()+"\n"; got != want {
+		t.Errorf("CLAUDE.md = %q", got)
+	}
+}
+
+func TestOtherConfigurationUnchanged(t *testing.T) {
+	r := committedRepo(t)
+	other := map[string]string{
+		".claude/settings.json":        "{}\n",
+		".claude/skills/mine/SKILL.md": "mine\n",
+		"openspec/config.yaml":         "schema: x\n",
+	}
+	for p, c := range other {
+		r.Write(p, c)
+	}
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t))
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	for p, c := range other {
+		if got := readFile(t, r.Dir, p); got != c {
+			t.Errorf("%s changed: %q", p, got)
+		}
+	}
+	if strings.Contains(so, "Add this section") {
+		t.Errorf("printed section:\n%s", so)
+	}
+	_, so, _ = runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if _, ok := resultOf(t, so)["agents_section"]; ok {
+		t.Errorf("agents_section present: %s", so)
 	}
 }

@@ -1,11 +1,10 @@
 // Package docket embeds the assets the dkt command ships: the OpenSpec
-// schema and the routing section of AGENTS.md.
+// schema, the skill and the Docket block of AGENTS.md.
 package docket
 
 import (
 	"embed"
 	"io/fs"
-	"strings"
 
 	"github.com/wake/docket/internal/setup"
 )
@@ -15,8 +14,6 @@ var schemaFS embed.FS
 
 //go:embed AGENTS.md
 var agentsMD string
-
-const agentsHeading = "## Change workflow (superpowers × OpenSpec)"
 
 // Schema returns the files of openspec/schemas/docket, with paths relative
 // to that directory (schema.yaml, templates/proposal.md, ...).
@@ -53,29 +50,4 @@ func Block() string {
 		panic("AGENTS.md has no docket block")
 	}
 	return agentsMD[from:to]
-}
-
-// AgentsSection returns the AGENTS.md section that starts at the change
-// workflow heading and ends before the next "## " line, trailing whitespace
-// trimmed. It panics if the heading is missing.
-func AgentsSection() string {
-	lines := strings.Split(agentsMD, "\n")
-	start := -1
-	for i, l := range lines {
-		if strings.TrimRight(l, " \t\r") == agentsHeading {
-			start = i
-			break
-		}
-	}
-	if start < 0 {
-		panic("AGENTS.md has no section " + agentsHeading)
-	}
-	end := len(lines)
-	for i := start + 1; i < len(lines); i++ {
-		if strings.HasPrefix(lines[i], "## ") {
-			end = i
-			break
-		}
-	}
-	return strings.TrimRight(strings.Join(lines[start:end], "\n"), " \t\r\n")
 }

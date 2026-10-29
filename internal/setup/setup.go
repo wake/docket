@@ -31,6 +31,7 @@ type FileKind string
 const (
 	KindSchema FileKind = "schema"
 	KindSkill  FileKind = "skill"
+	KindBlock  FileKind = "block"
 )
 
 // File is one installed file; Path is relative to the repository root. Kind
@@ -45,13 +46,13 @@ type File struct {
 type Result struct {
 	OpenSpecInitialized bool   `json:"openspec_initialized"`
 	Files               []File `json:"files"`
-	AgentsSection       string `json:"agents_section"`
 }
 
 // Assets are the files Init installs.
 type Assets struct {
-	Schema fs.FS // installed under schemaDir
-	Skill  fs.FS // installed under each of skillDirs
+	Schema fs.FS  // installed under schemaDir
+	Skill  fs.FS  // installed under each of skillDirs
+	Block  string // the Docket block kept in AGENTS.md and CLAUDE.md
 }
 
 // ProblemKind says why a path stopped Init.
@@ -60,6 +61,7 @@ type ProblemKind string
 const (
 	ProblemSymlink    ProblemKind = "symlink"
 	ProblemUnreadable ProblemKind = "unreadable"
+	ProblemMalformed  ProblemKind = "malformed" // Err wraps errMalformed
 )
 
 // Problem is one path that failed a check.
@@ -83,6 +85,12 @@ func (r *Refused) Error() string {
 // schemaDir is where the schema lives, relative to the repository root.
 const schemaDir = "openspec/schemas/docket"
 
+// agentsFile and claudeFile are the files that carry the Docket block.
+const (
+	agentsFile = "AGENTS.md"
+	claudeFile = "CLAUDE.md"
+)
+
 // skillDirs are the directories that receive the skill.
 var skillDirs = []string{".claude/skills/docket", ".agents/skills/docket"}
 
@@ -93,10 +101,13 @@ type target struct {
 	kind FileKind
 }
 
-// decided is a target with the status the check phase gave it.
+// decided is a target with what the check phase settled: the status, the
+// bytes to write, and whether the file existed.
 type decided struct {
 	target
-	status FileStatus
+	status  FileStatus
+	data    []byte
+	existed bool
 }
 
 // Init installs the schema and the skill under root. It first decides the
@@ -116,12 +127,12 @@ func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result,
 	var problems []Problem
 	plan := make([]decided, 0, len(targets))
 	for _, t := range targets {
-		status, p := decide(root, t, force)
+		d, p := decide(root, t, a.Block, force)
 		if p != nil {
 			problems = append(problems, *p)
 			continue
 		}
-		plan = append(plan, decided{t, status})
+		plan = append(plan, d)
 	}
 	if len(problems) > 0 {
 		return res, &Refused{Problems: problems}
@@ -143,8 +154,8 @@ func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result,
 	return res, nil
 }
 
-// targetsOf lists every file to install: the schema, then the skill in each
-// of skillDirs.
+// targetsOf lists every file to install: the schema, the skill in each of
+// skillDirs, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
 func targetsOf(a Assets) ([]target, error) {
 	var out []target
 	add := func(src fs.FS, dir string, kind FileKind) error {
@@ -168,6 +179,7 @@ func targetsOf(a Assets) ([]target, error) {
 			return nil, err
 		}
 	}
+	out = append(out, target{rel: agentsFile, kind: KindBlock}, target{rel: claudeFile, kind: KindBlock})
 	return out, nil
 }
 
@@ -182,23 +194,58 @@ func problemFor(rel string, err error) Problem {
 
 // decide checks t's path and reads the file there to say what a write would
 // do. It changes nothing.
-func decide(root string, t target, force bool) (FileStatus, *Problem) {
+func decide(root string, t target, block string, force bool) (decided, *Problem) {
+	d := decided{target: t}
+	abs := filepath.Join(root, filepath.FromSlash(t.rel))
+	if t.rel == claudeFile {
+		if tgt, err := os.Readlink(abs); err == nil && filepath.Clean(tgt) == agentsFile {
+			d.status = Unchanged
+			return d, nil
+		}
+	}
 	if err := safepath.Check(root, t.rel); err != nil {
 		p := problemFor(t.rel, err)
-		return "", &p
+		return d, &p
 	}
-	got, err := readNoFollow(filepath.Join(root, filepath.FromSlash(t.rel)))
+	got, err := readNoFollow(abs)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return d, &Problem{Path: t.rel, Kind: ProblemUnreadable, Err: err}
+	}
+	d.existed = err == nil
+	if t.kind == KindBlock {
+		return decideBlock(d, got, block, force)
+	}
+	d.data = t.want
 	switch {
-	case err == nil && bytes.Equal(got, t.want):
-		return Unchanged, nil
-	case err == nil && !force:
-		return Differs, nil
-	case err == nil:
-		return Overwritten, nil
-	case errors.Is(err, fs.ErrNotExist):
-		return Written, nil
+	case !d.existed:
+		d.status = Written
+	case bytes.Equal(got, t.want):
+		d.status = Unchanged
+	case !force:
+		d.status = Differs
+	default:
+		d.status = Overwritten
 	}
-	return "", &Problem{Path: t.rel, Kind: ProblemUnreadable, Err: err}
+	return d, nil
+}
+
+// decideBlock settles an AGENTS.md or CLAUDE.md target; got is the current
+// content (nil when the file is missing).
+func decideBlock(d decided, got []byte, block string, force bool) (decided, *Problem) {
+	switch {
+	case d.rel == claudeFile && !d.existed:
+		d.status, d.data = Written, []byte("@AGENTS.md\n")
+		return d, nil
+	case d.rel == claudeFile && importsAgents(got):
+		d.status = Unchanged
+		return d, nil
+	}
+	next, status, err := placeBlock(got, block, force)
+	if err != nil {
+		return d, &Problem{Path: d.rel, Kind: ProblemMalformed, Err: err}
+	}
+	d.status, d.data = status, next
+	return d, nil
 }
 
 // write carries out a decision, never following a link at the destination.
@@ -210,15 +257,17 @@ func write(root string, d decided) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("write %s: %w", d.rel, err)
 	}
+	// A block appended to an existing file is Written too, so the flags
+	// follow whether the file existed when it was checked.
 	flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
-	if d.status == Overwritten {
+	if d.existed {
 		flags = os.O_WRONLY | os.O_TRUNC
 	}
 	f, err := os.OpenFile(dst, flags|syscall.O_NOFOLLOW, 0o644)
 	if err != nil {
 		return fmt.Errorf("write %s: %w", d.rel, err)
 	}
-	if _, err := f.Write(d.want); err != nil {
+	if _, err := f.Write(d.data); err != nil {
 		f.Close()
 		return fmt.Errorf("write %s: %w", d.rel, err)
 	}

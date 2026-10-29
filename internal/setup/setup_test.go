@@ -16,7 +16,7 @@ var schema = fstest.MapFS{
 
 var skill = fstest.MapFS{"SKILL.md": {Data: []byte("# skill\n")}}
 
-var assets = Assets{Schema: schema, Skill: skill}
+var assets = Assets{Schema: schema, Skill: skill, Block: "<!-- docket:start -->\nblock\n<!-- docket:end -->"}
 
 func statuses(r Result) map[string]FileStatus {
 	m := map[string]FileStatus{}

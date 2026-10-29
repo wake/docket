@@ -29,19 +29,6 @@ func TestSchemaHasTemplates(t *testing.T) {
 	}
 }
 
-func TestAgentsSection(t *testing.T) {
-	s := AgentsSection()
-	if !strings.HasPrefix(s, "## Change workflow (superpowers × OpenSpec)") {
-		t.Errorf("unexpected start: %q", s)
-	}
-	if !strings.Contains(s, "dkt new") {
-		t.Error("section lacks dkt new")
-	}
-	if strings.Contains(s, "## Development") {
-		t.Error("section runs past its end")
-	}
-}
-
 func TestSkillFrontmatter(t *testing.T) {
 	b, err := fs.ReadFile(Skill(), "SKILL.md")
 	if err != nil {
