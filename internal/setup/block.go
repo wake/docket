@@ -3,6 +3,7 @@ package setup
 import (
 	"bytes"
 	"errors"
+	"fmt"
 )
 
 const (
@@ -15,19 +16,14 @@ const (
 var errMalformed = errors.New("malformed docket block")
 
 func malformed(why string) error {
-	return &malformedError{why}
+	return fmt.Errorf("%w: %s", errMalformed, why)
 }
-
-type malformedError struct{ why string }
-
-func (e *malformedError) Error() string   { return "malformed docket block: " + e.why }
-func (e *malformedError) Is(t error) bool { return t == errMalformed }
 
 // FindBlock locates the Docket block in b: from the start of the start marker
 // line through the end of the end marker text, without the newline after it.
 // A marker line is exactly the marker, with at most one CR before the LF.
-// found is false with a nil error when b has no marker; any other shape other
-// than exactly one start marker followed by one end marker is errMalformed.
+// found is false with a nil error when b has no marker; any shape other than
+// one start marker followed by one end marker is errMalformed.
 func FindBlock(b []byte) (from, to int, found bool, err error) {
 	start, end := -1, -1
 	for off := 0; off < len(b); {
