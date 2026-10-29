@@ -174,3 +174,4 @@ of Docket's own keeps OpenSpec's files as OpenSpec writes them.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-10-29 | Pre-merge spec check | change-archive "Spec titles carried" says that a file the title step cannot read is listed as unreadable with exit 3, as Failure Modes already did | Wording only; the code and tests already behave this way |

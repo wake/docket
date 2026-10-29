@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: Spec titles carried
-After `openspec archive` succeeds, for every capability that has a `docket.yaml` beside its delta in the change, the spec title step SHALL set `title` in `openspec/specs/<capability>/docket.yaml` to that delta's title, creating the file when it does not exist and changing no other line when it does. When it cannot, `dkt archive` SHALL report `spec-title-failed` for the capability, stop, and exit with 1.
+After `openspec archive` succeeds, for every capability with a `docket.yaml` beside its delta, the spec title step SHALL set `title` in `openspec/specs/<capability>/docket.yaml` to that delta's title, creating the file if needed and changing no other line. A file it cannot read SHALL be listed as unreadable, with exit 3; any other failure SHALL be `spec-title-failed` for the capability, with exit 1. Either way the run stops.
 
 #### Scenario: Title carried to a new spec
 - **WHEN** `add-x` adds the capability `booking`, `openspec/changes/add-x/specs/booking/docket.yaml` holds `title: Booking`, and a user runs `dkt archive add-x`
