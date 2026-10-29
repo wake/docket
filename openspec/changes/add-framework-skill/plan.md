@@ -42,7 +42,7 @@
 | Read without following a link | internal/setup/setup.go:readNoFollow | reuse | the check phase reads every target with it | `rg -n "readNoFollow" internal/setup` |
 | Refuse a link on a write path | internal/safepath/safepath.go:Check | reuse | before every write, including `AGENTS.md` and `CLAUDE.md` | `rg -n "func Check" internal/safepath` |
 | Init's walk, checks and writes | internal/setup/setup.go:Init | extend | becomes check-everything-then-write over schema, skill and block targets | `rg -n "func Init" internal/setup` |
-| Find marker lines and place the block | none | new | nothing finds marker lines with byte offsets; `markdown.Lines` rewrites CR and LF, so offsets into the original bytes are lost | `rg -n "func Lines" internal/markdown` |
+| Find marker lines and place the block | none | new | nothing finds marker lines with byte offsets; `markdown.Lines` rewrites CR and LF, so offsets into the original bytes are lost. `setup.FindBlock` is the one marker scan: `placeBlock` and `docket.Block()` both use it | `rg -n "func Lines" internal/markdown` |
 | Findings, unreadable entries and exit codes | internal/cli/envelope.go:Outcome, Unreadable, ExitCode | reuse | unreadable already wins over findings | `rg -n "func ExitCode" -A 14 internal/cli/envelope.go` |
 | Map init's result to output | internal/cli/cmd_init.go:initCommand | extend | new rules, no printed section | `rg -n "schema-differs" internal/cli` |
 | Parse the skill's frontmatter in a test | external: go.yaml.in/yaml/v3 | reuse | already a dependency (`go.mod`); no frontmatter parser exists in the repository | `rg -n "yaml/v3" go.mod`, `rg -n -i "frontmatter" --type go` |
@@ -115,9 +115,10 @@ git commit -F <message with Change: add-framework-skill / Task: 1>
 **Files:**
 - Create: `internal/setup/block.go`
 - Test: `internal/setup/block_test.go`
+- Modify: `schema.go` (structural: `Block()` calls `setup.FindBlock`)
 
 **Interfaces:**
-- Produces: `placeBlock(cur []byte, exists bool, block string, force bool) (next []byte, status FileStatus, err error)`: `next` is nil when nothing is to be written. `errMalformed` (an `error` whose message says which case: no end marker, end marker first, more than one block). `importsAgents(b []byte) bool`.
+- Produces: `FindBlock(b []byte) (from, to int, found bool, err error)`: `b[from:to]` is the block as defined in Global Constraints; `found` is false with a nil error when there is no marker; `err` is `errMalformed` otherwise. `placeBlock(cur []byte, exists bool, block string, force bool) (next []byte, status FileStatus, err error)`, built on `FindBlock`: `next` is nil when nothing is to be written. `errMalformed` (an `error` whose message says which case: no end marker, end marker first, more than one block). `importsAgents(b []byte) bool`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -138,6 +139,8 @@ Table test `TestPlaceBlock`, with `block = "<!-- docket:start -->\nB\n<!-- docke
 | indented marker | "  <!-- docket:start -->\n" | true | false | "  <!-- docket:start -->\n\n"+block+"\n" | Written |
 | CRLF copy of the block | "<!-- docket:start -->\r\nB\r\n<!-- docket:end -->\r\n" | true | false | nil | Differs |
 
+`TestFindBlock`: for `"x\n"+block+"\ny\n"`, `from == 2`, `to == 2+len(block)`, `found`; for `"x\n"`, not found and nil error; `errMalformed` for no end marker, end marker first, and two blocks.
+
 `TestImportsAgents`: true for `"@AGENTS.md\n"`, `"# x\n  @./AGENTS.md\t\n"`; false for `"See @AGENTS.md here\n"`, `"@AGENTS.md.bak\n"`, `""`.
 
 - [ ] **Step 2: Run them to see them fail**
@@ -155,6 +158,10 @@ Run: `go test ./internal/setup`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
+
+- [ ] **Step 6: Make `docket.Block()` use `setup.FindBlock`**
+
+A separate structural commit: `Block()` calls `setup.FindBlock([]byte(agentsMD))` and panics on an error or when no block is found, replacing its own scan. Run `go test ./...`; expected PASS with no test changed.
 
 ### Task 3: Install the skill, checking everything before writing
 
