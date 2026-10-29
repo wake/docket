@@ -51,6 +51,8 @@ An idea that is not ready goes to `docket/ideas/`, one file per idea.
 
 1. In a git worktree, open the change:
    `dkt new <slug> --kind feature|change-request|fix|baseline --source "<where the request came from>" --title "<one line>"`.
+   A change's title, kind, source and base are in its `docket.yaml`; a new
+   capability's delta folder has a `docket.yaml` with its title.
 2. superpowers:brainstorming writes its design into the change folder, not
    `docs/superpowers/specs/`: `proposal.md`, delta specs under `specs/`, and
    `design.md` when needed. Before writing each one, run
