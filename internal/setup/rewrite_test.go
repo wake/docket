@@ -3,8 +3,8 @@ package setup
 import (
 	"errors"
 	"os"
-	"syscall"
 	"path/filepath"
+	"syscall"
 	"testing"
 )
 
