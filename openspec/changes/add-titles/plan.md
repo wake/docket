@@ -70,11 +70,11 @@
 
 This change cannot give the existing specs titles through its deltas: CI lints the main specs with the new code before the change is archived. The titles are written directly. `.openspec.yaml` of this change keeps its `x-` keys until Task 8, so `dkt` from any commit of the branch can read the change.
 
-- [ ] **Step 1: Write the ten main spec titles**
+- [x] **Step 1: Write the ten main spec titles**
 
 One line each, `title: <title>`: change-archive `Change archiving`, change-creation `Change creation`, change-lint `Change lint`, change-status `Change status`, cli-output `Command output`, conflict-detection `Conflict detection`, openspec-runtime `OpenSpec runtime`, plan-sync `Plan sync`, project-setup `Project setup`, workspace-scan `Workspace scan`.
 
-- [ ] **Step 2: Write this change's docket.yaml**
+- [x] **Step 2: Write this change's docket.yaml**
 
 ```yaml
 title: Titles for changes and specs
@@ -83,12 +83,12 @@ source: docket/ideas/2026-10-29-document-titles.md, item 1 of docket/order.md
 base: 5df2ba2f4d187386ada6fc9e556edbb32f9597d7
 ```
 
-- [ ] **Step 3: Check that OpenSpec accepts the files**
+- [x] **Step 3: Check that OpenSpec accepts the files**
 
 Run: `openspec validate --specs --strict` and `openspec validate add-titles --strict` (OpenSpec 1.14.3)
 Expected: every spec and the change are valid.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ### Task 2: The docket.yaml format and metadata reading in internal/change
 
@@ -113,11 +113,11 @@ Expected: every spec and the change are valid.
   - `func SetKey(b []byte, key, value string) ([]byte, error)`: replaces the value on the one line that starts with `key:`; with no such line, appends `key: value` as a new line (adding a line ending first when `b` does not end with one, `\r\n` when `b` uses CRLF). The value is written as `yaml.Marshal` writes the scalar. Fails when more than one line starts with `key:`, or when the result does not parse to a mapping where `key` equals `value`.
   - `SetBase` is removed; `ParseMetadata` stays exported until Task 7.
 
-- [ ] **Step 1: Structural commit — `SetBase` becomes `SetKey`**
+- [x] **Step 1: Structural commit — `SetBase` becomes `SetKey`**
 
 Rename `SetBase(b, base)` to `SetKey(b, key, value)` with the same behavior for `key` = `x-base` (still failing when the line is missing), update `internal/archive/rebase.go` to call `change.SetKey(b, "x-base", nb)`, and keep every existing test green. Commit as a refactor.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 - `TestReadMetadataFromDocket`: files `docket.yaml` = `title: Booking waitlist\nkind: feature\nsource: issue 12\nbase: <sha>\n` and `.openspec.yaml` = `schema: docket\ncreated: 2026-01-02\n` → `Metadata{Title: "Booking waitlist", Kind: "feature", Source: "issue 12", Base: sha, Created: "2026-01-02", File: "docket.yaml"}`.
 - `TestReadMetadataLegacy`: only `.openspec.yaml` with `x-kind`, `x-source`, `x-base` → those values, `Title == ""`, `File == ".openspec.yaml"`.
@@ -128,19 +128,19 @@ Rename `SetBase(b, base)` to `SetKey(b, key, value)` with the same behavior for 
 - `TestCreateDocketRoundTrip`: for titles `Booking: waitlist #2`, `'quoted'`, `- dash`, `預約候補`, `CreateDocket` then `ParseDocket` gives the same `Docket`; the file starts with `title:` and has the keys in order title, kind, source, base; a second `CreateDocket` on the same path fails with `fs.ErrExist`; a symbolic link at the path is not followed.
 - `TestSetKeyAppend`: `SetKey([]byte("a: 1"), "title", "T")` → `"a: 1\ntitle: T\n"`; `SetKey([]byte("a: 1\r\n"), "title", "T")` → `"a: 1\r\ntitle: T\r\n"`; `SetKey([]byte("title: Old\nb: 2\n"), "title", "Booking: x")` → `"title: 'Booking: x'\nb: 2\n"`; two `title:` lines → error.
 
-- [ ] **Step 3: Run the tests to see them fail**
+- [x] **Step 3: Run the tests to see them fail**
 
 Run: `go test ./internal/change/`
 Expected: FAIL (undefined: `ReadMetadata`, `ParseDocket`, `CreateDocket`, …; `SetKey` append cases fail).
 
-- [ ] **Step 4: Implement the Interfaces above in `internal/change/docket.go` and `internal/change/metadata.go`**
+- [x] **Step 4: Implement the Interfaces above in `internal/change/docket.go` and `internal/change/metadata.go`**
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run: `go test ./internal/change/ ./internal/archive/`
 Expected: PASS.
 
-- [ ] **Step 6: Mutate the changed lines and commit**
+- [x] **Step 6: Mutate the changed lines and commit**
 
 ### Task 3: dkt new requires a title and writes docket.yaml
 
@@ -156,7 +156,7 @@ Expected: PASS.
 - Consumes: `change.ValidTitle`, `change.Docket`, `change.CreateDocket`, `change.DocketFile` (Task 2)
 - Produces: `change.NewResult` gains `Title string \`json:"title"\`` after `Slug`; `change.AppendMetadata` is deleted.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestNewMissingTitle`: `dkt new add-x --kind feature --source x` → exit 2, finding rule `usage`, no `openspec/changes/add-x/`, and the fake OpenSpec log has no `new` call.
 - `TestNewBlankTitle`: `--title "   "`, `--title "a\nb"` and `--title "a\rb"` (Go strings with a real line feed and carriage return) → exit 2, nothing created.
@@ -164,21 +164,21 @@ Expected: PASS.
 - `TestNewDocketYAMLFails`: with `FAKE_OPENSPEC_DOCKET_YAML=1` (the fake's `new` also writes `docket.yaml`), → finding `metadata-failed`, exit 1, `openspec/changes/add-x/` removed. Every `CreateDocket` error takes this one branch, so this test covers cleanup for write failures too.
 - Existing `dkt new` tests: add `--title X` to every invocation that is not about the title, so each still checks what it did (slug rules, slug reuse, unreadable worktree, concurrency, schema missing, symlink refusal, JSON output, unsupported version, OpenSpec failure). The OpenSpec failure test asserts no `docket.yaml` exists.
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `go test ./internal/cli/ -run 'TestNew'`
 Expected: FAIL (`--title` is an unknown flag; no `docket.yaml`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `newCommand`: define `--title`; after the `--source` check, `!change.ValidTitle(title)` (empty included) is `UsageError{Msg: "new needs --title: one line of text that is not blank"}`; the usage line becomes `new <slug> --kind <…> --source <text> --title <text>`. Check `openspec/changes/<slug>/docket.yaml` with `safepath.Check` where `.openspec.yaml` was checked, before and after OpenSpec runs, and replace `AppendMetadata` with `CreateDocket(…, change.Docket{Title: title, Kind: kind, Source: source, Base: base})` inside the same cleanup. Delete `AppendMetadata` and its tests, and the fake's `FAKE_OPENSPEC_BAD_YAML` and `FAKE_OPENSPEC_NO_EOL` when no test uses them; add `FAKE_OPENSPEC_DOCKET_YAML`.
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run: `go test ./internal/cli/ ./internal/change/ ./internal/testutil/`
 Expected: PASS.
 
-- [ ] **Step 5: Mutate the changed lines and commit**
+- [x] **Step 5: Mutate the changed lines and commit**
 
 ### Task 4: dkt lint reports missing titles
 
@@ -200,7 +200,7 @@ Rules (findings' `File` is repository-relative):
 - Each delta: a `docket.yaml` beside it is checked the same way. Absent, and `fs.Stat` of `openspec/specs/<cap>/spec.md` says it does not exist → `title-missing` on `openspec/changes/<slug>/specs/<cap>/docket.yaml`, naming the capability. Any other `Stat` error → unreadable.
 - Main specs, only when `in.Slugs` is empty: walk `openspec/specs`; for every regular `spec.md` that `CapabilityPath` maps, check the `docket.yaml` beside it as above, with no change on the finding. A missing `openspec/specs` is no finding; a walk error, or a `docket.yaml` that exists but cannot be read, is unreadable and gets no `title-missing`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 One test per scenario in `titles_test.go`, on `fstest.MapFS` repositories (`repoWith`):
 - `TestTitleMissingOnChange`: `add-x` with a proposal and no `docket.yaml`, `runOn(repo, "add-x")` → one `title-missing` with `File == "openspec/changes/add-x/docket.yaml"`.
@@ -213,21 +213,21 @@ One test per scenario in `titles_test.go`, on `fstest.MapFS` repositories (`repo
 - `TestBlankTitle`: `title: "  "` → `title-missing`.
 - Fixtures in other lint and command tests that assert a clean report gain a `docket.yaml` with a title, so they keep testing what they tested (`lint-every-active-change`, `named-change-missing` and `no-openspec-installed` are the existing tests, kept green).
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `go test ./internal/lint/ -run 'Title|DocketYAML|MainSpec'`
 Expected: FAIL (no `title-missing` or `metadata-invalid` findings).
 
-- [ ] **Step 3: Implement the rules in `internal/lint/titles.go` and call them from `Run`**
+- [x] **Step 3: Implement the rules in `internal/lint/titles.go` and call them from `Run`**
 
 `checkTitles` runs for every loaded change after `checkStructure`; `checkSpecTitles` runs once, after the loop, when `len(in.Slugs) == 0`.
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run: `go test ./internal/lint/ ./internal/cli/` and `go run ./cmd/dkt lint --default-branch main` in this worktree
 Expected: PASS, and `dkt lint: ok` (the titles of Task 1 satisfy the rule).
 
-- [ ] **Step 5: Mutate the changed lines and commit**
+- [x] **Step 5: Mutate the changed lines and commit**
 
 ### Task 5: Archive, rebase and sync read the base where the change keeps it
 
@@ -249,7 +249,7 @@ Behavior:
 - `evidence.render` writes the rows of the Global Constraints; the Checks line says `none changed since the base`.
 - Messages and human output that say `x-base` say `the base` (`base.go`, `run.go` no-task-commits, `cmd_archive.go` drift header `at the base:`, `cmd_rebase.go` `base: <old> -> <new>` and `base is already <sha>`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestRebaseDocketYAML`: change with `docket.yaml` (`title`, `kind`, `source`, `base: <old>`) and a `.openspec.yaml` without `x-base`; after the default branch merge, `Rebase` → `docket.yaml` equals the old bytes with only the base value replaced; `.openspec.yaml` unchanged.
 - `TestRebaseLegacy`: change with only `.openspec.yaml` `x-base` → `x-base` moved, no `docket.yaml` created.
@@ -258,19 +258,19 @@ Behavior:
 - `TestLoadDocketYAMLInvalid`: `docket.yaml` = `- a\n` → `dkt archive` stops at step `plan` with `metadata-invalid` on `openspec/changes/add-x/docket.yaml`.
 - Existing archive, base check and sync tests keep their `.openspec.yaml` fixtures (the legacy path) and stay green; update the assertions on the renamed messages.
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `go test ./internal/archive/ ./internal/cli/ -run 'Rebase|Sync|Evidence|Archive'`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement the behavior above**
+- [x] **Step 3: Implement the behavior above**
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run: `go test ./internal/archive/ ./internal/cli/`
 Expected: PASS.
 
-- [ ] **Step 5: Mutate the changed lines and commit**
+- [x] **Step 5: Mutate the changed lines and commit**
 
 ### Task 6: dkt archive carries spec titles to the main specs
 
@@ -291,7 +291,7 @@ Behavior: for each capability of `sortedCaps(c)`, read `<folder>/specs/<cap>/doc
 - A delta `docket.yaml` that does not parse or has no valid title, a link, `SetKey` failing, or a failure creating the folder or writing the file is `spec-title-failed` on the target, naming the capability and the reason (exit 1).
 - The step stops at the first capability with either. In `change`, the step runs after `r.archive`; when it stops, the change is listed in `Archived` with `Evidence: ""`, the run stops at step `spec-title`, no `evidence.md` is written, and the archived folder stays in the working tree.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestTitleCarriedToNewSpec`: delta for new capability `waitlist` with `docket.yaml` `title: Waitlist`; after `Archive` → `openspec/specs/waitlist/docket.yaml` is `title: Waitlist\n`, then `evidence.md` exists.
 - `TestTitleReplacedOnExistingSpec`: `openspec/specs/booking/docket.yaml` = `title: Bookings\nowner: x\n`, delta `docket.yaml` `title: Booking` → file is `title: Booking\nowner: x\n`.
@@ -304,19 +304,19 @@ Every failure test below asserts the same outcome, through one helper: `Stopped 
 - `TestTitleTargetUnreadable`: existing target with mode 0 (skipped as root, like the lint test) → `Unreadable` names `openspec/specs/booking/docket.yaml`, no finding.
 - The existing two-change test still stops `add-y` at `lint` with `add-x` archived and its evidence written.
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `go test ./internal/archive/ -run 'Title'`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `specTitles` and call it from `change`**
+- [x] **Step 3: Implement `specTitles` and call it from `change`**
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run: `go test ./internal/archive/ ./internal/cli/`
 Expected: PASS.
 
-- [ ] **Step 5: Mutate the changed lines and commit**
+- [x] **Step 5: Mutate the changed lines and commit**
 
 ### Task 7: dkt status gives each change's title
 
@@ -333,7 +333,7 @@ Expected: PASS.
 
 Behavior: `keep` adds `docket.yaml`; `Load` calls `ReadMetadata(files)`. An error leaves `Metadata` and `Title` nil (as a broken `.openspec.yaml` does now); otherwise `Metadata` is `{Kind, Source, Base, Created}` and `Title` points to the title when it is not `""`. The base for commits and activity is `m.Base`. The human line is `<slug>  "<title>"  <phase>  …` (`%q`), and without a title `<slug>  <phase>  …` as now.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestLoadTitle`: worktree change with `docket.yaml` `title: Booking waitlist` → `*ch.Title == "Booking waitlist"`, `Metadata.Base` from `docket.yaml`.
 - `TestLoadTitleFromBranch`: the change exists only on `refs/remotes/origin/add-y` with a `docket.yaml` → its title is read.
@@ -342,19 +342,19 @@ Behavior: `keep` adds `docket.yaml`; `Load` calls `ReadMetadata(files)`. An erro
 - `TestStatusLineTitle`: `dkt status` human output for a titled change contains `add-x  "Booking waitlist"  `; exit 0.
 - Existing activity and uncommitted tests stay green.
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run: `go test ./internal/status/ ./internal/cli/ -run 'Title|Status'`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement the behavior above**
+- [x] **Step 3: Implement the behavior above**
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run: `go test ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Mutate the changed lines and commit**
+- [x] **Step 5: Mutate the changed lines and commit**
 
 ### Task 8: Docs, shipped prompts and this change's metadata
 
@@ -365,7 +365,7 @@ Expected: PASS.
 **Files:**
 - Modify: `AGENTS.md`, `README.md`, `README.zh-TW.md`, `docs/ARCHITECTURE.md`, `openspec/schemas/docket/templates/plan.md`, `openspec/schemas/docket/schema.yaml`, `openspec/changes/add-titles/.openspec.yaml`
 
-- [ ] **Step 1: Edit the docs and prompts**
+- [x] **Step 1: Edit the docs and prompts**
 
 - `AGENTS.md` (the shipped "Change workflow" section): the `dkt new` line gains `--title "<title>"`, and one sentence says that a change's title, kind, source and base are in its `docket.yaml`, and that a new capability's delta has a `docket.yaml` with its title.
 - `README.md` and `README.zh-TW.md`: the `dkt new` usage line gains `--title`; `rebase` writes one line of `docket.yaml`; one paragraph on upgrading: changes made by an older dkt still work, `dkt lint` asks for their `docket.yaml`, and main specs need one each.
@@ -374,9 +374,9 @@ Expected: PASS.
 - `schema.yaml` plan instruction: after "Keep the writing-plans header and task structure", say the heading is `# Implementation Plan`, since the change's title names the work.
 - `.openspec.yaml` of this change: remove the `x-kind`, `x-source` and `x-base` lines; `docket.yaml` holds them.
 
-- [ ] **Step 2: Check them mechanically**
+- [x] **Step 2: Check them mechanically**
 
 Run: `openspec instructions plan --change add-titles` (OpenSpec 1.14.3), `go test ./...`, `go run ./cmd/dkt lint --default-branch main`, `go run ./cmd/dkt status add-titles --json`, and `rg -n "x-base|x-kind|x-source|AppendMetadata|SetBase" AGENTS.md README.md README.zh-TW.md docs/ARCHITECTURE.md openspec/schemas/`
 Expected: the instructions print the new heading; tests pass; lint is ok; status gives the title `Titles for changes and specs` and the base from `docket.yaml`; `rg` finds only sentences about changes made by an older dkt.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
