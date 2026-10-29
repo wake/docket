@@ -2,7 +2,8 @@
 
 ## Purpose
 Defines how `dkt init` prepares a repository for the Docket workflow by
-installing the `docket` OpenSpec schema, without touching the user's own
+installing the `docket` OpenSpec schema and the `docket` skill and keeping
+the Docket block in `AGENTS.md`, without touching the rest of the user's
 agent or OpenSpec configuration.
 
 ## Requirements
