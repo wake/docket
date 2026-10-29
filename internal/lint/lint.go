@@ -115,9 +115,13 @@ func Run(in Input) Report {
 		}
 		ds := deltas(c)
 		checkStructure(r, c, ds)
+		checkTitles(r, c, ds)
 		if c.Has(planFile) {
 			checkScenarios(r, c, ds)
 		}
+	}
+	if len(in.Slugs) == 0 {
+		checkSpecTitles(r)
 	}
 	sort.Strings(rep.Changes)
 	sort.SliceStable(rep.Findings, func(i, j int) bool {

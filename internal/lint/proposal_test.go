@@ -12,11 +12,11 @@ func lineOf(doc, needle string) int {
 
 func lintProposal(t *testing.T, proposal string) Report {
 	t.Helper()
-	return runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": proposal}))
+	return runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": proposal, "openspec/changes/add-x/docket.yaml": "title: X\n"}))
 }
 
 func TestProposalMissing(t *testing.T) {
-	r := runOn(repoWith(map[string]string{"openspec/changes/add-x/notes.txt": "x"}))
+	r := runOn(repoWith(map[string]string{"openspec/changes/add-x/notes.txt": "x", "openspec/changes/add-x/docket.yaml": "title: X\n"}))
 	f := wantOne(t, r, "proposal-section", 0)
 	if f.File != "" || f.Change != "add-x" {
 		t.Fatalf("finding = %+v", f)

@@ -52,6 +52,7 @@ func TestUnreadableMainSpecIsListedOnce(t *testing.T) {
 func lintDelta(d string) Report {
 	return runOn(repoWith(map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal, deltaAt("booking"): d,
+		"openspec/changes/add-x/docket.yaml": "title: X\n", "openspec/changes/add-x/specs/booking/docket.yaml": "title: X\n",
 	}))
 }
 

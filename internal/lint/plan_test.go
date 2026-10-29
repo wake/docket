@@ -20,6 +20,7 @@ func planRepo(plan string, extra ...string) fstest.MapFS {
 	m := repoWith(map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal,
 		"openspec/changes/add-x/plan.md":     plan,
+		"openspec/changes/add-x/docket.yaml": "title: X\n",
 		"internal/a.go":                      "package a\n",
 		"AGENTS.md":                          "x\n",
 	})
@@ -39,7 +40,7 @@ func TestGoodPlanIsClean(t *testing.T) {
 }
 
 func TestNoPlanNoPlanRules(t *testing.T) {
-	r := runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": validProposal}))
+	r := runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": validProposal, "openspec/changes/add-x/docket.yaml": "title: X\n"}))
 	if len(r.Findings) != 0 {
 		t.Fatalf("findings = %+v", r.Findings)
 	}

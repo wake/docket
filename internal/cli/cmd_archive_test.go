@@ -35,10 +35,12 @@ func archiveFixture(t *testing.T) *testutil.Repo {
 	r.Commit("code", map[string]string{"internal/x.go": "package x\n", "openspec/config.yaml": "schema: docket\n"})
 	base := r.Git("rev-parse", "HEAD")
 	r.Commit("add the change", map[string]string{
-		"openspec/changes/add-x/.openspec.yaml":  "schema: docket\nx-base: " + base + "\n",
-		"openspec/changes/add-x/proposal.md":     lintProposal,
-		"openspec/changes/add-x/specs/x/spec.md": archiveDelta,
-		"openspec/changes/add-x/plan.md":         archivePlan,
+		"openspec/changes/add-x/.openspec.yaml":      "schema: docket\nx-base: " + base + "\n",
+		"openspec/changes/add-x/proposal.md":         lintProposal,
+		"openspec/changes/add-x/docket.yaml":         "title: X\n",
+		"openspec/changes/add-x/specs/x/docket.yaml": "title: X\n",
+		"openspec/changes/add-x/specs/x/spec.md":     archiveDelta,
+		"openspec/changes/add-x/plan.md":             archivePlan,
 	})
 	r.Commit("work\n\nChange: add-x\nTask: 1", map[string]string{"a.txt": "a\n"})
 	code, so, se := runLint(t, r.Dir, r.Env, "add-x")
@@ -208,10 +210,12 @@ func TestArchiveKeepsItsReportOnAnInfrastructureError(t *testing.T) {
 	r := archiveFixture(t)
 	base := r.Git("rev-parse", "HEAD~2")
 	r.Commit("add the second change", map[string]string{
-		"openspec/changes/add-y/.openspec.yaml":  "schema: docket\nx-base: " + base + "\n",
-		"openspec/changes/add-y/proposal.md":     lintProposal,
-		"openspec/changes/add-y/specs/x/spec.md": archiveDelta,
-		"openspec/changes/add-y/plan.md":         archivePlan,
+		"openspec/changes/add-y/.openspec.yaml":      "schema: docket\nx-base: " + base + "\n",
+		"openspec/changes/add-y/proposal.md":         lintProposal,
+		"openspec/changes/add-y/docket.yaml":         "title: Y\n",
+		"openspec/changes/add-y/specs/x/docket.yaml": "title: Y\n",
+		"openspec/changes/add-y/specs/x/spec.md":     archiveDelta,
+		"openspec/changes/add-y/plan.md":             archivePlan,
 	})
 	r.Commit("more work\n\nChange: add-y\nTask: 1", map[string]string{"b.txt": "b\n"})
 	if code, so, se := runLint(t, r.Dir, r.Env, "add-y"); code != 0 {
@@ -279,6 +283,7 @@ func TestArchiveWithOpenSpec(t *testing.T) {
 		r.Commit("add "+slug, map[string]string{
 			"openspec/changes/" + slug + "/.openspec.yaml":        "schema: docket\nx-base: " + base + "\n",
 			"openspec/changes/" + slug + "/proposal.md":           strings.Replace(lintProposal, "`x`", "`booking`", 1),
+			"openspec/changes/" + slug + "/docket.yaml":           "title: " + slug + "\n",
 			"openspec/changes/" + slug + "/specs/booking/spec.md": realDelta(then),
 			"openspec/changes/" + slug + "/plan.md":               plan,
 		})
