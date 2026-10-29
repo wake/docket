@@ -14,7 +14,7 @@ Every command SHALL accept `--json`. With `--json`, the command SHALL write exac
 - **THEN** standard output parses as a single JSON object whose `ok` is true
 
 #### Scenario: JSON on failure
-- **WHEN** a user runs `dkt new Bad_Slug --kind feature --source x --json`
+- **WHEN** a user runs `dkt new Bad_Slug --kind feature --source x --title X --json`
 - **THEN** standard output parses as a single JSON object whose `ok` is false and whose findings name the invalid slug
 
 ### Requirement: Result envelope
