@@ -261,13 +261,10 @@ func write(root string, d decided) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return fmt.Errorf("write %s: %w", d.rel, err)
 	}
-	// A block appended to an existing file is Written too, so the flags
-	// follow whether the file existed when it was checked.
-	flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
 	if d.existed {
-		flags = os.O_WRONLY | os.O_TRUNC
+		return replace(dst, d.data, d.rel)
 	}
-	f, err := os.OpenFile(dst, flags|syscall.O_NOFOLLOW, 0o644)
+	f, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
 	if err != nil {
 		return fmt.Errorf("write %s: %w", d.rel, err)
 	}
@@ -277,6 +274,43 @@ func write(root string, d decided) error {
 	}
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("write %s: %w", d.rel, err)
+	}
+	return nil
+}
+
+// replace rewrites the existing file dst through a temporary file beside it,
+// so a failed write leaves the old file whole. The new file keeps the old
+// permission bits.
+func replace(dst string, data []byte, rel string) (err error) {
+	fail := func(err error) error { return fmt.Errorf("write %s: %w", rel, err) }
+	info, err := os.Lstat(dst)
+	if err != nil {
+		return fail(err)
+	}
+	if !info.Mode().IsRegular() {
+		return fail(fmt.Errorf("not a regular file"))
+	}
+	tmp := fmt.Sprintf("%s.docket-tmp-%d", dst, os.Getpid())
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, info.Mode().Perm())
+	if err != nil {
+		return fail(err)
+	}
+	defer func() {
+		if err != nil {
+			os.Remove(tmp)
+		}
+	}()
+	if err = f.Chmod(info.Mode().Perm()); err == nil {
+		_, err = f.Write(data)
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(tmp, dst)
+	}
+	if err != nil {
+		return fail(err)
 	}
 	return nil
 }
