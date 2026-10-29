@@ -34,7 +34,7 @@ Docket reads the files in the repository and the git history. It does four kinds
 | Assemble | `brief`, `accept --export` | Gathers pieces from several files into a brief for an implementing agent, or into a page a client can review |
 | Wrap | `init`, `new`, `archive`, `rebase` | Installs the schema, runs the OpenSpec CLI and the checks above in a fixed order, and records the base commit and the evidence |
 
-The commands that write files are `init` (the schema), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus `evidence.md`) and `rebase` (one line of `docket.yaml`). None of them commits.
+The commands that write files are `init` (the schema), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
 
 ## What Docket is not
 

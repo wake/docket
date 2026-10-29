@@ -33,7 +33,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Read a file from a scanned source | `scan.ReadFile` |
 | Start OpenSpec | `openspec.Runner.Run` (build with `openspec.New`) |
 | Validate a slug | `change.ValidateSlug` |
-| Record kind, source and base | `change.CreateDocket` |
+| Record title, kind, source and base | `change.CreateDocket` |
 | Install the schema | `setup.Init` |
 | Check a path before writing to it | `safepath.Check` |
 | Read Markdown lines, headings and tables | `markdown.Lines`, `markdown.Headings`, `markdown.FindTable` |
