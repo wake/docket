@@ -1,0 +1,75 @@
+# Spec Delta
+
+## ADDED Requirements
+
+### Requirement: Spec titles carried
+After `openspec archive` succeeds, for every capability that has a `docket.yaml` beside its delta in the change, the spec title step SHALL set `title` in `openspec/specs/<capability>/docket.yaml` to that delta's title, creating the file when it does not exist and changing no other line when it does. When it cannot, `dkt archive` SHALL report `spec-title-failed` for the capability, stop, and exit with 1.
+
+#### Scenario: Title carried to a new spec
+- **WHEN** `add-x` adds the capability `booking`, `openspec/changes/add-x/specs/booking/docket.yaml` holds `title: Booking`, and a user runs `dkt archive add-x`
+- **THEN** `openspec/specs/booking/docket.yaml` holds `title: Booking`
+
+#### Scenario: Title replaced on an existing spec
+- **WHEN** `openspec/specs/booking/docket.yaml` holds `title: Bookings` and another line, and `add-x`'s delta for `booking` has a `docket.yaml` holding `title: Booking`
+- **THEN** after `dkt archive add-x` that file holds `title: Booking` and its other line unchanged
+
+## MODIFIED Requirements
+
+### Requirement: Steps in order
+For each named change, in the order given, `dkt archive` SHALL run the plan check, lint, the base check, `openspec validate <slug> --strict`, the reading cross-check, `openspec archive <slug> -y --json`, the spec title step, and the evidence step. It SHALL stop at the first change that fails a step and report the step, leaving changes archived earlier in the same run archived in the working tree.
+
+#### Scenario: Second of two fails
+- **WHEN** a user runs `dkt archive add-x add-y`, `add-x` passes every step, and `add-y` fails lint
+- **THEN** `add-x` is archived in the working tree, `add-y` is untouched, the lint finding is reported, and the command exits with 1
+
+### Requirement: Plan check
+The plan check SHALL fail when `dkt sync <slug> --check` would exit with 1, when any step of a `### Task` section in plan.md is unticked, or when no commit reachable from HEAD and not from the change's base carries both `Change: <slug>` and a `Task:` trailer.
+
+#### Scenario: Unticked task
+- **WHEN** Task 5 of `add-x` has an unticked step and no commit names it
+- **THEN** `dkt archive add-x` stops at the plan check and names Task 5
+
+#### Scenario: Squashed pull request
+- **WHEN** every step of `add-x` is ticked but no commit since its base carries `Change: add-x` with a `Task:` trailer
+- **THEN** `dkt archive add-x` stops at the plan check
+
+### Requirement: Base check
+For every requirement the change modifies, removes or renames, the base check SHALL compare that requirement's block in the main spec at the change's base with its block in the working tree, which includes changes archived earlier in the same run, and SHALL fail, showing the difference, when they differ. For every requirement the change adds, it SHALL fail when the working tree's main spec has a requirement of that name that the main spec at the base did not.
+
+#### Scenario: Requirement changed since base
+- **WHEN** `add-y` modifies `booking` / "Cancel booking", and `add-x`, archived after `add-y`'s base, changed that requirement
+- **THEN** `dkt archive add-y` stops at the base check and shows the requirement's text at the base and now
+
+#### Scenario: Two changes in one run touch one requirement
+- **WHEN** `add-x` and `add-y` share a base, both modify `booking` / "Cancel booking", and a user runs `dkt archive add-x add-y`
+- **THEN** `add-x` is archived and `add-y` stops at the base check
+
+#### Scenario: Other requirement in the same capability
+- **WHEN** `add-y` modifies `booking` / "Cancel booking", and since its base only `booking` / "Refund points" has changed
+- **THEN** the base check passes
+
+#### Scenario: Added name now taken
+- **WHEN** `add-y` adds `booking` / "Waitlist cap" and that requirement appeared in the main spec after `add-y`'s base
+- **THEN** `dkt archive add-y` stops at the base check
+
+### Requirement: Evidence
+After the spec title step, `dkt archive` SHALL write `evidence.md` in the archived change folder, recording the date, the Docket and OpenSpec versions, the URL of the `origin` remote or none, the HEAD SHA, the change's title or none, its kind, source and base, for each task the commits whose trailers name it, and the results of the validate and base check steps.
+
+#### Scenario: Evidence written
+- **WHEN** `dkt archive add-x` succeeds on 2026-11-02 and `add-x`'s title is "Booking waitlist"
+- **THEN** `openspec/changes/archive/2026-11-02-add-x/evidence.md` exists, gives the title "Booking waitlist", and lists the commits for every task
+
+### Requirement: Rebase
+`dkt rebase <slug>` SHALL set the change's base to the full SHA of the merge base of HEAD and the default branch tip, where `docket-metadata` keeps it, changing no other line, and SHALL list every requirement the change touches whose main-spec block differs between the old and the new base. It SHALL NOT require the OpenSpec CLI.
+
+#### Scenario: Rebase after merging the default branch
+- **WHEN** the default branch was merged into the change's branch and its archived changes modified a requirement `add-y` touches
+- **THEN** `dkt rebase add-y` moves `base` in `openspec/changes/add-y/docket.yaml` to the new merge base and lists that requirement
+
+#### Scenario: Rebase a change made before docket.yaml
+- **WHEN** `add-y` has no `docket.yaml` and its `.openspec.yaml` holds `x-base`
+- **THEN** `dkt rebase add-y` moves `x-base` to the new merge base and creates no `docket.yaml`
+
+#### Scenario: Nothing to move
+- **WHEN** the merge base of HEAD and the default branch tip equals the change's current base
+- **THEN** `dkt rebase add-y` changes nothing and exits with 0
