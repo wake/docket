@@ -34,7 +34,7 @@ Docket 讀 repo 裡的檔案和 git 紀錄，做四種工作：
 | 組裝 | `brief`、`accept --export` | 把散在多個檔案的內容拼成給實作 agent 的 brief，或拼成給客戶確認的頁面 |
 | 流程包裝 | `init`、`new`、`archive`、`rebase` | 安裝 schema，依固定順序呼叫 OpenSpec CLI 和上面的檢查，並記下 base commit 與證據 |
 
-會寫檔的指令有：`init`（schema）、`new`（change 資料夾）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 spec 標題與 `evidence.md`）、`rebase`（`docket.yaml` 的 base 那一行；舊版 dkt 建立的 change 則是 `.openspec.yaml` 的那一行）。它們都不會 commit。
+會寫檔的指令有：`init`（schema、skill 與 Docket 區塊）、`new`（change 資料夾）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 spec 標題與 `evidence.md`）、`rebase`（`docket.yaml` 的 base 那一行；舊版 dkt 建立的 change 則是 `.openspec.yaml` 的那一行）。它們都不會 commit。
 
 ## Docket 不是什麼
 
@@ -42,17 +42,17 @@ Docket **不會**：
 
 - **判斷內容。**它不呼叫語言模型，也不判斷內容對不對，那是審查者的工作。
 - **保存狀態。**它回報的一切都能從 repo 和 git 重新算出來。
-- **修改 agent 設定。**它不碰 `CLAUDE.md`、`AGENTS.md`、`.claude/settings.json`。
+- **修改 agent 設定。**它不碰 `.claude/settings.json`；在 `AGENTS.md` 和 `CLAUDE.md` 裡只寫有標記的 Docket 區塊，兩個檔案缺哪個就建哪個。
 - **自己合併規格。**它不重寫 OpenSpec 的合併引擎，而是呼叫一個鎖定版本的 `openspec` CLI。
 
 ## 它假設的流程
 
-由 superpowers 開場。OpenSpec 從不主動啟動任何步驟，只在三個時間點被呼叫：建立 change 資料夾、驗證、封存。
+由 superpowers 開場。OpenSpec 從不主動啟動任何步驟，只在三個時間點被呼叫：建立 change 資料夾、驗證、封存。這些規則由 `docket` skill 承載，`dkt init` 會把它裝進專案。
 
 1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。同時符合好幾條時，取最重的：
    - 會改到 `openspec/specs/` 裡的句子：開 change，照下面的步驟走。任何設下新預期的改動也一樣，例如說不出「原本該怎樣」的 bug，或斷言新行為的測試：規格沒寫、也沒有既有行為可對照，改它就是在定義行為。
    - 讓程式回到規格行為的 bug 修正，或不改行為的重構（搬移程式碼也是重構）：修正要寫回歸測試，先看它在修正前失敗；重構要讓涵蓋它的測試前後都通過，而且突變改動的行會讓測試失敗。合併前讓整份 diff 審一次。會改變建置或執行的註解（例如編譯指令）算程式碼。完全不碰 OpenSpec。
-   - prompt 文字（agent 讀了會照做的文字，例如 `AGENTS.md`、schema 裡的說明；路徑列在 `AGENTS.md`）、只改測試而且測的是已經規定或已經存在的行為，以及 CI 這類檢查設定：prompt 用機械方式檢查，測試用突變它所測的程式碼來檢查，檢查設定靠 PR 自己跑的 CI 來檢查，合併前讓整份 diff 審一次。完全不碰 OpenSpec。
+   - prompt 文字（agent 讀了會照做的文字，例如 `AGENTS.md`、`docket` skill、schema 裡的說明；路徑列在 `AGENTS.md`）、只改測試而且測的是已經規定或已經存在的行為，以及 CI 這類檢查設定：prompt 用機械方式檢查，測試用突變它所測的程式碼來檢查，檢查設定靠 PR 自己跑的 CI 來檢查，合併前讓整份 diff 審一次。完全不碰 OpenSpec。
    - 給人讀的文件、程式碼或測試檔裡只改註解或空白（這不算改程式碼或測試）、版本號、只改相依套件清單的升級：只跑自動檢查，不另外審查。改到程式碼或測試檔時，先讓一個只讀 diff 的新 agent 確認每一行改動都是註解或空白，而且沒有會改變建置或執行的註解。依改到的東西歸類：prompt 裡的錯字算 prompt，搬移程式碼算重構。完全不碰 OpenSpec。
 2. **開 change。**在 git worktree 裡執行 `dkt new <slug>`，它會呼叫 `openspec new change`。
 3. **寫提案與 delta。**
@@ -91,7 +91,7 @@ Docket **不會**：
 ## 規劃中的指令（草案）
 
 ```
-dkt init [--force]                # 安裝 docket schema
+dkt init [--force]                # 安裝 docket schema、skill 與 Docket 區塊
 dkt new <slug> --kind feature|change-request|fix|baseline --source "<出處>" --title "<標題>"
 dkt lint [<slug>...]              # 文件規則
 dkt conflicts [<slug>]            # 被多個進行中 change 碰到的需求
@@ -127,6 +127,8 @@ go install github.com/wake/docket/cmd/dkt@latest
 ### 升級
 
 舊版 dkt 建立的 change 仍可使用：它們的 kind、source、base 會從 `.openspec.yaml` 的 `x-kind`、`x-source`、`x-base` 讀取。`dkt lint` 會要求為每一個補上帶 title 的 `docket.yaml`，每份主 spec 也各需要一個帶 title 的 `docket.yaml`。
+
+舊版 dkt 設定過的專案，請再跑一次 `dkt init`：它會加上 `docket` skill 和 Docket 區塊。把先前版本貼進 `AGENTS.md` 的「Change workflow」章節刪掉，並提交 `.claude/skills/docket/`、`.agents/skills/docket/`、`AGENTS.md` 與 `CLAUDE.md`。
 
 ## 需求（規劃中）
 

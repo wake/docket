@@ -34,7 +34,7 @@ Docket reads the files in the repository and the git history. It does four kinds
 | Assemble | `brief`, `accept --export` | Gathers pieces from several files into a brief for an implementing agent, or into a page a client can review |
 | Wrap | `init`, `new`, `archive`, `rebase` | Installs the schema, runs the OpenSpec CLI and the checks above in a fixed order, and records the base commit and the evidence |
 
-The commands that write files are `init` (the schema), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
+The commands that write files are `init` (the schema, the skill and the Docket block), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
 
 ## What Docket is not
 
@@ -42,17 +42,17 @@ Docket does **not**:
 
 - **Judge content.** It never calls a language model or decides whether content is correct. That is the reviewer's job.
 - **Store state.** Everything it reports can be recomputed from the repository and git.
-- **Edit agent configuration.** It never touches `CLAUDE.md`, `AGENTS.md` or `.claude/settings.json`.
+- **Edit agent configuration.** It never touches `.claude/settings.json`. In `AGENTS.md` and `CLAUDE.md` it writes only the marked Docket block, creating either file when missing.
 - **Merge specs itself.** It does not reimplement OpenSpec's merge engine; it calls a pinned `openspec` CLI.
 
 ## The workflow it assumes
 
-superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it.
+superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it. The `docket` skill carries these rules, and `dkt init` installs it.
 
 1. **Triage with brainstorming.** superpowers brainstorming reads the project and talks the idea through. When several paths apply, take the heaviest:
    - It changes a sentence in `openspec/specs/`: open a change and follow the steps below. So does any edit that sets an expectation no spec states and no existing behavior shows, such as a bug fix with no specified answer or a test that asserts new behavior, since it defines behavior.
    - A bug fix that restores the specified behavior, or a restructuring that changes no behavior (moving code is one): for a fix, write a regression test and see it fail before the fix; for a restructuring, the tests that cover the code pass before and after, and mutating the changed lines makes one fail. Have the diff reviewed once before merging. A comment that changes how the code builds or runs, such as a compiler directive, is code. OpenSpec is not involved.
-   - Prompt text (the text agents act on, such as `AGENTS.md` and the schema's instructions; list the paths in `AGENTS.md`), tests that check behavior already specified or already shown, and check settings such as CI configuration: check prompts mechanically, tests by mutating the code they cover, and check settings by the pull request's own CI run, and have the diff reviewed once before merging. OpenSpec is not involved.
+   - Prompt text (the text agents act on, such as `AGENTS.md`, the `docket` skill and the schema's instructions; list the paths in `AGENTS.md`), tests that check behavior already specified or already shown, and check settings such as CI configuration: check prompts mechanically, tests by mutating the code they cover, and check settings by the pull request's own CI run, and have the diff reviewed once before merging. OpenSpec is not involved.
    - Docs for people, edits that only change comments or whitespace in code or test files (these are not edits to code or tests), version bumps, and dependency upgrades that touch only the dependency manifests: no review beyond the automated checks. When such an edit touches a code or test file, a fresh agent that reads only the diff first confirms that every changed line is a comment or whitespace and that no comment changes how the code builds or runs. Sort by what is touched: a typo in a prompt is prompt text, and moving code is a restructuring. OpenSpec is not involved.
 2. **Open a change** in a git worktree with `dkt new <slug>`, which wraps `openspec new change`.
 3. **Write the proposal and the delta.**
@@ -91,7 +91,7 @@ We found no public project that uses a single list this way; most keep both file
 ## Planned commands (draft)
 
 ```
-dkt init [--force]                # install the docket schema
+dkt init [--force]                # install the docket schema, the skill and the Docket block
 dkt new <slug> --kind feature|change-request|fix|baseline --source "<origin>" --title "<title>"
 dkt lint [<slug>...]              # document rules
 dkt conflicts [<slug>]            # requirements touched by more than one active change
@@ -127,6 +127,8 @@ go install github.com/wake/docket/cmd/dkt@latest
 ### Upgrading
 
 Changes made by an older dkt still work: their kind, source and base are read from `x-kind`, `x-source` and `x-base` in `.openspec.yaml`. `dkt lint` asks for a `docket.yaml` with a title for each of them, and each main spec needs a `docket.yaml` with its title too.
+
+In a project set up by an older dkt, run `dkt init` again. It adds the `docket` skill and the Docket block. Delete any "Change workflow" section pasted into `AGENTS.md` from an earlier release, and commit `.claude/skills/docket/`, `.agents/skills/docket/`, `AGENTS.md` and `CLAUDE.md`.
 
 ## Requirements (planned)
 

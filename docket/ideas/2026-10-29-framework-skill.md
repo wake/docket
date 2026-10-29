@@ -58,14 +58,16 @@ to bring them in.
   `AGENTS.md` keeps no pointer or summary for them.
 - Docket supports a repository only after `dkt init`, with OpenSpec and
   superpowers installed. Docket's own repository is set up like any other.
+- Settled by the change `add-framework-skill`: the framework skill is
+  installed in the project (`.claude/skills/docket/` and
+  `.agents/skills/docket/`, committed); a marked Docket block in `AGENTS.md`
+  points to it and lets it win over superpowers defaults, and `CLAUDE.md`
+  reaches the block; the Reuse table stays in the framework.
 
 ## Open questions
 
-- Where the framework skill is installed (the project's `.claude/skills/`
-  or a plugin), and how `dkt init --force` updates it.
 - Where the materialized workflow lives for each agent: Claude Code reads
   user skills from `~/.claude/skills`, Codex from `~/.agents/skills`.
-- Whether the `## Reuse` table stays in the framework.
 - The checks `docket doctor` runs, and which of them `dkt` can do without
   judgment.
 - Queued ideas written before this split, to update when each is taken up:
@@ -73,6 +75,12 @@ to bring them in.
   sections; `2026-10-29-commit-gate.md` keeps its checks that work lands in
   the right container; `2026-10-28-lint-review-and-files.md` becomes a check
   of fields a project declares, or is dropped.
+
+## Status
+
+The change `add-framework-skill` took the first part (the skill and the
+block). Two later changes remain: the materialized workflow, and
+`docket doctor`.
 
 ## Notes
 
