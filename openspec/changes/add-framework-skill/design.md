@@ -60,9 +60,13 @@ Init first builds the list of writes: schema files, skill files, the
 `AGENTS.md` block, and `CLAUDE.md` when it needs one. For each it checks
 links, reads the current file, and for `AGENTS.md` and `CLAUDE.md` finds
 the markers. A link, a malformed block or an unreadable file stops the run
-before any write. Only then does it write, with the same no-follow writes
-as today. A failure during writing can leave earlier files written; a
-re-run finishes, since identical files are left alone.
+before any write. Only then does it write. A missing file is created with
+no-follow, exclusive writes as today; an existing file, which may now be a
+user's `AGENTS.md`, is written to a temporary file in its directory with
+its mode and renamed over it, so a failed write never leaves it
+half-written (this takes up the atomic-writes idea for init). A failure
+during writing can leave earlier files written; a re-run finishes, since
+identical files are left alone.
 
 ### Block placement and comparison
 

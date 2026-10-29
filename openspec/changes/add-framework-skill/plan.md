@@ -258,7 +258,7 @@ Expected: PASS
 
 **Files:**
 - Create: `.claude/skills/docket/SKILL.md` (written by `dkt init`)
-- Modify: `AGENTS.md`, `schema_test.go`, `README.md`, `README.zh-TW.md`, `docs/ARCHITECTURE.md`, `docket/ideas/2026-10-29-framework-skill.md`
+- Modify: `AGENTS.md`, `schema_test.go`, `README.md`, `README.zh-TW.md`, `docs/ARCHITECTURE.md`, `docket/ideas/2026-10-29-framework-skill.md`, `docket/ideas/2026-10-24-atomic-writes.md` (init now writes through a temporary file; the metadata writes remain)
 - Delete: `docket/ideas/2026-10-24-routing-section-fence.md`
 
 - [ ] **Step 1: Write the failing test**
