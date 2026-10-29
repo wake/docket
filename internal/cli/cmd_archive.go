@@ -105,7 +105,7 @@ func archiveHuman(rep archive.ArchiveReport) []string {
 		}
 	}
 	for _, d := range rep.Drifts {
-		h = append(h, fmt.Sprintf("%s / %s at x-base:", d.Capability, d.Requirement))
+		h = append(h, fmt.Sprintf("%s / %s at the base:", d.Capability, d.Requirement))
 		h = append(h, indented(d.Base)...)
 		h = append(h, "now:")
 		h = append(h, indented(d.Now)...)

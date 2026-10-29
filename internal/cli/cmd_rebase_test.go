@@ -57,7 +57,7 @@ func TestRebaseCommand(t *testing.T) {
 		t.Fatalf("result %v", res)
 	}
 	code, so, _ = runRebase(t, r, env, "add-x")
-	if code != 0 || !strings.Contains(so, "x-base is already "+c2[:7]) {
+	if code != 0 || !strings.Contains(so, "base is already "+c2[:7]) {
 		t.Fatalf("second run: %d %s", code, so)
 	}
 }

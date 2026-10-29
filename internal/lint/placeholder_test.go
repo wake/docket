@@ -71,6 +71,7 @@ func TestPlaceholderInPlan(t *testing.T) {
 	repo := repoWith(map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal,
 		"openspec/changes/add-x/plan.md":     plan,
+		"openspec/changes/add-x/docket.yaml": "title: X\n",
 	})
 	f := wantOne(t, runOn(repo), "placeholder", lineOf(plan, "<name>"))
 	if f.File != "openspec/changes/add-x/plan.md" || !strings.Contains(f.Message, "<name>") {
@@ -82,6 +83,7 @@ func TestPlaceholderInOtherFile(t *testing.T) {
 	comment := templateWhyComment(t)
 	repo := repoWith(map[string]string{
 		"openspec/changes/add-x/proposal.md":    validProposal,
+		"openspec/changes/add-x/docket.yaml":    "title: X\n",
 		"openspec/changes/add-x/.openspec.yaml": "x: 1\n# " + comment + "\n",
 		"openspec/changes/add-x/notes/a.txt":    "\n\n" + comment,
 	})

@@ -31,7 +31,7 @@ func TestRoutingFinding(t *testing.T) {
 }
 
 func TestRoutingUnreadable(t *testing.T) {
-	repo := repoWith(map[string]string{"openspec/changes/add-x/.openspec.yaml": "schema: docket\n"})
+	repo := repoWith(map[string]string{"openspec/changes/add-x/.openspec.yaml": "schema: docket\n", "openspec/changes/add-x/docket.yaml": "title: X\n"})
 	rep := Run(Input{Repo: repo, Templates: docket.Schema(), AddedErr: errors.New("no default branch")})
 	if len(rep.Unreadable) != 1 || rep.Unreadable[0].Source != "routing" || rep.Unreadable[0].Reason != "no default branch" {
 		t.Fatalf("unreadable = %+v", rep.Unreadable)

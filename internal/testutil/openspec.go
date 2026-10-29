@@ -54,12 +54,9 @@ new)
     ln -s "$FAKE_OPENSPEC_LINK_CHANGES" openspec/changes
   fi
   mkdir -p "openspec/changes/$slug"
-  if [ "$FAKE_OPENSPEC_BAD_YAML" = "1" ]; then
-    printf 'schema: [\n' > "openspec/changes/$slug/.openspec.yaml"
-  elif [ "$FAKE_OPENSPEC_NO_EOL" = "1" ]; then
-    printf 'schema: %s\ncreated: 2026-01-02' "$schema" > "openspec/changes/$slug/.openspec.yaml"
-  else
-    printf 'schema: %s\ncreated: 2026-01-02\n' "$schema" > "openspec/changes/$slug/.openspec.yaml"
+  printf 'schema: %s\ncreated: 2026-01-02\n' "$schema" > "openspec/changes/$slug/.openspec.yaml"
+  if [ "$FAKE_OPENSPEC_DOCKET_YAML" = "1" ]; then
+    printf 'title: preexisting\n' > "openspec/changes/$slug/docket.yaml"
   fi
   if [ "$FAKE_OPENSPEC_LOCK_CHILD" = "1" ]; then
     mkdir "openspec/changes/$slug/locked"

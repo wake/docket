@@ -79,7 +79,11 @@ func statusLine(ch status.Change) string {
 	if ch.LastActivity != nil {
 		idle = fmt.Sprintf("idle %dd", ch.LastActivity.IdleDays)
 	}
-	line := fmt.Sprintf("%s  %s  %d/%d tasks  %s", ch.Slug, ch.Phase, ch.Progress.TasksDone, ch.Progress.TasksTotal, idle)
+	head := ch.Slug
+	if ch.Title != nil {
+		head = fmt.Sprintf("%s  %q", ch.Slug, *ch.Title)
+	}
+	line := fmt.Sprintf("%s  %s  %d/%d tasks  %s", head, ch.Phase, ch.Progress.TasksDone, ch.Progress.TasksTotal, idle)
 	if ch.Uncommitted != nil {
 		line += fmt.Sprintf("  %d uncommitted", *ch.Uncommitted)
 	}

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 const bookingDelta = "## ADDED Requirements\n\n### Requirement: Join\n\nThe system SHALL join.\n\n#### Scenario: Join when full\n\n- **WHEN** x\n- **THEN** y\n"
@@ -16,6 +17,9 @@ func scenRepo(plan string, files map[string]string) Report {
 	m := planRepo(plan)
 	for p, s := range files {
 		m[p] = repoWith(map[string]string{p: s})[p]
+		if strings.HasSuffix(p, "/spec.md") {
+			m[strings.TrimSuffix(p, "spec.md")+"docket.yaml"] = &fstest.MapFile{Data: []byte("title: X\n")}
+		}
 	}
 	return runOn(m)
 }
@@ -177,6 +181,7 @@ func TestDuplicatesWithoutPlan(t *testing.T) {
 	d := "## ADDED Requirements\n\n### Requirement: A\n\nx\n\n#### Scenario: S\n\n- a\n\n#### Scenario: S\n\n- a\n"
 	r := runOn(repoWith(map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal, deltaAt("booking"): d,
+		"openspec/changes/add-x/docket.yaml": "title: X\n", "openspec/changes/add-x/specs/booking/docket.yaml": "title: X\n",
 	}))
 	if len(dupFindings(r)) != 1 || len(r.Findings) != 1 {
 		t.Fatalf("findings = %+v", r.Findings)

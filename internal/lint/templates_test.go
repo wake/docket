@@ -25,7 +25,9 @@ func (f failingFS) Open(name string) (fs.File, error) {
 func twoChanges() fstest.MapFS {
 	return repoWith(map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal,
+		"openspec/changes/add-x/docket.yaml": "title: X\n",
 		"openspec/changes/add-y/proposal.md": validProposal,
+		"openspec/changes/add-y/docket.yaml": "title: Y\n",
 	})
 }
 

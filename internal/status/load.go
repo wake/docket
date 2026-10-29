@@ -12,7 +12,7 @@ import (
 	"github.com/wake/docket/internal/scan"
 )
 
-// Metadata is what .openspec.yaml records about where a change came from.
+// Metadata is what a change's metadata files record about where a change came from.
 type Metadata struct {
 	Kind    string `json:"kind"`
 	Source  string `json:"source"`
@@ -39,6 +39,7 @@ type Activity struct {
 // Change is one active change with its phase, tasks and activity.
 type Change struct {
 	Slug         string        `json:"slug"`
+	Title        *string       `json:"title"`
 	Sources      []scan.Source `json:"sources"`
 	Metadata     *Metadata     `json:"metadata"`
 	Documents    Documents     `json:"documents"`
@@ -56,7 +57,7 @@ type Change struct {
 func Load(g gitx.Git, inv scan.Inventory, now time.Time) ([]Change, []scan.Unreadable, error) {
 	keep := func(rel string) bool {
 		switch rel {
-		case ".openspec.yaml", "proposal.md", "design.md", "plan.md":
+		case change.DocketFile, change.OpenSpecFile, "proposal.md", "design.md", "plan.md":
 			return true
 		}
 		_, ok := delta.CapabilityPath(rel)
@@ -77,13 +78,14 @@ func Load(g gitx.Git, inv scan.Inventory, now time.Time) ([]Change, []scan.Unrea
 		unread = append(unread, bad...)
 		ch := Change{Slug: c.Slug, Sources: c.Sources, Documents: documentsOf(files)}
 		base := ""
-		if b, ok := files[".openspec.yaml"]; ok {
-			// A malformed .openspec.yaml leaves the change without metadata, so
-			// without base, commits and activity; dkt lint reports the file.
-			if m, err := change.ParseMetadata(b); err == nil {
-				ch.Metadata = &Metadata{Kind: m.Kind, Source: m.Source, Base: m.Base, Created: m.Created}
-				base = m.Base
+		// Unreadable metadata leaves the change without metadata, title, base,
+		// commits and activity; dkt lint reports the file.
+		if m, err := change.ReadMetadata(files); err == nil {
+			ch.Metadata = &Metadata{Kind: m.Kind, Source: m.Source, Base: m.Base, Created: m.Created}
+			if m.Title != "" {
+				ch.Title = &m.Title
 			}
+			base = m.Base
 		}
 		commits, err := rangeCommits(g, base, src.Commit)
 		if err != nil {

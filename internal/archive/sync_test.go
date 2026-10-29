@@ -340,3 +340,24 @@ func TestSyncNoCommits(t *testing.T) {
 		t.Fatalf("%v %+v", err, rep)
 	}
 }
+
+func TestSyncCountsFromDocketBase(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "main")
+	r.Commit("init", map[string]string{"README.md": "x\n"})
+	work(r, "add-x", "1")
+	base := strings.TrimSpace(r.Git("rev-parse", "HEAD"))
+	r.Commit("add the change", map[string]string{
+		"openspec/changes/add-x/docket.yaml": "title: X\nkind: feature\nsource: a\nbase: " + base + "\n",
+		"openspec/changes/add-x/plan.md":     planText("\n"),
+	})
+	work(r, "add-x", "2")
+	e := Env{Git: gitx.Git{Dir: r.Dir, Env: r.Env}, Root: r.Dir}
+	rep, err := Sync(e, "add-x", false)
+	if err != nil || len(rep.Findings) != 0 {
+		t.Fatalf("%v %+v", err, rep)
+	}
+	if !reflect.DeepEqual(rep.Ticked, []TaskTicks{{2, 1}}) {
+		t.Fatalf("ticked %+v", rep.Ticked)
+	}
+}

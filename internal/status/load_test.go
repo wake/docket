@@ -338,7 +338,7 @@ func TestMetadataUnusable(t *testing.T) {
 				t.Fatalf("unreadable = %+v", unread)
 			}
 			c := mustFind(t, cs, "add-x")
-			parsed, perr := change.ParseMetadata([]byte(tc.yaml))
+			parsed, perr := change.ReadMetadata(map[string][]byte{".openspec.yaml": []byte(tc.yaml)})
 			if perr != nil {
 				if c.Metadata != nil {
 					t.Fatalf("metadata = %+v, want nil", c.Metadata)

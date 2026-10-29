@@ -35,10 +35,12 @@ func archiveFixture(t *testing.T) *testutil.Repo {
 	r.Commit("code", map[string]string{"internal/x.go": "package x\n", "openspec/config.yaml": "schema: docket\n"})
 	base := r.Git("rev-parse", "HEAD")
 	r.Commit("add the change", map[string]string{
-		"openspec/changes/add-x/.openspec.yaml":  "schema: docket\nx-base: " + base + "\n",
-		"openspec/changes/add-x/proposal.md":     lintProposal,
-		"openspec/changes/add-x/specs/x/spec.md": archiveDelta,
-		"openspec/changes/add-x/plan.md":         archivePlan,
+		"openspec/changes/add-x/.openspec.yaml":      "schema: docket\n",
+		"openspec/changes/add-x/proposal.md":         lintProposal,
+		"openspec/changes/add-x/docket.yaml":         "title: X\nkind: feature\nsource: test\nbase: " + base + "\n",
+		"openspec/changes/add-x/specs/x/docket.yaml": "title: X\n",
+		"openspec/changes/add-x/specs/x/spec.md":     archiveDelta,
+		"openspec/changes/add-x/plan.md":             archivePlan,
 	})
 	r.Commit("work\n\nChange: add-x\nTask: 1", map[string]string{"a.txt": "a\n"})
 	code, so, se := runLint(t, r.Dir, r.Env, "add-x")
@@ -153,7 +155,7 @@ func TestArchiveHumanDriftAndReadings(t *testing.T) {
 		Readings: &archive.Readings{Docket: []string{"a", "b"}, OpenSpec: nil},
 	}
 	got := archiveHuman(rep)
-	want := []string{"x / Do x at x-base:", "  (absent)", "now:", "  line1", "  line2",
+	want := []string{"x / Do x at the base:", "  (absent)", "now:", "  line1", "  line2",
 		"docket:", "  a", "  b", "openspec:", "  (absent)"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %q\nwant %q", got, want)
@@ -208,10 +210,12 @@ func TestArchiveKeepsItsReportOnAnInfrastructureError(t *testing.T) {
 	r := archiveFixture(t)
 	base := r.Git("rev-parse", "HEAD~2")
 	r.Commit("add the second change", map[string]string{
-		"openspec/changes/add-y/.openspec.yaml":  "schema: docket\nx-base: " + base + "\n",
-		"openspec/changes/add-y/proposal.md":     lintProposal,
-		"openspec/changes/add-y/specs/x/spec.md": archiveDelta,
-		"openspec/changes/add-y/plan.md":         archivePlan,
+		"openspec/changes/add-y/.openspec.yaml":      "schema: docket\n",
+		"openspec/changes/add-y/proposal.md":         lintProposal,
+		"openspec/changes/add-y/docket.yaml":         "title: Y\nkind: feature\nsource: test\nbase: " + base + "\n",
+		"openspec/changes/add-y/specs/x/docket.yaml": "title: Y\n",
+		"openspec/changes/add-y/specs/x/spec.md":     archiveDelta,
+		"openspec/changes/add-y/plan.md":             archivePlan,
 	})
 	r.Commit("more work\n\nChange: add-y\nTask: 1", map[string]string{"b.txt": "b\n"})
 	if code, so, se := runLint(t, r.Dir, r.Env, "add-y"); code != 0 {
@@ -277,10 +281,12 @@ func TestArchiveWithOpenSpec(t *testing.T) {
 	for i, slug := range []string{"add-x", "add-y"} {
 		then := []string{"it is cancelled at once", "it is cancelled late"}[i]
 		r.Commit("add "+slug, map[string]string{
-			"openspec/changes/" + slug + "/.openspec.yaml":        "schema: docket\nx-base: " + base + "\n",
-			"openspec/changes/" + slug + "/proposal.md":           strings.Replace(lintProposal, "`x`", "`booking`", 1),
-			"openspec/changes/" + slug + "/specs/booking/spec.md": realDelta(then),
-			"openspec/changes/" + slug + "/plan.md":               plan,
+			"openspec/changes/" + slug + "/.openspec.yaml":            "schema: docket\n",
+			"openspec/changes/" + slug + "/proposal.md":               strings.Replace(lintProposal, "`x`", "`booking`", 1),
+			"openspec/changes/" + slug + "/docket.yaml":               "title: " + slug + "\nkind: feature\nsource: x\nbase: " + base + "\n",
+			"openspec/changes/" + slug + "/specs/booking/spec.md":     realDelta(then),
+			"openspec/changes/" + slug + "/specs/booking/docket.yaml": "title: Booking\n",
+			"openspec/changes/" + slug + "/plan.md":                   plan,
 		})
 		r.Commit("work\n\nChange: "+slug+"\nTask: 1", map[string]string{slug + ".txt": "a\n"})
 	}
@@ -305,6 +311,9 @@ func TestArchiveWithOpenSpec(t *testing.T) {
 	spec, _ := os.ReadFile(filepath.Join(r.Dir, "openspec/specs/booking/spec.md"))
 	if !strings.Contains(string(spec), "it is cancelled at once") {
 		t.Fatalf("specs not merged:\n%s", spec)
+	}
+	if title, _ := os.ReadFile(filepath.Join(r.Dir, "openspec/specs/booking/docket.yaml")); string(title) != "title: Booking\n" {
+		t.Fatalf("spec title = %q", title)
 	}
 	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/changes/add-y/plan.md")); err != nil {
 		t.Fatalf("add-y touched: %v", err)

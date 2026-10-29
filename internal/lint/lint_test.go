@@ -99,7 +99,9 @@ func wantOne(t *testing.T, r Report, rule string, line int) Finding {
 func TestLintEveryActiveChange(t *testing.T) {
 	repo := repoWith(map[string]string{
 		"openspec/changes/add-y/proposal.md":                    validProposal,
+		"openspec/changes/add-y/docket.yaml":                    "title: Y\n",
 		"openspec/changes/add-x/proposal.md":                    validProposal,
+		"openspec/changes/add-x/docket.yaml":                    "title: X\n",
 		"openspec/changes/archive/2026-01-01-add-z/proposal.md": "junk",
 	})
 	r := runOn(repo)
@@ -119,7 +121,7 @@ func TestNoChangesDirectory(t *testing.T) {
 }
 
 func TestNamedChangeMissing(t *testing.T) {
-	repo := repoWith(map[string]string{"openspec/changes/add-x/proposal.md": validProposal})
+	repo := repoWith(map[string]string{"openspec/changes/add-x/proposal.md": validProposal, "openspec/changes/add-x/docket.yaml": "title: X\n"})
 	for _, slug := range []string{"add-z", "../x", "a/b", "archive"} {
 		r := runOn(repo, slug)
 		f := wantOne(t, r, "change-missing", 0)
@@ -135,6 +137,7 @@ func TestNamedChangeMissing(t *testing.T) {
 func TestNamedChangeLintsOnlyThat(t *testing.T) {
 	repo := repoWith(map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal,
+		"openspec/changes/add-x/docket.yaml": "title: X\n",
 		"openspec/changes/add-y/proposal.md": "",
 	})
 	r := runOn(repo, "add-x")
@@ -144,14 +147,14 @@ func TestNamedChangeLintsOnlyThat(t *testing.T) {
 }
 
 func TestValidProposalIsClean(t *testing.T) {
-	r := runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": validProposal}))
+	r := runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": validProposal, "openspec/changes/add-x/docket.yaml": "title: X\n"}))
 	if len(r.Findings) != 0 || len(r.Unreadable) != 0 {
 		t.Fatalf("report = %+v", r)
 	}
 }
 
 func TestPlanNotWrittenYet(t *testing.T) {
-	repo := repoWith(map[string]string{"openspec/changes/add-x/proposal.md": validProposal})
+	repo := repoWith(map[string]string{"openspec/changes/add-x/proposal.md": validProposal, "openspec/changes/add-x/docket.yaml": "title: X\n"})
 	for _, f := range runOn(repo).Findings {
 		t.Errorf("unexpected %+v", f)
 	}
@@ -159,13 +162,13 @@ func TestPlanNotWrittenYet(t *testing.T) {
 
 func TestCRLFProposal(t *testing.T) {
 	crlf := "\xef\xbb\xbf" + strings.ReplaceAll(validProposal, "\n", "\r\n")
-	r := runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": crlf}))
+	r := runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": crlf, "openspec/changes/add-x/docket.yaml": "title: X\n"}))
 	if len(r.Findings) != 0 {
 		t.Fatalf("findings = %+v", r.Findings)
 	}
 	broken := strings.Replace(crlf, "| 2026-10-24 | review", "| 2026-10-24 |  ", 1)
 	want := strings.Count(validProposal[:strings.Index(validProposal, "| 2026-10-24")], "\n") + 1
-	wantOne(t, runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": broken})), "change-log", want)
+	wantOne(t, runOn(repoWith(map[string]string{"openspec/changes/add-x/proposal.md": broken, "openspec/changes/add-x/docket.yaml": "title: X\n"})), "change-log", want)
 }
 
 func osRepo(t *testing.T, files map[string]string) string {
@@ -189,7 +192,9 @@ func osRepo(t *testing.T, files map[string]string) string {
 func TestUnreadableFile(t *testing.T) {
 	root := osRepo(t, map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal,
+		"openspec/changes/add-x/docket.yaml": "title: X\n",
 		"openspec/changes/add-x/plan.md":     "# Plan\n",
+		"openspec/changes/add-y/docket.yaml": "title: Y\n",
 		"openspec/changes/add-y/proposal.md": strings.Replace(validProposal, "## Non-Goals", "## Other", 1),
 	})
 	plan := filepath.Join(root, "openspec/changes/add-x/plan.md")
@@ -213,6 +218,7 @@ func TestUnreadableChangeDirectory(t *testing.T) {
 	root := osRepo(t, map[string]string{
 		"openspec/changes/add-x/proposal.md": validProposal,
 		"openspec/changes/add-y/proposal.md": validProposal,
+		"openspec/changes/add-y/docket.yaml": "title: Y\n",
 	})
 	dir := filepath.Join(root, "openspec/changes/add-x")
 	if err := os.Chmod(dir, 0); err != nil {

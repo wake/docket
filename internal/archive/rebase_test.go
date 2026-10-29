@@ -174,3 +174,41 @@ func TestWriteOrRefuseLinkedParentDirectory(t *testing.T) {
 		t.Fatalf("written: %s", b)
 	}
 }
+
+const docketPath = "openspec/changes/add-y/docket.yaml"
+
+func TestRebaseDocketYAML(t *testing.T) {
+	e, c1, c2 := movedRepo(t)
+	docket := "title: Booking\nkind: feature\nsource: a\nbase: " + c1 + "\n"
+	legacy := "schema: docket\n"
+	for p, c := range map[string]string{docketPath: docket, metaPath: legacy} {
+		if err := os.WriteFile(filepath.Join(e.Root, p), []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rep, err := Rebase(e, "add-y")
+	if err != nil || len(rep.Findings) != 0 || !rep.Moved || rep.From != c1 || rep.To != c2 {
+		t.Fatalf("%v %+v", err, rep)
+	}
+	b, _ := os.ReadFile(filepath.Join(e.Root, docketPath))
+	if string(b) != strings.Replace(docket, c1, c2, 1) {
+		t.Fatalf("docket.yaml:\n%s", b)
+	}
+	if got := readMeta(t, e.Root); got != legacy {
+		t.Fatalf(".openspec.yaml changed:\n%s", got)
+	}
+}
+
+func TestRebaseLegacy(t *testing.T) {
+	e, c1, c2 := movedRepo(t)
+	rep, err := Rebase(e, "add-y")
+	if err != nil || !rep.Moved || rep.From != c1 || rep.To != c2 {
+		t.Fatalf("%v %+v", err, rep)
+	}
+	if got := readMeta(t, e.Root); !strings.Contains(got, "x-base: "+c2) {
+		t.Fatalf("%s", got)
+	}
+	if _, err := os.Stat(filepath.Join(e.Root, docketPath)); !os.IsNotExist(err) {
+		t.Fatalf("docket.yaml created: %v", err)
+	}
+}

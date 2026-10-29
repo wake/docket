@@ -89,7 +89,7 @@ func touched(d delta.Delta, withTo bool) (existing, added []string) {
 }
 
 // checkBase compares, for every capability the change has a delta for, the
-// main spec at x-base with the main spec in the worktree. It returns the
+// main spec at the base with the main spec in the worktree. It returns the
 // drifts, a finding for each, the sources it could not read, and how many
 // requirement names it checked.
 func checkBase(e Env, c *loadedChange) (drifts []Drift, finds []Finding, unread []Unreadable, checked int) {
@@ -118,7 +118,7 @@ func checkBase(e Env, c *loadedChange) (drifts []Drift, finds []Finding, unread 
 			}
 			drifts = append(drifts, Drift{capability, name, then[name].Text, now[name].Text})
 			finds = append(finds, Finding{Rule: "base-drift", Change: c.Slug, File: file, Line: now[name].Line,
-				Message: fmt.Sprintf("requirement %q of %s changed since x-base; update the delta, then run dkt rebase %s", name, capability, c.Slug)})
+				Message: fmt.Sprintf("requirement %q of %s changed since the base; update the delta, then run dkt rebase %s", name, capability, c.Slug)})
 		}
 		for _, name := range added {
 			checked++
@@ -128,7 +128,7 @@ func checkBase(e Env, c *loadedChange) (drifts []Drift, finds []Finding, unread 
 			}
 			drifts = append(drifts, Drift{capability, name, "", now[name].Text})
 			finds = append(finds, Finding{Rule: "name-taken", Change: c.Slug, File: file, Line: now[name].Line,
-				Message: fmt.Sprintf("requirement %q of %s was added to the main spec since x-base; rename the ADDED requirement or fold it into a MODIFIED one, then run dkt rebase %s", name, capability, c.Slug)})
+				Message: fmt.Sprintf("requirement %q of %s was added to the main spec since the base; rename the ADDED requirement or fold it into a MODIFIED one, then run dkt rebase %s", name, capability, c.Slug)})
 		}
 	}
 	return

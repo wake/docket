@@ -76,6 +76,7 @@ func lintFixture(t *testing.T) *testutil.Repo {
 	for _, slug := range []string{"add-x", "add-y"} {
 		r.Write("openspec/changes/"+slug+"/.openspec.yaml", "schema: docket\n")
 		r.Write("openspec/changes/"+slug+"/proposal.md", lintProposal)
+		r.Write("openspec/changes/"+slug+"/docket.yaml", "title: "+slug+"\n")
 	}
 	return r
 }
