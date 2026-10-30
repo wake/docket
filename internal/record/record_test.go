@@ -139,6 +139,26 @@ func TestCreateTooLong(t *testing.T) {
 	if es, _ := os.ReadDir(dir); len(es) != 0 {
 		t.Errorf("wrote %d files", len(es))
 	}
+
+	missing := filepath.Join(t.TempDir(), "records")
+	_, err = Create(missing, slug, func(s string) bool { return s == slug }, []byte("x"))
+	if !errors.Is(err, ErrTooLong) {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := os.Lstat(missing); err == nil {
+		t.Error("the folder was created")
+	}
+}
+
+func TestCreateMakesTheFolder(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "docket", "records")
+	got, err := Create(dir, "x", never, []byte("hello\n"))
+	if err != nil || got != "x" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "x.md")); err != nil || string(b) != "hello\n" {
+		t.Errorf("%q, %v", b, err)
+	}
 }
 
 func TestRender(t *testing.T) {

@@ -168,9 +168,7 @@ func TestRecordSuffixTooLong(t *testing.T) {
 	if code != 1 || !hasRule(t, so, "slug-invalid") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
-	if ents, _ := os.ReadDir(filepath.Join(r.Dir, "docket/records")); len(ents) != 0 {
-		t.Errorf("records written: %v", ents)
-	}
+	noDocketDir(t, r.Dir)
 }
 
 func TestRecordNameTakenInThisWorktree(t *testing.T) {

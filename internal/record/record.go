@@ -84,7 +84,9 @@ func (e *LinkError) Error() string {
 	return e.Name + " is a symbolic link; Docket does not write through links"
 }
 
-// Create writes content to the first free record file in dir: slug, then
+// Create writes content to the first free record file in dir, creating dir
+// when it first needs to open a file (so nothing is created when it returns
+// ErrTooLong without trying one): slug, then
 // slug-2, slug-3, and so on. A candidate is skipped when used reports it or
 // when its file exists; the file is created exclusively, so concurrent runs
 // never take the same one. It returns the slug written. A symbolic link in
@@ -100,6 +102,9 @@ func Create(dir, slug string, used func(slug string) bool, content []byte) (stri
 			continue
 		}
 		path := filepath.Join(dir, cand+".md")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", err
+		}
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
 		if errors.Is(err, fs.ErrExist) {
 			fi, lerr := os.Lstat(path)

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -64,9 +63,6 @@ func recordCommand() Command {
 				return Outcome{}, err
 			}
 			dir := filepath.Join(c.Repo.Root, filepath.FromSlash(record.Dir))
-			if err := os.MkdirAll(dir, 0o755); err != nil {
-				return Outcome{}, err
-			}
 			written, err := record.Create(dir, slug, func(cand string) bool { return inv.RecordSources(cand) != nil }, content)
 			var le *record.LinkError
 			switch {
