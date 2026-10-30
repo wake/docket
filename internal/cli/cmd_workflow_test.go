@@ -298,6 +298,33 @@ func TestWorkflowBrokenLink(t *testing.T) {
 	}
 }
 
+func TestWorkflowBrokenParentLink(t *testing.T) {
+	env, _ := wfConfig(t)
+	x := t.TempDir()
+	if err := os.Symlink(filepath.Join(t.TempDir(), "gone"), filepath.Join(x, "docket")); err != nil {
+		t.Fatal(err)
+	}
+	var e []string
+	for _, v := range env {
+		if !strings.HasPrefix(v, "XDG_CONFIG_HOME=") {
+			e = append(e, v)
+		}
+	}
+	e = append(e, "XDG_CONFIG_HOME="+x)
+	code, so, _ := runWorkflow(t, nil, e, "workflow", "--json")
+	if code != 3 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	m := decode(t, so)
+	u, _ := m["unreadable"].([]any)
+	if len(u) != 1 || u[0].(map[string]any)["source"] != filepath.Join(x, "docket", "workflow.md") {
+		t.Errorf("unreadable = %v", u)
+	}
+	if m["result"] != nil {
+		t.Errorf("result = %v", m["result"])
+	}
+}
+
 func TestWorkflowThroughLink(t *testing.T) {
 	env, path := wfConfig(t)
 	target := filepath.Join(t.TempDir(), "real.md")

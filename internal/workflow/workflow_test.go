@@ -140,4 +140,23 @@ func TestRead(t *testing.T) {
 	if _, _, err := Read(d); err == nil {
 		t.Error("directory: want error")
 	}
+	gone := filepath.Join(d, "gone")
+	badDir := filepath.Join(d, "baddir")
+	if err := os.Symlink(gone, badDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err := Read(filepath.Join(badDir, "workflow.md")); err == nil || found {
+		t.Errorf("parent link to a missing directory: found %v err %v", found, err)
+	}
+	realDir := filepath.Join(d, "realdir")
+	if err := os.Mkdir(realDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	okDir := filepath.Join(d, "okdir")
+	if err := os.Symlink(realDir, okDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, found, err := Read(filepath.Join(okDir, "workflow.md")); err != nil || found {
+		t.Errorf("parent link to an existing directory: found %v err %v", found, err)
+	}
 }

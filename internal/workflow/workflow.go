@@ -82,15 +82,28 @@ func Hash(text string) string {
 }
 
 // Read reads the file at path. A path that does not exist gives found false
-// and a nil error; a dangling link, a directory or any other failure is an error.
+// and a nil error. A dangling link anywhere in the path (the deepest existing
+// entry is a link whose target does not exist), a directory or any other
+// failure is an error.
 func Read(path string) (b []byte, found bool, err error) {
 	b, err = os.ReadFile(path)
 	if err == nil {
 		return b, true, nil
 	}
 	if errors.Is(err, fs.ErrNotExist) {
-		if _, lerr := os.Lstat(path); lerr == nil {
-			return nil, false, fmt.Errorf("%s is a link whose target does not exist", path)
+		p := path
+		for {
+			if _, lerr := os.Lstat(p); lerr == nil {
+				if _, serr := os.Stat(p); serr != nil && errors.Is(serr, fs.ErrNotExist) {
+					return nil, false, fmt.Errorf("%s is a link whose target does not exist", p)
+				}
+				break
+			}
+			parent := filepath.Dir(p)
+			if parent == p {
+				break
+			}
+			p = parent
 		}
 		return nil, false, nil
 	}
