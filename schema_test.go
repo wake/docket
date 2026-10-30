@@ -10,6 +10,30 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+func TestTemplateHeadings(t *testing.T) {
+	lines := strings.Split(Template(), "\n")
+	for _, h := range []string{"## Full review", "## Light review", "## Check", "## Direct merge", "## Reviews"} {
+		n := 0
+		for _, l := range lines {
+			if l == h {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("template has %q on %d whole lines, want 1", h, n)
+		}
+	}
+}
+
+func TestTemplateNamesNoProduct(t *testing.T) {
+	low := strings.ToLower(Template())
+	for _, w := range []string{"claude", "opus", "sonnet", "haiku", "fable", "gpt", "codex", "gemini", "openai", "anthropic", "superpowers", "copilot"} {
+		if strings.Contains(low, w) {
+			t.Errorf("template names %q", w)
+		}
+	}
+}
+
 func TestSchemaHasSchemaFile(t *testing.T) {
 	b, err := fs.ReadFile(Schema(), "schema.yaml")
 	if err != nil {

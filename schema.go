@@ -1,5 +1,6 @@
 // Package docket embeds the assets the dkt command ships: the OpenSpec
-// schema, the skill and the Docket block of AGENTS.md.
+// schema, the skill, the Docket block of AGENTS.md and the workflow
+// template.
 package docket
 
 import (
@@ -14,6 +15,13 @@ var schemaFS embed.FS
 
 //go:embed AGENTS.md
 var agentsMD string
+
+//go:embed workflow/template.md
+var workflowTemplate string
+
+// Template returns the workflow template, workflow/template.md: the review
+// and verification steps for each path, worded in capabilities.
+func Template() string { return workflowTemplate }
 
 // Schema returns the files of openspec/schemas/docket, with paths relative
 // to that directory (schema.yaml, templates/proposal.md, ...).
