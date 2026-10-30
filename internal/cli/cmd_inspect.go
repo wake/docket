@@ -12,7 +12,7 @@ import (
 	"github.com/wake/docket/internal/workflow"
 )
 
-// InspectResult is the result of dkt inspect. Later checks add their fields.
+// InspectResult is the result of dkt inspect.
 type InspectResult struct {
 	Files    []InspectFile   `json:"files"`
 	OpenSpec OpenSpecState   `json:"openspec"`
