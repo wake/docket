@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/wake/docket/internal/setup"
 )
 
 func TestTemplateHeadings(t *testing.T) {
@@ -56,7 +58,13 @@ func TestSchemaHasTemplates(t *testing.T) {
 }
 
 func TestSkillFrontmatter(t *testing.T) {
-	b, err := fs.ReadFile(Skill(), "SKILL.md")
+	for _, sk := range Skills() {
+		t.Run(sk.Name, func(t *testing.T) { checkSkillFrontmatter(t, sk) })
+	}
+}
+
+func checkSkillFrontmatter(t *testing.T, sk setup.Skill) {
+	b, err := fs.ReadFile(sk.Files, "SKILL.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +84,7 @@ func TestSkillFrontmatter(t *testing.T) {
 	if err := yaml.Unmarshal([]byte(rest[:end]), &fm); err != nil {
 		t.Fatal(err)
 	}
-	if fm.Name != "docket" {
+	if fm.Name != sk.Name {
 		t.Errorf("name = %q", fm.Name)
 	}
 	if fm.Description == "" || len(fm.Description) > 1024 {
@@ -110,25 +118,27 @@ func TestPlanTemplateReviewLine(t *testing.T) {
 }
 
 func TestInstalledSkillMatchesShipped(t *testing.T) {
-	err := fs.WalkDir(Skill(), ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		want, err := fs.ReadFile(Skill(), p)
-		if err != nil {
-			return err
-		}
-		got, err := os.ReadFile(filepath.Join(".claude", "skills", "docket", filepath.FromSlash(p)))
-		if err != nil {
-			t.Errorf("%s: %v", p, err)
+	for _, sk := range Skills() {
+		err := fs.WalkDir(sk.Files, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			want, err := fs.ReadFile(sk.Files, p)
+			if err != nil {
+				return err
+			}
+			got, err := os.ReadFile(filepath.Join(".claude", "skills", sk.Name, filepath.FromSlash(p)))
+			if err != nil {
+				t.Errorf("%s/%s: %v", sk.Name, p, err)
+				return nil
+			}
+			if string(got) != string(want) {
+				t.Errorf("%s/%s differs from the shipped copy", sk.Name, p)
+			}
 			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
-		if string(got) != string(want) {
-			t.Errorf("%s differs from the shipped copy", p)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 }

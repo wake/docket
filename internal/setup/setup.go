@@ -1,4 +1,4 @@
-// Package setup installs the docket schema and skill into a repository.
+// Package setup installs the docket schema and skills into a repository.
 package setup
 
 import (
@@ -48,11 +48,18 @@ type Result struct {
 	Files               []File `json:"files"`
 }
 
+// Skill is one skill folder: its name, and its files with paths relative to
+// that folder (SKILL.md, ...).
+type Skill struct {
+	Name  string
+	Files fs.FS
+}
+
 // Assets are the files Init installs.
 type Assets struct {
-	Schema fs.FS  // installed under schemaDir
-	Skill  fs.FS  // installed under each of skillDirs
-	Block  string // the Docket block kept in AGENTS.md and CLAUDE.md
+	Schema fs.FS   // installed under schemaDir
+	Skills []Skill // each installed under <root>/<name> for each of skillRoots
+	Block  string  // the Docket block kept in AGENTS.md and CLAUDE.md
 }
 
 // ProblemKind says why a path stopped Init.
@@ -91,8 +98,9 @@ const (
 	claudeFile = "CLAUDE.md"
 )
 
-// skillDirs are the directories that receive the skill.
-var skillDirs = []string{".claude/skills/docket", ".agents/skills/docket"}
+// skillRoots are the directories that receive each skill, in a folder named
+// after it.
+var skillRoots = []string{".claude/skills", ".agents/skills"}
 
 // target is one file Init installs.
 type target struct {
@@ -113,7 +121,7 @@ type decided struct {
 	viaAgents bool
 }
 
-// Init installs the schema and the skill under root. It first decides the
+// Init installs the schema and the skills under root. It first decides the
 // status of every file and checks every path; only when all checks pass does
 // it call initOpenSpec (when <root>/openspec is missing) and write. A refused
 // run writes nothing and returns *Refused. A differing file is left alone
@@ -188,8 +196,8 @@ func Inspect(root string, a Assets) ([]File, []Problem, error) {
 	return files, problems, nil
 }
 
-// targetsOf lists every file to install: the schema, the skill in each of
-// skillDirs, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
+// targetsOf lists every file to install: the schema, the skills in each of
+// skillRoots, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
 func targetsOf(a Assets) ([]target, error) {
 	var out []target
 	add := func(src fs.FS, dir string, kind FileKind) error {
@@ -208,9 +216,11 @@ func targetsOf(a Assets) ([]target, error) {
 	if err := add(a.Schema, schemaDir, KindSchema); err != nil {
 		return nil, err
 	}
-	for _, dir := range skillDirs {
-		if err := add(a.Skill, dir, KindSkill); err != nil {
-			return nil, err
+	for _, root := range skillRoots {
+		for _, sk := range a.Skills {
+			if err := add(sk.Files, path.Join(root, sk.Name), KindSkill); err != nil {
+				return nil, err
+			}
 		}
 	}
 	out = append(out, target{rel: agentsFile, kind: KindBlock}, target{rel: claudeFile, kind: KindBlock})

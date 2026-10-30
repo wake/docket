@@ -167,7 +167,7 @@ func TestRerunNoDifferences(t *testing.T) {
 	if err != nil || len(times) == 0 {
 		t.Fatalf("walk: %v", err)
 	}
-	for _, rel := range append(strings.Fields(skillRels), "AGENTS.md", "CLAUDE.md") {
+	for _, rel := range append(skillRels(t), "AGENTS.md", "CLAUDE.md") {
 		i, err := os.Stat(filepath.Join(r.Dir, rel))
 		if err != nil {
 			t.Fatal(err)
@@ -412,23 +412,53 @@ func TestPartialFailureKeepsResult(t *testing.T) {
 	}
 }
 
-const skillRels = ".claude/skills/docket/SKILL.md .claude/skills/docket/setup.md .agents/skills/docket/SKILL.md .agents/skills/docket/setup.md"
-
 func TestFreshRepositoryGetsTheSkill(t *testing.T) {
 	r := committedRepo(t)
 	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
-	for _, rel := range strings.Fields(skillRels) {
-		want, err := fs.ReadFile(docket.Skill(), filepath.Base(rel))
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, err := os.ReadFile(filepath.Join(r.Dir, rel))
-		if err != nil || !bytes.Equal(got, want) {
-			t.Errorf("%s differs (err %v)", rel, err)
+	for _, root := range []string{".claude/skills", ".agents/skills"} {
+		for _, sk := range docket.Skills() {
+			err := fs.WalkDir(sk.Files, ".", func(p string, d fs.DirEntry, err error) error {
+				if err != nil || d.IsDir() {
+					return err
+				}
+				want, err := fs.ReadFile(sk.Files, p)
+				if err != nil {
+					return err
+				}
+				rel := root + "/" + sk.Name + "/" + p
+				got, err := os.ReadFile(filepath.Join(r.Dir, rel))
+				if err != nil || !bytes.Equal(got, want) {
+					t.Errorf("%s differs (err %v)", rel, err)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
+}
+
+// skillRels lists every installed skill file, relative to the repository.
+func skillRels(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	for _, root := range []string{".claude/skills", ".agents/skills"} {
+		for _, sk := range docket.Skills() {
+			err := fs.WalkDir(sk.Files, ".", func(p string, d fs.DirEntry, err error) error {
+				if err == nil && !d.IsDir() {
+					out = append(out, root+"/"+sk.Name+"/"+p)
+				}
+				return err
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return out
 }
 
 func TestEditedSkillFile(t *testing.T) {

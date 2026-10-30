@@ -14,9 +14,15 @@ var schema = fstest.MapFS{
 	"templates/proposal.md": {Data: []byte("# proposal\n")},
 }
 
-var skill = fstest.MapFS{"SKILL.md": {Data: []byte("# skill\n")}}
+var skills = []Skill{
+	{"docket", fstest.MapFS{"SKILL.md": {Data: []byte("# skill\n")}}},
+	{"docket-setup", fstest.MapFS{
+		"SKILL.md":      {Data: []byte("# setup\n")},
+		"agents/x.yaml": {Data: []byte("x: 1\n")},
+	}},
+}
 
-var assets = Assets{Schema: schema, Skill: skill, Block: "<!-- docket:start -->\nblock\n<!-- docket:end -->"}
+var assets = Assets{Schema: schema, Skills: skills, Block: "<!-- docket:start -->\nblock\n<!-- docket:end -->"}
 
 func statuses(r Result) map[string]FileStatus {
 	m := map[string]FileStatus{}
@@ -259,11 +265,17 @@ func TestInitInstallsSkill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, rel := range []string{".claude/skills/docket/SKILL.md", ".agents/skills/docket/SKILL.md"} {
+	wants := map[string]string{}
+	for _, base := range []string{".claude/skills", ".agents/skills"} {
+		wants[base+"/docket/SKILL.md"] = "# skill\n"
+		wants[base+"/docket-setup/SKILL.md"] = "# setup\n"
+		wants[base+"/docket-setup/agents/x.yaml"] = "x: 1\n"
+	}
+	for rel, want := range wants {
 		if got := statuses(r)[rel]; got != Written {
 			t.Errorf("%s = %q", rel, got)
 		}
-		if b, _ := os.ReadFile(filepath.Join(root, rel)); string(b) != "# skill\n" {
+		if b, _ := os.ReadFile(filepath.Join(root, rel)); string(b) != want {
 			t.Errorf("%s content %q", rel, b)
 		}
 		for _, f := range r.Files {
@@ -368,7 +380,7 @@ func TestInitWriteFailureThenRerun(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 	st := statuses(r)
-	if st[schemaDir+"/schema.yaml"] != Written || st[".claude/skills/docket/SKILL.md"] != Written || len(st) != 3 {
+	if st[schemaDir+"/schema.yaml"] != Written || st[".claude/skills/docket/SKILL.md"] != Written || len(st) != 5 {
 		t.Fatalf("files = %v", st)
 	}
 	if err := os.Chmod(dir, 0o755); err != nil {

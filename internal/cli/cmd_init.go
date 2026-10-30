@@ -13,7 +13,7 @@ import (
 
 // shippedAssets are the files this build of dkt installs.
 func shippedAssets() setup.Assets {
-	return setup.Assets{Schema: docket.Schema(), Skill: docket.Skill(), Block: docket.Block()}
+	return setup.Assets{Schema: docket.Schema(), Skills: docket.Skills(), Block: docket.Block()}
 }
 
 // problemFindings maps the problems that stopped a check to findings and

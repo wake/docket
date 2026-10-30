@@ -1,5 +1,5 @@
 // Package docket embeds the assets the dkt command ships: the OpenSpec
-// schema, the skill, the Docket block of AGENTS.md and the workflow
+// schema, the skills, the Docket block of AGENTS.md and the workflow
 // template.
 package docket
 
@@ -36,14 +36,18 @@ func Schema() fs.FS {
 //go:embed .agents/skills/docket
 var skillFS embed.FS
 
-// Skill returns the files of .agents/skills/docket, with paths relative to
-// that directory (SKILL.md, ...).
-func Skill() fs.FS {
-	sub, err := fs.Sub(skillFS, ".agents/skills/docket")
-	if err != nil {
-		panic(err)
+// Skills returns the skills under .agents/skills, each with paths relative
+// to its folder (SKILL.md, ...).
+func Skills() []setup.Skill {
+	var out []setup.Skill
+	for _, name := range []string{"docket"} {
+		sub, err := fs.Sub(skillFS, ".agents/skills/"+name)
+		if err != nil {
+			panic(err)
+		}
+		out = append(out, setup.Skill{Name: name, Files: sub})
 	}
-	return sub
+	return out
 }
 
 // Block returns the Docket block of AGENTS.md: from the start of the line
