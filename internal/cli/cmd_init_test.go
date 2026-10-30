@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.yaml.in/yaml/v3"
+
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/testutil"
 )
@@ -459,6 +461,56 @@ func skillRels(t *testing.T) []string {
 		}
 	}
 	return out
+}
+
+func TestSkillCopiesAgree(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	files := func(root, name string) map[string][]byte {
+		m := map[string][]byte{}
+		base := filepath.Join(r.Dir, root, name)
+		err := filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || !d.Type().IsRegular() {
+				return err
+			}
+			rel, _ := filepath.Rel(base, p)
+			m[rel], err = os.ReadFile(p)
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	for _, sk := range docket.Skills() {
+		a, b := files(".claude/skills", sk.Name), files(".agents/skills", sk.Name)
+		if len(a) == 0 || len(a) != len(b) {
+			t.Errorf("%s: %d files vs %d", sk.Name, len(a), len(b))
+		}
+		for rel, data := range a {
+			if !bytes.Equal(data, b[rel]) {
+				t.Errorf("%s/%s differs between the copies", sk.Name, rel)
+			}
+		}
+		var fm struct {
+			Name        string `yaml:"name"`
+			Description string `yaml:"description"`
+		}
+		text := string(a["SKILL.md"])
+		rest := strings.TrimPrefix(text, "---\n")
+		end := strings.Index(rest, "\n---\n")
+		if rest == text || end < 0 {
+			t.Fatalf("%s: no frontmatter", sk.Name)
+		}
+		if err := yaml.Unmarshal([]byte(rest[:end]), &fm); err != nil {
+			t.Fatal(err)
+		}
+		if fm.Name != sk.Name || len(fm.Description) > 1024 {
+			t.Errorf("%s: name %q, description length %d", sk.Name, fm.Name, len(fm.Description))
+		}
+	}
 }
 
 func TestEditedSkillFile(t *testing.T) {

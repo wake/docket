@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -78,8 +79,9 @@ func checkSkillFrontmatter(t *testing.T, sk setup.Skill) {
 		t.Fatal("frontmatter is not closed")
 	}
 	var fm struct {
-		Name        string `yaml:"name"`
-		Description string `yaml:"description"`
+		Name                   string `yaml:"name"`
+		Description            string `yaml:"description"`
+		DisableModelInvocation *bool  `yaml:"disable-model-invocation"`
 	}
 	if err := yaml.Unmarshal([]byte(rest[:end]), &fm); err != nil {
 		t.Fatal(err)
@@ -89,6 +91,49 @@ func checkSkillFrontmatter(t *testing.T, sk setup.Skill) {
 	}
 	if fm.Description == "" || len(fm.Description) > 1024 {
 		t.Errorf("description length %d", len(fm.Description))
+	}
+	if sk.Name == "docket-doctor" {
+		if fm.DisableModelInvocation == nil || !*fm.DisableModelInvocation {
+			t.Error("disable-model-invocation must be true")
+		}
+	} else if fm.DisableModelInvocation != nil {
+		t.Error("disable-model-invocation must be absent")
+	}
+}
+
+func TestSkillNames(t *testing.T) {
+	var got []string
+	for _, sk := range Skills() {
+		got = append(got, sk.Name)
+	}
+	if want := []string{"docket", "docket-setup", "docket-doctor"}; !slices.Equal(got, want) {
+		t.Errorf("names = %v, want %v", got, want)
+	}
+}
+
+func TestDoctorHiddenFromCodex(t *testing.T) {
+	for _, sk := range Skills() {
+		b, err := fs.ReadFile(sk.Files, "agents/openai.yaml")
+		if sk.Name != "docket-doctor" {
+			if err == nil {
+				t.Errorf("%s has agents/openai.yaml", sk.Name)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		var y struct {
+			Policy struct {
+				AllowImplicitInvocation *bool `yaml:"allow_implicit_invocation"`
+			} `yaml:"policy"`
+		}
+		if err := yaml.Unmarshal(b, &y); err != nil {
+			t.Fatal(err)
+		}
+		if a := y.Policy.AllowImplicitInvocation; a == nil || *a {
+			t.Error("policy.allow_implicit_invocation must be false")
+		}
 	}
 }
 
@@ -119,7 +164,24 @@ func TestPlanTemplateReviewLine(t *testing.T) {
 
 func TestInstalledSkillMatchesShipped(t *testing.T) {
 	for _, sk := range Skills() {
-		err := fs.WalkDir(sk.Files, ".", func(p string, d fs.DirEntry, err error) error {
+		dir := filepath.Join(".claude", "skills", sk.Name)
+		err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || !d.Type().IsRegular() {
+				return err
+			}
+			rel, err := filepath.Rel(dir, p)
+			if err != nil {
+				return err
+			}
+			if _, err := fs.Stat(sk.Files, filepath.ToSlash(rel)); err != nil {
+				t.Errorf("%s is installed but not shipped", p)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Errorf("%s: %v", dir, err)
+		}
+		err = fs.WalkDir(sk.Files, ".", func(p string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return err
 			}

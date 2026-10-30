@@ -1,0 +1,102 @@
+---
+name: docket-doctor
+description: >-
+  Check this project's Docket setup (the files dkt init installs, the
+  OpenSpec CLI, the user's workflow file, merged changes that lost their
+  commit trailers, and what needs judgment), then help the user fix what
+  is wrong. Runs only when the user invokes it.
+disable-model-invocation: true
+---
+
+# Docket doctor
+
+Check this project's Docket setup, list every problem, then fix them with
+the user one at a time. Change nothing the user has not agreed to.
+
+## 1. Run `dkt inspect`
+
+Run `dkt inspect --json` before anything else. It writes nothing. Its
+`result` holds:
+
+- `files`: each file `dkt init` installs, as `same`, `missing` or
+  `differs`;
+- `openspec`: the OpenSpec CLI's `version` (null when none could be
+  started) and whether it is `supported`;
+- `workflow`: the user's workflow file, as `dkt workflow` reports it;
+- `changes`: the active changes on the default branch whose commit
+  trailers were checked, and those skipped, with the reason.
+
+Its `findings` and `unreadable` are the mechanical problems. When it exits
+with 2 or 4 it checked nothing: tell the user what it said and stop.
+
+## 2. Check what needs judgment
+
+Read the workflow file at `result.workflow.path` when it exists, then
+check:
+
+- What each step needs: for each step of the workflow file, whether this
+  environment has what it names, such as another model to review with,
+  subagents, or a command, skill or plugin. Where a required review's
+  reviewer is missing, say which level of the fallback under the file's
+  `## Reviews` applies: a reviewer on a different model, else the same
+  model in a fresh context, else a note in the pull request that the work
+  had no independent review.
+- Drift: where the workflow file and the user's instructions already in
+  your context (their global agent instructions, memory, this project's
+  `AGENTS.md` and `CLAUDE.md`) say different things about the same step,
+  such as another reviewer, model or effort. Quote both.
+- Conflicts with the framework: instructions in your context that
+  Docket's rules do not allow, such as squash merges (`dkt sync` reads
+  each commit's trailers), or rules that open a change or a release where
+  the triage would not.
+- superpowers: whether its skills (brainstorming, writing-plans,
+  subagent-driven-development) are available; the full review path uses
+  them.
+
+Do not read, list or search user-level files that are not already in your
+context, such as global instruction files or another agent's
+configuration, unless the user agrees first.
+
+## 3. List every problem
+
+Before fixing anything, list every problem from steps 1 and 2, each with
+what it is, why it matters and the fix you propose. When there is none,
+say so and stop.
+
+## 4. Fix them one at a time
+
+Take the problems in the order listed. For each, say what you will do,
+and do it only after the user agrees; when they decline, go to the next.
+
+- The workflow file (`workflow-missing`, `workflow-incomplete`,
+  `workflow-stale`, or a step this environment cannot do): run the
+  `docket-setup` skill.
+- Drift: ask which side the user wants to keep. The workflow file changes
+  through `docket-setup`; for their own instructions, propose the
+  wording.
+- An installed file (`schema-missing`, `skill-missing`,
+  `agents-block-missing`, `schema-differs`, `skill-differs`,
+  `agents-block-differs`): for a differing file, first show how it differs
+  from the shipped one. In a new temporary directory, run `git init`,
+  create an empty `openspec` directory, run `dkt init` there, and compare
+  the file at the same path. Then run `dkt init` for a missing file, or
+  `dkt init --force` for a differing one; `--force` replaces every
+  differing file, so name them all before asking.
+- `symlink-refused` or `agents-block-malformed`: explain what stops
+  `dkt init` and propose how to fix it; do not change the link or the
+  markers yourself.
+- `openspec-missing` or `openspec-unsupported`: say which versions Docket
+  supports (the finding names them) and that `DOCKET_OPENSPEC` can name
+  the command that runs one. Install nothing.
+- A conflict with the framework: propose the wording for the user's
+  instructions; never edit their files.
+- `no-task-commits`: explain that the change's commits on the default
+  branch lost their `Change` and `Task` trailers, as a squashed pull
+  request does, and that `dkt archive` will refuse the change. Leave the
+  decision to the user.
+- An unreadable source, or no superpowers: say what is wrong; the fix is
+  the user's.
+
+## 5. Check again
+
+Run `dkt inspect` again and report what is left.

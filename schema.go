@@ -33,14 +33,14 @@ func Schema() fs.FS {
 	return sub
 }
 
-//go:embed .agents/skills/docket
+//go:embed .agents/skills/docket .agents/skills/docket-setup .agents/skills/docket-doctor
 var skillFS embed.FS
 
 // Skills returns the skills under .agents/skills, each with paths relative
 // to its folder (SKILL.md, ...).
 func Skills() []setup.Skill {
 	var out []setup.Skill
-	for _, name := range []string{"docket"} {
+	for _, name := range []string{"docket", "docket-setup", "docket-doctor"} {
 		sub, err := fs.Sub(skillFS, ".agents/skills/"+name)
 		if err != nil {
 			panic(err)
