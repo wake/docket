@@ -42,3 +42,13 @@ Caching scan results by ref SHA belongs to a long-running workbench, not to
 `dkt`. The results must stay the same, including a single ref that cannot be
 read being reported alone as unreadable; a promised speed would be a new
 expectation and a spec change.
+
+## Status
+
+Done by the record `docket/records/2026-10-31-scan-git-calls.md` (leads 1
+to 3): `dkt status` here went from 46 git processes and 3.3 s to 21 and
+1.6 s, and settling refs no longer grows with their number. Left for later:
+each unmerged ref still costs one `ls-tree`, which matters in a repository
+that merges by squash (its old branches stay unmerged); each worktree still
+costs one `merge-base`; `Toplevel` still runs git twice; and lead 4,
+bounded parallelism.
