@@ -8,7 +8,7 @@ instead of living only in prompts.
 ## Requirements
 
 ### Requirement: What is linted
-`dkt lint` SHALL lint the changes named on the command line, or, when none is named, every active change in the current worktree's `openspec/changes/` and the titles of the main specs under `openspec/specs/`. It SHALL read the worktree's files as they are, uncommitted edits included, and SHALL NOT require the OpenSpec CLI.
+`dkt lint` SHALL lint the changes and records named on the command line, or, when none is named, every active change in the current worktree's `openspec/changes/`, every record under `docket/records/` that the branch adds (committed since the merge base with the default branch, or not yet committed), and the titles of the main specs under `openspec/specs/`. A name that starts with a date names a record. It SHALL read the worktree's files as they are, uncommitted edits included, and SHALL NOT require the OpenSpec CLI.
 
 #### Scenario: Lint every active change
 - **WHEN** the worktree has the active changes `add-x` and `add-y` and a user runs `dkt lint`
@@ -21,6 +21,10 @@ instead of living only in prompts.
 #### Scenario: No OpenSpec installed
 - **WHEN** no OpenSpec CLI is installed and a user runs `dkt lint`
 - **THEN** the command lints normally
+
+#### Scenario: Lint records the branch adds
+- **WHEN** the default branch holds the record `2026-10-01-fix-a`, the branch adds the record `2026-10-30-fix-b`, and a user runs `dkt lint`
+- **THEN** `2026-10-30-fix-b` is linted and `2026-10-01-fix-a` is not
 
 ### Requirement: Proposal sections
 proposal.md SHALL have the sections Why, What Changes, Non-Goals, Builds On, Capabilities, Impact, Implementation Contract and Change Log, and Implementation Contract SHALL have the subsections Observable Behavior, Interfaces, Failure Modes and Acceptance Criteria. Non-Goals, Builds On and each of the four subsections SHALL hold text other than whitespace and HTML comments.
