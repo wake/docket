@@ -1,15 +1,28 @@
 package cli
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 
+	"github.com/wake/docket"
+	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/setup"
+	"github.com/wake/docket/internal/workflow"
 )
 
 // InspectResult is the result of dkt inspect. Later checks add their fields.
 type InspectResult struct {
-	Files []InspectFile `json:"files"`
+	Files    []InspectFile   `json:"files"`
+	OpenSpec OpenSpecState   `json:"openspec"`
+	Workflow *WorkflowResult `json:"workflow"` // nil when the workflow file is unreadable
+}
+
+// OpenSpecState is the OpenSpec CLI dkt found. Version is nil only when no CLI
+// could be started.
+type OpenSpecState struct {
+	Version   *string `json:"version"`
+	Supported bool    `json:"supported"`
 }
 
 // InspectFile is one file dkt init installs and whether it is in place.
@@ -48,6 +61,29 @@ func inspectCommand() Command {
 			pf, pu := problemFindings(problems)
 			out.Findings = append(out.Findings, pf...)
 			out.Unreadable = append(out.Unreadable, pu...)
+			state, f, err := openSpecState(c)
+			if err != nil {
+				return Outcome{Result: res}, err
+			}
+			res.OpenSpec = state
+			out.Findings = append(out.Findings, f...)
+			out.Human = append(out.Human, openSpecLine(state))
+
+			wf, f, u, err := inspectWorkflow(c)
+			if err != nil {
+				return Outcome{Result: res}, err
+			}
+			res.Workflow = wf
+			out.Findings = append(out.Findings, f...)
+			out.Unreadable = append(out.Unreadable, u...)
+			if wf != nil {
+				line := fmt.Sprintf("workflow %s", wf.Status)
+				if wf.Path != nil {
+					line += " " + *wf.Path
+				}
+				out.Human = append(out.Human, line)
+			}
+
 			out.Result = res
 			return out, nil
 		},
@@ -78,4 +114,47 @@ func inspectStatus(f setup.File) (status, rule, msg string) {
 		return "differs", name + "-differs", "the Docket block differs from " + what + "; dkt init --force replaces it"
 	}
 	return "differs", name + "-differs", "differs from " + what + "; dkt init --force overwrites it"
+}
+
+// openSpecState finds the OpenSpec CLI and its version. A CLI that is missing,
+// cannot be started or does not report a version is a finding, as is one
+// outside the supported range.
+func openSpecState(c *Context) (OpenSpecState, []Finding, error) {
+	r, err := openspec.New(c.Repo.Root, c.Env)
+	var v string
+	if err == nil {
+		v, err = r.CheckVersion()
+	}
+	var un *openspec.UnavailableError
+	var us *openspec.UnsupportedError
+	switch {
+	case err == nil:
+		return OpenSpecState{Version: &v, Supported: true}, nil, nil
+	case errors.As(err, &un):
+		return OpenSpecState{}, []Finding{{Rule: "openspec-missing", Message: err.Error()}}, nil
+	case errors.As(err, &us):
+		return OpenSpecState{Version: &us.Found}, []Finding{{Rule: "openspec-unsupported", Message: err.Error()}}, nil
+	}
+	return OpenSpecState{}, nil, err
+}
+
+func openSpecLine(s OpenSpecState) string {
+	switch {
+	case s.Version == nil:
+		return "openspec not found"
+	case !s.Supported:
+		return "openspec " + *s.Version + " (unsupported)"
+	}
+	return "openspec " + *s.Version
+}
+
+// inspectWorkflow reports the workflow file as dkt workflow does. With no home
+// directory to look in, the file is missing, which is a finding.
+func inspectWorkflow(c *Context) (*WorkflowResult, []Finding, []Unreadable, error) {
+	wf, f, u, err := workflowState(c)
+	if errors.Is(err, workflow.ErrNoHome) {
+		return &WorkflowResult{Status: workflow.Missing, Template: workflow.Hash(docket.Template()), MissingSections: []string{}},
+			[]Finding{{Rule: "workflow-missing", Message: err.Error()}}, nil, nil
+	}
+	return wf, f, u, err
 }

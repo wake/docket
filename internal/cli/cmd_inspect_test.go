@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
+	"github.com/wake/docket/internal/workflow"
 )
 
 // runInspect runs dkt inspect in dir with env and returns the exit code,
@@ -212,6 +215,197 @@ func TestInspectUnreadableFile(t *testing.T) {
 	}
 	if f := inspectFiles(t, so)["openspec/schemas/docket/schema.yaml"]; f["status"] != "same" {
 		t.Errorf("schema entry: %v", f)
+	}
+	res := resultOf(t, so)
+	if o, _ := res["openspec"].(map[string]any); o["version"] != "1.14.3" {
+		t.Errorf("openspec: %v", res["openspec"])
+	}
+	if wf, _ := res["workflow"].(map[string]any); wf["status"] != "ok" {
+		t.Errorf("workflow: %v", res["workflow"])
+	}
+}
+
+func TestInspectCleanSetup(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if fs := decode(t, so)["findings"].([]any); len(fs) != 0 {
+		t.Errorf("findings: %v", fs)
+	}
+	res := resultOf(t, so)
+	if got := res["openspec"]; !reflect.DeepEqual(got, map[string]any{"version": "1.14.3", "supported": true}) {
+		t.Errorf("openspec: %v", got)
+	}
+	if wf, _ := res["workflow"].(map[string]any); wf["status"] != "ok" {
+		t.Errorf("workflow: %v", res["workflow"])
+	}
+	if got, want := wfKeys(res), []string{"files", "openspec", "workflow"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("keys %v, want %v", got, want)
+	}
+}
+
+// inspectOpenSpecMissing checks the result of an inspect run where no OpenSpec
+// could be started.
+func inspectOpenSpecMissing(t *testing.T, env []string) {
+	t.Helper()
+	r := committedRepo(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if got := resultOf(t, so)["openspec"]; !reflect.DeepEqual(got, map[string]any{"version": nil, "supported": false}) {
+		t.Errorf("openspec: %v", got)
+	}
+	found := false
+	for _, x := range inspectRules(t, so) {
+		if x == "openspec-missing" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no openspec-missing finding: %s", so)
+	}
+}
+
+func TestInspectUnsupportedOpenSpec(t *testing.T) {
+	r := committedRepo(t)
+	env, _ := inspectEnv(t)
+	fake, _ := testutil.FakeOpenSpec(t, "1.3.0")
+	env = append(env, "DOCKET_OPENSPEC="+fake)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if got := resultOf(t, so)["openspec"]; !reflect.DeepEqual(got, map[string]any{"version": "1.3.0", "supported": false}) {
+		t.Errorf("openspec: %v", got)
+	}
+	found := false
+	for _, f := range wfFindings(t, so) {
+		if f["rule"] == "openspec-unsupported" {
+			found = true
+			msg, _ := f["message"].(string)
+			if !strings.Contains(msg, "1.3.0") || !strings.Contains(msg, "1.14.x") {
+				t.Errorf("message: %q", msg)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("no openspec-unsupported finding: %s", so)
+	}
+}
+
+func TestInspectNoOpenSpec(t *testing.T) {
+	env, _ := inspectEnv(t)
+	inspectOpenSpecMissing(t, append(env, "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "missing")))
+}
+
+func TestInspectOpenSpecVersionFails(t *testing.T) {
+	script := filepath.Join(t.TempDir(), "openspec")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\nexit 3\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	inspectOpenSpecMissing(t, append(env, "DOCKET_OPENSPEC="+script))
+}
+
+func TestInspectWorkflowReported(t *testing.T) {
+	r := committedRepo(t)
+	env, path := inspectEnv(t)
+	wfWrite(t, path, wfFM(wfHash())+strings.Replace(wfFour, "## Check", "## Other", 1))
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if wf, _ := resultOf(t, so)["workflow"].(map[string]any); wf["status"] != "incomplete" {
+		t.Errorf("workflow: %v", resultOf(t, so)["workflow"])
+	}
+	n := 0
+	for _, f := range wfFindings(t, so) {
+		if f["rule"] == "workflow-incomplete" {
+			n++
+			if msg, _ := f["message"].(string); !strings.Contains(msg, `"## Check"`) {
+				t.Errorf("message: %q", msg)
+			}
+		}
+	}
+	if n != 1 {
+		t.Errorf("%d workflow-incomplete findings: %s", n, so)
+	}
+}
+
+func TestInspectWorkflowNoHome(t *testing.T) {
+	r := committedRepo(t)
+	env, _ := inspectEnv(t)
+	var bare []string
+	for _, e := range env {
+		if !strings.HasPrefix(e, "HOME=") && !strings.HasPrefix(e, "XDG_CONFIG_HOME=") {
+			bare = append(bare, e)
+		}
+	}
+	var so, se bytes.Buffer
+	code := Run(Options{Args: []string{"inspect", "--json"}, Dir: r.Dir, Env: bare, UserHome: nil, Stdout: &so, Stderr: &se})
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so.String())
+	}
+	want := map[string]any{"path": nil, "status": "missing", "template": wfHash(), "recorded": nil, "missing_sections": []any{}}
+	if got := resultOf(t, so.String())["workflow"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("workflow: %v, want %v", got, want)
+	}
+	found := false
+	for _, f := range wfFindings(t, so.String()) {
+		if f["rule"] == "workflow-missing" {
+			found = true
+			if f["message"] != workflow.ErrNoHome.Error() {
+				t.Errorf("message: %v", f["message"])
+			}
+		}
+	}
+	if !found {
+		t.Errorf("no workflow-missing finding: %s", so.String())
+	}
+	if len(inspectFiles(t, so.String())) == 0 {
+		t.Error("no files")
+	}
+}
+
+func TestInspectWorkflowUnreadable(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads every file")
+	}
+	r := committedRepo(t)
+	env, path := inspectEnv(t)
+	if err := os.Chmod(path, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(path, 0o644) })
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 3 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	found := false
+	for _, u := range decode(t, so)["unreadable"].([]any) {
+		if u.(map[string]any)["source"] == path {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("unreadable does not name %s: %s", path, so)
+	}
+	res := resultOf(t, so)
+	if res["workflow"] != nil {
+		t.Errorf("workflow: %v", res["workflow"])
+	}
+	if len(inspectFiles(t, so)) == 0 {
+		t.Error("no files")
+	}
+	if o, _ := res["openspec"].(map[string]any); o["version"] != "1.14.3" {
+		t.Errorf("openspec: %v", res["openspec"])
 	}
 }
 

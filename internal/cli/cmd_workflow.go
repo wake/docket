@@ -11,7 +11,7 @@ import (
 
 // WorkflowResult is the result object of dkt workflow.
 type WorkflowResult struct {
-	Path            string          `json:"path"`
+	Path            *string         `json:"path"`
 	Status          workflow.Status `json:"status"`
 	Template        string          `json:"template"`
 	Recorded        *string         `json:"recorded"`
@@ -54,7 +54,7 @@ func workflowReport(c *Context) (Outcome, error) {
 	}
 	out := Outcome{Findings: findings, Unreadable: unreadable}
 	if res != nil {
-		out.Human = []string{fmt.Sprintf("%-10s %s", res.Status, res.Path)}
+		out.Human = []string{fmt.Sprintf("%-10s %s", res.Status, *res.Path)}
 		out.Result = *res
 	}
 	return out, nil
@@ -94,6 +94,6 @@ func workflowState(c *Context) (*WorkflowResult, []Finding, []Unreadable, error)
 		}
 		findings = append(findings, Finding{Rule: "workflow-stale", File: path, Message: msg})
 	}
-	return &WorkflowResult{Path: path, Status: rep.Status, Template: shipped,
+	return &WorkflowResult{Path: &path, Status: rep.Status, Template: shipped,
 		Recorded: rep.Recorded, MissingSections: rep.MissingSections}, findings, nil, nil
 }
