@@ -11,7 +11,7 @@ README.md. It is a public repository: write everything in English, and never
 commit hostnames, customer names, personal paths or secrets.
 
 Status: milestone 1 is complete. `dkt init`, `dkt new`, `dkt lint`,
-`dkt conflicts`, `dkt sync`, `dkt archive`, `dkt rebase`, `dkt status` and `dkt workflow` exist; build them
+`dkt conflicts`, `dkt sync`, `dkt archive`, `dkt rebase`, `dkt status`, `dkt workflow` and `dkt inspect` exist; build them
 with `go install ./cmd/dkt`. Upcoming work is ordered in `docket/order.md`.
 
 Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` for module
@@ -29,9 +29,10 @@ unticked line is the next piece of work.
   instructions and templates are prompts shipped to other projects.
 - Prompt paths, the text agents act on: `AGENTS.md`, `CLAUDE.md`, `context`
   in `openspec/config.yaml`, `openspec/schemas/docket/`,
-  `.claude/skills/docket/`, `.agents/skills/docket/` and
-  `workflow/template.md`. `dkt init` ships `openspec/schemas/docket/`, the
-  `docket` skill and the Docket block of `AGENTS.md` to other projects, and
+  `.claude/skills/docket/`, `.claude/skills/docket-setup/`,
+  `.claude/skills/docket-doctor/`, the same three under `.agents/skills/`,
+  and `workflow/template.md`. `dkt init` ships `openspec/schemas/docket/`, the
+  `docket`, `docket-setup` and `docket-doctor` skills and the Docket block of `AGENTS.md` to other projects, and
   `dkt workflow template` prints `workflow/template.md`.
 
 <!-- docket:start -->

@@ -44,7 +44,7 @@ to bring them in.
   Docket's template; a materialized workflow is always at the user level.
   The first version builds only Docket's template and the user-level
   materialized workflow.
-- A `docket doctor` skill checks the setup, among other things the review
+- A `docket-doctor` skill checks the setup, among other things the review
   workflow: whether the materialized workflow covers every path, which
   review fallback applies in this environment, and conflicts with the
   framework, such as squash merges, which drop the trailers `dkt sync`
@@ -62,8 +62,8 @@ to bring them in.
   reaches the block; the Reuse table stays in the framework.
 - Settled by the change `add-workflow`:
   - The materialized workflow has one mode. Reference mode is dropped: a
-    user's own instructions may be too loose to point into, and `docket
-    doctor` finds drift instead.
+    user's own instructions may be too loose to point into, and the
+    doctor finds drift instead.
   - It lives at `$XDG_CONFIG_HOME/docket/workflow.md` or
     `~/.config/docket/workflow.md`.
   - The template lives in `dkt`, is printed by `dkt workflow template` and
@@ -75,8 +75,6 @@ to bring them in.
 
 ## Open questions
 
-- The checks `docket doctor` runs, and which of them `dkt` can do without
-  judgment.
 - Queued ideas written before this split, to update when each is taken up:
   `2026-10-29-records.md` keeps its mechanism and kinds, without its review
   sections; `2026-10-29-commit-gate.md` keeps its checks that work lands in
@@ -85,8 +83,7 @@ to bring them in.
 
 ## Status
 
-Two changes are done: `add-framework-skill` (the skill and the block) and
-`add-workflow` (the materialized workflow). `docket doctor` remains.
+All three changes are done: `add-framework-skill` (the skill and the block), `add-workflow` (the materialized workflow) and `add-doctor` (`dkt inspect` and the `docket-doctor` command).
 
 ## Notes
 
