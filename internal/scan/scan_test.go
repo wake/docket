@@ -522,11 +522,13 @@ func TestScanListsRecords(t *testing.T) {
 	r.Commit("z", map[string]string{"docket/records/2026-10-01-fix-z.md": "z\n"})
 	r.Git("checkout", "-q", "-b", "b")
 	r.Commit("y", map[string]string{
-		"docket/records/2026-10-29-fix-y.md":    "y\n",
-		"docket/records/sub/2026-10-29-deep.md": "d\n",
+		"docket/records/2026-10-29-fix-y.md":               "y\n",
+		"docket/records/sub/2026-10-29-deep.md":            "d\n",
+		"docket/records/2026-10-29-dir/2026-10-29-deep.md": "d\n",
 	})
 	r.Git("checkout", "-q", "main")
 	r.Write("docket/records/2026-10-30-fix-x.md", "x\n")
+	r.Write("docket/records/2026-10-30-dir/2026-10-30-deep.md", "d\n")
 	r.Write("docket/records/README.md", "r\n")
 	r.Write("docket/records/2026-10-30-notes.txt", "n\n")
 	if err := os.Symlink("2026-10-30-fix-x.md", filepath.Join(r.Dir, "docket/records/2026-10-30-link.md")); err != nil {
