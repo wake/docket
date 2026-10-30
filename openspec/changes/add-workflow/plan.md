@@ -66,16 +66,16 @@
 **Interfaces:**
 - Produces: `docket.Template() string`, the bytes of `workflow/template.md`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `TestTemplateHeadings`: each of `## Full review`, `## Light review`, `## Check`, `## Direct merge` and `## Reviews` is a whole line of `Template()`, once. `TestTemplateNamesNoProduct`: `strings.ToLower(Template())` contains none of `claude`, `opus`, `sonnet`, `haiku`, `fable`, `gpt`, `codex`, `gemini`, `openai`, `anthropic`, `superpowers`, `copilot`.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 Run: `go test -run 'TestTemplate' .`
 Expected: FAIL (undefined `Template`).
 
-- [ ] **Step 3: Write `workflow/template.md`**
+- [x] **Step 3: Write `workflow/template.md`**
 
 Exactly this text. It is today's per-path review and verification steps from `SKILL.md`, worded in capabilities; Task 3 removes them from the skill.
 
@@ -144,16 +144,16 @@ the pull request says it had no independent review and asks a person to
 review it. The author's own reading is not a review.
 ````
 
-- [ ] **Step 4: Implement `Template()` in `schema.go`**
+- [x] **Step 4: Implement `Template()` in `schema.go`**
 
 `//go:embed workflow/template.md` into an unexported string; `Template()` returns it. Update the package comment to name the workflow template.
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run: `go test .`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ### Task 2: Reading the workflow file and `dkt workflow`
 
@@ -176,7 +176,7 @@ Expected: PASS
   - `type Report struct { Status Status; Recorded *string; MissingSections []string }`; `Inspect(b []byte, shipped string) Report` never leaves `MissingSections` nil, and its status is never `Missing` (a missing file is the caller's to report).
 - Produces, in `internal/cli`: `Options.UserHome func() (string, error)` and `Context.UserHome` (nil means no lookup); `WorkflowResult{Path string "path"; Status workflow.Status "status"; Template string "template"; Recorded *string "recorded"; MissingSections []string "missing_sections"}`; `TemplateResult{Template string "template"; Text string "text"}`.
 
-- [ ] **Step 1: Write the failing unit tests**
+- [x] **Step 1: Write the failing unit tests**
 
 In `internal/workflow/workflow_test.go`, with `four = "## Full review\n## Light review\n## Check\n## Direct merge\n"` and `fm(h) = "---\ntemplate: " + h + "\n---\n"`:
 
@@ -206,23 +206,23 @@ In `internal/workflow/workflow_test.go`, with `four = "## Full review\n## Light 
 
 `TestRead`: a missing path → `found` false, nil error; a file → its bytes, `found` true; a link to a file → the file's bytes; a link to a missing file → non-nil error; a directory → non-nil error.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
 Run: `go test ./internal/workflow`
 Expected: FAIL (package does not build).
 
-- [ ] **Step 3: Implement `internal/workflow/workflow.go`**
+- [x] **Step 3: Implement `internal/workflow/workflow.go`**
 
 Package comment: locates a user's workflow file, reads it, and reports its state against the shipped template; it never writes the file. `Locate` reads only the `env` it is given (an unexported last-value lookup). `Read` uses `os.ReadFile`; on `fs.ErrNotExist` it calls `os.Lstat`, and an existing entry (a dangling link) is an error saying the link's target does not exist. `Inspect` splits with `markdown.Lines`, reads the frontmatter by the rule in Global Constraints (decode into `struct{ Template yaml.Node }`, take `Value` of a scalar whose tag is not `!!null`), checks `Sections` by the line rule, and orders the status as in Global Constraints.
 
-- [ ] **Step 4: Run them to see them pass**
+- [x] **Step 4: Run them to see them pass**
 
 Run: `go test ./internal/workflow`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
-- [ ] **Step 6: Write the failing command tests**
+- [x] **Step 6: Write the failing command tests**
 
 In `internal/cli/cmd_workflow_test.go`, a helper runs `Run` with `Options{Env: env, UserHome: home, ...}` in a `testutil.NewRepo` directory, where `env` is `testutil.Env(t)` with extra variables appended. `hash := hex of sha256(docket.Template())[:12]`, computed in the test with `crypto/sha256`. Each test reads `result` from `--json` unless it says text.
 
@@ -241,12 +241,12 @@ In `internal/cli/cmd_workflow_test.go`, a helper runs `Run` with `Options{Env: e
 - `TestWorkflowNoHome`: `env` without `HOME` and `XDG_CONFIG_HOME`, `UserHome` nil: exit 4, one finding with rule `environment`. With `UserHome` returning a temp `u`: `result.path == u/.config/docket/workflow.md`.
 - `TestWorkflowUsage`: `workflow other` and `workflow template extra`: exit 2.
 
-- [ ] **Step 7: Run them to see them fail**
+- [x] **Step 7: Run them to see them fail**
 
 Run: `go test ./internal/cli -run TestWorkflow`
 Expected: FAIL (unknown command `workflow`).
 
-- [ ] **Step 8: Implement the command**
+- [x] **Step 8: Implement the command**
 
 `envelope.go`: `Options.UserHome func() (string, error)` (comment: the operating system's lookup of the user's home directory; nil means none) and `Context.UserHome`; `run.go` copies it into the context and adds `workflowCommand` to `commands`. `cmd/dkt/main.go` sets `UserHome` to a function returning `user.Current()`'s `HomeDir`.
 
@@ -258,12 +258,12 @@ Expected: FAIL (unknown command `workflow`).
   - `workflow-stale`: `made from template <recorded>; the shipped template is <hash>`, or with no recorded hash, `no template hash recorded; the shipped template is <hash>`
 - Template: `result` is `TemplateResult{Template: Hash(text), Text: text}`; the human lines are the template's lines (the final newline dropped before splitting).
 
-- [ ] **Step 9: Run all tests**
+- [x] **Step 9: Run all tests**
 
 Run: `go vet ./... && go test ./...`
 Expected: PASS
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ### Task 3: The skill split, setup and the block
 
@@ -279,7 +279,7 @@ Expected: PASS
 **Interfaces:**
 - Consumes: `dkt workflow` and `dkt workflow template` (Task 2), the template's headings (Task 1).
 
-- [ ] **Step 1: Rewrite `.agents/skills/docket/SKILL.md`**
+- [x] **Step 1: Rewrite `.agents/skills/docket/SKILL.md`**
 
 Keep the frontmatter, `## Triage`, `## Parallel sessions` and `## Prompt paths` byte for byte, except one sentence: in `## Triage`, the Direct merge bullet's `No change and no review beyond the automated checks.` becomes `No change is opened.` (the checks and "No review" move to the template). Replace the rest as follows.
 
@@ -344,11 +344,11 @@ the workflow file, open the pull request and merge it with a merge commit.
 
 `## Reviews` is removed (it is in the template).
 
-- [ ] **Step 2: Check that every rule of the old skill has a home**
+- [x] **Step 2: Check that every rule of the old skill has a home**
 
 Compare the old `SKILL.md` (`git show HEAD:.agents/skills/docket/SKILL.md`) with the new one and `workflow/template.md`, rule by rule: old step 5 → template Full review 1; old step 6 → template Full review 2 and 3, trailers → skill step 5; old step 7 → template Full review 4; old step 9 → skill step 7 and template Full review 5; old steps 8, 10, 11 → skill steps 6, 7, 8; old Light review 1 and 2 → template Light review; old Check → template Check; old Direct merge's checks and "No review", and the same words in the Triage's Direct merge bullet → template Direct merge; old Reviews → template Reviews. Expected: no rule dropped, none in both places except the path names.
 
-- [ ] **Step 3: Write `.agents/skills/docket/setup.md`**
+- [x] **Step 3: Write `.agents/skills/docket/setup.md`**
 
 Exactly this text:
 
@@ -403,7 +403,7 @@ If the user does not want to set up now, follow the template's steps for
 this piece of work, and ask again at the next one.
 ````
 
-- [ ] **Step 4: Replace the Docket block in `AGENTS.md`**
+- [x] **Step 4: Replace the Docket block in `AGENTS.md`**
 
 Replace the block's last sentence, `This block does not override the user's own instructions.`, so that the block reads exactly as "The block's text" in design.md: the second paragraph ends at `` `/opsx:*` commands are not used.``, and a third paragraph follows:
 
@@ -413,17 +413,17 @@ The steps of each path come from the user's workflow file, which
 differ. Otherwise this block does not override the user's own instructions.
 ```
 
-- [ ] **Step 5: Install the new skill and block in Docket's own repository**
+- [x] **Step 5: Install the new skill and block in Docket's own repository**
 
 Run: `go run ./cmd/dkt init --force --json`
 Expected: exit 0; `.claude/skills/docket/SKILL.md` `overwritten`, `.claude/skills/docket/setup.md` `written`, every other file `unchanged` (the `.agents` copies are the source, and `AGENTS.md` holds the shipped block).
 
-- [ ] **Step 6: Run the checks**
+- [x] **Step 6: Run the checks**
 
 Run: `go vet ./... && go test ./... && go run ./cmd/dkt init --json`
 Expected: PASS (`TestInstalledSkillMatchesShipped` covers `setup.md`, `TestBlock` the new block); the second init reports every file `unchanged`, exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ### Task 4: Docket's docs
 
@@ -434,28 +434,28 @@ Expected: PASS (`TestInstalledSkillMatchesShipped` covers `setup.md`, `TestBlock
 **Files:**
 - Modify: `AGENTS.md` (outside the block), `README.md`, `README.zh-TW.md`, `docs/ARCHITECTURE.md`, `docket/ideas/2026-10-29-framework-skill.md`
 
-- [ ] **Step 1: AGENTS.md**
+- [x] **Step 1: AGENTS.md**
 
 The Status paragraph lists `dkt workflow` with the other commands. In Development, the prompt paths add `workflow/template.md`, and the last sentence says `dkt init` ships `openspec/schemas/docket/`, the `docket` skill and the Docket block of `AGENTS.md` to other projects, and `dkt workflow template` prints `workflow/template.md`.
 
-- [ ] **Step 2: Both READMEs**
+- [x] **Step 2: Both READMEs**
 
 "What Docket is not": under "Store state", add that it reads one file outside the repository, the user's workflow file, and never writes it. "The workflow it assumes": after the sentence on the `docket` skill, say that each path's review and verification steps come from the user's workflow file (`~/.config/docket/workflow.md`, or under `XDG_CONFIG_HOME`), which the agent writes with the user from Docket's template at the first piece of work, and that `dkt workflow` reports whether it is missing, lacks a path or was made from an older template. The command list gains `dkt workflow [template] [--json]   # the user's workflow file, or the template`. "Upgrading" gains this release: run `dkt init --force` to take the new block and skill (until then `dkt init` reports `agents-block-differs`), commit, and expect setup at the first piece of work. `README.zh-TW.md` says the same in Traditional Chinese.
 
-- [ ] **Step 3: docs/ARCHITECTURE.md**
+- [x] **Step 3: docs/ARCHITECTURE.md**
 
 Codemap: the `schema.go` row also names the workflow template (`workflow/template.md`); a new row `internal/workflow`: "Locates the user's workflow file and reports its state against the shipped template; never writes it". Capability index: "Locate the user's workflow file" → `workflow.Locate`; "Read the workflow file" → `workflow.Read`; "Report a workflow file's state" → `workflow.Inspect`; "Hash the template" → `workflow.Hash`. Invariants: the environment bullet also names the user lookup (`Options.UserHome`).
 
-- [ ] **Step 4: The framework-skill idea**
+- [x] **Step 4: The framework-skill idea**
 
 Decided: the materialized workflow has one mode (reference mode dropped: a user's own instructions may be too loose to point into; `docket doctor` finds drift instead); it lives at `$XDG_CONFIG_HOME/docket/workflow.md` or `~/.config/docket/workflow.md`; the template lives in `dkt`, printed by `dkt workflow template`, identified by a hash; the workflow wins over the user's other instructions for the four paths; with no workflow, setup runs before the first piece of work and `dkt init` says nothing about it; a stale workflow keeps working and the agent says so once. Open questions: drop the one on where the file lives. Status: two changes done (`add-framework-skill`, `add-workflow`); `docket doctor` remains.
 
-- [ ] **Step 5: Run the checks**
+- [x] **Step 5: Run the checks**
 
 Run: `go test ./... && go run ./cmd/dkt lint add-workflow`
 Expected: PASS, `dkt lint: ok`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ### Task 5: Trial of setup and the workflow in a set-up project
 
@@ -468,30 +468,30 @@ Expected: PASS, `dkt lint: ok`.
 
 The lead runs this task. Transcripts and a results table go in the scratchpad; the summary goes in the pull request. Every run uses `--setting-sources project,local`, `--plugin-dir` at the installed superpowers, the branch's `dkt` first on `PATH`, and `XDG_CONFIG_HOME` set to a scratch directory, so the user's own instructions and workflow file are never read or written.
 
-- [ ] **Step 1: Set up a scratch project**
+- [x] **Step 1: Set up a scratch project**
 
 A new git repository with a small Go program (`main.go` printing `hello`, a README), `.claude/commands/greet.md` containing the typo `helo`, and two scripts `review-light.sh` and `review-other.sh` that each append their own name to a log file in the scratchpad and print `no findings`; then the branch's `dkt init` and a commit.
 
-- [ ] **Step 2: Setup before the first work**
+- [x] **Step 2: Setup before the first work**
 
 No workflow file. Prompt "Add a --name flag to hello." on each of two models (the session's default and Sonnet), `--max-turns 15`. Expected: the `docket` skill loads; `dkt workflow` and `dkt workflow template` run before any brainstorming or edit; the last message shows a draft with the four path sections and asks for agreement; no `workflow.md` exists afterwards.
 
-- [ ] **Step 3: Setup for an incomplete workflow**
+- [x] **Step 3: Setup for an incomplete workflow**
 
 Write `<XDG_CONFIG_HOME>/docket/workflow.md` as the current hash and the template without its `## Check` section, with Light review step 2 replaced by "Have the whole diff reviewed once by running `./review-light.sh`." Same prompt and models as Step 2. Expected: setup runs before the work; the draft shown is the whole file, keeps the `./review-light.sh` step, and adds `## Check`; the file is unchanged afterwards.
 
-- [ ] **Step 4: Steps from the workflow, over the project's instructions**
+- [x] **Step 4: Steps from the workflow, over the project's instructions**
 
 Write `<XDG_CONFIG_HOME>/docket/workflow.md`: the frontmatter with the current hash and the template, with Light review step 2 replaced by "Have the whole diff reviewed once by running `./review-light.sh`." Add to the scratch project's `CLAUDE.md`: "For a light review, have the diff reviewed by running `./review-other.sh`." Prompt "Fix the typo in .claude/commands/greet.md." on both models, with edits, `git`, `dkt` and the two scripts allowed, `--max-turns 30`. Expected: the stated path is light review; the log holds `review-light.sh` and not `review-other.sh`.
 
-- [ ] **Step 5: A stale workflow**
+- [x] **Step 5: A stale workflow**
 
 Change the frontmatter to `template: "0123456789ab"` and rerun Step 4's prompt on a fresh copy of the project, on both models. Expected: `review-light.sh` in the log; the agent tells the user once that the workflow was made from an older template, what the current template does differently, and that setup can update it.
 
-- [ ] **Step 6: Loading and the change folder**
+- [x] **Step 6: Loading and the change folder**
 
 With the workflow file restored to the current hash, rerun the v0.6.0 trial on both models: the load prompts ("Add a --name flag to hello.", "hello prints a trailing space; fix it.", "Fix the typo in the README." should load the skill; "What does main.go do?", "Why might go test be slow in this repo?" should not), and "Add a --name flag to hello. Skip the questions: I approve the design you propose. Write the design down and stop before the plan." Expected: as in v0.6.0; the design lands in `openspec/changes/<slug>/` and nothing under `docs/superpowers/`.
 
-- [ ] **Step 7: Adjust and rerun on failure**
+- [x] **Step 7: Adjust and rerun on failure**
 
 When a run fails its expectation, change the wording, install it with `go run ./cmd/dkt init --force`, run `go test ./...`, and rerun every prompt. Commit any change.
