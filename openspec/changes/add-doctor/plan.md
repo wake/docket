@@ -118,7 +118,7 @@
     - `InspectFile{Path string; Kind setup.FileKind; Status string}`, with JSON `path`, `kind` and `status`.
   - Tasks 2 and 3 add fields to `InspectResult`.
 
-- [ ] **Step 1: Split init's decisions from its writes (structural)**
+- [x] **Step 1: Split init's decisions from its writes (structural)**
   - In `setup.go`, move the start of `Init` into `decideAll(root string, a Assets, force bool) ([]decided, []Problem, error)`. That is the `openspec` symlink check, with its early return, then `targetsOf` and the `decide` loop. `Init` calls `decideAll` and keeps the rest.
   - In `cmd_init.go`:
     - extract `shippedAssets()`, the `setup.Assets{...}` literal;
@@ -126,7 +126,7 @@
   - Run `go test ./internal/setup/ ./internal/cli/` and `go vet ./...`. Expected: PASS, with no test file changed.
   - Commit as `refactor(setup): split init's decisions from its writes`, with the trailers.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
   **`internal/setup/setup_test.go: TestInspect`**, using the package's `assets`, with one sub-test per case:
   - Empty temporary root:
@@ -177,12 +177,12 @@
     - `result.files` still lists the schema files.
   - **`TestInspectUsage`**: `dkt inspect extra` exits with 2.
 
-- [ ] **Step 3: Run them to see them fail**
+- [x] **Step 3: Run them to see them fail**
 
   Run: `go test ./internal/setup/ -run TestInspect` and `go test ./internal/cli/ -run TestInspect`.
   Expected: FAIL (`undefined: Inspect`, `unknown command "inspect"`).
 
-- [ ] **Step 4: Implement `setup.Inspect` and the `inspect` command**
+- [x] **Step 4: Implement `setup.Inspect` and the `inspect` command**
   - **`setup.Inspect`**
     - It is `decideAll(root, a, false)`, with each `decided` mapped to a `File`.
     - Mark the two `CLAUDE.md` cases with an unexported field on `decided`, set where `decide` and `decideBlock` already return `Unchanged` for them, and skip those entries. `Init` ignores the field.
@@ -199,12 +199,12 @@
   - **Human output**: one line `fmt.Sprintf("%-8s %s", status, path)` for each file that is not `same`.
   - `result.files` is `[]InspectFile{}` when empty.
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
   Run: `go test ./internal/setup/ ./internal/cli/` and `go vet ./...`.
   Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   Commit as `feat(inspect): report the installed files`, with the trailers.
 
@@ -231,12 +231,12 @@
     - `OpenSpecState{Version *string; Supported bool}`, with JSON `version` and `supported`;
     - `InspectResult.Workflow *WorkflowResult`, with JSON `workflow`.
 
-- [ ] **Step 1: Share `dkt workflow`'s report (structural)**
+- [x] **Step 1: Share `dkt workflow`'s report (structural)**
   - Move everything in `workflowReport` except the `ErrNoHome` → `EnvError` mapping into `workflowState`. `workflowReport` keeps that mapping and builds its Human line.
   - Run `go test ./internal/cli/ -run TestWorkflow`. Expected: PASS, with no test changed.
   - Commit as `refactor(workflow): share the workflow report`, with the trailers.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
   **Shared setup.** Each test starts from Task 1's `inspectEnv(t)`. It overrides `DOCKET_OPENSPEC` by appending a variable, or rewrites the file at `workflowPath`.
   - **`TestInspectCleanSetup`**:
@@ -273,12 +273,12 @@
     - `result.files` is non-empty and `result.openspec.version` is `1.14.3`. Task 3 adds `result.changes`.
   - Extend Task 1's `TestInspectUnreadableFile`: `result.openspec.version` is `1.14.3` and `result.workflow.status` is `ok`.
 
-- [ ] **Step 3: Run them to see them fail**
+- [x] **Step 3: Run them to see them fail**
 
   Run: `go test ./internal/cli/ -run TestInspect`.
   Expected: FAIL (no `openspec` or `workflow` in `result`).
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
   - **OpenSpec.** Call `openspec.New(c.Repo.Root, c.Env)`, then `CheckVersion()`.
     - On success: `version` is the result and `supported` is true.
     - `*openspec.UnavailableError`, from either call: `openspec-missing` with the error's text as the message, and `version` null.
@@ -291,12 +291,12 @@
     - `openspec <version>`, plus ` (unsupported)` when not supported, or `openspec not found`;
     - `workflow <status> <path>`, with no path when it is null; no line when `result.workflow` is null.
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
   Run: `go test ./internal/cli/` and `go vet ./...`.
   Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   Commit as `feat(inspect): report OpenSpec and the workflow file`, with the trailers.
 
@@ -322,7 +322,7 @@
   - `archive.Trailers(e Env) ([]TrailerCheck, []Finding, error)`;
   - `InspectResult.Changes []archive.TrailerCheck`, with JSON `changes`, never null.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
   **`internal/archive/trailers_test.go`** builds repositories on `main` with `testutil.NewRepo` and `Repo.Commit`. The plan is `"# Plan\n\n### Task 1: One\n\n- [x] **Step 1: a**\n\n### Task 2: Two\n\n- [x] **Step 1: b**\n"`. `docket.yaml` is `title: X\nkind: feature\nsource: s\nbase: <sha>\n`. The `Env` comes from `scan.ResolveDefaultBranch(g, "main")`.
   - **`TestTrailersSquashed`**:
@@ -384,12 +384,12 @@
   - Extend `TestInspectCleanSetup`: add `changes` to the key assertion, as `[]`.
   - Extend `TestInspectUnreadableFile` and `TestInspectWorkflowUnreadable`: `result.changes` is present, as `[]`.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
   Run: `go test ./internal/archive/ -run TestTrailers` and `go test ./internal/cli/ -run TestInspect`.
   Expected: FAIL (`undefined: Trailers`, no `changes` in `result`).
 
-- [ ] **Step 3: Implement `archive.Trailers`**
+- [x] **Step 3: Implement `archive.Trailers`**
 
   For each name `e.Git.ListDirs(e.Default.Commit, "openspec/changes")` returns, except `archive`, in that order, with `dir` = `openspec/changes/<name>`:
   1. Read `<dir>/plan.md` with `ShowIfExists` at the tip. When it is missing, or `change.ParsePlan` finds no task, the change is not listed.
@@ -410,12 +410,12 @@
   - add its findings with `addArchiveReport`;
   - add a Human line `skipped  <slug>: <reason>` for each skipped change.
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
   Run: `go test ./internal/archive/ ./internal/cli/` and `go vet ./...`.
   Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Commit as `feat(inspect): check the trailers of changes on the default branch`, with the trailers.
 
@@ -447,7 +447,7 @@
   - In `setup.go`, `skillRoots = []string{".claude/skills", ".agents/skills"}` replaces `skillDirs`.
   - `targetsOf` order: the schema; then, for each root, each skill in order; then `AGENTS.md` and `CLAUDE.md`.
 
-- [ ] **Step 1: Take the skills by name (structural)**
+- [x] **Step 1: Take the skills by name (structural)**
   - **`internal/setup/setup.go`**:
     - add `Skill`, `Assets.Skills` and `skillRoots`, in place of `Assets.Skill` and `skillDirs`;
     - `targetsOf` uses the order above.
@@ -463,7 +463,7 @@
   - Update the doc comments that say "the skill" where they now mean the skills.
   - Commit as `refactor(setup): take the skills by name`, with the trailers.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
   **`schema_test.go`:**
   - **`TestSkillNames`**: the names of `Skills()` are `[docket docket-setup docket-doctor]`.
@@ -479,12 +479,12 @@
     - `SKILL.md`'s frontmatter `name` equals `<name>`;
     - its `description` is at most 1,024 characters.
 
-- [ ] **Step 3: Run them to see them fail**
+- [x] **Step 3: Run them to see them fail**
 
   Run: `go test . -run 'TestSkill|TestDoctor|TestInstalled'`.
   Expected: FAIL. `TestSkillNames` sees only `docket`; `TestDoctorHiddenFromCodex` finds no `docket-doctor`.
 
-- [ ] **Step 4: Write the skill files**
+- [x] **Step 4: Write the skill files**
   - In `schema.go`, embed `.agents/skills/docket .agents/skills/docket-setup .agents/skills/docket-doctor`. `Skills()` returns the three, in that order.
   - Create `.agents/skills/docket-setup/SKILL.md` with the text below. It is today's `setup.md`, with the changes this change asks for.
   - Create `.agents/skills/docket-doctor/SKILL.md` and `.agents/skills/docket-doctor/agents/openai.yaml` with the text below.
@@ -683,19 +683,19 @@
     allow_implicit_invocation: false
   ```
 
-- [ ] **Step 5: Regenerate the repository's copies**
+- [x] **Step 5: Regenerate the repository's copies**
   - Run: `go run ./cmd/dkt init --force`.
     - Expected: it reports `overwritten` for `.claude/skills/docket/SKILL.md`, and `written` for the docket-setup and docket-doctor files under `.claude/skills/`. It never asks for OpenSpec, since `openspec/` exists.
   - Run: `git rm .claude/skills/docket/setup.md`.
   - Run: `rg -n "setup\.md" .agents .claude/skills`.
     - Expected: no output.
 
-- [ ] **Step 6: Run the tests to see them pass**
+- [x] **Step 6: Run the tests to see them pass**
 
   Run: `go test ./...` and `go vet ./...`.
   Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
   Commit as `feat(skill): setup and doctor skills, installed by dkt init`, with the trailers. It holds the skill files, the deletions, the embedding, the new tests and the regenerated copies.
 
@@ -714,7 +714,7 @@
   - `docket/order.md`
 - Create: `docket/ideas/2026-10-30-process-review.md` (written during design; commit it)
 
-- [ ] **Step 1: Edit the docs**
+- [x] **Step 1: Edit the docs**
   - **`AGENTS.md`**, outside the Docket block:
     - the status line lists `dkt inspect` with the other commands;
     - the prompt paths become `.claude/skills/docket/`, `.claude/skills/docket-setup/`, `.claude/skills/docket-doctor/`, the same three under `.agents/skills/`, and the rest as they are;
@@ -739,7 +739,7 @@
   - **`docket/order.md`**: tick line 2.
   - **`docket/ideas/2026-10-30-process-review.md`**: "Not part of `docket doctor`" becomes "Not part of the doctor (`docket-doctor`)".
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
   Run: `rg -n "setup\.md|docket doctor" README.md README.zh-TW.md docs AGENTS.md docket/ideas/2026-10-29-framework-skill.md docket/ideas/2026-10-30-process-review.md`.
   Expected: no output.
@@ -747,7 +747,7 @@
   Run: `go test . -run 'TestBlock|TestInstalledSkill'`.
   Expected: PASS. The Docket block is unchanged.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
   Commit as `docs: dkt inspect, the setup and doctor skills`, with the trailers.
 
@@ -769,19 +769,19 @@ The lead runs this task.
   - has `XDG_CONFIG_HOME` set to a scratch directory.
 - So the user's own instructions and workflow file are never read or written.
 
-- [ ] **Step 1: Set up a scratch project**
+- [x] **Step 1: Set up a scratch project**
   - A new git repository on `main` holding:
     - a small Go program (`main.go` printing `hello`) and a README;
     - a script `review-light.sh` that appends its arguments to a log in the scratchpad and prints `no findings`.
   - Run the branch's `dkt init` and commit.
   - Write `<XDG_CONFIG_HOME>/docket/workflow.md` with the current template's hash and text, with Light review step 2 replaced by "Have the whole diff reviewed once by running `./review-light.sh --effort low`."
 
-- [ ] **Step 2: The doctor does not run on its own**
+- [x] **Step 2: The doctor does not run on its own**
 
   Prompts "Add a --name flag to hello." and "What does main.go do?", with `--max-turns 8`.
   Expected: no Skill call to `docket-doctor`, and no Bash command containing `dkt inspect`.
 
-- [ ] **Step 3: The doctor lists every problem first**
+- [x] **Step 3: The doctor lists every problem first**
 
   **Setup:**
   - append a line to `.claude/skills/docket/SKILL.md`;
@@ -807,7 +807,7 @@ The lead runs this task.
 
   **Run once more on Sonnet, without `--plugin-dir`.** Expected: the list also says that superpowers is not available.
 
-- [ ] **Step 4: The fix waits for consent**
+- [x] **Step 4: The fix waits for consent**
   1. Resume Step 3's session with "Start with the edited skill."
      - Expected: the agent shows how `.claude/skills/docket/SKILL.md` differs from the shipped file and asks before `dkt init --force`.
      - The file is unchanged.
@@ -816,14 +816,14 @@ The lead runs this task.
      - The file equals the shipped one.
      - The workflow file is unchanged.
 
-- [ ] **Step 5: Codex**
+- [x] **Step 5: Codex**
   1. In the scratch project, run `codex debug prompt-input` (no model call). Expected: the skills listed to the model include `docket` and `docket-setup`, and not `docket-doctor`.
   2. Run `codex exec --model gpt-5.6-sol --sandbox read-only '$docket-doctor'` once, on a copy of Step 3's project made before Step 4.
      - Its first command is `dkt inspect --json`.
      - Its last message lists `skill-differs`, `workflow-stale` and the drift before any fix.
      - Every checksum is unchanged.
 
-- [ ] **Step 6: Setup invoked by the user, and before the first work**
+- [x] **Step 6: Setup invoked by the user, and before the first work**
   1. Restore the workflow file to the current hash. Prompt `/docket-setup Change the light review reviewer to ./review-other.sh.`
      - Expected: the whole revised file is shown with the new reviewer.
      - The workflow file is unchanged.
@@ -831,7 +831,7 @@ The lead runs this task.
      - Expected: the `docket` skill sends the agent to `docket-setup`, and a draft of the four path sections is shown before any other step of the work.
      - No workflow file exists afterwards.
 
-- [ ] **Step 7: Adjust and rerun on failure**
+- [x] **Step 7: Adjust and rerun on failure**
 
   When a run fails its expectation:
   1. change the wording;
