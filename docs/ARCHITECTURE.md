@@ -6,7 +6,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 
 | Path | Role |
 |---|---|
-| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket`, `docket-setup` and `docket-doctor` skills, the Docket block of `AGENTS.md` and the workflow template (`workflow/template.md`) and the record template (`record/template.md`) |
+| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket`, `docket-setup` and `docket-doctor` skills, the Docket block of `AGENTS.md`, the workflow template (`workflow/template.md`) and the record template (`record/template.md`) |
 | `cmd/dkt` | Entry point; the only place that reads the process environment and working directory |
 | `internal/cli` | Command table, argument handling, text and JSON output, exit codes |
 | `internal/gitx` | Every git call: refs, worktrees, merge-base, file contents at a revision |

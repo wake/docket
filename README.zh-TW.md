@@ -4,7 +4,7 @@
 
 Docket 是一個小型命令列工具，負責檢查 [OpenSpec](https://github.com/Fission-AI/OpenSpec) 的 change 資料夾，並幫它們記帳。適用於用 [superpowers](https://github.com/obra/superpowers) 規劃與執行工作的專案。Docket 自己不存任何狀態，指令名稱是 `dkt`。
 
-> **狀態：早期。**`init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`、`status`、`workflow` 已經能用，前面七個指令完成了第一個里程碑。下面其餘的指令還是草案，之後會調整。Docket 本身就是照這份 README 描述的流程開發的。
+> **狀態：早期。**`init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`、`status`、`record`、`workflow` 已經能用，前面七個指令完成了第一個里程碑。下面其餘的指令還是草案，之後會調整。Docket 本身就是照這份 README 描述的流程開發的。
 
 ## 為什麼要有它
 
@@ -52,8 +52,10 @@ Docket **不會**：
 1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。同時符合好幾條時，取最重的：
    - 會改到 `openspec/specs/` 裡的句子：開 change，照下面的步驟走。任何設下新預期的改動也一樣，例如說不出「原本該怎樣」的 bug，或斷言新行為的測試：規格沒寫、也沒有既有行為可對照，改它就是在定義行為。
    - 讓程式回到規格行為的 bug 修正，或不改行為的重構（搬移程式碼也是重構）：修正要寫回歸測試，先看它在修正前失敗；重構要讓涵蓋它的測試前後都通過，而且突變改動的行會讓測試失敗。合併前讓整份 diff 審一次。會改變建置或執行的註解（例如編譯指令）算程式碼。完全不碰 OpenSpec。
-   - prompt 文字（agent 讀了會照做的文字，例如 `AGENTS.md`、`docket` skill、schema 裡的說明；路徑列在 `AGENTS.md`）、只改測試而且測的是已經規定或已經存在的行為，以及 CI 這類檢查設定：prompt 用機械方式檢查，測試用突變它所測的程式碼來檢查，檢查設定靠 PR 自己跑的 CI 來檢查，合併前讓整份 diff 審一次。完全不碰 OpenSpec。 輕審的工作不開 change，但會在 `docket/records/` 留一份紀錄，由 `dkt record` 寫出、`dkt lint` 檢查，它的 commit 帶 `Record: <slug>`。`dkt new` 和 `dkt record` 在 slug 已被用掉時，會改用空著的 `-2`（再來 `-3`，依此類推）後綴。
+   - prompt 文字（agent 讀了會照做的文字，例如 `AGENTS.md`、`docket` skill、schema 裡的說明；路徑列在 `AGENTS.md`）、只改測試而且測的是已經規定或已經存在的行為，以及 CI 這類檢查設定：prompt 用機械方式檢查，測試用突變它所測的程式碼來檢查，檢查設定靠 PR 自己跑的 CI 來檢查，合併前讓整份 diff 審一次。完全不碰 OpenSpec。
    - 給人讀的文件、程式碼或測試檔裡只改註解或空白（這不算改程式碼或測試）、版本號、只改相依套件清單的升級：只跑自動檢查，不另外審查。改到程式碼或測試檔時，先讓一個只讀 diff 的新 agent 確認每一行改動都是註解或空白，而且沒有會改變建置或執行的註解。依改到的東西歸類：prompt 裡的錯字算 prompt，搬移程式碼算重構。完全不碰 OpenSpec。
+
+   第二、第三條路徑的工作不開 change，但會在 `docket/records/` 留一份紀錄，由 `dkt record` 寫出、`dkt lint` 檢查，它的 commit 帶 `Record: <slug>`。`dkt new` 和 `dkt record` 在 slug 已被用掉時，會改用空著的 `-2`（再來 `-3`，依此類推）後綴。
 2. **開 change。**在 git worktree 裡執行 `dkt new <slug>`，它會呼叫 `openspec new change`。
 3. **寫提案與 delta。**
    - brainstorming 直接把 `proposal.md` 和 `specs/**/spec.md` 寫進 change 資料夾，需要時再加 `design.md`。
