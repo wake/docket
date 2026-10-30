@@ -10,13 +10,15 @@ with each step said the way this user does it.
    hash (`result.template`).
 2. Draft the file from the template, step by step, saying for each step
    how this user does it:
-   - Look first at the user's instructions you already have, such as their
-     global agent instructions and memory: the reviewers, models, commands
-     and habits they name for planning, reviews, verification and merging.
+   - Look first at the user's instructions already in your context, such
+     as their global agent instructions and memory: the reviewers, models,
+     commands and habits they name for planning, reviews, verification and
+     merging.
    - Then at the tools you can use: other models you can call for a
      review, subagent types, plugins, skills and commands.
-   - Ask the user before reading any other user-level file, such as
-     another agent's configuration.
+   - Do not read, list or search user-level files that are not already in
+     your context, such as global instruction files or another agent's
+     configuration, unless the user agrees first.
    - Keep every step of the template. Where the user's instructions say
      how to do a step, write it their way, naming the tool and its
      settings; where they add a step, add it; where they contradict a
@@ -28,9 +30,10 @@ with each step said the way this user does it.
      are and draft only the missing ones; the draft is still the whole
      file. For `stale`, keep the user's tools and bring in what the
      current template does differently.
-3. Show the user the whole draft, every section of it, then each point where it departs from
-   the template or from their instructions, and the conflicts to settle.
-   Revise it until they agree.
+3. Show the user the whole file as it will be written, in one block with
+   every section in full, not a summary or only the new part. Then list
+   each point where it departs from the template or from their
+   instructions, and the conflicts to settle. Revise it until they agree.
 4. Only after the user agrees, write the file at `result.path`, creating
    its directory when missing. If the path is a symbolic link, write
    through it and keep the link. The file starts with the hash from

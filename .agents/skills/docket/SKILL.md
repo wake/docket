@@ -58,7 +58,7 @@ Right after triage, before any other step of the work, run
   file wins over the user's other instructions.
 - `missing` or `incomplete`: read `setup.md` in this skill's directory and
   run setup first; then start the work.
-- `stale`: keep following the file. Tell the user once in this session
+- `stale`: follow the file as for `ok`. Tell the user once in this session
   that it was made from an older template, what the current template
   (`dkt workflow template`) does differently, and that setup can update it.
 - anything else, such as the file being unreadable: tell the user what
