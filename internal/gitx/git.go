@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -131,11 +132,19 @@ func (g Git) gitMarkerPossible() bool {
 
 // output runs git and returns raw stdout.
 func (g Git) output(args ...string) ([]byte, error) {
+	return g.outputIn("", args...)
+}
+
+// outputIn is output with stdin fed to git when it is not empty.
+func (g Git) outputIn(stdin string, args ...string) ([]byte, error) {
 	bin, err := g.lookPath()
 	if err != nil {
 		return nil, err
 	}
 	cmd := exec.Command(bin, args...)
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
 	cmd.Dir = g.Dir
 	cmd.Env = g.Env
 	var stdout, stderr bytes.Buffer
@@ -241,13 +250,33 @@ type Ref struct{ Name, SHA string }
 // Refs lists references matching the patterns by full refname; symbolic refs
 // are left out.
 func (g Git) Refs(patterns ...string) ([]Ref, error) {
-	args := append([]string{"for-each-ref", "--format=%(refname)%09%(objectname)%09%(symref)"}, patterns...)
-	out, err := g.Run(args...)
+	return g.listRefs(nil, patterns)
+}
+
+// WalkUnmerged walks the history of tips that excluded does not contain and
+// returns an error when git cannot read all of it, as when an ancestor object
+// is missing. The commits go through stdin, so any number of tips fits.
+func (g Git) WalkUnmerged(tips []string, excluded string) error {
+	in := strings.Join(tips, "\n") + "\n^" + excluded + "\n"
+	_, err := g.outputIn(in, "rev-list", "--quiet", "--stdin")
+	return err
+}
+
+// RefsFiltered is Refs narrowed by one for-each-ref filter, given whole, such
+// as "--merged=<commit>" or "--no-merged=<commit>".
+func (g Git) RefsFiltered(filter string, patterns ...string) ([]Ref, error) {
+	return g.listRefs([]string{filter}, patterns)
+}
+
+func (g Git) listRefs(filters, patterns []string) ([]Ref, error) {
+	args := append([]string{"for-each-ref", "--format=%(refname)%09%(objectname)%09%(symref)"}, filters...)
+	args = append(args, patterns...)
+	out, err := g.output(args...)
 	if err != nil {
 		return nil, err
 	}
 	var refs []Ref
-	for _, line := range strings.Split(out, "\n") {
+	for _, line := range strings.Split(string(out), "\n") {
 		if line == "" {
 			continue
 		}
@@ -301,6 +330,80 @@ func (g Git) Show(rev, path string) ([]byte, error) {
 	return g.output("show", rev+":"+path)
 }
 
+// ShowAll reads the blobs at rev:path for several paths with one
+// `git cat-file --batch`. files holds the content of each path git returned
+// as a blob, byte for byte as Show returns it. missed lists, in input order,
+// every path that did not come back as a blob (missing, ambiguous, a folder
+// or a submodule) and every path holding a newline, which cannot go on a line
+// of the batch input and is not sent; Show tells why. An unknown rev is an
+// error, as is git failing as a whole, but rev is checked only when at least
+// one path is sent: when none can be sent, no git runs and every path is in
+// missed.
+func (g Git) ShowAll(rev string, paths []string) (files map[string][]byte, missed []string, err error) {
+	files = map[string][]byte{}
+	var in strings.Builder
+	// The first line probes rev itself: batch answers "missing" for every
+	// path of an unknown rev and still exits 0.
+	in.WriteString(rev + "^{tree}\n")
+	sent := 0
+	for _, p := range paths {
+		if !strings.Contains(p, "\n") {
+			in.WriteString(rev + ":" + p + "\n")
+			sent++
+		}
+	}
+	if sent == 0 {
+		return files, slices.Clone(paths), nil
+	}
+	out, err := g.outputIn(in.String(), "cat-file", "--batch")
+	if err != nil {
+		return nil, nil, err
+	}
+	// Each answer is a header line; an object adds its content and a newline,
+	// and the size in the header says where the content ends.
+	next := func() (typ string, content []byte, ok bool) {
+		nl := bytes.IndexByte(out, '\n')
+		if nl < 0 {
+			return "", nil, false
+		}
+		header := string(out[:nl])
+		out = out[nl+1:]
+		if strings.HasSuffix(header, " missing") || strings.HasSuffix(header, " ambiguous") {
+			return "", nil, true
+		}
+		f := strings.Fields(header)
+		if len(f) != 3 {
+			return "", nil, false
+		}
+		size, err := strconv.Atoi(f[2])
+		if err != nil || size < 0 || size+1 > len(out) {
+			return "", nil, false
+		}
+		content = out[:size]
+		out = out[size+1:]
+		return f[1], content, true
+	}
+	if typ, _, ok := next(); !ok || typ == "" {
+		return nil, nil, fmt.Errorf("git cat-file: unknown revision %q", rev)
+	}
+	for _, p := range paths {
+		if strings.Contains(p, "\n") {
+			missed = append(missed, p)
+			continue
+		}
+		typ, content, ok := next()
+		if !ok {
+			return nil, nil, fmt.Errorf("git cat-file: unexpected output at %q", p)
+		}
+		if typ == "blob" {
+			files[p] = content
+		} else {
+			missed = append(missed, p)
+		}
+	}
+	return files, missed, nil
+}
+
 // ListFiles returns, sorted, the paths (relative to the repository root) of
 // the regular files below dir in rev's tree, at any depth. Links and
 // submodules are left out. A missing dir gives an empty list; a dir that is
@@ -330,4 +433,30 @@ func (g Git) ListFiles(rev, dir string) ([]string, error) {
 	}
 	slices.Sort(paths)
 	return paths, nil
+}
+
+// TreeEntry is one entry of a tree: its mode, its type (blob, tree or commit)
+// and its path relative to the repository root.
+type TreeEntry struct{ Mode, Type, Path string }
+
+// ListTree returns the entries that one non-recursive ls-tree gives for paths
+// in rev's tree: a path with a trailing slash lists what is directly inside
+// that folder, one without lists the entry itself. A missing path gives no
+// entries. Git leaves out the entry of a folder when a path inside it is also
+// asked for.
+func (g Git) ListTree(rev string, paths ...string) ([]TreeEntry, error) {
+	out, err := g.output(append([]string{"ls-tree", "-z", rev, "--"}, paths...)...)
+	if err != nil {
+		return nil, err
+	}
+	var entries []TreeEntry
+	for _, entry := range splitNUL(string(out)) {
+		meta, path, ok := strings.Cut(entry, "\t")
+		f := strings.Fields(meta)
+		if !ok || len(f) != 3 {
+			return nil, fmt.Errorf("git ls-tree: unexpected entry %q", entry)
+		}
+		entries = append(entries, TreeEntry{Mode: f[0], Type: f[1], Path: path})
+	}
+	return entries, nil
 }

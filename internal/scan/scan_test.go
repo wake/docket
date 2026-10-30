@@ -559,3 +559,212 @@ func TestScanListsRecords(t *testing.T) {
 		t.Errorf("unreadable = %+v", inv.Unreadable)
 	}
 }
+
+// onBranch commits build's changes on a new branch b and returns to main, so
+// that b is read as a branch source.
+func onBranch(t *testing.T, r *testutil.Repo, build func()) {
+	t.Helper()
+	r.Git("checkout", "-q", "-b", "b")
+	build()
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "b")
+	r.Git("checkout", "-q", "main")
+}
+
+// branchChanges returns the slugs of the changes that b alone holds.
+func branchChanges(inv scan.Inventory) []string {
+	slugs := []string{}
+	for _, c := range inv.Changes {
+		for _, s := range c.Sources {
+			if s.Name == "refs/heads/b" {
+				slugs = append(slugs, c.Slug)
+			}
+		}
+	}
+	return slugs
+}
+
+func recordsErrors(inv scan.Inventory) []scan.Unreadable {
+	var got []scan.Unreadable
+	for _, u := range inv.Unreadable {
+		if u.Path == "docket/records" {
+			got = append(got, u)
+		}
+	}
+	return got
+}
+
+func TestBranchTreeActiveAndArchived(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write(yamlPath("add-x"), "a: b\n")
+		r.Write("openspec/changes/archive/2026-10-24-add-y/proposal.md", "p\n")
+		r.Write("openspec/changes/notes.md", "n\n")
+	})
+	inv, _ := scanOf(t, r)
+	if got := branchChanges(inv); strings.Join(got, ",") != "add-x" {
+		t.Fatalf("changes = %v, inv = %+v", got, inv)
+	}
+	if find(inv, "archive") != nil || find(inv, "notes.md") != nil {
+		t.Fatalf("archive folder or file counted as a change: %+v", inv.Changes)
+	}
+	if _, arch := inv.Uses("add-y"); len(arch) != 1 || arch[0].Folder != "2026-10-24-add-y" {
+		t.Fatalf("archived = %+v", inv.Archived)
+	}
+	if len(inv.Unreadable) != 0 {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+}
+
+func TestBranchTreeArchiveEmptyOrMissing(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() { r.Write(yamlPath("add-x"), "a: b\n") })
+	inv, _ := scanOf(t, r)
+	if got := branchChanges(inv); strings.Join(got, ",") != "add-x" || len(inv.Archived) != 0 || len(inv.Unreadable) != 0 {
+		t.Fatalf("missing archive: inv = %+v", inv)
+	}
+	// An archive that is a file is no folder: nothing archived.
+	r2 := baseRepo(t)
+	onBranch(t, r2, func() {
+		r2.Write(yamlPath("add-x"), "a: b\n")
+		r2.Write("openspec/changes/archive", "file\n")
+	})
+	inv, _ = scanOf(t, r2)
+	if len(inv.Archived) != 0 || find(inv, "archive") != nil {
+		t.Fatalf("file archive: inv = %+v", inv)
+	}
+	if got := branchChanges(inv); strings.Join(got, ",") != "add-x" {
+		t.Fatalf("file archive: changes = %v", got)
+	}
+}
+
+func TestBranchTreeNoChangesFolder(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write("openspec/changes/archive/2026-10-24-add-y/proposal.md", "p\n")
+	})
+	inv, _ := scanOf(t, r)
+	if len(inv.Changes) != 0 || len(inv.Archived) != 1 || len(inv.Unreadable) != 0 {
+		t.Fatalf("inv = %+v", inv)
+	}
+}
+
+func TestBranchRecordsLinkIsNotAFolder(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write(yamlPath("add-x"), "a: b\n")
+		if err := os.MkdirAll(filepath.Join(r.Dir, "docket"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink("elsewhere", filepath.Join(r.Dir, "docket/records")); err != nil {
+			t.Fatal(err)
+		}
+	})
+	inv, _ := scanOf(t, r)
+	got := recordsErrors(inv)
+	if len(got) != 1 || got[0].Source.Name != "refs/heads/b" || got[0].Reason != "docket/records is not a folder at "+r.Git("rev-parse", "b") {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+	if len(inv.Unreadable) != 1 || strings.Join(branchChanges(inv), ",") != "add-x" {
+		t.Fatalf("inv = %+v", inv)
+	}
+}
+
+func TestBranchRecordsSubmoduleIsNotAFolder(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("checkout", "-q", "-b", "b")
+	r.Write(yamlPath("add-x"), "a: b\n")
+	r.Git("add", "-A")
+	r.Git("update-index", "--add", "--cacheinfo", "160000,"+r.Git("rev-parse", "HEAD")+",docket/records")
+	r.Git("commit", "-q", "-m", "b")
+	r.Git("checkout", "-q", "main")
+	inv, _ := scanOf(t, r)
+	got := recordsErrors(inv)
+	if len(got) != 1 || got[0].Reason != "docket/records is not a folder at "+r.Git("rev-parse", "b") {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+	if strings.Join(branchChanges(inv), ",") != "add-x" {
+		t.Fatalf("changes = %v", branchChanges(inv))
+	}
+}
+
+func TestBranchRecordsFileReason(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write(yamlPath("add-x"), "a: b\n")
+		r.Write("docket/records", "file\n")
+	})
+	inv, _ := scanOf(t, r)
+	got := recordsErrors(inv)
+	if len(got) != 1 || got[0].Reason != "docket/records is not a folder at "+r.Git("rev-parse", "b") {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+	if strings.Join(branchChanges(inv), ",") != "add-x" {
+		t.Fatalf("changes = %v", branchChanges(inv))
+	}
+}
+
+func TestBranchRecordLinkNotListed(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write("docket/records/2026-10-30-fix-x.md", "x\n")
+		if err := os.Symlink("2026-10-30-fix-x.md", filepath.Join(r.Dir, "docket/records/2026-10-30-link.md")); err != nil {
+			t.Fatal(err)
+		}
+		r.Write("docket/records/2026-10-30-fix-z.md", "z\n")
+		if err := os.Chmod(filepath.Join(r.Dir, "docket/records/2026-10-30-fix-z.md"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	})
+	inv, _ := scanOf(t, r)
+	want := []string{"2026-10-30-fix-x", "2026-10-30-fix-z"}
+	if got := recordSlugs(inv); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("records = %v, want %v", got, want)
+	}
+	if len(inv.Unreadable) != 0 {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+}
+
+func TestBranchRecordsTreeMissingIsRecordsErrorAlone(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write(yamlPath("add-x"), "a: b\n")
+		r.Write("docket/records/2026-10-30-fix-x.md", "x\n")
+	})
+	sha := r.Git("rev-parse", "b:docket/records")
+	obj := filepath.Join(r.Dir, ".git", "objects", sha[:2], sha[2:])
+	if err := os.Chmod(obj, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(obj); err != nil {
+		t.Fatal(err)
+	}
+	inv, _ := scanOf(t, r)
+	got := recordsErrors(inv)
+	if len(got) != 1 || got[0].Source.Name != "refs/heads/b" || got[0].Reason == "" {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+	if len(inv.Unreadable) != 1 || strings.Join(branchChanges(inv), ",") != "add-x" {
+		t.Fatalf("inv = %+v", inv)
+	}
+}
+
+func TestBranchFileInArchiveIsNotArchived(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write(yamlPath("add-keep"), "a: b\n")
+		r.Write("openspec/changes/archive/2026-01-01-add-x.md", "n\n")
+		r.Write("openspec/changes/archive/2026-01-01-add-x", "n\n")
+	})
+	inv, _ := scanOf(t, r)
+	if len(inv.Archived) != 0 {
+		t.Fatalf("archived = %+v", inv.Archived)
+	}
+	if _, arch := inv.Uses("add-x"); len(arch) != 0 {
+		t.Fatalf("add-x archived = %+v", arch)
+	}
+	if strings.Join(branchChanges(inv), ",") != "add-keep" || len(inv.Unreadable) != 0 {
+		t.Fatalf("inv = %+v", inv)
+	}
+}

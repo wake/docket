@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -150,25 +151,19 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		f.add(src, rank, active, archived, records)
 	}
 
-	refs, err := g.Refs("refs/heads", "refs/remotes")
+	unmerged, err := unmergedRefs(g, db)
 	if err != nil {
 		return inv, err
 	}
-	for _, r := range refs {
-		if r.Name == db.Ref {
-			continue
-		}
+	for _, u := range unmerged {
+		r := u.Ref
 		kind, rank := KindLocalBranch, rankLocalBranch
 		if strings.HasPrefix(r.Name, "refs/remotes/") {
 			kind, rank = KindRemoteBranch, rankRemoteBranch
 		}
 		src := Source{Kind: kind, Name: r.Name, Commit: r.SHA}
-		merged, err := g.IsAncestor(r.SHA, db.Commit)
-		if err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
-			continue
-		}
-		if merged {
+		if u.Err != nil {
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: u.Err.Error()})
 			continue
 		}
 		active, archived, records, recErr, err := readTree(g, r.SHA)
@@ -213,6 +208,64 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	}
 	sort.Slice(inv.Records, func(i, j int) bool { return inv.Records[i].Slug < inv.Records[j].Slug })
 	return inv, nil
+}
+
+// unmergedRef is a ref to read, or, when Err is set, one whose ancestry
+// could not be computed.
+type unmergedRef struct {
+	Ref gitx.Ref
+	Err error
+}
+
+// unmergedRefs lists, in ref order, the local and remote-tracking refs other
+// than the default branch's own that the default branch tip does not contain,
+// and the ones whose ancestry cannot be computed. Two filtered listings
+// settle most refs in two git processes. A ref that is in both or in neither
+// (git leaves out a ref whose tip it cannot read) is asked on its own, and
+// when either listing fails, or the history behind the unmerged tips cannot
+// be walked, every ref is asked on its own.
+func unmergedRefs(g gitx.Git, db DefaultBranch) (unmerged []unmergedRef, err error) {
+	patterns := []string{"refs/heads", "refs/remotes"}
+	all, err := g.Refs(patterns...)
+	if err != nil {
+		return nil, err
+	}
+	inMerged, inUnmerged := map[string]bool{}, map[string]bool{}
+	merged, errM := g.RefsFiltered("--merged="+db.Commit, patterns...)
+	no, errU := g.RefsFiltered("--no-merged="+db.Commit, patterns...)
+	listed := errM == nil && errU == nil
+	if listed {
+		for _, r := range merged {
+			inMerged[r.Name] = true
+		}
+		var tips []string
+		for _, r := range no {
+			inUnmerged[r.Name] = true
+			if r.Name != db.Ref {
+				tips = append(tips, r.SHA)
+			}
+		}
+		// The listings do not notice damaged history behind a tip.
+		if len(tips) > 0 && g.WalkUnmerged(tips, db.Commit) != nil {
+			listed = false
+		}
+	}
+	for _, r := range all {
+		if r.Name == db.Ref {
+			continue
+		}
+		if listed && inMerged[r.Name] != inUnmerged[r.Name] {
+			if inUnmerged[r.Name] {
+				unmerged = append(unmerged, unmergedRef{Ref: r})
+			}
+			continue
+		}
+		isMerged, err := g.IsAncestor(r.SHA, db.Commit)
+		if err != nil || !isMerged {
+			unmerged = append(unmerged, unmergedRef{Ref: r, Err: err})
+		}
+	}
+	return unmerged, nil
 }
 
 // unbornHead reports a worktree whose HEAD has no commit yet.
@@ -272,8 +325,35 @@ func diskDirs(dir string) ([]string, error) {
 	return names, nil
 }
 
-// readTree reads a commit. recErr is a failure to list the records alone.
+// readTree reads a commit with one ls-tree. recErr is a failure to list the
+// records alone.
 func readTree(g gitx.Git, rev string) (active, archived, records []string, recErr, err error) {
+	entries, err := g.ListTree(rev, changesDir+"/", archiveDir+"/", record.Dir, record.Dir+"/")
+	if err != nil {
+		// One unreadable folder may be the records alone: ask for each in turn.
+		return readTreeEach(g, rev)
+	}
+	for _, e := range entries {
+		dir, name := path.Split(e.Path)
+		switch {
+		case e.Path == record.Dir:
+			recErr = fmt.Errorf("%s is not a folder at %s", record.Dir, rev)
+		case dir == changesDir+"/" && e.Type == "tree":
+			active = append(active, name)
+		case dir == archiveDir+"/" && e.Type == "tree":
+			archived = append(archived, name)
+		case dir == record.Dir+"/" && e.Type == "blob" && (e.Mode == "100644" || e.Mode == "100755"):
+			if slug, ok := record.SlugOf(name); ok {
+				records = append(records, slug)
+			}
+		}
+	}
+	return active, archived, records, recErr, nil
+}
+
+// readTreeEach is readTree with one git call per folder, which tells a
+// failure of the records folder from a failure of the changes.
+func readTreeEach(g gitx.Git, rev string) (active, archived, records []string, recErr, err error) {
 	if active, err = g.ListDirs(rev, changesDir); err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -364,17 +444,33 @@ func ReadFiles(g gitx.Git, src Source, dir string, keep func(rel string) bool) (
 			fail(dir, err)
 			return files, unread, nil
 		}
+		var kept []string
 		for _, p := range paths {
-			rel := strings.TrimPrefix(p, dir+"/")
-			if !keep(rel) {
+			if keep(strings.TrimPrefix(p, dir+"/")) {
+				kept = append(kept, p)
+			}
+		}
+		// One batch reads the files; Show reads again what the batch did not
+		// return (and everything when the batch fails), so a file git cannot
+		// read gets Show's error.
+		blobs, missed, err := g.ShowAll(src.Commit, kept)
+		if err != nil {
+			blobs, missed = nil, kept
+		}
+		for _, p := range kept {
+			b, ok := blobs[p]
+			if !ok {
 				continue
 			}
+			files[strings.TrimPrefix(p, dir+"/")] = b
+		}
+		for _, p := range missed {
 			b, err := g.Show(src.Commit, p)
 			if err != nil {
 				fail(p, err)
 				continue
 			}
-			files[rel] = b
+			files[strings.TrimPrefix(p, dir+"/")] = b
 		}
 		return files, unread, nil
 	}
