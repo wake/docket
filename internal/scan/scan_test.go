@@ -458,3 +458,102 @@ func TestPathsWithSpaces(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func recordSlugs(inv scan.Inventory) []string {
+	slugs := []string{}
+	for _, r := range inv.Records {
+		slugs = append(slugs, r.Slug)
+	}
+	return slugs
+}
+
+func TestScanNoRecordsFolder(t *testing.T) {
+	inv, _ := scanOf(t, baseRepo(t))
+	if inv.Records == nil || len(inv.Records) != 0 {
+		t.Fatalf("records = %#v, want empty and not nil", inv.Records)
+	}
+	if len(inv.Unreadable) != 0 {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+}
+
+func TestScanRecordsUnreadable(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("mode 000 does not stop root")
+	}
+	a := baseRepo(t)
+	bPath := filepath.Join(t.TempDir(), "b")
+	b := a.AddWorktree(bPath, "other")
+	b.Write(yamlPath("add-x"), "schema: spec-driven\n")
+	b.Write("docket/records/2026-10-30-fix-x.md", "x\n")
+	dir := filepath.Join(bPath, "docket/records")
+	if err := os.Chmod(dir, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, 0o755) })
+	inv, _ := scanOf(t, a)
+	var got []scan.Unreadable
+	for _, u := range inv.Unreadable {
+		if u.Source.Kind == scan.KindWorktree && realPath(t, u.Source.Name) == realPath(t, bPath) {
+			got = append(got, u)
+		}
+	}
+	if len(got) != 1 || got[0].Path != "docket/records" {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+	if find(inv, "add-x") == nil {
+		t.Fatal("add-x lost")
+	}
+}
+
+func TestScanRecordsNotAFolder(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("checkout", "-q", "-b", "b")
+	r.Commit("file", map[string]string{"docket/records": "not a folder\n"})
+	r.Git("checkout", "-q", "main")
+	inv, _ := scanOf(t, r)
+	if len(inv.Unreadable) != 1 || inv.Unreadable[0].Source.Name != "refs/heads/b" || inv.Unreadable[0].Path != "docket/records" {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+}
+
+func TestScanListsRecords(t *testing.T) {
+	r := baseRepo(t)
+	r.Commit("z", map[string]string{"docket/records/2026-10-01-fix-z.md": "z\n"})
+	r.Git("checkout", "-q", "-b", "b")
+	r.Commit("y", map[string]string{
+		"docket/records/2026-10-29-fix-y.md":    "y\n",
+		"docket/records/sub/2026-10-29-deep.md": "d\n",
+	})
+	r.Git("checkout", "-q", "main")
+	r.Write("docket/records/2026-10-30-fix-x.md", "x\n")
+	r.Write("docket/records/README.md", "r\n")
+	r.Write("docket/records/2026-10-30-notes.txt", "n\n")
+	if err := os.Symlink("2026-10-30-fix-x.md", filepath.Join(r.Dir, "docket/records/2026-10-30-link.md")); err != nil {
+		t.Fatal(err)
+	}
+	inv, _ := scanOf(t, r)
+	want := []string{"2026-10-01-fix-z", "2026-10-29-fix-y", "2026-10-30-fix-x"}
+	if got := recordSlugs(inv); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("records = %v, want %v", got, want)
+	}
+	if s := inv.RecordSources("2026-10-30-fix-x"); len(s) != 1 || s[0].Kind != scan.KindWorktree {
+		t.Errorf("fix-x sources = %+v", s)
+	}
+	if s := inv.RecordSources("2026-10-29-fix-y"); len(s) != 1 || s[0].Name != "refs/heads/b" {
+		t.Errorf("fix-y sources = %+v", s)
+	}
+	hasDefault := false
+	for _, s := range inv.RecordSources("2026-10-01-fix-z") {
+		hasDefault = hasDefault || s.Kind == scan.KindDefaultBranch
+	}
+	if !hasDefault {
+		t.Errorf("fix-z sources lack the default branch")
+	}
+	if s := inv.RecordSources("2026-10-30-none"); s != nil {
+		t.Errorf("none sources = %+v, want nil", s)
+	}
+	if len(inv.Unreadable) != 0 {
+		t.Errorf("unreadable = %+v", inv.Unreadable)
+	}
+}

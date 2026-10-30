@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/record"
 )
 
 // Kind says what a Source is.
@@ -48,6 +49,12 @@ type Change struct {
 	Sources []Source // Sources[0] is where content is read from
 }
 
+// Record is a record, reported once however many sources hold it.
+type Record struct {
+	Slug    string
+	Sources []Source // Sources[0] is ranked as for changes
+}
+
 // Archived is an archived use of a slug.
 type Archived struct {
 	Slug, Folder string
@@ -66,6 +73,7 @@ type Inventory struct {
 	DefaultBranch DefaultBranch
 	Changes       []Change
 	Archived      []Archived
+	Records       []Record
 	Unreadable    []Unreadable
 }
 
@@ -79,10 +87,11 @@ var archiveName = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(.+)$`)
 type found struct {
 	active   map[string][]Source
 	archived map[string][]Source // keyed by archive folder
+	records  map[string][]Source
 	rank     map[Source]int
 }
 
-func (f *found) add(src Source, rank int, active, archived []string) {
+func (f *found) add(src Source, rank int, active, archived, records []string) {
 	f.rank[src] = rank
 	for _, s := range active {
 		if s != "archive" {
@@ -94,14 +103,17 @@ func (f *found) add(src Source, rank int, active, archived []string) {
 			f.archived[a] = append(f.archived[a], src)
 		}
 	}
+	for _, r := range records {
+		f.records[r] = append(f.records[r], src)
+	}
 }
 
 // Scan reads every worktree, every unmerged local and remote-tracking branch
 // and the default branch tip. It contacts no remote. Only failures not tied to
 // one source are returned; a source that cannot be read goes into Unreadable.
 func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
-	inv := Inventory{DefaultBranch: db, Changes: []Change{}, Archived: []Archived{}, Unreadable: []Unreadable{}}
-	f := &found{active: map[string][]Source{}, archived: map[string][]Source{}, rank: map[Source]int{}}
+	inv := Inventory{DefaultBranch: db, Changes: []Change{}, Archived: []Archived{}, Records: []Record{}, Unreadable: []Unreadable{}}
+	f := &found{active: map[string][]Source{}, archived: map[string][]Source{}, records: map[string][]Source{}, rank: map[Source]int{}}
 
 	wts, err := g.Worktrees()
 	if err != nil {
@@ -116,10 +128,13 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: "worktree is prunable: its directory is gone"})
 			continue
 		}
-		active, archived, err := readDisk(w.Path)
+		active, archived, records, recErr, err := readDisk(w.Path)
 		if err != nil {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
 			continue
+		}
+		if recErr != nil {
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Path: record.Dir, Reason: recErr.Error()})
 		}
 		rank := rankContainedWorktree
 		if !unbornHead(w.Head) {
@@ -132,7 +147,7 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 				rank = rankUnmergedWorktree
 			}
 		}
-		f.add(src, rank, active, archived)
+		f.add(src, rank, active, archived, records)
 	}
 
 	refs, err := g.Refs("refs/heads", "refs/remotes")
@@ -156,20 +171,26 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		if merged {
 			continue
 		}
-		active, archived, err := readTree(g, r.SHA)
+		active, archived, records, recErr, err := readTree(g, r.SHA)
 		if err != nil {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
 			continue
 		}
-		f.add(src, rank, active, archived)
+		if recErr != nil {
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Path: record.Dir, Reason: recErr.Error()})
+		}
+		f.add(src, rank, active, archived, records)
 	}
 
 	dbSrc := Source{Kind: KindDefaultBranch, Name: db.Ref, Commit: db.Commit}
-	active, archived, err := readTree(g, db.Commit)
+	active, archived, records, recErr, err := readTree(g, db.Commit)
 	if err != nil {
 		inv.Unreadable = append(inv.Unreadable, Unreadable{Source: dbSrc, Reason: err.Error()})
 	} else {
-		f.add(dbSrc, rankDefaultBranch, active, archived)
+		if recErr != nil {
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: dbSrc, Path: record.Dir, Reason: recErr.Error()})
+		}
+		f.add(dbSrc, rankDefaultBranch, active, archived, records)
 	}
 
 	for slug, srcs := range f.active {
@@ -187,6 +208,10 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		}
 		return a.Folder < b.Folder
 	})
+	for slug, srcs := range f.records {
+		inv.Records = append(inv.Records, Record{Slug: slug, Sources: f.sortSources(srcs)})
+	}
+	sort.Slice(inv.Records, func(i, j int) bool { return inv.Records[i].Slug < inv.Records[j].Slug })
 	return inv, nil
 }
 
@@ -205,17 +230,28 @@ func (f *found) sortSources(s []Source) []Source {
 	return s
 }
 
-func readDisk(root string) (active, archived []string, err error) {
+// readDisk reads a worktree. recErr is a failure to list the records alone;
+// the changes are still returned.
+func readDisk(root string) (active, archived, records []string, recErr, err error) {
 	if _, err := os.Stat(root); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if active, err = diskDirs(filepath.Join(root, changesDir)); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if archived, err = diskDirs(filepath.Join(root, archiveDir)); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return active, archived, nil
+	entries, recErr := os.ReadDir(filepath.Join(root, record.Dir))
+	if errors.Is(recErr, fs.ErrNotExist) {
+		recErr = nil
+	}
+	for _, e := range entries {
+		if slug, ok := record.SlugOf(e.Name()); ok && e.Type().IsRegular() {
+			records = append(records, slug)
+		}
+	}
+	return active, archived, records, recErr, nil
 }
 
 // diskDirs lists subdirectory names; a missing directory is empty.
@@ -236,14 +272,22 @@ func diskDirs(dir string) ([]string, error) {
 	return names, nil
 }
 
-func readTree(g gitx.Git, rev string) (active, archived []string, err error) {
+// readTree reads a commit. recErr is a failure to list the records alone.
+func readTree(g gitx.Git, rev string) (active, archived, records []string, recErr, err error) {
 	if active, err = g.ListDirs(rev, changesDir); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if archived, err = g.ListDirs(rev, archiveDir); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	return active, archived, nil
+	paths, recErr := g.ListFiles(rev, record.Dir)
+	for _, p := range paths {
+		name := strings.TrimPrefix(p, record.Dir+"/")
+		if slug, ok := record.SlugOf(name); ok && !strings.Contains(name, "/") {
+			records = append(records, slug)
+		}
+	}
+	return active, archived, records, recErr, nil
 }
 
 // Uses reports how a slug is used: the active change, if any, and every
@@ -260,6 +304,16 @@ func (inv Inventory) Uses(slug string) (active *Change, archived []Archived) {
 		}
 	}
 	return active, archived
+}
+
+// RecordSources returns the sources holding the record, nil when none.
+func (inv Inventory) RecordSources(slug string) []Source {
+	for _, r := range inv.Records {
+		if r.Slug == slug {
+			return r.Sources
+		}
+	}
+	return nil
 }
 
 // ReadFile reads rel (relative to the repository root) from a source. rel must
