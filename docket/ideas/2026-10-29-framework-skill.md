@@ -79,7 +79,8 @@ to bring them in.
   `2026-10-29-records.md` keeps its mechanism and kinds, without its review
   sections; `2026-10-29-commit-gate.md` keeps its checks that work lands in
   the right container; `2026-10-28-lint-review-and-files.md` becomes a check
-  of fields a project declares, or is dropped.
+  of fields a project declares, or is dropped. `add-records` has since
+  settled the records idea (half of it: tracking remains, see that file).
 
 ## Status
 

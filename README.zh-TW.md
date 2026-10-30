@@ -29,12 +29,12 @@ Docket 讀 repo 裡的檔案和 git 紀錄，做四種工作：
 
 | 角色 | 指令 | 做什麼 |
 |---|---|---|
-| 檢查（唯讀，失敗時回傳非零結束碼） | `lint`、`conflicts`、`check` | 必填段落、殘留的佔位字、任務標題格式、複用表裡不存在的路徑、被多個進行中 change 修改的需求、沒有測試的 scenario |
+| 檢查（唯讀，失敗時回傳非零結束碼） | `lint`、`conflicts`、`check` | 必填段落（紀錄：front matter、段落、字數上限）、殘留的佔位字、任務標題格式、複用表裡不存在的路徑、被多個進行中 change 修改的需求、沒有測試的 scenario |
 | 記帳 | `status`、`sync`、`log` | 從 commit trailer 算出進度、閒置天數、一條需求怎麼演變。`sync` 只改 `plan.md` 的勾選框，不動其他內容 |
 | 組裝 | `brief`、`accept --export` | 把散在多個檔案的內容拼成給實作 agent 的 brief，或拼成給客戶確認的頁面 |
 | 流程包裝 | `init`、`new`、`archive`、`rebase` | 安裝 schema，依固定順序呼叫 OpenSpec CLI 和上面的檢查，並記下 base commit 與證據 |
 
-會寫檔的指令有：`init`（schema、skill 與 Docket 區塊）、`new`（change 資料夾）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 spec 標題與 `evidence.md`）、`rebase`（`docket.yaml` 的 base 那一行；舊版 dkt 建立的 change 則是 `.openspec.yaml` 的那一行）。它們都不會 commit。
+會寫檔的指令有：`init`（schema、skill 與 Docket 區塊）、`new`（change 資料夾）、`record`（`docket/records/` 底下的紀錄）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 spec 標題與 `evidence.md`）、`rebase`（`docket.yaml` 的 base 那一行；舊版 dkt 建立的 change 則是 `.openspec.yaml` 的那一行）。它們都不會 commit。
 
 ## Docket 不是什麼
 
@@ -52,7 +52,7 @@ Docket **不會**：
 1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。同時符合好幾條時，取最重的：
    - 會改到 `openspec/specs/` 裡的句子：開 change，照下面的步驟走。任何設下新預期的改動也一樣，例如說不出「原本該怎樣」的 bug，或斷言新行為的測試：規格沒寫、也沒有既有行為可對照，改它就是在定義行為。
    - 讓程式回到規格行為的 bug 修正，或不改行為的重構（搬移程式碼也是重構）：修正要寫回歸測試，先看它在修正前失敗；重構要讓涵蓋它的測試前後都通過，而且突變改動的行會讓測試失敗。合併前讓整份 diff 審一次。會改變建置或執行的註解（例如編譯指令）算程式碼。完全不碰 OpenSpec。
-   - prompt 文字（agent 讀了會照做的文字，例如 `AGENTS.md`、`docket` skill、schema 裡的說明；路徑列在 `AGENTS.md`）、只改測試而且測的是已經規定或已經存在的行為，以及 CI 這類檢查設定：prompt 用機械方式檢查，測試用突變它所測的程式碼來檢查，檢查設定靠 PR 自己跑的 CI 來檢查，合併前讓整份 diff 審一次。完全不碰 OpenSpec。
+   - prompt 文字（agent 讀了會照做的文字，例如 `AGENTS.md`、`docket` skill、schema 裡的說明；路徑列在 `AGENTS.md`）、只改測試而且測的是已經規定或已經存在的行為，以及 CI 這類檢查設定：prompt 用機械方式檢查，測試用突變它所測的程式碼來檢查，檢查設定靠 PR 自己跑的 CI 來檢查，合併前讓整份 diff 審一次。完全不碰 OpenSpec。 輕審的工作不開 change，但會在 `docket/records/` 留一份紀錄，由 `dkt record` 寫出、`dkt lint` 檢查，它的 commit 帶 `Record: <slug>`。`dkt new` 和 `dkt record` 在 slug 已被用掉時，會改用空著的 `-2`（再來 `-3`，依此類推）後綴。
    - 給人讀的文件、程式碼或測試檔裡只改註解或空白（這不算改程式碼或測試）、版本號、只改相依套件清單的升級：只跑自動檢查，不另外審查。改到程式碼或測試檔時，先讓一個只讀 diff 的新 agent 確認每一行改動都是註解或空白，而且沒有會改變建置或執行的註解。依改到的東西歸類：prompt 裡的錯字算 prompt，搬移程式碼算重構。完全不碰 OpenSpec。
 2. **開 change。**在 git worktree 裡執行 `dkt new <slug>`，它會呼叫 `openspec new change`。
 3. **寫提案與 delta。**
@@ -92,8 +92,9 @@ Docket **不會**：
 
 ```
 dkt init [--force]                # 安裝 docket schema、各 skill 與 Docket 區塊
-dkt new <slug> --kind feature|change-request|fix|baseline --source "<出處>" --title "<標題>"
-dkt lint [<slug>...]              # 文件規則
+dkt new <slug> --kind feature|change-request|baseline --source "<出處>" --title "<標題>"
+dkt record <name> --kind fix|refactor|test|prompt|checks --source "<出處>" --title "<標題>"   # 輕審工作的紀錄
+dkt lint [<slug>|<record>...]     # 文件規則
 dkt conflicts [<slug>]            # 被多個進行中 change 碰到的需求
 dkt sync <slug> [--check]         # 依 commit trailer 勾 plan.md
 dkt archive <slug>...             # 發版步驟，在從預設分支開出的分支上

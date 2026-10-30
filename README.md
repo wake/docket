@@ -4,7 +4,7 @@ English | [繁體中文](README.zh-TW.md)
 
 Docket is a small command-line tool that checks [OpenSpec](https://github.com/Fission-AI/OpenSpec) change folders and keeps their books. It is meant for projects that plan and execute work with [superpowers](https://github.com/obra/superpowers). Docket keeps no state of its own, and the command is `dkt`.
 
-> **Status: early.** `init`, `new`, `lint`, `conflicts`, `sync`, `archive`, `rebase`, `status` and `workflow` work; the first seven of them completed the first milestone. The other commands below are a draft and will change. Docket is built with the workflow this README describes.
+> **Status: early.** `init`, `new`, `lint`, `conflicts`, `sync`, `archive`, `rebase`, `status`, `record` and `workflow` work; the first seven of them completed the first milestone. The other commands below are a draft and will change. Docket is built with the workflow this README describes.
 
 ## Why
 
@@ -29,12 +29,12 @@ Docket reads the files in the repository and the git history. It does four kinds
 
 | Role | Commands | What it does |
 |---|---|---|
-| Check (read-only; exits non-zero on failure) | `lint`, `conflicts`, `check` | Required sections, leftover placeholders, task heading format, reuse-table paths that do not exist, requirements touched by more than one active change, scenarios without tests |
+| Check (read-only; exits non-zero on failure) | `lint`, `conflicts`, `check` | Required sections (records: front matter, sections, word limits), leftover placeholders, task heading format, reuse-table paths that do not exist, requirements touched by more than one active change, scenarios without tests |
 | Bookkeeping | `status`, `sync`, `log` | Progress from commit trailers, idle days, and how a requirement changed over time. `sync` changes nothing but checkboxes in `plan.md` |
 | Assemble | `brief`, `accept --export` | Gathers pieces from several files into a brief for an implementing agent, or into a page a client can review |
 | Wrap | `init`, `new`, `archive`, `rebase` | Installs the schema, runs the OpenSpec CLI and the checks above in a fixed order, and records the base commit and the evidence |
 
-The commands that write files are `init` (the schema, the skills and the Docket block), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
+The commands that write files are `init` (the schema, the skills and the Docket block), `new` (the change folder), `record` (a record under `docket/records/`), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
 
 ## What Docket is not
 
@@ -52,7 +52,7 @@ superpowers starts the work. OpenSpec never starts a step on its own; it is call
 1. **Triage with brainstorming.** superpowers brainstorming reads the project and talks the idea through. When several paths apply, take the heaviest:
    - It changes a sentence in `openspec/specs/`: open a change and follow the steps below. So does any edit that sets an expectation no spec states and no existing behavior shows, such as a bug fix with no specified answer or a test that asserts new behavior, since it defines behavior.
    - A bug fix that restores the specified behavior, or a restructuring that changes no behavior (moving code is one): for a fix, write a regression test and see it fail before the fix; for a restructuring, the tests that cover the code pass before and after, and mutating the changed lines makes one fail. Have the diff reviewed once before merging. A comment that changes how the code builds or runs, such as a compiler directive, is code. OpenSpec is not involved.
-   - Prompt text (the text agents act on, such as `AGENTS.md`, the `docket` skill and the schema's instructions; list the paths in `AGENTS.md`), tests that check behavior already specified or already shown, and check settings such as CI configuration: check prompts mechanically, tests by mutating the code they cover, and check settings by the pull request's own CI run, and have the diff reviewed once before merging. OpenSpec is not involved.
+   - Prompt text (the text agents act on, such as `AGENTS.md`, the `docket` skill and the schema's instructions; list the paths in `AGENTS.md`), tests that check behavior already specified or already shown, and check settings such as CI configuration: check prompts mechanically, tests by mutating the code they cover, and check settings by the pull request's own CI run, and have the diff reviewed once before merging. OpenSpec is not involved. Light-review work opens no change but keeps a record in `docket/records/`, written by `dkt record` and checked by `dkt lint`; its commits carry `Record: <slug>`. `dkt new` and `dkt record` take a free `-2` suffix (then `-3`, and so on) when the slug is used.
    - Docs for people, edits that only change comments or whitespace in code or test files (these are not edits to code or tests), version bumps, and dependency upgrades that touch only the dependency manifests: no review beyond the automated checks. When such an edit touches a code or test file, a fresh agent that reads only the diff first confirms that every changed line is a comment or whitespace and that no comment changes how the code builds or runs. Sort by what is touched: a typo in a prompt is prompt text, and moving code is a restructuring. OpenSpec is not involved.
 2. **Open a change** in a git worktree with `dkt new <slug>`, which wraps `openspec new change`.
 3. **Write the proposal and the delta.**
@@ -92,8 +92,9 @@ We found no public project that uses a single list this way; most keep both file
 
 ```
 dkt init [--force]                # install the docket schema, the skills and the Docket block
-dkt new <slug> --kind feature|change-request|fix|baseline --source "<origin>" --title "<title>"
-dkt lint [<slug>...]              # document rules
+dkt new <slug> --kind feature|change-request|baseline --source "<origin>" --title "<title>"
+dkt record <name> --kind fix|refactor|test|prompt|checks --source "<origin>" --title "<title>"   # a record for light-review work
+dkt lint [<slug>|<record>...]     # document rules
 dkt conflicts [<slug>]            # requirements touched by more than one active change
 dkt sync <slug> [--check]         # tick plan.md from commit trailers
 dkt archive <slug>...             # release step, on a branch made from the default branch
