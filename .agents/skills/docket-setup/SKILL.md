@@ -67,4 +67,4 @@ said the way this user does it. Run it:
    there is any.
 
 If the user does not want to set up now, follow the template's steps for
-this piece of work, and ask again at the next one.
+the work at hand, if any, and ask again at the next piece of work.

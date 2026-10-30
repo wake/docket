@@ -70,18 +70,23 @@ and do it only after the user agrees; when they decline, go to the next.
 
 - The workflow file (`workflow-missing`, `workflow-incomplete`,
   `workflow-stale`, or a step this environment cannot do): run the
-  `docket-setup` skill.
+  `docket-setup` skill. When `result.workflow.path` is null, no home
+  directory was found to hold the file: say so instead; setup cannot run
+  until `HOME` is set.
 - Drift: ask which side the user wants to keep. The workflow file changes
   through `docket-setup`; for their own instructions, propose the
   wording.
-- An installed file (`schema-missing`, `skill-missing`,
+- The installed files (`schema-missing`, `skill-missing`,
   `agents-block-missing`, `schema-differs`, `skill-differs`,
-  `agents-block-differs`): for a differing file, first show how it differs
-  from the shipped one. In a new temporary directory, run `git init`,
-  create an empty `openspec` directory, run `dkt init` there, and compare
-  the file at the same path. Then run `dkt init` for a missing file, or
-  `dkt init --force` for a differing one; `--force` replaces every
-  differing file, so name them all before asking.
+  `agents-block-differs`): take them together, since one command fixes
+  them all. `dkt init` writes every missing file and leaves differing ones
+  alone; when there is no `openspec` directory it first runs
+  `openspec init`. `dkt init --force` also replaces every differing file.
+  First show how each differing file differs from the shipped one: in a
+  new temporary directory, run `git init`, create an empty `openspec`
+  directory, run `dkt init` there, and compare the file at the same path.
+  Then name every file the command will write, and run it only after the
+  user agrees.
 - `symlink-refused` or `agents-block-malformed`: explain what stops
   `dkt init` and propose how to fix it; do not change the link or the
   markers yourself.
