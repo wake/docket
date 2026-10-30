@@ -43,7 +43,8 @@ restructuring.
 - **Direct merge**: docs for people (moves and typos in them included),
   edits that only change comments or whitespace in code or test files and
   pass the check, version bumps, and dependency upgrades that touch only
-  the dependency manifests (such as `go.mod` and `go.sum`). No change is opened.
+  the dependency manifests (such as `go.mod` and `go.sum`). No change is
+  opened.
 
 An idea that is not ready goes to `docket/ideas/`, one file per idea.
 

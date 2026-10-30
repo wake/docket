@@ -26,10 +26,12 @@ with each step said the way this user does it.
      settle.
    - Keep the headings exactly as the template has them: `## Full review`,
      `## Light review`, `## Check`, `## Direct merge` and `## Reviews`.
-   - For `incomplete`, keep the sections the file already has as they
-     are and draft only the missing ones; the draft is still the whole
-     file. For `stale`, keep the user's tools and bring in what the
-     current template does differently.
+   - For `incomplete`, keep the sections the file already has and draft
+     only the missing ones; the draft is still the whole file. When
+     `result.recorded` from step 1 is not the template's hash, the kept
+     sections are also out of date: treat them as for `stale`. For
+     `stale`, keep the user's tools and bring in what the current
+     template does differently.
 3. Show the user the whole file as it will be written, in one block with
    every section in full, not a summary or only the new part. Then list
    each point where it departs from the template or from their
