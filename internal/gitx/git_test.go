@@ -334,6 +334,15 @@ func TestShowAll(t *testing.T) {
 	if _, _, err := g.ShowAll("nonexistent-rev", []string{"d/a.md"}); err == nil {
 		t.Fatal("unknown rev: want an error")
 	}
+	// With nothing to send, no git runs and rev is not checked.
+	files, missed, err = g.ShowAll("nonexistent-rev", []string{"x\ny", "z\nw"})
+	if err != nil || len(files) != 0 || !slices.Equal(missed, []string{"x\ny", "z\nw"}) {
+		t.Fatalf("unknown rev, newline paths = %q, %q, %v", files, missed, err)
+	}
+	files, missed, err = g.ShowAll("nonexistent-rev", nil)
+	if err != nil || len(files) != 0 || len(missed) != 0 {
+		t.Fatalf("unknown rev, no paths = %q, %q, %v", files, missed, err)
+	}
 }
 
 func TestMergeBaseUnrelated(t *testing.T) {

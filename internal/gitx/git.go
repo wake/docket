@@ -336,7 +336,9 @@ func (g Git) Show(rev, path string) ([]byte, error) {
 // every path that did not come back as a blob (missing, ambiguous, a folder
 // or a submodule) and every path holding a newline, which cannot go on a line
 // of the batch input and is not sent; Show tells why. An unknown rev is an
-// error, as is git failing as a whole.
+// error, as is git failing as a whole, but rev is checked only when at least
+// one path is sent: when none can be sent, no git runs and every path is in
+// missed.
 func (g Git) ShowAll(rev string, paths []string) (files map[string][]byte, missed []string, err error) {
 	files = map[string][]byte{}
 	var in strings.Builder
