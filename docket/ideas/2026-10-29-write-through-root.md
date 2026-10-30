@@ -10,8 +10,9 @@ Every writer checks its path with `safepath.Check` and then opens it by
 absolute path. The check refuses links committed to the repository, but a
 process that replaces a parent directory with a link between the check and
 the write makes the write follow it out of the repository: `dkt new`
-writing `docket.yaml`, the `MkdirAll` of the archive title step, and every
-other writer the same way. The race needs a process of the same user
+writing `docket.yaml`, the `MkdirAll` of the archive title step, `dkt record`
+creating its folder and file (`record.Create`), and every other writer the
+same way. The race needs a process of the same user
 changing the repository while `dkt` runs, which could already write there
 itself, so this is defense in depth.
 
