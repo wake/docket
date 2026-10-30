@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -218,6 +219,9 @@ func TestInspectUnreadableFile(t *testing.T) {
 		t.Errorf("schema entry: %v", f)
 	}
 	res := resultOf(t, so)
+	if got := res["changes"]; !reflect.DeepEqual(got, []any{}) {
+		t.Errorf("changes: %v", got)
+	}
 	if o, _ := res["openspec"].(map[string]any); o["version"] != "1.14.3" {
 		t.Errorf("openspec: %v", res["openspec"])
 	}
@@ -246,8 +250,11 @@ func TestInspectCleanSetup(t *testing.T) {
 	if wf, _ := res["workflow"].(map[string]any); wf["status"] != "ok" {
 		t.Errorf("workflow: %v", res["workflow"])
 	}
-	if got, want := wfKeys(res), []string{"files", "openspec", "workflow"}; !reflect.DeepEqual(got, want) {
+	if got, want := wfKeys(res), []string{"changes", "files", "openspec", "workflow"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("keys %v, want %v", got, want)
+	}
+	if got := res["changes"]; !reflect.DeepEqual(got, []any{}) {
+		t.Errorf("changes: %v", got)
 	}
 }
 
@@ -405,6 +412,9 @@ func TestInspectWorkflowUnreadable(t *testing.T) {
 	if len(inspectFiles(t, so)) == 0 {
 		t.Error("no files")
 	}
+	if got := res["changes"]; !reflect.DeepEqual(got, []any{}) {
+		t.Errorf("changes: %v", got)
+	}
 	if o, _ := res["openspec"].(map[string]any); o["version"] != "1.14.3" {
 		t.Errorf("openspec: %v", res["openspec"])
 	}
@@ -484,5 +494,166 @@ func TestInspectUsage(t *testing.T) {
 	env, _ := inspectEnv(t)
 	if code, so, _ := runInspect(t, r.Dir, env, "extra"); code != 2 {
 		t.Errorf("exit %d: %s", code, so)
+	}
+}
+
+const squashedPlan = "# Plan\n\n### Task 1: One\n\n- [x] **Step 1: a**\n"
+
+// commitSquashed commits a change add-x with no trailers, as a squashed pull
+// request leaves it, and returns the commit.
+func commitSquashed(t *testing.T, r *testutil.Repo) string {
+	t.Helper()
+	base := strings.TrimSpace(r.Git("rev-parse", "HEAD"))
+	return r.Commit("squashed (#1)", map[string]string{
+		"openspec/changes/add-x/docket.yaml": "title: X\nkind: feature\nsource: s\nbase: " + base + "\n",
+		"openspec/changes/add-x/plan.md":     squashedPlan,
+	})
+}
+
+// hasChangeFinding reports whether the findings in so include rule for change.
+func hasChangeFinding(t *testing.T, so, rule, change string) bool {
+	t.Helper()
+	for _, f := range decode(t, so)["findings"].([]any) {
+		m := f.(map[string]any)
+		if m["rule"] == rule && m["change"] == change {
+			return true
+		}
+	}
+	return false
+}
+
+func TestInspectSquashedChange(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	r.Commit("install", nil)
+	commitSquashed(t, r)
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if !hasChangeFinding(t, so, "no-task-commits", "add-x") {
+		t.Errorf("no no-task-commits finding: %s", so)
+	}
+	want := []any{map[string]any{"slug": "add-x", "skipped": nil}}
+	if got := resultOf(t, so)["changes"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("changes: %v", got)
+	}
+}
+
+// envValue returns the value of name in env, the last one counting.
+func envValue(env []string, name string) string {
+	v := ""
+	for _, e := range env {
+		if strings.HasPrefix(e, name+"=") {
+			v = strings.TrimPrefix(e, name+"=")
+		}
+	}
+	return v
+}
+
+func TestInspectNothingWritten(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	for _, root := range []string{"openspec/schemas/docket", ".claude/skills", ".agents/skills"} {
+		err := filepath.WalkDir(filepath.Join(r.Dir, root), func(p string, d fs.DirEntry, err error) error {
+			if err == nil && d.Type().IsRegular() {
+				err = os.WriteFile(p, []byte("mine\n"), 0o644)
+			}
+			return err
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	agents := filepath.Join(r.Dir, "AGENTS.md")
+	b, err := os.ReadFile(agents)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	i, j := strings.Index(s, "<!-- docket:start -->"), strings.Index(s, "<!-- docket:end -->")
+	if i < 0 || j < i {
+		t.Fatalf("no Docket block: %s", s)
+	}
+	if err := os.WriteFile(agents, []byte(s[:i]+"<!-- docket:start -->\nmine\n"+s[j:]), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r.Commit("install", nil)
+	commitSquashed(t, r)
+
+	env, wf := inspectEnv(t)
+	if err := os.Remove(wf); err != nil {
+		t.Fatal(err)
+	}
+	fake, log := testutil.FakeOpenSpec(t, "1.14.3")
+	env = append(env, "DOCKET_OPENSPEC="+fake)
+	xdg, home := envValue(env, "XDG_CONFIG_HOME"), envValue(env, "HOME")
+	snaps := [3]map[string]string{snapshot(t, r.Dir), snapshot(t, xdg), snapshot(t, home)}
+	status := r.Git("status", "--porcelain")
+
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	rules := map[string]bool{}
+	for _, x := range inspectRules(t, so) {
+		rules[x] = true
+		if strings.HasPrefix(x, "openspec-") {
+			t.Errorf("unexpected %s", x)
+		}
+	}
+	for _, want := range []string{"schema-differs", "skill-differs", "agents-block-differs", "workflow-missing", "no-task-commits"} {
+		if !rules[want] {
+			t.Errorf("no %s finding: %s", want, so)
+		}
+	}
+	sameSnapshot(t, snaps[0], snapshot(t, r.Dir))
+	sameSnapshot(t, snaps[1], snapshot(t, xdg))
+	sameSnapshot(t, snaps[2], snapshot(t, home))
+	if got := r.Git("status", "--porcelain"); got != status {
+		t.Errorf("git status changed: %q -> %q", status, got)
+	}
+	lb, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lines := strings.Split(strings.TrimSpace(string(lb)), "\n"); !reflect.DeepEqual(lines, []string{"--version"}) {
+		t.Errorf("openspec calls: %q", lines)
+	}
+}
+
+func TestInspectNoDefaultBranch(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "work")
+	r.Commit("init", map[string]string{"README.md": "x\n"})
+	env, _ := inspectEnv(t)
+	if code, so, _ := runInspect(t, r.Dir, env, "--json"); code != 4 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+}
+
+func TestInspectDefaultBranchFlag(t *testing.T) {
+	r := committedRepo(t)
+	r.Git("checkout", "-q", "-b", "trunk")
+	commitSquashed(t, r)
+	r.Git("checkout", "-q", "main")
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json", "--default-branch", "trunk")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if !hasChangeFinding(t, so, "no-task-commits", "add-x") {
+		t.Errorf("no no-task-commits finding: %s", so)
+	}
+	_, so, _ = runInspect(t, r.Dir, env, "--json")
+	for _, f := range decode(t, so)["findings"].([]any) {
+		if f.(map[string]any)["change"] == "add-x" {
+			t.Errorf("finding names add-x: %s", so)
+		}
 	}
 }
