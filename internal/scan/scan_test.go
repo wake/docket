@@ -749,3 +749,22 @@ func TestBranchRecordsTreeMissingIsRecordsErrorAlone(t *testing.T) {
 		t.Fatalf("inv = %+v", inv)
 	}
 }
+
+func TestBranchFileInArchiveIsNotArchived(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write(yamlPath("add-keep"), "a: b\n")
+		r.Write("openspec/changes/archive/2026-01-01-add-x.md", "n\n")
+		r.Write("openspec/changes/archive/2026-01-01-add-x", "n\n")
+	})
+	inv, _ := scanOf(t, r)
+	if len(inv.Archived) != 0 {
+		t.Fatalf("archived = %+v", inv.Archived)
+	}
+	if _, arch := inv.Uses("add-x"); len(arch) != 0 {
+		t.Fatalf("add-x archived = %+v", arch)
+	}
+	if strings.Join(branchChanges(inv), ",") != "add-keep" || len(inv.Unreadable) != 0 {
+		t.Fatalf("inv = %+v", inv)
+	}
+}
