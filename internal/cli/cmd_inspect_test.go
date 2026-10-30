@@ -187,6 +187,50 @@ func TestInspectSymlinkedSkillDirectory(t *testing.T) {
 	}
 }
 
+func TestInspectSymlinkedOpenSpec(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	link := filepath.Join(r.Dir, "openspec")
+	if err := os.RemoveAll(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(t.TempDir(), link); err != nil {
+		t.Fatal(err)
+	}
+	const rel = ".claude/skills/docket/SKILL.md"
+	if err := os.WriteFile(filepath.Join(r.Dir, rel), []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	links, differs := 0, false
+	for _, f := range decode(t, so)["findings"].([]any) {
+		m := f.(map[string]any)
+		switch m["rule"] {
+		case "symlink-refused":
+			links++
+			if m["file"] != "openspec" {
+				t.Errorf("symlink finding: %v", m)
+			}
+		case "skill-differs":
+			if m["file"] == rel {
+				differs = true
+			}
+		}
+	}
+	if links != 1 || !differs {
+		t.Errorf("links %d, differs %v: %s", links, differs, so)
+	}
+	if f := inspectFiles(t, so)[rel]; f["status"] != "differs" {
+		t.Errorf("entry: %v", f)
+	}
+}
+
 func TestInspectUnreadableFile(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root reads every file")

@@ -167,6 +167,43 @@ func TestInspectSymlinkedSkillDirectory(t *testing.T) {
 	}
 }
 
+func TestInspectSymlinkedOpenSpec(t *testing.T) {
+	root := initedRoot(t)
+	other := t.TempDir()
+	if err := os.RemoveAll(filepath.Join(root, "openspec")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, filepath.Join(root, "openspec")); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(root, ".agents/skills/docket/SKILL.md")
+	if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, problems, err := Inspect(root, assets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, pr := range problems {
+		if pr.Path == "openspec" && pr.Kind == ProblemSymlink {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no symlink problem for openspec: %v", problems)
+	}
+	if f := inspectPaths(files)[".agents/skills/docket/SKILL.md"]; f.Status != Differs {
+		t.Errorf("edited skill: %+v", f)
+	}
+	if b, _ := os.ReadFile(p); string(b) != "mine\n" {
+		t.Errorf("file changed: %q", b)
+	}
+	if entries, _ := os.ReadDir(other); len(entries) != 0 {
+		t.Errorf("wrote through the link: %v", entries)
+	}
+}
+
 func TestInitCallsOpenSpecOnlyWhenMissing(t *testing.T) {
 	root := t.TempDir()
 	calls := 0

@@ -128,6 +128,9 @@ type decided struct {
 // (Differs) unless force is set (Overwritten).
 func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result, error) {
 	res := Result{Files: []File{}}
+	if err := safepath.Check(root, "openspec"); err != nil {
+		return res, &Refused{Problems: []Problem{problemFor("openspec", err)}}
+	}
 	plan, problems, err := decideAll(root, a, force)
 	if err != nil {
 		return res, err
@@ -152,13 +155,11 @@ func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result,
 	return res, nil
 }
 
-// decideAll checks the openspec path and settles every target. It returns the
-// decisions that passed and the problems that would make Init refuse; an
-// unsafe openspec path ends the check at once. It changes nothing.
+// decideAll settles every target. It returns the decisions that passed and
+// the problems that would make Init refuse. It does not check the openspec
+// directory itself: Init does that first, and Inspect adds it to the problems
+// it reports. It changes nothing.
 func decideAll(root string, a Assets, force bool) ([]decided, []Problem, error) {
-	if err := safepath.Check(root, "openspec"); err != nil {
-		return nil, []Problem{problemFor("openspec", err)}, nil
-	}
 	targets, err := targetsOf(a)
 	if err != nil {
 		return nil, nil, err
@@ -180,11 +181,15 @@ func decideAll(root string, a Assets, force bool) ([]decided, []Problem, error) 
 // starting nothing: the files it would install or keep with Init's statuses,
 // and the problems that would make it refuse. Unlike Init it still returns
 // the files that passed. A CLAUDE.md that imports AGENTS.md, or links to it,
-// is left out. The error is for failing to read the assets.
+// is left out. An unsafe openspec path is one of the problems, and the other
+// files are still decided. The error is for failing to read the assets.
 func Inspect(root string, a Assets) ([]File, []Problem, error) {
 	plan, problems, err := decideAll(root, a, false)
 	if err != nil {
 		return nil, nil, err
+	}
+	if err := safepath.Check(root, "openspec"); err != nil {
+		problems = append([]Problem{problemFor("openspec", err)}, problems...)
 	}
 	files := make([]File, 0, len(plan))
 	for _, d := range plan {
