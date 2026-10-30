@@ -444,17 +444,33 @@ func ReadFiles(g gitx.Git, src Source, dir string, keep func(rel string) bool) (
 			fail(dir, err)
 			return files, unread, nil
 		}
+		var kept []string
 		for _, p := range paths {
-			rel := strings.TrimPrefix(p, dir+"/")
-			if !keep(rel) {
+			if keep(strings.TrimPrefix(p, dir+"/")) {
+				kept = append(kept, p)
+			}
+		}
+		// One batch reads the files; Show reads again what the batch did not
+		// return (and everything when the batch fails), so a file git cannot
+		// read gets Show's error.
+		blobs, missed, err := g.ShowAll(src.Commit, kept)
+		if err != nil {
+			blobs, missed = nil, kept
+		}
+		for _, p := range kept {
+			b, ok := blobs[p]
+			if !ok {
 				continue
 			}
+			files[strings.TrimPrefix(p, dir+"/")] = b
+		}
+		for _, p := range missed {
 			b, err := g.Show(src.Commit, p)
 			if err != nil {
 				fail(p, err)
 				continue
 			}
-			files[rel] = b
+			files[strings.TrimPrefix(p, dir+"/")] = b
 		}
 		return files, unread, nil
 	}

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -327,6 +328,78 @@ func (g Git) ShowIfExists(rev, path string) ([]byte, bool, error) {
 // Show returns the blob at rev:path.
 func (g Git) Show(rev, path string) ([]byte, error) {
 	return g.output("show", rev+":"+path)
+}
+
+// ShowAll reads the blobs at rev:path for several paths with one
+// `git cat-file --batch`. files holds the content of each path git returned
+// as a blob, byte for byte as Show returns it. missed lists, in input order,
+// every path that did not come back as a blob (missing, ambiguous, a folder
+// or a submodule) and every path holding a newline, which cannot go on a line
+// of the batch input and is not sent; Show tells why. An unknown rev is an
+// error, as is git failing as a whole.
+func (g Git) ShowAll(rev string, paths []string) (files map[string][]byte, missed []string, err error) {
+	files = map[string][]byte{}
+	var in strings.Builder
+	// The first line probes rev itself: batch answers "missing" for every
+	// path of an unknown rev and still exits 0.
+	in.WriteString(rev + "^{tree}\n")
+	sent := 0
+	for _, p := range paths {
+		if !strings.Contains(p, "\n") {
+			in.WriteString(rev + ":" + p + "\n")
+			sent++
+		}
+	}
+	if sent == 0 {
+		return files, slices.Clone(paths), nil
+	}
+	out, err := g.outputIn(in.String(), "cat-file", "--batch")
+	if err != nil {
+		return nil, nil, err
+	}
+	// Each answer is a header line; an object adds its content and a newline,
+	// and the size in the header says where the content ends.
+	next := func() (typ string, content []byte, ok bool) {
+		nl := bytes.IndexByte(out, '\n')
+		if nl < 0 {
+			return "", nil, false
+		}
+		header := string(out[:nl])
+		out = out[nl+1:]
+		if strings.HasSuffix(header, " missing") || strings.HasSuffix(header, " ambiguous") {
+			return "", nil, true
+		}
+		f := strings.Fields(header)
+		if len(f) != 3 {
+			return "", nil, false
+		}
+		size, err := strconv.Atoi(f[2])
+		if err != nil || size < 0 || size+1 > len(out) {
+			return "", nil, false
+		}
+		content = out[:size]
+		out = out[size+1:]
+		return f[1], content, true
+	}
+	if typ, _, ok := next(); !ok || typ == "" {
+		return nil, nil, fmt.Errorf("git cat-file: unknown revision %q", rev)
+	}
+	for _, p := range paths {
+		if strings.Contains(p, "\n") {
+			missed = append(missed, p)
+			continue
+		}
+		typ, content, ok := next()
+		if !ok {
+			return nil, nil, fmt.Errorf("git cat-file: unexpected output at %q", p)
+		}
+		if typ == "blob" {
+			files[p] = content
+		} else {
+			missed = append(missed, p)
+		}
+	}
+	return files, missed, nil
 }
 
 // ListFiles returns, sorted, the paths (relative to the repository root) of

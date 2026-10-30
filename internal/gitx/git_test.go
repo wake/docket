@@ -289,6 +289,53 @@ func TestShow(t *testing.T) {
 	}
 }
 
+func TestShowAll(t *testing.T) {
+	r := testutil.NewRepo(t)
+	rev := r.Commit("one", map[string]string{
+		"d/a.md":       "a\n",
+		"d/empty":      "",
+		"d/bin":        "x\x00\ny\n\x00",
+		"d/no newline": "tail",
+		"d/sub/b.md":   "b\n\n",
+		"nl\nname":     "newline in the path\n",
+	})
+	g := Git{Dir: r.Dir, Env: r.Env}
+
+	paths := []string{"d/a.md", "d/gone.md", "d/empty", "d/bin", "d/sub", "nl\nname", "d/no newline", "d/sub/b.md"}
+	files, missed, err := g.ShowAll(rev, paths)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"d/a.md": "a\n", "d/empty": "", "d/bin": "x\x00\ny\n\x00", "d/no newline": "tail", "d/sub/b.md": "b\n\n"}
+	if len(files) != len(want) {
+		t.Fatalf("files = %q, want %q", files, want)
+	}
+	for p, c := range want {
+		if got, ok := files[p]; !ok || string(got) != c {
+			t.Fatalf("files[%q] = %q, %v; want %q", p, got, ok, c)
+		}
+		if shown, err := g.Show(rev, p); err != nil || string(shown) != c {
+			t.Fatalf("Show(%q) = %q, %v", p, shown, err)
+		}
+	}
+	// A folder is not a blob; the path with a newline is not sent.
+	if wantMissed := []string{"d/gone.md", "d/sub", "nl\nname"}; !slices.Equal(missed, wantMissed) {
+		t.Fatalf("missed = %q, want %q", missed, wantMissed)
+	}
+
+	files, missed, err = g.ShowAll(rev, []string{"nl\nname"})
+	if err != nil || len(files) != 0 || !slices.Equal(missed, []string{"nl\nname"}) {
+		t.Fatalf("only a newline path = %q, %q, %v", files, missed, err)
+	}
+	files, missed, err = g.ShowAll(rev, nil)
+	if err != nil || len(files) != 0 || len(missed) != 0 {
+		t.Fatalf("no paths = %q, %q, %v", files, missed, err)
+	}
+	if _, _, err := g.ShowAll("nonexistent-rev", []string{"d/a.md"}); err == nil {
+		t.Fatal("unknown rev: want an error")
+	}
+}
+
 func TestMergeBaseUnrelated(t *testing.T) {
 	r := testutil.NewRepo(t)
 	base := r.Commit("root", map[string]string{"a": "1"})
