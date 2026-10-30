@@ -34,19 +34,25 @@ type Unreadable struct {
 // Findings are sorted by change, file, line and rule.
 type Report struct {
 	Changes    []string
+	Records    []string
 	Findings   []Finding
 	Unreadable []Unreadable
 }
 
 // Input says what to lint. Repo is the worktree root and Templates is the
 // shipped schema (docket.Schema()). Added and AddedErr feed the routing
-// rule: the files the branch adds, or why they are unknown.
+// rule: the files the branch adds, or why they are unknown. AddedRecords and
+// AddedRecordsErr say the same for docket/records, and RecordTemplate is the
+// template of a new record (docket.RecordTemplate()).
 type Input struct {
-	Repo      fs.FS
-	Templates fs.FS
-	Slugs     []string
-	Added     []string
-	AddedErr  error
+	Repo            fs.FS
+	Templates       fs.FS
+	Slugs           []string
+	Added           []string
+	AddedErr        error
+	AddedRecords    []string
+	AddedRecordsErr error
+	RecordTemplate  string
 }
 
 const changesDir = "openspec/changes"
@@ -95,14 +101,27 @@ func (r *run) unreadable(source string, err error) {
 	r.rep.Unreadable = append(r.rep.Unreadable, Unreadable{Source: source, Reason: err.Error()})
 }
 
-// Run lints the named changes, or every active change when none is named.
-// Each rule is a function of (run, loaded) called once per change; later
-// rules are added to the list in the loop below.
+// Run lints the named changes and records, or every active change and the
+// records the branch adds when none is named. Each rule is a function of
+// (run, loaded) called once per change; later rules are added to the list in
+// the loop below.
 func Run(in Input) Report {
 	rep := Report{}
 	r := &run{in: in, rep: &rep}
 	checkRouting(r)
-	for _, slug := range r.scope() {
+	var changeNames, recordNames []string
+	for _, name := range in.Slugs {
+		if change.StartsWithDate(name) {
+			recordNames = append(recordNames, name)
+		} else {
+			changeNames = append(changeNames, name)
+		}
+	}
+	var slugs []string
+	if len(in.Slugs) == 0 || len(changeNames) > 0 {
+		slugs = r.scope(changeNames)
+	}
+	for _, slug := range slugs {
 		c, ok := r.load(slug)
 		if !ok {
 			continue
@@ -120,10 +139,12 @@ func Run(in Input) Report {
 			checkScenarios(r, c, ds)
 		}
 	}
+	r.lintRecords(recordNames)
 	if len(in.Slugs) == 0 {
 		checkSpecTitles(r)
 	}
 	sort.Strings(rep.Changes)
+	sort.Strings(rep.Records)
 	sort.SliceStable(rep.Findings, func(i, j int) bool {
 		a, b := rep.Findings[i], rep.Findings[j]
 		switch {
@@ -142,8 +163,9 @@ func Run(in Input) Report {
 }
 
 // scope returns the slugs to lint, reporting named ones that do not exist.
-func (r *run) scope() []string {
-	if len(r.in.Slugs) == 0 {
+// No names means every active change.
+func (r *run) scope(names []string) []string {
+	if len(names) == 0 {
 		entries, err := fs.ReadDir(r.in.Repo, changesDir)
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
@@ -162,7 +184,7 @@ func (r *run) scope() []string {
 	}
 	var slugs []string
 	seen := map[string]bool{}
-	for _, slug := range r.in.Slugs {
+	for _, slug := range names {
 		if seen[slug] {
 			continue
 		}

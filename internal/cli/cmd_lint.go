@@ -8,12 +8,14 @@ import (
 
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/lint"
+	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/scan"
 )
 
 // LintResult is the result object of dkt lint.
 type LintResult struct {
 	Changes []string `json:"changes"`
+	Records []string `json:"records"`
 }
 
 func lintCommand() Command {
@@ -28,15 +30,19 @@ func lintCommand() Command {
 			defer root.Close()
 
 			added, addedErr := addedFiles(c, lint.RoutedDirs...)
+			records, recordsErr := addedFiles(c, record.Dir)
 			rep := lint.Run(lint.Input{
-				Repo:      root.FS(),
-				Templates: docket.Schema(),
-				Slugs:     args,
-				Added:     added,
-				AddedErr:  addedErr,
+				Repo:            root.FS(),
+				Templates:       docket.Schema(),
+				Slugs:           args,
+				Added:           added,
+				AddedErr:        addedErr,
+				AddedRecords:    records,
+				AddedRecordsErr: recordsErr,
+				RecordTemplate:  docket.RecordTemplate(),
 			})
 
-			out := Outcome{Result: LintResult{Changes: append([]string{}, rep.Changes...)}}
+			out := Outcome{Result: LintResult{Changes: append([]string{}, rep.Changes...), Records: append([]string{}, rep.Records...)}}
 			for _, f := range rep.Findings {
 				out.Findings = append(out.Findings, Finding{Rule: f.Rule, Message: f.Message, Change: f.Change, File: f.File, Line: f.Line})
 			}

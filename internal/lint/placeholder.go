@@ -29,6 +29,9 @@ func (r *run) placeholders() map[string]string {
 func (r *run) readPlaceholders() map[string]string {
 	const source = "schema templates/*.md"
 	out := map[string]string{}
+	if r.in.RecordTemplate != "" {
+		collectPlaceholders(out, "record/template.md", []byte(r.in.RecordTemplate))
+	}
 	if r.in.Templates == nil {
 		r.unreadable(source, errors.New("no templates given"))
 		return out
@@ -49,19 +52,25 @@ func (r *run) readPlaceholders() map[string]string {
 			r.unreadable("schema "+name, err)
 			continue
 		}
-		text := strings.Join(markdown.Lines(b), "\n")
-		for _, m := range commentRe.FindAllString(text, -1) {
-			if _, ok := out[m]; !ok {
-				out[m] = name
-			}
-		}
-		for _, m := range angleRe.FindAllString(commentRe.ReplaceAllString(text, ""), -1) {
-			if _, ok := out[m]; !ok {
-				out[m] = name
-			}
-		}
+		collectPlaceholders(out, name, b)
 	}
 	return out
+}
+
+// collectPlaceholders adds the placeholders of one template to out, keeping
+// the first template that holds each.
+func collectPlaceholders(out map[string]string, name string, b []byte) {
+	text := strings.Join(markdown.Lines(b), "\n")
+	for _, m := range commentRe.FindAllString(text, -1) {
+		if _, ok := out[m]; !ok {
+			out[m] = name
+		}
+	}
+	for _, m := range angleRe.FindAllString(commentRe.ReplaceAllString(text, ""), -1) {
+		if _, ok := out[m]; !ok {
+			out[m] = name
+		}
+	}
 }
 
 // checkPlaceholders reports template text left in any file of the change.
