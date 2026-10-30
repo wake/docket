@@ -61,20 +61,20 @@ func inspectCommand() Command {
 			pf, pu := problemFindings(problems)
 			out.Findings = append(out.Findings, pf...)
 			out.Unreadable = append(out.Unreadable, pu...)
-			state, f, err := openSpecState(c)
+			state, osFinds, err := openSpecState(c)
 			if err != nil {
 				return Outcome{Result: res}, err
 			}
 			res.OpenSpec = state
-			out.Findings = append(out.Findings, f...)
+			out.Findings = append(out.Findings, osFinds...)
 			out.Human = append(out.Human, openSpecLine(state))
 
-			wf, f, u, err := inspectWorkflow(c)
+			wf, wfFinds, u, err := inspectWorkflow(c)
 			if err != nil {
 				return Outcome{Result: res}, err
 			}
 			res.Workflow = wf
-			out.Findings = append(out.Findings, f...)
+			out.Findings = append(out.Findings, wfFinds...)
 			out.Unreadable = append(out.Unreadable, u...)
 			if wf != nil {
 				line := fmt.Sprintf("workflow %s", wf.Status)
