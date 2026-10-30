@@ -6,7 +6,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 
 | Path | Role |
 |---|---|
-| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket`, `docket-setup` and `docket-doctor` skills, the Docket block of `AGENTS.md` and the workflow template (`workflow/template.md`) |
+| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket`, `docket-setup` and `docket-doctor` skills, the Docket block of `AGENTS.md`, the workflow template (`workflow/template.md`) and the record template (`record/template.md`) |
 | `cmd/dkt` | Entry point; the only place that reads the process environment and working directory |
 | `internal/cli` | Command table, argument handling, text and JSON output, exit codes |
 | `internal/gitx` | Every git call: refs, worktrees, merge-base, file contents at a revision |
@@ -19,6 +19,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/delta` | Reads delta specs and main specs; makes scenario slugs |
 | `internal/status` | Summarizes each active change: phase, task states from commit trailers, progress, last activity |
 | `internal/conflicts` | Finds requirements that more than one active change touches |
+| `internal/record` | Records: kinds, name and slug, the template rendering, creating a file under a free name, parsing and word counting |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
 | `internal/safepath` | Refuses a write path that passes through a symbolic link |
 | `internal/workflow` | Locates the user's workflow file and reports its state against the shipped template; never writes it |
@@ -71,6 +72,10 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Decide what init would install, without writing | `setup.Inspect` |
 | Check the trailers of the changes on the default branch | `archive.Trailers` |
 | Hash the template | `workflow.Hash` |
+| Pick a free slug | `change.Suffixed` with `scan.Inventory.Uses` or `RecordSources` |
+| Where a record slug is used | `scan.Inventory.RecordSources` |
+| Count a record section's words | `record.Words` |
+| Check task headings in any file | `lint.checkTaskHeadings` |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |
 | Stand in for OpenSpec | `testutil.FakeOpenSpec` |

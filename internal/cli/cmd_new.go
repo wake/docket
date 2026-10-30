@@ -62,22 +62,8 @@ func newCommand() Command {
 			if err != nil {
 				return Outcome{}, err
 			}
-			var out Outcome
-			active, archived := inv.Uses(slug)
-			if active != nil || len(archived) > 0 {
-				var parts []string
-				if active != nil {
-					parts = append(parts, "active in "+sourceNames(active.Sources))
-				}
-				for _, a := range archived {
-					parts = append(parts, "archived as "+a.Folder+" in "+sourceNames(a.Sources))
-				}
-				out.Findings = append(out.Findings, Finding{Rule: "slug-used", Change: slug,
-					Message: fmt.Sprintf("slug %q is already used: %s", slug, strings.Join(parts, "; "))})
-			}
-			out.Unreadable = scanUnreadable(inv.Unreadable)
-			if len(out.Unreadable) > 0 || len(out.Findings) > 0 {
-				return out, nil
+			if unreadable := scanUnreadable(inv.Unreadable); len(unreadable) > 0 {
+				return Outcome{Unreadable: unreadable}, nil
 			}
 
 			head := *c.Repo.Head
@@ -98,16 +84,44 @@ func newCommand() Command {
 				return Outcome{}, err
 			}
 			defer unlock()
-			dir := filepath.Join(c.Repo.Root, "openspec/changes", slug)
+			// Take the first free slug: the requested one, then -2, -3, ...
+			// A candidate is taken when any source uses it or this worktree
+			// already has an entry for it.
+			used := usedPlaces(inv, slug)
+			var chosen, dir string
+			for n := 1; ; n++ {
+				cand := change.Suffixed(slug, n)
+				if err := change.ValidateSlug(cand); err != nil {
+					return fail("slug-invalid", err.Error())
+				}
+				if n > 1 {
+					if act, arch := inv.Uses(cand); act != nil || len(arch) > 0 {
+						continue
+					}
+				} else if len(used) > 0 {
+					continue
+				}
+				candDir := filepath.Join(c.Repo.Root, "openspec/changes", cand)
+				_, err := os.Lstat(candDir)
+				if err == nil {
+					if n == 1 && len(used) == 0 {
+						used = []string{"openspec/changes/" + slug + " exists in this worktree"}
+					}
+					continue
+				}
+				if !errors.Is(err, os.ErrNotExist) {
+					return Outcome{}, err
+				}
+				chosen, dir = cand, candDir
+				break
+			}
+			if used == nil {
+				used = []string{}
+			}
+			slug, requested := chosen, slug
 			metaRel := "openspec/changes/" + slug + "/" + change.DocketFile
 			if err := safepath.Check(c.Repo.Root, metaRel); err != nil {
 				return refuse(fail, err)
-			}
-			if _, err := os.Lstat(dir); err == nil {
-				return Outcome{Findings: []Finding{{Rule: "slug-used", Change: slug,
-					Message: fmt.Sprintf("slug %q is already used: %s exists", slug, dir)}}}, nil
-			} else if !errors.Is(err, os.ErrNotExist) {
-				return Outcome{}, err
 			}
 			// The lock is held and dir did not exist, so whatever is there
 			// from here on was created by this run and is safe to remove,
@@ -137,10 +151,33 @@ func newCommand() Command {
 			if err := change.CreateDocket(filepath.Join(dir, change.DocketFile), change.Docket{Title: title, Kind: kind, Source: source, Base: base}); err != nil {
 				return fail("metadata-failed", cleanup(err).Error())
 			}
-			res := change.NewResult{Slug: slug, Title: title, Path: dir, Kind: kind, Source: source, Base: base}
-			return Outcome{Result: res, Human: []string{"created " + dir}}, nil
+			res := change.NewResult{Slug: slug, Title: title, Path: dir, Kind: kind, Source: source, Base: base, Requested: requested, Used: used}
+			human := []string{"created " + dir}
+			if slug != requested {
+				human = append([]string{usedLine(requested, used, slug)}, human...)
+			}
+			return Outcome{Result: res, Human: human}, nil
 		},
 	}
+}
+
+// usedPlaces lists where a slug is in use: the active change, then each
+// archived use.
+func usedPlaces(inv scan.Inventory, slug string) []string {
+	active, archived := inv.Uses(slug)
+	var parts []string
+	if active != nil {
+		parts = append(parts, "active in "+sourceNames(active.Sources))
+	}
+	for _, a := range archived {
+		parts = append(parts, "archived as "+a.Folder+" in "+sourceNames(a.Sources))
+	}
+	return parts
+}
+
+// usedLine reports that a requested slug was used and which one was created.
+func usedLine(requested string, used []string, created string) string {
+	return requested + " is used: " + strings.Join(used, "; ") + "; created " + created
 }
 
 // lockOpenSpec takes an exclusive lock on <root>/openspec, blocking until it

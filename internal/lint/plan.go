@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/wake/docket/internal/change"
 )
 
 const planFile = "plan.md"
@@ -14,11 +16,7 @@ var reuseHeader = []string{"Need", "Existing (path:symbol)", "Decision", "Reason
 // checkPlan applies the plan rules to a change that has a plan.md.
 func checkPlan(r *run, c *loaded) {
 	p := c.Plan
-	for _, h := range p.BadHeadings {
-		r.add(c, "task-heading", planFile, h.Line,
-			"%q at heading level %d is not a task heading; use `### Task <N>: <name>`", h.Text, h.Level)
-	}
-	checkTaskNumbers(r, c)
+	checkTaskHeadings(r, c, planFile, p)
 	checkReuse(r, c)
 	cancelled := map[int]bool{}
 	for _, x := range p.Cancelled {
@@ -51,14 +49,24 @@ func checkPlan(r *run, c *loaded) {
 	}
 }
 
+// checkTaskHeadings reports the headings of p that are not task headings and
+// the task numbers it uses more than once, in file.
+func checkTaskHeadings(r *run, c *loaded, file string, p change.Plan) {
+	for _, h := range p.BadHeadings {
+		r.add(c, "task-heading", file, h.Line,
+			"%q at heading level %d is not a task heading; use `### Task <N>: <name>`", h.Text, h.Level)
+	}
+	checkTaskNumbers(r, c, file, p)
+}
+
 // checkTaskNumbers reports each task number used more than once across the
 // tasks and the cancelled bullets, on the later line.
-func checkTaskNumbers(r *run, c *loaded) {
+func checkTaskNumbers(r *run, c *loaded, file string, p change.Plan) {
 	lines := map[int][]int{}
-	for _, t := range c.Plan.Tasks {
+	for _, t := range p.Tasks {
 		lines[t.Number] = append(lines[t.Number], t.Line)
 	}
-	for _, x := range c.Plan.Cancelled {
+	for _, x := range p.Cancelled {
 		if x.Number > 0 {
 			lines[x.Number] = append(lines[x.Number], x.Line)
 		}
@@ -77,7 +85,7 @@ func checkTaskNumbers(r *run, c *loaded) {
 		for i, l := range ls {
 			parts[i] = strconv.Itoa(l)
 		}
-		r.add(c, "task-heading", planFile, ls[len(ls)-1],
+		r.add(c, "task-heading", file, ls[len(ls)-1],
 			"task number %d is used more than once (lines %s)", n, strings.Join(parts, ", "))
 	}
 }

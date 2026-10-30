@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"github.com/wake/docket"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -119,11 +120,11 @@ func TestNoDefaultBranchForRouting(t *testing.T) {
 	if !hasRule(t, so, "proposal-section") {
 		t.Fatalf("other rules did not run:\n%s", so)
 	}
-	if got := sourcesOf(t, so); !reflect.DeepEqual(got, []string{"routing"}) {
+	if got := sourcesOf(t, so); !reflect.DeepEqual(got, []string{"routing", "records"}) {
 		t.Fatalf("unreadable = %v\n%s", got, so)
 	}
-	if !strings.Contains(so, "--default-branch") {
-		t.Fatalf("no hint:\n%s", so)
+	if strings.Count(so, "--default-branch") < 2 {
+		t.Fatalf("each source needs the hint:\n%s", so)
 	}
 }
 
@@ -198,6 +199,9 @@ func TestLintEveryActiveChangeJSON(t *testing.T) {
 	if got := res["changes"]; !reflect.DeepEqual(got, []any{"add-x", "add-y"}) {
 		t.Fatalf("changes = %v", got)
 	}
+	if got := res["records"]; !reflect.DeepEqual(got, []any{}) {
+		t.Fatalf("records = %#v, want []", got)
+	}
 }
 
 func TestLintNamedChanges(t *testing.T) {
@@ -222,4 +226,44 @@ func TestLintCleanExit(t *testing.T) {
 	if code != 0 || !strings.HasSuffix(strings.TrimRight(so, "\n"), "dkt lint: ok") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
+}
+
+const lintRecord = "---\ntitle: T\nkind: fix\nsource: s\n---\n\n" +
+	"## What\n\na\n\n## Why\n\nb\n\n## Verification\n\nc\n\n## Review\n\nd\n"
+
+func TestLintRecordsTheBranchAdds(t *testing.T) {
+	r := cleanRepo(t)
+	r.Commit("old record", map[string]string{"docket/records/2026-10-01-fix-a.md": "bad\n"})
+	r.Git("checkout", "-q", "-b", "topic")
+	r.Commit("record", map[string]string{"docket/records/2026-10-30-fix-b.md": lintRecord})
+	r.Write("docket/records/2026-10-30-fix-c.md", lintRecord)
+	code, so, se := runLint(t, r.Dir, r.Env, "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := decode(t, so)["result"].(map[string]any)
+	if got := res["records"]; !reflect.DeepEqual(got, []any{"2026-10-30-fix-b", "2026-10-30-fix-c"}) {
+		t.Fatalf("records = %v\n%s", got, so)
+	}
+	if strings.Contains(so, "fix-a") {
+		t.Fatalf("an old record was linted:\n%s", so)
+	}
+}
+
+func TestLintRecordTemplateTextLeft(t *testing.T) {
+	tpl := docket.RecordTemplate()
+	i := strings.Index(tpl, "## Why\n\n") + len("## Why\n\n")
+	comment := tpl[i : i+strings.Index(tpl[i:], "-->")+3]
+	rec := strings.Replace(lintRecord, "## Why\n\nb\n", "## Why\n\n"+comment+"\n", 1)
+	r := cleanRepo(t)
+	r.Git("checkout", "-q", "-b", "topic")
+	r.Commit("record", map[string]string{"docket/records/2026-10-30-fix-b.md": rec})
+	_, so, _ := runLint(t, r.Dir, r.Env, "--json")
+	for _, f := range decode(t, so)["findings"].([]any) {
+		m := f.(map[string]any)
+		if m["rule"] == "placeholder" && m["file"] == "docket/records/2026-10-30-fix-b.md" {
+			return
+		}
+	}
+	t.Fatalf("no placeholder finding:\n%s", so)
 }

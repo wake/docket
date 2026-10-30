@@ -69,9 +69,11 @@ Right after triage, before any other step of the work, run
 ## Full review
 
 1. In a git worktree, open the change:
-   `dkt new <slug> --kind feature|change-request|fix|baseline --source "<where the request came from>" --title "<one line>"`.
+   `dkt new <slug> --kind feature|change-request|baseline --source "<where the request came from>" --title "<one line>"`.
    A change's title, kind, source and base are in its `docket.yaml`; a new
-   capability's delta folder has a `docket.yaml` with its title.
+   capability's delta folder has a `docket.yaml` with its title. When the
+   slug is taken, `dkt new` creates the change under the first free suffix
+   (`-2`, `-3`, ...) and reports it; use the slug it reports.
 2. superpowers:brainstorming writes its design into the change folder, not
    `docs/superpowers/specs/`: `proposal.md`, delta specs under `specs/`, and
    `design.md` when needed. Before writing each one, run
@@ -89,7 +91,10 @@ Right after triage, before any other step of the work, run
    proposal's Builds On names what already exists.
 5. Review the plan, execute it and review the change before merging by
    the steps under `## Full review` in the workflow file. Every commit made
-   for a task carries the trailers `Change: <slug>` and `Task: <N>`.
+   for a task carries the trailers `Change: <slug>` and `Task: <N>`. Put
+   them in the message's last paragraph, with any other trailers such as
+   `Co-Authored-By` and no blank line between them: git reads trailers
+   from the last paragraph only.
 6. Before opening the pull request, run `dkt sync <slug>` and
    `dkt lint <slug>`, and commit plan.md.
 7. A change is one pull request unless the workflow file says to split
@@ -105,9 +110,27 @@ compensating tasks, a Revision section, a Change Log row.
 
 ## Light review
 
-No change is opened. In a git worktree, make the edit following the steps
-under `## Light review` in the workflow file; then open the pull request
-and merge it with a merge commit.
+No change is opened; a record in `docket/records/` says what the work
+did. In a git worktree:
+
+1. Before the first commit, open the record:
+   `dkt record <name> --kind fix|refactor|test|prompt|checks --source "<where the request came from>" --title "<one line>"`.
+   The kind follows triage: a fix (`fix`), a restructuring
+   (`refactor`), tests (`test`), prompt text (`prompt`), check settings
+   (`checks`). The record's slug is its file name without `.md`: the
+   date, the name, and a suffix when the name is taken. Use that slug,
+   as `dkt record` reports it, never the bare name you passed.
+2. Make the edit following the steps under `## Light review` in the
+   workflow file. Fill the record's sections as the work and its review
+   go, in a few sentences each, replacing the comments.
+3. Every commit for the work carries the trailer `Record: <slug>`.
+   Larger work may list tasks under `## Tasks` in the plan's format; a
+   commit for one also carries `Task: <N>`. Put them in the message's
+   last paragraph, with any other trailers such as `Co-Authored-By` and
+   no blank line between them: git reads trailers from the last
+   paragraph only.
+4. Run `dkt lint` and fix what it reports. Then open the pull request
+   and merge it with a merge commit.
 
 ## Check
 

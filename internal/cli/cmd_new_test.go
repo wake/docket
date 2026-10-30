@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -131,10 +133,51 @@ func TestUnknownKind(t *testing.T) {
 	if code != 2 {
 		t.Fatalf("exit %d", code)
 	}
-	for _, k := range []string{"feature", "change-request", "fix", "baseline"} {
+	for _, k := range []string{"feature", "change-request", "baseline"} {
 		if !strings.Contains(se, k) {
 			t.Errorf("stderr lacks %s: %s", k, se)
 		}
+	}
+	code, _, se = runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "fix", "--source", "x", "--title", "X")
+	if code != 2 || !strings.Contains(se, "use one of feature, change-request, baseline") {
+		t.Errorf("--kind fix: exit %d: %s", code, se)
+	}
+}
+
+// realDir resolves symlinks, as the command reports real paths.
+func realDir(t *testing.T, dir string) string {
+	t.Helper()
+	d, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+func usedOf(t *testing.T, res map[string]any) []string {
+	t.Helper()
+	arr, ok := res["used"].([]any)
+	if !ok {
+		t.Fatalf("used is not an array: %v", res["used"])
+	}
+	out := []string{}
+	for _, v := range arr {
+		out = append(out, v.(string))
+	}
+	return out
+}
+
+func TestSlugActiveInThisWorktree(t *testing.T) {
+	r := cleanRepo(t)
+	r.Write("openspec/changes/add-x/.openspec.yaml", "schema: docket\n")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := resultOf(t, so)
+	used := usedOf(t, res)
+	if res["slug"] != "add-x-2" || len(used) != 1 || used[0] != "active in "+realDir(t, r.Dir) {
+		t.Fatalf("result = %v", res)
 	}
 }
 
@@ -143,19 +186,76 @@ func TestSlugActiveInAnotherWorktree(t *testing.T) {
 	b := r.AddWorktree(filepath.Join(t.TempDir(), "wt-b"), "b")
 	b.Write("openspec/changes/add-x/.openspec.yaml", "schema: docket\n")
 	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
-	if code != 1 || !hasRule(t, so, "slug-used") || !strings.Contains(so, b.Dir) {
+	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
+	res := resultOf(t, so)
+	used := usedOf(t, res)
+	if res["slug"] != "add-x-2" || res["requested"] != "add-x" || len(used) != 1 ||
+		!strings.Contains(used[0], "active in") || !strings.Contains(used[0], b.Dir) {
+		t.Fatalf("result = %v", res)
+	}
+	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/changes/add-x-2/docket.yaml")); err != nil {
+		t.Error(err)
+	}
 	noChange(t, r.Dir)
+
+	// Human output names the suffix.
+	r2 := cleanRepo(t)
+	b2 := r2.AddWorktree(filepath.Join(t.TempDir(), "wt-b"), "b")
+	b2.Write("openspec/changes/add-x/.openspec.yaml", "schema: docket\n")
+	var so2, se2 bytes.Buffer
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+testutil.OpenSpecCmd(t))
+	code = Run(Options{Args: []string{"new", "add-x", "--kind", "feature", "--source", "x", "--title", "X"}, Dir: r2.Dir, Env: env, Stdout: &so2, Stderr: &se2})
+	want := "add-x is used: active in " + realDir(t, b2.Dir) + "; created add-x-2"
+	if code != 0 || !slices.Contains(strings.Split(so2.String(), "\n"), want) {
+		t.Fatalf("exit %d, want line %q\n%s\n%s", code, want, so2.String(), se2.String())
+	}
 }
 
 func TestSlugArchived(t *testing.T) {
 	r := newRepo(t)
 	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
-	if code != 1 || !strings.Contains(so, "2025-01-02-add-x") {
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := resultOf(t, so)
+	used := usedOf(t, res)
+	if res["slug"] != "add-x-2" || len(used) != 1 || !strings.Contains(used[0], "archived as 2025-01-02-add-x") {
+		t.Fatalf("result = %v", res)
+	}
+}
+
+func TestSlugSuffixSkipsUsed(t *testing.T) {
+	r := cleanRepo(t)
+	b := r.AddWorktree(filepath.Join(t.TempDir(), "wt-b"), "b")
+	b.Write("openspec/changes/add-x/.openspec.yaml", "schema: docket\n")
+	c := r.AddWorktree(filepath.Join(t.TempDir(), "wt-c"), "c")
+	c.Write("openspec/changes/add-x-2/.openspec.yaml", "schema: docket\n")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := resultOf(t, so)
+	used := usedOf(t, res)
+	if res["slug"] != "add-x-3" || len(used) != 1 || !strings.Contains(used[0], b.Dir) || strings.Contains(used[0], c.Dir) {
+		t.Fatalf("result = %v", res)
+	}
+}
+
+func TestNewSuffixTooLong(t *testing.T) {
+	r := cleanRepo(t)
+	long := strings.Repeat("a", change.MaxSlug-1)
+	b := r.AddWorktree(filepath.Join(t.TempDir(), "wt-b"), "b")
+	b.Write("openspec/changes/"+long+"/.openspec.yaml", "schema: docket\n")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, long, "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 1 || !hasRule(t, so, "slug-invalid") || !strings.Contains(so, "201") {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 	noChange(t, r.Dir)
+	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/changes", long+"-2")); err == nil {
+		t.Error("suffixed folder exists")
+	}
 }
 
 func TestUnreadableWorktreeBlocksCreation(t *testing.T) {
@@ -171,7 +271,7 @@ func TestUnreadableWorktreeBlocksCreation(t *testing.T) {
 	noChange(t, r.Dir)
 }
 
-func TestUnreadableSourceWithOtherFindings(t *testing.T) {
+func TestUnreadableSourceWithUsedSlug(t *testing.T) {
 	r := cleanRepo(t)
 	b := r.AddWorktree(filepath.Join(t.TempDir(), "wt-b"), "b")
 	b.Write("openspec/changes/add-x/.openspec.yaml", "schema: docket\n")
@@ -180,7 +280,7 @@ func TestUnreadableSourceWithOtherFindings(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
-	if code != 3 || !hasRule(t, so, "slug-used") {
+	if code != 3 || len(findingRules(t, so)) != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 	u, _ := decode(t, so)["unreadable"].([]any)
@@ -202,6 +302,9 @@ func TestChangeCreated(t *testing.T) {
 	res := resultOf(t, so)
 	if res["slug"] != "add-x" || res["title"] != "Booking waitlist" || res["kind"] != "feature" || res["source"] != "issue 12" || res["base"] != base || res["path"] == "" {
 		t.Errorf("result = %v", res)
+	}
+	if res["requested"] != "add-x" || !reflect.DeepEqual(res["used"], []any{}) {
+		t.Errorf("requested/used = %v / %#v", res["requested"], res["used"])
 	}
 }
 
@@ -329,7 +432,7 @@ func TestNewInPathWithSpaces(t *testing.T) {
 	r.Git("checkout", "-q", "-b", "main")
 	testutil.InstallSchema(t, r.Dir)
 	r.Commit("init", nil)
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "fix", "--source", "x", "--title", "X")
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
@@ -451,17 +554,28 @@ func TestConcurrentRunsKeepTheFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := <-done
-	if res.code != 1 || !hasRule(t, res.so, "slug-used") {
+	if res.code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", res.code, res.so, res.se)
+	}
+	out := resultOf(t, res.so)
+	if out["slug"] != "add-x-2" || !reflect.DeepEqual(usedOf(t, out), []string{"openspec/changes/add-x exists in this worktree"}) {
+		t.Errorf("result = %v", out)
 	}
 	if b, err := os.ReadFile(marker); err != nil || string(b) != "first\n" {
 		t.Errorf("first run's file damaged: %q %v", b, err)
 	}
 	b, _ := os.ReadFile(log)
+	var sawSuffixed bool
 	for _, l := range strings.Split(string(b), "\n") {
-		if strings.HasPrefix(l, "new") {
-			t.Errorf("openspec new was run: %q", l)
+		if l == "new\tchange\tadd-x\t--schema\tdocket" {
+			t.Errorf("openspec new was run for the taken slug: %q", l)
 		}
+		if strings.HasPrefix(l, "new\tchange\tadd-x-2\t") {
+			sawSuffixed = true
+		}
+	}
+	if !sawSuffixed {
+		t.Errorf("openspec new add-x-2 not run:\n%s", b)
 	}
 }
 

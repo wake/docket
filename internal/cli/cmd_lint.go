@@ -8,12 +8,14 @@ import (
 
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/lint"
+	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/scan"
 )
 
 // LintResult is the result object of dkt lint.
 type LintResult struct {
 	Changes []string `json:"changes"`
+	Records []string `json:"records"`
 }
 
 func lintCommand() Command {
@@ -27,16 +29,20 @@ func lintCommand() Command {
 			}
 			defer root.Close()
 
-			added, addedErr := addedFiles(c)
+			added, addedErr := addedFiles(c, lint.RoutedDirs...)
+			records, recordsErr := addedFiles(c, record.Dir)
 			rep := lint.Run(lint.Input{
-				Repo:      root.FS(),
-				Templates: docket.Schema(),
-				Slugs:     args,
-				Added:     added,
-				AddedErr:  addedErr,
+				Repo:            root.FS(),
+				Templates:       docket.Schema(),
+				Slugs:           args,
+				Added:           added,
+				AddedErr:        addedErr,
+				AddedRecords:    records,
+				AddedRecordsErr: recordsErr,
+				RecordTemplate:  docket.RecordTemplate(),
 			})
 
-			out := Outcome{Result: LintResult{Changes: append([]string{}, rep.Changes...)}}
+			out := Outcome{Result: LintResult{Changes: append([]string{}, rep.Changes...), Records: append([]string{}, rep.Records...)}}
 			for _, f := range rep.Findings {
 				out.Findings = append(out.Findings, Finding{Rule: f.Rule, Message: f.Message, Change: f.Change, File: f.File, Line: f.Line})
 			}
@@ -48,10 +54,10 @@ func lintCommand() Command {
 	}
 }
 
-// addedFiles returns the files the branch adds under the superpowers folders:
+// addedFiles returns the files the branch adds under the given folders:
 // committed since the merge base with the default branch, plus uncommitted
 // ones. The error says why they could not be known.
-func addedFiles(c *Context) ([]string, error) {
+func addedFiles(c *Context, dirs ...string) ([]string, error) {
 	set := map[string]bool{}
 	if c.Repo.Head != nil {
 		db, err := scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)
@@ -68,7 +74,7 @@ func addedFiles(c *Context) ([]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("HEAD and %s share no history; pass --default-branch to name another branch", db.Name)
 		}
-		files, err := c.Git.AddedFiles(base, lint.RoutedDirs...)
+		files, err := c.Git.AddedFiles(base, dirs...)
 		if err != nil {
 			return nil, err
 		}
@@ -76,7 +82,7 @@ func addedFiles(c *Context) ([]string, error) {
 			set[f] = true
 		}
 	}
-	files, err := c.Git.UncommittedAdded(lint.RoutedDirs...)
+	files, err := c.Git.UncommittedAdded(dirs...)
 	if err != nil {
 		return nil, err
 	}

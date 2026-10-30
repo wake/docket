@@ -23,6 +23,13 @@ var workflowTemplate string
 // and verification steps for each path, worded in capabilities.
 func Template() string { return workflowTemplate }
 
+//go:embed record/template.md
+var recordTemplate string
+
+// RecordTemplate returns the body of a new record, record/template.md: the
+// four sections, each holding a comment that says what to write.
+func RecordTemplate() string { return recordTemplate }
+
 // Schema returns the files of openspec/schemas/docket, with paths relative
 // to that directory (schema.yaml, templates/proposal.md, ...).
 func Schema() fs.FS {
