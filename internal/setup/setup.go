@@ -117,22 +117,9 @@ type decided struct {
 // (Differs) unless force is set (Overwritten).
 func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result, error) {
 	res := Result{Files: []File{}}
-	if err := safepath.Check(root, "openspec"); err != nil {
-		return res, &Refused{Problems: []Problem{problemFor("openspec", err)}}
-	}
-	targets, err := targetsOf(a)
+	plan, problems, err := decideAll(root, a, force)
 	if err != nil {
 		return res, err
-	}
-	var problems []Problem
-	plan := make([]decided, 0, len(targets))
-	for _, t := range targets {
-		d, p := decide(root, t, a.Block, force)
-		if p != nil {
-			problems = append(problems, *p)
-			continue
-		}
-		plan = append(plan, d)
 	}
 	if len(problems) > 0 {
 		return res, &Refused{Problems: problems}
@@ -152,6 +139,30 @@ func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result,
 		res.Files = append(res.Files, File{Path: d.rel, Status: d.status, Kind: d.kind})
 	}
 	return res, nil
+}
+
+// decideAll checks the openspec path and settles every target. It returns the
+// decisions that passed and the problems that would make Init refuse; an
+// unsafe openspec path ends the check at once. It changes nothing.
+func decideAll(root string, a Assets, force bool) ([]decided, []Problem, error) {
+	if err := safepath.Check(root, "openspec"); err != nil {
+		return nil, []Problem{problemFor("openspec", err)}, nil
+	}
+	targets, err := targetsOf(a)
+	if err != nil {
+		return nil, nil, err
+	}
+	var problems []Problem
+	plan := make([]decided, 0, len(targets))
+	for _, t := range targets {
+		d, p := decide(root, t, a.Block, force)
+		if p != nil {
+			problems = append(problems, *p)
+			continue
+		}
+		plan = append(plan, d)
+	}
+	return plan, problems, nil
 }
 
 // targetsOf lists every file to install: the schema, the skill in each of
