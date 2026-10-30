@@ -37,10 +37,16 @@ func initCommand() Command {
 			var ref *setup.Refused
 			if errors.As(err, &ref) {
 				out := Outcome{Result: res}
+				seenLink := map[string]bool{}
 				for _, p := range ref.Problems {
 					var sl *safepath.SymlinkError
 					switch {
 					case p.Kind == setup.ProblemSymlink && errors.As(p.Err, &sl):
+						// One linked directory refuses every file under it.
+						if seenLink[sl.Path] {
+							continue
+						}
+						seenLink[sl.Path] = true
 						out.Findings = append(out.Findings, Finding{Rule: "symlink-refused", Message: sl.Error(), File: sl.Path})
 					case p.Kind == setup.ProblemMalformed:
 						out.Findings = append(out.Findings, Finding{Rule: "agents-block-malformed", Message: p.Err.Error(), File: p.Path})

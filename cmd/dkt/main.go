@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/user"
 	"runtime/debug"
 	"time"
 
@@ -33,5 +34,12 @@ func main() {
 	os.Exit(cli.Run(cli.Options{
 		Args: os.Args[1:], Dir: dir, Env: os.Environ(),
 		Stdout: os.Stdout, Stderr: os.Stderr, Now: time.Now(),
+		UserHome: func() (string, error) {
+			u, err := user.Current()
+			if err != nil {
+				return "", err
+			}
+			return u.HomeDir, nil
+		},
 	}))
 }

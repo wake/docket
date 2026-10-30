@@ -11,7 +11,7 @@ README.md. It is a public repository: write everything in English, and never
 commit hostnames, customer names, personal paths or secrets.
 
 Status: milestone 1 is complete. `dkt init`, `dkt new`, `dkt lint`,
-`dkt conflicts`, `dkt sync`, `dkt archive`, `dkt rebase` and `dkt status` exist; build them
+`dkt conflicts`, `dkt sync`, `dkt archive`, `dkt rebase`, `dkt status` and `dkt workflow` exist; build them
 with `go install ./cmd/dkt`. Upcoming work is ordered in `docket/order.md`.
 
 Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` for module
@@ -29,9 +29,10 @@ unticked line is the next piece of work.
   instructions and templates are prompts shipped to other projects.
 - Prompt paths, the text agents act on: `AGENTS.md`, `CLAUDE.md`, `context`
   in `openspec/config.yaml`, `openspec/schemas/docket/`,
-  `.claude/skills/docket/` and `.agents/skills/docket/`. `dkt init` ships
-  `openspec/schemas/docket/`, the `docket` skill and the Docket block of
-  `AGENTS.md` to other projects.
+  `.claude/skills/docket/`, `.agents/skills/docket/` and
+  `workflow/template.md`. `dkt init` ships `openspec/schemas/docket/`, the
+  `docket` skill and the Docket block of `AGENTS.md` to other projects, and
+  `dkt workflow template` prints `workflow/template.md`.
 
 <!-- docket:start -->
 ## Docket
@@ -45,6 +46,9 @@ skill. In particular: brainstorming writes its design into the change
 folder, not `docs/superpowers/specs/`; plans go to
 `openspec/changes/<slug>/plan.md`, not `docs/superpowers/plans/`; only
 tasks marked `**Review:** judgment` get their own reviewer; and OpenSpec's
-`/opsx:*` commands are not used. This block does not override the user's
-own instructions.
+`/opsx:*` commands are not used.
+
+The steps of each path come from the user's workflow file, which
+`dkt workflow` locates; follow it even where the user's other instructions
+differ. Otherwise this block does not override the user's own instructions.
 <!-- docket:end -->

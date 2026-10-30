@@ -4,7 +4,7 @@ English | [繁體中文](README.zh-TW.md)
 
 Docket is a small command-line tool that checks [OpenSpec](https://github.com/Fission-AI/OpenSpec) change folders and keeps their books. It is meant for projects that plan and execute work with [superpowers](https://github.com/obra/superpowers). Docket keeps no state of its own, and the command is `dkt`.
 
-> **Status: early.** `init`, `new`, `lint`, `conflicts`, `sync`, `archive`, `rebase` and `status` work; the first seven of them completed the first milestone. The other commands below are a draft and will change. Docket is built with the workflow this README describes.
+> **Status: early.** `init`, `new`, `lint`, `conflicts`, `sync`, `archive`, `rebase`, `status` and `workflow` work; the first seven of them completed the first milestone. The other commands below are a draft and will change. Docket is built with the workflow this README describes.
 
 ## Why
 
@@ -41,13 +41,13 @@ The commands that write files are `init` (the schema, the skill and the Docket b
 Docket does **not**:
 
 - **Judge content.** It never calls a language model or decides whether content is correct. That is the reviewer's job.
-- **Store state.** Everything it reports can be recomputed from the repository and git.
+- **Store state.** Everything it reports can be recomputed from the repository and git. The one file it reads outside the repository is the user's workflow file, and it never writes it.
 - **Edit agent configuration.** It never touches `.claude/settings.json`. In `AGENTS.md` and `CLAUDE.md` it writes only the marked Docket block, creating either file when missing.
 - **Merge specs itself.** It does not reimplement OpenSpec's merge engine; it calls a pinned `openspec` CLI.
 
 ## The workflow it assumes
 
-superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it. The `docket` skill carries these rules, and `dkt init` installs it.
+superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it. The `docket` skill carries these rules, and `dkt init` installs it. The review and verification steps of each path come from the user's workflow file (`~/.config/docket/workflow.md`, or under `XDG_CONFIG_HOME`). The agent writes it with the user from Docket's template at the first piece of work, and `dkt workflow` reports whether it is missing, lacks a path or was made from an older template.
 
 1. **Triage with brainstorming.** superpowers brainstorming reads the project and talks the idea through. When several paths apply, take the heaviest:
    - It changes a sentence in `openspec/specs/`: open a change and follow the steps below. So does any edit that sets an expectation no spec states and no existing behavior shows, such as a bug fix with no specified answer or a test that asserts new behavior, since it defines behavior.
@@ -99,6 +99,7 @@ dkt sync <slug> [--check]         # tick plan.md from commit trailers
 dkt archive <slug>...             # release step, on a branch made from the default branch
 dkt rebase <slug>                 # accept the newer specs as the change's base
 dkt status [<slug>...] [--json]   # phase, tasks and their commits, progress, last activity, uncommitted work
+dkt workflow [template] [--json]  # the user's workflow file, or the template
 dkt brief <slug> --task N         # brief for an implementing agent
 dkt check <slug>                  # scenario coverage and checkbox consistency (pull request gate)
 dkt accept <slug> --round N [--export html]
@@ -129,6 +130,8 @@ go install github.com/wake/docket/cmd/dkt@latest
 Changes made by an older dkt still work: their kind, source and base are read from `x-kind`, `x-source` and `x-base` in `.openspec.yaml`. `dkt lint` asks for a `docket.yaml` with a title for each of them, and each main spec needs a `docket.yaml` with its title too.
 
 In a project set up by an older dkt, run `dkt init` again. It adds the `docket` skill and the Docket block. Delete any "Change workflow" section pasted into `AGENTS.md` from an earlier release, and commit `.claude/skills/docket/`, `.agents/skills/docket/`, `AGENTS.md` and `CLAUDE.md`.
+
+In a project set up by dkt v0.6.0, run `dkt init --force` to take the new Docket block and skill (until then `dkt init` reports `agents-block-differs`), and commit them. The agent then sets up your workflow file at the first piece of development work.
 
 ## Requirements (planned)
 

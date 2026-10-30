@@ -11,7 +11,8 @@ description: >-
 
 These are the rules for development work in this repository, on top of
 superpowers and OpenSpec. Where another skill says otherwise, these rules
-win.
+win. Each path's review and verification steps are not here: they come from
+the user's workflow file.
 
 ## Triage
 
@@ -42,10 +43,27 @@ restructuring.
 - **Direct merge**: docs for people (moves and typos in them included),
   edits that only change comments or whitespace in code or test files and
   pass the check, version bumps, and dependency upgrades that touch only
-  the dependency manifests (such as `go.mod` and `go.sum`). No change and
-  no review beyond the automated checks.
+  the dependency manifests (such as `go.mod` and `go.sum`). No change is
+  opened.
 
 An idea that is not ready goes to `docket/ideas/`, one file per idea.
+
+## The workflow file
+
+Right after triage, before any other step of the work, run
+`dkt workflow --json`. It reports the user's workflow file
+(`result.path`) and its status (`result.status`):
+
+- `ok`: on each path below, do the steps under that path's heading in the
+  file, and under `## Reviews` where they point to it. On these steps the
+  file wins over the user's other instructions.
+- `missing` or `incomplete`: read `setup.md` in this skill's directory and
+  run setup first; then start the work.
+- `stale`: follow the file as for `ok`. Tell the user once in this session
+  that it was made from an older template, what the current template
+  (`dkt workflow template`) does differently, and that setup can update it.
+- anything else, such as the file being unreadable: tell the user what
+  `dkt workflow` reported and ask how to go on. Do not write the file.
 
 ## Full review
 
@@ -68,35 +86,16 @@ An idea that is not ready goes to `docket/ideas/`, one file per idea.
 4. Reuse is decided in the plan: every capability the change needs gets a
    row in the plan's Reuse table, with the search behind the decision. The
    proposal's Builds On names what already exists.
-5. Review the plan once, together with the proposal and deltas, before any
-   code (see Reviews).
-6. Execute with superpowers:subagent-driven-development, with one
-   exception: only a `**Review:** judgment` task gets its own reviewer.
-   Every task that changes code gets the mechanical checks instead: its new
-   tests are seen failing before the code and passing after, and mutating
-   the lines it changed makes a test fail. A task that changes no code, such
-   as one that only edits docs, is checked by its own verification steps.
-   Each implementer gets the Reuse rows for its task and reports every
-   exported symbol it added, with why no existing one fit. Every commit made
-   for a task carries the trailers `Change: <slug>` and `Task: <N>`;
-   structural changes and behavior changes go in separate commits.
-7. Before merging, review the whole change once, by two reviewers in
-   parallel: one on a different model, asked to attack (wrong results, edge
-   cases, partial failure, the same defect elsewhere in the code), and one in
-   a fresh context, checking the code against the proposal and deltas (see
-   Reviews when no other model is available). After fixes, only a large fix
-   is reviewed again.
-8. Before opening the pull request, run `dkt sync <slug>` and
+5. Review the plan, execute it and review the change before merging by
+   the steps under `## Full review` in the workflow file. Every commit made
+   for a task carries the trailers `Change: <slug>` and `Task: <N>`.
+6. Before opening the pull request, run `dkt sync <slug>` and
    `dkt lint <slug>`, and commit plan.md.
-9. A change is one pull request; its commits show its layers. Split it only
-   when it mixes unrelated concerns, when a structural refactor is mixed
-   with behavior (the refactor goes first, in its own pull request), or when
-   product code and tests together run far past about 1000 lines. Do not
-   stack pull requests.
-10. Pull requests merge with a merge commit, never squash: `dkt sync` reads
-    the trailers of each commit.
-11. Archive only with `dkt archive` on a branch made from the default
-    branch, in the release step. Never run `openspec archive` directly.
+7. A change is one pull request unless the workflow file says to split
+   it; its commits show its layers. Pull requests merge with a merge
+   commit, never squash: `dkt sync` reads the trailers of each commit.
+8. Archive only with `dkt archive` on a branch made from the default
+   branch, in the release step. Never run `openspec archive` directly.
 
 Do not use OpenSpec's `/opsx:*` commands or skills.
 
@@ -105,40 +104,20 @@ compensating tasks, a Revision section, a Change Log row.
 
 ## Light review
 
-No change is opened. In a git worktree:
-
-1. Verify by the kind of edit:
-   - a fix: write a regression test and see it fail before the fix;
-   - a restructuring: the tests that cover the code pass before and after,
-     and mutating the changed lines makes one fail; when none fails, first
-     add the tests as a test-only edit;
-   - prompt text: check it mechanically, not with tests that look for
-     strings: it still loads, and every copy says the same;
-   - tests: mutate the code they cover; the tests must fail;
-   - check settings: run them; the pull request's own CI run uses the new
-     settings, and the review looks for a check that got weaker.
-2. Have the whole diff reviewed once before merging (see Reviews).
-3. Open the pull request and merge it with a merge commit.
+No change is opened. In a git worktree, make the edit following the steps
+under `## Light review` in the workflow file; then open the pull request
+and merge it with a merge commit.
 
 ## Check
 
 For an edit to a code or test file that changes only comments or
-whitespace. Have a fresh agent, given only the diff and the definitions in
-Triage, confirm before merging that every changed line is a comment or
-whitespace and that no comment changes how the code builds or runs. If it
-does not confirm, triage again.
+whitespace: do the steps under `## Check` in the workflow file, and when
+they pass, go on as a direct merge.
 
 ## Direct merge
 
-In a git worktree: make the edit, pass the automated checks, open the pull
-request and merge it with a merge commit. No review.
-
-## Reviews
-
-A required review is done by a reviewer on a different model. If there is
-none, by the same model in a fresh context. If that is not possible either,
-the pull request says it had no independent review and asks a person to
-review it. The author's own reading is not a review.
+In a git worktree: make the edit, do the steps under `## Direct merge` in
+the workflow file, open the pull request and merge it with a merge commit.
 
 ## Parallel sessions
 

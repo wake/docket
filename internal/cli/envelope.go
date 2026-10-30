@@ -63,7 +63,8 @@ type Context struct {
 	DefaultBranch string
 	Git           gitx.Git
 	Repo          *Repo
-	Now           time.Time // the run's start time
+	Now           time.Time              // the run's start time
+	UserHome      func() (string, error) // nil means no lookup
 }
 
 // Command is one dkt subcommand.
@@ -80,6 +81,8 @@ type Options struct {
 	Env            []string
 	Stdout, Stderr io.Writer
 	Now            time.Time // the run's start time; zero means time.Now()
+	// UserHome is the operating system's lookup of the user's home directory; nil means none.
+	UserHome func() (string, error)
 }
 
 func asUsage(err error) bool {

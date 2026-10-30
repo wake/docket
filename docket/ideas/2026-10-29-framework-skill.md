@@ -29,16 +29,13 @@ to bring them in.
 - The **materialized workflow** joins the two: for each path, the template
   brought as close as the user's workflow and tools allow. It is neither the
   template verbatim nor the user's workflow verbatim. It lives at the user
-  level, never in the project repository, in one of two modes chosen at
-  setup:
-  - reference: written into the user's own global workflow, which Docket
-    refers to, so a change there applies everywhere;
-  - fixed: a workflow used by Docket only.
-- Setup: when `dkt init` finds no materialized workflow, the agent checks
-  the environment, reads the templates, guides the user, and shows the
-  result before writing it. `dkt` itself only reports facts and checks
-  structure: whether the materialized workflow exists, and which template
-  version it was made from, so a changed template shows it is out of date.
+  level, never in the project repository (the settlement below says where).
+- Setup: when the agent begins the first piece of development work and
+  finds no materialized workflow, it checks the environment, reads the
+  templates, guides the user, and shows the result before writing it. `dkt`
+  itself only reports facts and checks structure: whether the workflow
+  exists, whether it lacks a path, and which template it was made from (a
+  hash), so a changed template shows it is out of date.
 - Review fallback in the templates: a cross-model review; else a subagent
   review (same model, fresh context); else the work is recorded as having no
   independent review and a person reviews the pull request. A self-review is
@@ -63,11 +60,21 @@ to bring them in.
   `.agents/skills/docket/`, committed); a marked Docket block in `AGENTS.md`
   points to it and lets it win over superpowers defaults, and `CLAUDE.md`
   reaches the block; the Reuse table stays in the framework.
+- Settled by the change `add-workflow`:
+  - The materialized workflow has one mode. Reference mode is dropped: a
+    user's own instructions may be too loose to point into, and `docket
+    doctor` finds drift instead.
+  - It lives at `$XDG_CONFIG_HOME/docket/workflow.md` or
+    `~/.config/docket/workflow.md`.
+  - The template lives in `dkt`, is printed by `dkt workflow template` and
+    is identified by a hash.
+  - The workflow wins over the user's other instructions for the four paths.
+  - With no workflow, setup runs before the first piece of work, and
+    `dkt init` says nothing about it.
+  - A stale workflow keeps working, and the agent says so once.
 
 ## Open questions
 
-- Where the materialized workflow lives for each agent: Claude Code reads
-  user skills from `~/.claude/skills`, Codex from `~/.agents/skills`.
 - The checks `docket doctor` runs, and which of them `dkt` can do without
   judgment.
 - Queued ideas written before this split, to update when each is taken up:
@@ -78,9 +85,8 @@ to bring them in.
 
 ## Status
 
-The change `add-framework-skill` took the first part (the skill and the
-block). Two later changes remain: the materialized workflow, and
-`docket doctor`.
+Two changes are done: `add-framework-skill` (the skill and the block) and
+`add-workflow` (the materialized workflow). `docket doctor` remains.
 
 ## Notes
 

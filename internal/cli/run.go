@@ -13,7 +13,7 @@ import (
 )
 
 // commands is the real command set.
-var commands = []func() Command{initCommand, newCommand, lintCommand, syncCommand, rebaseCommand, archiveCommand, conflictsCommand, statusCommand}
+var commands = []func() Command{initCommand, newCommand, lintCommand, syncCommand, rebaseCommand, archiveCommand, conflictsCommand, statusCommand, workflowCommand}
 
 // Run runs dkt with the real command set and returns the exit code.
 func Run(o Options) int { return RunWith(o, commands) }
@@ -46,6 +46,7 @@ func RunWith(o Options, cmds []func() Command) int {
 	}
 
 	ctx := &Context{Dir: o.Dir, Env: o.Env, JSON: preJSON, DefaultBranch: preBranch}
+	ctx.UserHome = o.UserHome
 	ctx.Now = o.Now
 	if ctx.Now.IsZero() {
 		ctx.Now = time.Now()
