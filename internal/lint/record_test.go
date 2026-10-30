@@ -96,18 +96,19 @@ func TestRecordSections(t *testing.T) {
 	for name, c := range map[string]struct {
 		content, name string
 		line          int
+		msg           string
 	}{
-		"missing why":    {recFront + what + ver + rev, "Why", 0},
-		"extra section":  {goodRecord() + "## Notes\n\nx\n", "Notes", 23},
-		"out of order":   {recFront + why + what + ver + rev, "What", 11},
-		"twice":          {goodRecord() + "## Why\n\nagain\n", "Why", 23},
-		"tasks early":    {recFront + what + why + ver + "## Tasks\n\n### Task 1: x\n\n" + rev, "Review", 23},
-		"review empty":   {recFront + what + why + ver + "## Review\n", "Review", 19},
-		"review comment": {recFront + what + why + ver + "## Review\n\n<!-- later -->\n", "Review", 19},
+		"missing why":    {recFront + what + ver + rev, "Why", 0, ""},
+		"extra section":  {goodRecord() + "## Notes\n\nx\n", "Notes", 23, "is not a record section"},
+		"out of order":   {recFront + why + what + ver + rev, "What", 11, ""},
+		"twice":          {goodRecord() + "## Why\n\nagain\n", "Why", 23, "appears more than once"},
+		"tasks early":    {recFront + what + why + ver + "## Tasks\n\n### Task 1: x\n\n" + rev, "Review", 23, ""},
+		"review empty":   {recFront + what + why + ver + "## Review\n", "Review", 19, ""},
+		"review comment": {recFront + what + why + ver + "## Review\n\n<!-- later -->\n", "Review", 19, ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := wantRec(t, runRecord(c.content), "record-section")
-			if !strings.Contains(f.Message, c.name) || f.Line != c.line {
+			if !strings.Contains(f.Message, c.name) || f.Line != c.line || !strings.Contains(f.Message, c.msg) {
 				t.Fatalf("finding = %+v, want name %s line %d", f, c.name, c.line)
 			}
 		})
@@ -176,6 +177,14 @@ func TestRecordTasks(t *testing.T) {
 		f := wantRec(t, runRecord(content), "task-heading")
 		if !strings.Contains(f.Message, "## Tasks") {
 			t.Fatalf("message = %q", f.Message)
+		}
+	})
+	t.Run("task above the tasks section", func(t *testing.T) {
+		content := recFront + "## What\n\na\n\n### Task 2: x\n\n" + section("Why", "b") + section("Verification", "c") + section("Review", "d") +
+			"## Tasks\n\n### Task 1: Move\n"
+		f := wantRec(t, runRecord(content), "task-heading")
+		if f.Line != 11 || !strings.Contains(f.Message, "belong under `## Tasks`") {
+			t.Fatalf("finding = %+v", f)
 		}
 	})
 	t.Run("no tasks section", func(t *testing.T) {
@@ -291,5 +300,17 @@ func TestLintRecordsUnknown(t *testing.T) {
 	r := Run(in)
 	if len(r.Unreadable) != 1 || r.Unreadable[0].Source != "records" {
 		t.Fatalf("%+v", r.Unreadable)
+	}
+}
+
+func TestLintRecordsDirUnreadable(t *testing.T) {
+	in := recInput(map[string]string{recPath(goodSlug): goodRecord()}, recPath(goodSlug))
+	in.Repo = failingFS{FS: in.Repo.(fstest.MapFS), bad: "docket/records"}
+	r := Run(in)
+	if len(r.Unreadable) != 1 || r.Unreadable[0].Source != "docket/records" {
+		t.Fatalf("unreadable = %+v", r.Unreadable)
+	}
+	if len(r.Records) != 0 || len(r.Findings) != 0 {
+		t.Fatalf("records = %v, findings = %+v", r.Records, r.Findings)
 	}
 }

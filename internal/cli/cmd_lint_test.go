@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"github.com/wake/docket"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -247,4 +248,22 @@ func TestLintRecordsTheBranchAdds(t *testing.T) {
 	if strings.Contains(so, "fix-a") {
 		t.Fatalf("an old record was linted:\n%s", so)
 	}
+}
+
+func TestLintRecordTemplateTextLeft(t *testing.T) {
+	tpl := docket.RecordTemplate()
+	i := strings.Index(tpl, "## Why\n\n") + len("## Why\n\n")
+	comment := tpl[i : i+strings.Index(tpl[i:], "-->")+3]
+	rec := strings.Replace(lintRecord, "## Why\n\nb\n", "## Why\n\n"+comment+"\n", 1)
+	r := cleanRepo(t)
+	r.Git("checkout", "-q", "-b", "topic")
+	r.Commit("record", map[string]string{"docket/records/2026-10-30-fix-b.md": rec})
+	_, so, _ := runLint(t, r.Dir, r.Env, "--json")
+	for _, f := range decode(t, so)["findings"].([]any) {
+		m := f.(map[string]any)
+		if m["rule"] == "placeholder" && m["file"] == "docket/records/2026-10-30-fix-b.md" {
+			return
+		}
+	}
+	t.Fatalf("no placeholder finding:\n%s", so)
 }
