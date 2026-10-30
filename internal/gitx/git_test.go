@@ -311,3 +311,120 @@ func TestMergeBaseUnrelated(t *testing.T) {
 		t.Fatalf("IsAncestor(tip, base) = %v, %v", yes, err)
 	}
 }
+
+func TestListTree(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Write("a/x/f", "1")
+	r.Write("a/file", "2")
+	r.Write("a/sub/deep/g", "3")
+	r.Write("b/h", "4")
+	r.Write("exec.sh", "5")
+	if err := os.Chmod(filepath.Join(r.Dir, "exec.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r.Commit("one", nil)
+	g := Git{Dir: r.Dir, Env: r.Env}
+	list := func(paths ...string) []TreeEntry {
+		t.Helper()
+		got, err := g.ListTree("HEAD", paths...)
+		if err != nil {
+			t.Fatalf("ListTree %v: %v", paths, err)
+		}
+		return got
+	}
+	names := func(es []TreeEntry) []string {
+		var n []string
+		for _, e := range es {
+			n = append(n, e.Type+" "+e.Path)
+		}
+		slices.Sort(n)
+		return n
+	}
+	eq := func(got []TreeEntry, want ...string) {
+		t.Helper()
+		if !slices.Equal(names(got), want) {
+			t.Fatalf("got %v, want %v", names(got), want)
+		}
+	}
+	eq(list("a/", "b/"), "blob a/file", "blob b/h", "tree a/sub", "tree a/x")
+	eq(list("nope/"))
+	eq(list("nope", "nope/"))
+	eq(list("a/file"), "blob a/file")
+	eq(list("a/file", "a/"), "blob a/file", "tree a/sub", "tree a/x")
+	eq(list("a"), "tree a")
+	if e := list("exec.sh"); len(e) != 1 || e[0].Mode != "100755" || e[0].Type != "blob" {
+		t.Fatalf("entry = %+v", e)
+	}
+	// Overlapping paths as the scan asks for them: a folder, then a folder
+	// inside it, with and without the trailing slash.
+	eq(list("a/", "a/sub/"), "blob a/file", "tree a/sub/deep", "tree a/x")
+	eq(list("a/", "a/sub"), "blob a/file", "tree a/sub", "tree a/x")
+	eq(list("a", "a/sub/"), "blob a/file", "tree a/sub/deep", "tree a/x")
+	eq(list("a/sub/", "a/sub"), "tree a/sub/deep")
+	if _, err := g.ListTree("no-such-rev", "a/"); err == nil {
+		t.Fatal("unknown revision: want an error")
+	}
+}
+
+func TestListTreeScanPaths(t *testing.T) {
+	paths := []string{"openspec/changes/", "openspec/changes/archive/", "docket/records", "docket/records/"}
+	list := func(t *testing.T, build func(r *testutil.Repo)) []string {
+		t.Helper()
+		r := testutil.NewRepo(t)
+		r.Write("README.md", "x")
+		build(r)
+		r.Commit("one", nil)
+		g := Git{Dir: r.Dir, Env: r.Env}
+		es, err := g.ListTree("HEAD", paths...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var n []string
+		for _, e := range es {
+			n = append(n, e.Mode+" "+e.Type+" "+e.Path)
+		}
+		slices.Sort(n)
+		return n
+	}
+	eq := func(t *testing.T, got []string, want ...string) {
+		t.Helper()
+		if !slices.Equal(got, want) {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	}
+	t.Run("folders", func(t *testing.T) {
+		eq(t, list(t, func(r *testutil.Repo) {
+			r.Write("openspec/changes/add-x/f", "1")
+			r.Write("openspec/changes/notes.md", "2")
+			r.Write("openspec/changes/archive/2026-10-24-add-y/f", "3")
+			r.Write("docket/records/2026-10-30-fix-x.md", "4")
+			r.Write("docket/records/sub/deep.md", "5")
+		}),
+			"040000 tree docket/records/sub",
+			"040000 tree openspec/changes/add-x",
+			"040000 tree openspec/changes/archive/2026-10-24-add-y",
+			"100644 blob docket/records/2026-10-30-fix-x.md",
+			"100644 blob openspec/changes/notes.md")
+	})
+	t.Run("archive is a file", func(t *testing.T) {
+		eq(t, list(t, func(r *testutil.Repo) {
+			r.Write("openspec/changes/archive", "f")
+		}), "100644 blob openspec/changes/archive")
+	})
+	t.Run("records is a file", func(t *testing.T) {
+		eq(t, list(t, func(r *testutil.Repo) {
+			r.Write("docket/records", "f")
+		}), "100644 blob docket/records")
+	})
+	t.Run("records is a link", func(t *testing.T) {
+		eq(t, list(t, func(r *testutil.Repo) {
+			r.Write("docket/other", "f")
+			if err := os.Symlink("other", filepath.Join(r.Dir, "docket/records")); err != nil {
+				t.Skipf("symlinks unavailable: %v", err)
+			}
+		}), "120000 blob docket/records")
+	})
+	t.Run("nothing", func(t *testing.T) {
+		eq(t, list(t, func(r *testutil.Repo) {}))
+	})
+}

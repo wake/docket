@@ -359,3 +359,29 @@ func (g Git) ListFiles(rev, dir string) ([]string, error) {
 	slices.Sort(paths)
 	return paths, nil
 }
+
+// TreeEntry is one entry of a tree: its mode, its type (blob, tree or commit)
+// and its path relative to the repository root.
+type TreeEntry struct{ Mode, Type, Path string }
+
+// ListTree returns the entries that one non-recursive ls-tree gives for paths
+// in rev's tree: a path with a trailing slash lists what is directly inside
+// that folder, one without lists the entry itself. A missing path gives no
+// entries. Git leaves out the entry of a folder when a path inside it is also
+// asked for.
+func (g Git) ListTree(rev string, paths ...string) ([]TreeEntry, error) {
+	out, err := g.output(append([]string{"ls-tree", "-z", rev, "--"}, paths...)...)
+	if err != nil {
+		return nil, err
+	}
+	var entries []TreeEntry
+	for _, entry := range splitNUL(string(out)) {
+		meta, path, ok := strings.Cut(entry, "\t")
+		f := strings.Fields(meta)
+		if !ok || len(f) != 3 {
+			return nil, fmt.Errorf("git ls-tree: unexpected entry %q", entry)
+		}
+		entries = append(entries, TreeEntry{Mode: f[0], Type: f[1], Path: path})
+	}
+	return entries, nil
+}

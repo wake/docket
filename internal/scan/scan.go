@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -324,8 +325,35 @@ func diskDirs(dir string) ([]string, error) {
 	return names, nil
 }
 
-// readTree reads a commit. recErr is a failure to list the records alone.
+// readTree reads a commit with one ls-tree. recErr is a failure to list the
+// records alone.
 func readTree(g gitx.Git, rev string) (active, archived, records []string, recErr, err error) {
+	entries, err := g.ListTree(rev, changesDir+"/", archiveDir+"/", record.Dir, record.Dir+"/")
+	if err != nil {
+		// One unreadable folder may be the records alone: ask for each in turn.
+		return readTreeEach(g, rev)
+	}
+	for _, e := range entries {
+		dir, name := path.Split(e.Path)
+		switch {
+		case e.Path == record.Dir:
+			recErr = fmt.Errorf("%s is not a folder at %s", record.Dir, rev)
+		case dir == changesDir+"/" && e.Type == "tree":
+			active = append(active, name)
+		case dir == archiveDir+"/" && e.Type == "tree":
+			archived = append(archived, name)
+		case dir == record.Dir+"/" && e.Type == "blob" && (e.Mode == "100644" || e.Mode == "100755"):
+			if slug, ok := record.SlugOf(name); ok {
+				records = append(records, slug)
+			}
+		}
+	}
+	return active, archived, records, recErr, nil
+}
+
+// readTreeEach is readTree with one git call per folder, which tells a
+// failure of the records folder from a failure of the changes.
+func readTreeEach(g gitx.Git, rev string) (active, archived, records []string, recErr, err error) {
 	if active, err = g.ListDirs(rev, changesDir); err != nil {
 		return nil, nil, nil, nil, err
 	}
