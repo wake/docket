@@ -76,39 +76,49 @@ func checkPlaceholders(r *run, c *loaded) {
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		lines := markdown.Lines(c.Files[name])
-		mask := markdown.FenceMask(lines)
-		orig := strings.Join(lines, "\n")
-		blank := []byte(orig)
-		off := 0
-		for i, line := range lines {
-			if mask[i] {
-				blankRange(blank, off, off+len(line))
-			} else {
-				for _, sp := range markdown.CodeSpans(line) {
-					blankRange(blank, off+sp[0], off+sp[1])
-				}
+		checkPlaceholderFile(r, c, name, c.Files[name])
+	}
+}
+
+// checkPlaceholderFile reports template text left in one file, name being its
+// path relative to the folder of c.
+func checkPlaceholderFile(r *run, c *loaded, name string, b []byte) {
+	known := r.placeholders()
+	if len(known) == 0 {
+		return
+	}
+	lines := markdown.Lines(b)
+	mask := markdown.FenceMask(lines)
+	orig := strings.Join(lines, "\n")
+	blank := []byte(orig)
+	off := 0
+	for i, line := range lines {
+		if mask[i] {
+			blankRange(blank, off, off+len(line))
+		} else {
+			for _, sp := range markdown.CodeSpans(line) {
+				blankRange(blank, off+sp[0], off+sp[1])
 			}
-			off += len(line) + 1
 		}
-		// Matches are located in the blanked text and compared in the
-		// original, so a code span inside a comment does not hide it.
-		report := func(start, end int) {
-			ph := orig[start:end]
-			tmpl, ok := known[ph]
-			if !ok {
-				return
-			}
-			line := strings.Count(orig[:start], "\n") + 1
-			r.add(c, "placeholder", name, line, "template text left: %s (from %s)", quote(ph), tmpl)
-			blankRange(blank, start, end)
+		off += len(line) + 1
+	}
+	// Matches are located in the blanked text and compared in the
+	// original, so a code span inside a comment does not hide it.
+	report := func(start, end int) {
+		ph := orig[start:end]
+		tmpl, ok := known[ph]
+		if !ok {
+			return
 		}
-		for _, m := range commentRe.FindAllIndex(blank, -1) {
-			report(m[0], m[1])
-		}
-		for _, m := range angleRe.FindAllIndex(blank, -1) {
-			report(m[0], m[1])
-		}
+		line := strings.Count(orig[:start], "\n") + 1
+		r.add(c, "placeholder", name, line, "template text left: %s (from %s)", quote(ph), tmpl)
+		blankRange(blank, start, end)
+	}
+	for _, m := range commentRe.FindAllIndex(blank, -1) {
+		report(m[0], m[1])
+	}
+	for _, m := range angleRe.FindAllIndex(blank, -1) {
+		report(m[0], m[1])
 	}
 }
 
