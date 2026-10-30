@@ -32,3 +32,25 @@ func TestValidateSlug(t *testing.T) {
 		}
 	}
 }
+
+func TestSuffixed(t *testing.T) {
+	for _, c := range []struct {
+		n    int
+		want string
+	}{{0, "add-x"}, {1, "add-x"}, {2, "add-x-2"}, {12, "add-x-12"}} {
+		if got := Suffixed("add-x", c.n); got != c.want {
+			t.Errorf("Suffixed(add-x, %d) = %q, want %q", c.n, got, c.want)
+		}
+	}
+}
+
+func TestStartsWithDate(t *testing.T) {
+	for s, want := range map[string]bool{
+		"2026-10-30-fix-x": true, "2026-10-30": true,
+		"add-x": false, "2026-10-x": false, "20261030-x": false,
+	} {
+		if got := StartsWithDate(s); got != want {
+			t.Errorf("StartsWithDate(%q) = %v, want %v", s, got, want)
+		}
+	}
+}
