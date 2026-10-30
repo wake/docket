@@ -150,25 +150,19 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		f.add(src, rank, active, archived, records)
 	}
 
-	refs, err := g.Refs("refs/heads", "refs/remotes")
+	unmerged, err := unmergedRefs(g, db)
 	if err != nil {
 		return inv, err
 	}
-	for _, r := range refs {
-		if r.Name == db.Ref {
-			continue
-		}
+	for _, u := range unmerged {
+		r := u.Ref
 		kind, rank := KindLocalBranch, rankLocalBranch
 		if strings.HasPrefix(r.Name, "refs/remotes/") {
 			kind, rank = KindRemoteBranch, rankRemoteBranch
 		}
 		src := Source{Kind: kind, Name: r.Name, Commit: r.SHA}
-		merged, err := g.IsAncestor(r.SHA, db.Commit)
-		if err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
-			continue
-		}
-		if merged {
+		if u.Err != nil {
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: u.Err.Error()})
 			continue
 		}
 		active, archived, records, recErr, err := readTree(g, r.SHA)
@@ -213,6 +207,64 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	}
 	sort.Slice(inv.Records, func(i, j int) bool { return inv.Records[i].Slug < inv.Records[j].Slug })
 	return inv, nil
+}
+
+// unmergedRef is a ref to read, or, when Err is set, one whose ancestry
+// could not be computed.
+type unmergedRef struct {
+	Ref gitx.Ref
+	Err error
+}
+
+// unmergedRefs lists, in ref order, the local and remote-tracking refs other
+// than the default branch's own that the default branch tip does not contain,
+// and the ones whose ancestry cannot be computed. Two filtered listings
+// settle most refs in two git processes. A ref that is in both or in neither
+// (git leaves out a ref whose tip it cannot read) is asked on its own, and
+// when either listing fails, or the history behind the unmerged tips cannot
+// be walked, every ref is asked on its own.
+func unmergedRefs(g gitx.Git, db DefaultBranch) (unmerged []unmergedRef, err error) {
+	patterns := []string{"refs/heads", "refs/remotes"}
+	all, err := g.Refs(patterns...)
+	if err != nil {
+		return nil, err
+	}
+	inMerged, inUnmerged := map[string]bool{}, map[string]bool{}
+	merged, errM := g.RefsFiltered("--merged="+db.Commit, patterns...)
+	no, errU := g.RefsFiltered("--no-merged="+db.Commit, patterns...)
+	listed := errM == nil && errU == nil
+	if listed {
+		for _, r := range merged {
+			inMerged[r.Name] = true
+		}
+		var tips []string
+		for _, r := range no {
+			inUnmerged[r.Name] = true
+			if r.Name != db.Ref {
+				tips = append(tips, r.SHA)
+			}
+		}
+		// The listings do not notice damaged history behind a tip.
+		if len(tips) > 0 && g.WalkUnmerged(tips, db.Commit) != nil {
+			listed = false
+		}
+	}
+	for _, r := range all {
+		if r.Name == db.Ref {
+			continue
+		}
+		if listed && inMerged[r.Name] != inUnmerged[r.Name] {
+			if inUnmerged[r.Name] {
+				unmerged = append(unmerged, unmergedRef{Ref: r})
+			}
+			continue
+		}
+		isMerged, err := g.IsAncestor(r.SHA, db.Commit)
+		if err != nil || !isMerged {
+			unmerged = append(unmerged, unmergedRef{Ref: r, Err: err})
+		}
+	}
+	return unmerged, nil
 }
 
 // unbornHead reports a worktree whose HEAD has no commit yet.

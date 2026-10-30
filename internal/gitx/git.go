@@ -131,11 +131,19 @@ func (g Git) gitMarkerPossible() bool {
 
 // output runs git and returns raw stdout.
 func (g Git) output(args ...string) ([]byte, error) {
+	return g.outputIn("", args...)
+}
+
+// outputIn is output with stdin fed to git when it is not empty.
+func (g Git) outputIn(stdin string, args ...string) ([]byte, error) {
 	bin, err := g.lookPath()
 	if err != nil {
 		return nil, err
 	}
 	cmd := exec.Command(bin, args...)
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
 	cmd.Dir = g.Dir
 	cmd.Env = g.Env
 	var stdout, stderr bytes.Buffer
@@ -241,13 +249,33 @@ type Ref struct{ Name, SHA string }
 // Refs lists references matching the patterns by full refname; symbolic refs
 // are left out.
 func (g Git) Refs(patterns ...string) ([]Ref, error) {
-	args := append([]string{"for-each-ref", "--format=%(refname)%09%(objectname)%09%(symref)"}, patterns...)
-	out, err := g.Run(args...)
+	return g.listRefs(nil, patterns)
+}
+
+// WalkUnmerged walks the history of tips that excluded does not contain and
+// returns an error when git cannot read all of it, as when an ancestor object
+// is missing. The commits go through stdin, so any number of tips fits.
+func (g Git) WalkUnmerged(tips []string, excluded string) error {
+	in := strings.Join(tips, "\n") + "\n^" + excluded + "\n"
+	_, err := g.outputIn(in, "rev-list", "--quiet", "--stdin")
+	return err
+}
+
+// RefsFiltered is Refs narrowed by one for-each-ref filter, given whole, such
+// as "--merged=<commit>" or "--no-merged=<commit>".
+func (g Git) RefsFiltered(filter string, patterns ...string) ([]Ref, error) {
+	return g.listRefs([]string{filter}, patterns)
+}
+
+func (g Git) listRefs(filters, patterns []string) ([]Ref, error) {
+	args := append([]string{"for-each-ref", "--format=%(refname)%09%(objectname)%09%(symref)"}, filters...)
+	args = append(args, patterns...)
+	out, err := g.output(args...)
 	if err != nil {
 		return nil, err
 	}
 	var refs []Ref
-	for _, line := range strings.Split(out, "\n") {
+	for _, line := range strings.Split(string(out), "\n") {
 		if line == "" {
 			continue
 		}

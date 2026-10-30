@@ -143,6 +143,70 @@ func TestRefsSkipsSymbolic(t *testing.T) {
 	}
 }
 
+func TestRefsFiltered(t *testing.T) {
+	src := testutil.NewRepo(t)
+	src.Commit("one", map[string]string{"a": "1"})
+	src.Git("branch", "merged")
+	src.Git("checkout", "-q", "-b", "ahead")
+	src.Commit("two", map[string]string{"a": "2"})
+	src.Git("checkout", "-q", "main")
+	src.Commit("three", map[string]string{"a": "3"})
+	clone := src.CloneTo(t, filepath.Join(t.TempDir(), "c"))
+	g := Git{Dir: clone.Dir, Env: clone.Env}
+	tip := clone.Git("rev-parse", "main")
+	names := func(refs []Ref) []string {
+		var n []string
+		for _, r := range refs {
+			n = append(n, r.Name)
+		}
+		return n
+	}
+	refs, err := g.RefsFiltered("--merged="+tip, "refs/heads", "refs/remotes")
+	if err != nil {
+		t.Fatalf("merged: %v", err)
+	}
+	// origin/HEAD is symbolic and left out
+	if want := []string{"refs/heads/main", "refs/remotes/origin/main", "refs/remotes/origin/merged"}; !slices.Equal(names(refs), want) {
+		t.Fatalf("merged = %v, want %v", names(refs), want)
+	}
+	refs, err = g.RefsFiltered("--no-merged="+tip, "refs/heads", "refs/remotes")
+	if err != nil {
+		t.Fatalf("no-merged: %v", err)
+	}
+	if want := []string{"refs/remotes/origin/ahead"}; !slices.Equal(names(refs), want) {
+		t.Fatalf("no-merged = %v, want %v", names(refs), want)
+	}
+	if _, err := g.RefsFiltered("--merged=0123456789012345678901234567890123456789", "refs/heads"); err == nil {
+		t.Fatal("want an error for a commit that does not exist")
+	}
+}
+
+func TestWalkUnmerged(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("one", map[string]string{"a": "1"})
+	r.Git("checkout", "-q", "-b", "br")
+	r.Commit("two", map[string]string{"a": "2"})
+	r.Commit("three", map[string]string{"a": "3"})
+	sha := r.Git("rev-parse", "br~1")
+	r.Git("checkout", "-q", "main")
+	tip := r.Git("rev-parse", "main")
+	obj := filepath.Join(r.Dir, ".git", "objects", sha[:2], sha[2:])
+	if err := os.Chmod(obj, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(obj); err != nil {
+		t.Fatal(err)
+	}
+	g := Git{Dir: r.Dir, Env: r.Env}
+	if err := g.WalkUnmerged([]string{r.Git("rev-parse", "main")}, tip); err != nil {
+		t.Fatalf("intact: %v", err)
+	}
+	brTip := r.Git("rev-parse", "br")
+	if err := g.WalkUnmerged([]string{brTip}, tip); err == nil {
+		t.Fatal("want an error for a tip whose parent object is missing")
+	}
+}
+
 func TestWorktreesPrunable(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("one", map[string]string{"a": "1"})
