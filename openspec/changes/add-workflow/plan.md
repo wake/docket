@@ -200,7 +200,7 @@ In `internal/workflow/workflow_test.go`, with `four = "## Full review\n## Light 
 | no key | `"---\nother: x\n---\n"+four` | stale | nil | `[]` |
 | empty | `""` | incomplete | nil | all four |
 
-`TestLocate`: `HOME=/h` → `/h/.config/docket/workflow.md`; plus `XDG_CONFIG_HOME=/x` → `/x/docket/workflow.md`; `XDG_CONFIG_HOME=/x/` → `/x/docket/workflow.md`; `XDG_CONFIG_HOME=rel` and `XDG_CONFIG_HOME=` → `/h/.config/docket/workflow.md`; `HOME=/a` then `HOME=/b` → `/b/.config/docket/workflow.md`; `HOME=rel` with a lookup returning `/u` → `/u/.config/docket/workflow.md`; no `HOME` with a lookup returning `/u` → `/u/...`; no `HOME` and a nil lookup, a lookup returning an error, `""` or `rel` → `errors.Is(err, ErrNoHome)`. (Build expected paths with `filepath.Join`.)
+`TestLocate`: `HOME=/h` → `/h/.config/docket/workflow.md`; plus `XDG_CONFIG_HOME=/x` → `/x/docket/workflow.md`; `XDG_CONFIG_HOME=/x/` → `/x/docket/workflow.md`; `XDG_CONFIG_HOME=rel` and `XDG_CONFIG_HOME=` → `/h/.config/docket/workflow.md`; `HOME=/a` then `HOME=/b` → `/b/.config/docket/workflow.md`; `XDG_CONFIG_HOME=/x` then `XDG_CONFIG_HOME=/y` → `/y/docket/workflow.md`; `XDG_CONFIG_HOME=/x` then `XDG_CONFIG_HOME=rel` → `/h/.config/docket/workflow.md`; `HOME=rel` with a lookup returning `/u` → `/u/.config/docket/workflow.md`; no `HOME` with a lookup returning `/u` → `/u/...`; no `HOME` and a nil lookup, a lookup returning an error, `""` or `rel` → `errors.Is(err, ErrNoHome)`. (Build expected paths with `filepath.Join`.)
 
 `TestHash`: `Hash("") == "e3b0c44298fc"`; `len(Hash("x")) == 12`.
 
@@ -229,10 +229,10 @@ In `internal/cli/cmd_workflow_test.go`, a helper runs `Run` with `Options{Env: e
 - `TestWorkflowPathInConfigHome`: `HOME=<temp h>`: `result.path == h/.config/docket/workflow.md`.
 - `TestWorkflowPathUnderXDG`: `XDG_CONFIG_HOME=<temp x>`: `result.path == x/docket/workflow.md`.
 - `TestWorkflowXDGRelativeIgnored`: `XDG_CONFIG_HOME=rel`, `HOME=<temp h>`: `result.path == h/.config/docket/workflow.md`.
-- `TestWorkflowTemplatePrinted`: `workflow template --json`: exit 0, `result.text == docket.Template()`, `result.template == hash`, `result` has exactly two keys. Text mode: exit 0, stdout starts with `docket.Template()`.
-- `TestWorkflowMissing`: no file: exit 1, `status` `missing`, `recorded` null, `missing_sections` `[]`, `template == hash`, findings exactly one `workflow-missing` with `file == result.path`; afterwards the config directory still does not exist.
-- `TestWorkflowComplete`: file `fm(hash)+four`: exit 0, `status` `ok`, `recorded == hash`, findings `[]`. Text mode: stdout ends with `dkt workflow: ok\n`.
-- `TestWorkflowSectionMissing`: `fm("0123456789ab")` + four without `## Check`: exit 1, `status` `incomplete`, `missing_sections == ["Check"]`, findings exactly one `workflow-incomplete`.
+- `TestWorkflowTemplatePrinted`: `workflow template --json`: exit 0, `result.text == docket.Template()`, `result.template == hash`, `result` has exactly two keys. Text mode: exit 0, stdout is exactly `docket.Template() + "dkt workflow: ok\n"`.
+- `TestWorkflowMissing`: no file: exit 1, `result` has exactly the keys `path`, `status`, `template`, `recorded`, `missing_sections`; `status` `missing`, `recorded` null, `missing_sections` `[]`, `template == hash`, findings exactly one `workflow-missing` with `file == result.path`; afterwards the config directory still does not exist.
+- `TestWorkflowComplete`: file `fm(hash)+four`: exit 0, `result` has exactly the five keys, `status` `ok`, `recorded == hash`, findings `[]`. Text mode: stdout ends with `dkt workflow: ok\n`.
+- `TestWorkflowSectionMissing`: `fm("0123456789ab")` + four without `## Check`: exit 1, `status` `incomplete`, `missing_sections == ["Check"]`, findings exactly one `workflow-incomplete`, its message containing `## Check` and its `file` the path. Subtest: without `## Check` and `## Direct merge`, `missing_sections == ["Check", "Direct merge"]` and two `workflow-incomplete` findings, in that order, each naming its section.
 - `TestWorkflowStale`: `fm("0123456789ab")+four`: exit 1, `status` `stale`, `recorded == "0123456789ab"`, `template == hash`, findings exactly one `workflow-stale`.
 - `TestWorkflowNoFrontmatter`: `four`: `status` `stale`, `recorded` null.
 - `TestWorkflowUnreadable`, skipped as root: mode 000: exit 3, `unreadable` has one entry with `source == path`, `result` null. Subtest: a directory at the path, exit 3 (not skipped as root).
@@ -281,7 +281,7 @@ Expected: PASS
 
 - [ ] **Step 1: Rewrite `.agents/skills/docket/SKILL.md`**
 
-Keep the frontmatter, `## Triage`, `## Parallel sessions` and `## Prompt paths` byte for byte. Replace the rest as follows.
+Keep the frontmatter, `## Triage`, `## Parallel sessions` and `## Prompt paths` byte for byte, except one sentence: in `## Triage`, the Direct merge bullet's `No change and no review beyond the automated checks.` becomes `No change is opened.` (the checks and "No review" move to the template). Replace the rest as follows.
 
 The opening paragraph gains a last sentence: `Each path's review and verification steps are not here: they come from the user's workflow file.`
 
@@ -346,7 +346,7 @@ the workflow file, open the pull request and merge it with a merge commit.
 
 - [ ] **Step 2: Check that every rule of the old skill has a home**
 
-Compare the old `SKILL.md` (`git show HEAD:.agents/skills/docket/SKILL.md`) with the new one and `workflow/template.md`, rule by rule: old step 5 → template Full review 1; old step 6 → template Full review 2 and 3, trailers → skill step 5; old step 7 → template Full review 4; old step 9 → skill step 7 and template Full review 5; old steps 8, 10, 11 → skill steps 6, 7, 8; old Light review 1 and 2 → template Light review; old Check → template Check; old Direct merge's checks and "No review" → template Direct merge; old Reviews → template Reviews. Expected: no rule dropped, none in both places except the path names.
+Compare the old `SKILL.md` (`git show HEAD:.agents/skills/docket/SKILL.md`) with the new one and `workflow/template.md`, rule by rule: old step 5 → template Full review 1; old step 6 → template Full review 2 and 3, trailers → skill step 5; old step 7 → template Full review 4; old step 9 → skill step 7 and template Full review 5; old steps 8, 10, 11 → skill steps 6, 7, 8; old Light review 1 and 2 → template Light review; old Check → template Check; old Direct merge's checks and "No review", and the same words in the Triage's Direct merge bullet → template Direct merge; old Reviews → template Reviews. Expected: no rule dropped, none in both places except the path names.
 
 - [ ] **Step 3: Write `.agents/skills/docket/setup.md`**
 
@@ -379,10 +379,11 @@ with each step said the way this user does it.
      settle.
    - Keep the headings exactly as the template has them: `## Full review`,
      `## Light review`, `## Check`, `## Direct merge` and `## Reviews`.
-   - For `incomplete`, keep the sections the file already has and draft
-     only the missing ones. For `stale`, keep the user's tools and bring in
-     what the current template does differently.
-3. Show the user the whole draft, then each point where it departs from
+   - For `incomplete`, keep the sections the file already has as they
+     are and draft only the missing ones; the draft is still the whole
+     file. For `stale`, keep the user's tools and bring in what the
+     current template does differently.
+3. Show the user the whole draft, every section of it, then each point where it departs from
    the template or from their instructions, and the conflicts to settle.
    Revise it until they agree.
 4. Only after the user agrees, write the file at `result.path`, creating
@@ -475,18 +476,22 @@ A new git repository with a small Go program (`main.go` printing `hello`, a READ
 
 No workflow file. Prompt "Add a --name flag to hello." on each of two models (the session's default and Sonnet), `--max-turns 15`. Expected: the `docket` skill loads; `dkt workflow` and `dkt workflow template` run before any brainstorming or edit; the last message shows a draft with the four path sections and asks for agreement; no `workflow.md` exists afterwards.
 
-- [ ] **Step 3: Steps from the workflow, over the project's instructions**
+- [ ] **Step 3: Setup for an incomplete workflow**
+
+Write `<XDG_CONFIG_HOME>/docket/workflow.md` as the current hash and the template without its `## Check` section, with Light review step 2 replaced by "Have the whole diff reviewed once by running `./review-light.sh`." Same prompt and models as Step 2. Expected: setup runs before the work; the draft shown is the whole file, keeps the `./review-light.sh` step, and adds `## Check`; the file is unchanged afterwards.
+
+- [ ] **Step 4: Steps from the workflow, over the project's instructions**
 
 Write `<XDG_CONFIG_HOME>/docket/workflow.md`: the frontmatter with the current hash and the template, with Light review step 2 replaced by "Have the whole diff reviewed once by running `./review-light.sh`." Add to the scratch project's `CLAUDE.md`: "For a light review, have the diff reviewed by running `./review-other.sh`." Prompt "Fix the typo in .claude/commands/greet.md." on both models, with edits, `git`, `dkt` and the two scripts allowed, `--max-turns 30`. Expected: the stated path is light review; the log holds `review-light.sh` and not `review-other.sh`.
 
-- [ ] **Step 4: A stale workflow**
+- [ ] **Step 5: A stale workflow**
 
-Change the frontmatter to `template: "0123456789ab"` and rerun Step 3's prompt on a fresh copy of the project, on both models. Expected: `review-light.sh` in the log; the agent tells the user once that the workflow was made from an older template.
+Change the frontmatter to `template: "0123456789ab"` and rerun Step 4's prompt on a fresh copy of the project, on both models. Expected: `review-light.sh` in the log; the agent tells the user once that the workflow was made from an older template, what the current template does differently, and that setup can update it.
 
-- [ ] **Step 5: Loading and the change folder**
+- [ ] **Step 6: Loading and the change folder**
 
 With the workflow file restored to the current hash, rerun the v0.6.0 trial on both models: the load prompts ("Add a --name flag to hello.", "hello prints a trailing space; fix it.", "Fix the typo in the README." should load the skill; "What does main.go do?", "Why might go test be slow in this repo?" should not), and "Add a --name flag to hello. Skip the questions: I approve the design you propose. Write the design down and stop before the plan." Expected: as in v0.6.0; the design lands in `openspec/changes/<slug>/` and nothing under `docs/superpowers/`.
 
-- [ ] **Step 6: Adjust and rerun on failure**
+- [ ] **Step 7: Adjust and rerun on failure**
 
 When a run fails its expectation, change the wording, install it with `go run ./cmd/dkt init --force`, run `go test ./...`, and rerun every prompt. Commit any change.
