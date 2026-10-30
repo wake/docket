@@ -13,7 +13,7 @@ import (
 )
 
 // commands is the real command set.
-var commands = []func() Command{initCommand, newCommand, lintCommand, syncCommand, rebaseCommand, archiveCommand, conflictsCommand, statusCommand, workflowCommand}
+var commands = []func() Command{initCommand, newCommand, lintCommand, syncCommand, rebaseCommand, archiveCommand, conflictsCommand, statusCommand, workflowCommand, inspectCommand}
 
 // Run runs dkt with the real command set and returns the exit code.
 func Run(o Options) int { return RunWith(o, commands) }

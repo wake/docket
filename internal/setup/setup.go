@@ -108,6 +108,9 @@ type decided struct {
 	status  FileStatus
 	data    []byte
 	existed bool
+	// viaAgents marks a CLAUDE.md that already leads to AGENTS.md (an import
+	// or a link); Inspect leaves it out and Init ignores it.
+	viaAgents bool
 }
 
 // Init installs the schema and the skill under root. It first decides the
@@ -165,6 +168,26 @@ func decideAll(root string, a Assets, force bool) ([]decided, []Problem, error) 
 	return plan, problems, nil
 }
 
+// Inspect reports what Init without force would do under root, writing and
+// starting nothing: the files it would install or keep with Init's statuses,
+// and the problems that would make it refuse. Unlike Init it still returns
+// the files that passed. A CLAUDE.md that imports AGENTS.md, or links to it,
+// is left out. The error is for failing to read the assets.
+func Inspect(root string, a Assets) ([]File, []Problem, error) {
+	plan, problems, err := decideAll(root, a, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	files := make([]File, 0, len(plan))
+	for _, d := range plan {
+		if d.viaAgents {
+			continue
+		}
+		files = append(files, File{Path: d.rel, Status: d.status, Kind: d.kind})
+	}
+	return files, problems, nil
+}
+
 // targetsOf lists every file to install: the schema, the skill in each of
 // skillDirs, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
 func targetsOf(a Assets) ([]target, error) {
@@ -210,7 +233,7 @@ func decide(root string, t target, block string, force bool) (decided, *Problem)
 	abs := filepath.Join(root, filepath.FromSlash(t.rel))
 	if t.rel == claudeFile {
 		if tgt, err := os.Readlink(abs); err == nil && filepath.Clean(tgt) == agentsFile {
-			d.status = Unchanged
+			d.status, d.viaAgents = Unchanged, true
 			return d, nil
 		}
 	}
@@ -252,7 +275,7 @@ func decideBlock(d decided, got []byte, block string, force bool) (decided, *Pro
 		if _, _, _, err := FindBlock(got); err != nil {
 			return d, &Problem{Path: d.rel, Kind: ProblemMalformed, Err: err}
 		}
-		d.status = Unchanged
+		d.status, d.viaAgents = Unchanged, true
 		return d, nil
 	}
 	next, status, err := placeBlock(got, block, force)

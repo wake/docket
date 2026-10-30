@@ -26,6 +26,141 @@ func statuses(r Result) map[string]FileStatus {
 	return m
 }
 
+func inspectPaths(fs []File) map[string]File {
+	m := map[string]File{}
+	for _, f := range fs {
+		m[f.Path] = f
+	}
+	return m
+}
+
+func TestInspect(t *testing.T) {
+	t.Run("empty root", func(t *testing.T) {
+		root := t.TempDir()
+		files, problems, err := Inspect(root, assets)
+		if err != nil || len(problems) != 0 {
+			t.Fatalf("err %v problems %v", err, problems)
+		}
+		got := inspectPaths(files)
+		for _, p := range []string{"AGENTS.md", "CLAUDE.md", "openspec/schemas/docket/schema.yaml", ".claude/skills/docket/SKILL.md"} {
+			if _, ok := got[p]; !ok {
+				t.Errorf("%s not listed", p)
+			}
+		}
+		for _, f := range files {
+			if f.Status != Written {
+				t.Errorf("%s: status %q, want written", f.Path, f.Status)
+			}
+		}
+		entries, _ := os.ReadDir(root)
+		if len(entries) != 0 {
+			t.Errorf("root not empty: %v", entries)
+		}
+	})
+}
+
+func TestInspectAfterInit(t *testing.T) {
+	root := t.TempDir()
+	if _, err := Init(root, assets, false, func() error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	files, problems, err := Inspect(root, assets)
+	if err != nil || len(problems) != 0 {
+		t.Fatalf("err %v problems %v", err, problems)
+	}
+	if len(files) == 0 {
+		t.Fatal("no files")
+	}
+	for _, f := range files {
+		if f.Status != Unchanged {
+			t.Errorf("%s: status %q, want unchanged", f.Path, f.Status)
+		}
+		if f.Path == "CLAUDE.md" {
+			t.Error("CLAUDE.md listed although it imports AGENTS.md")
+		}
+	}
+}
+
+func initedRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	if _, err := Init(root, assets, false, func() error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func TestInspectEditedSkill(t *testing.T) {
+	root := initedRoot(t)
+	p := filepath.Join(root, ".agents/skills/docket/SKILL.md")
+	if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files, problems, err := Inspect(root, assets)
+	if err != nil || len(problems) != 0 {
+		t.Fatalf("err %v problems %v", err, problems)
+	}
+	f := inspectPaths(files)[".agents/skills/docket/SKILL.md"]
+	if f.Status != Differs || f.Kind != KindSkill {
+		t.Errorf("got %+v", f)
+	}
+	if b, _ := os.ReadFile(p); string(b) != "mine\n" {
+		t.Errorf("file changed: %q", b)
+	}
+}
+
+func TestInspectClaudeMDLinkedToAgents(t *testing.T) {
+	root := initedRoot(t)
+	p := filepath.Join(root, "CLAUDE.md")
+	if err := os.Remove(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("AGENTS.md", p); err != nil {
+		t.Fatal(err)
+	}
+	files, problems, err := Inspect(root, assets)
+	if err != nil || len(problems) != 0 {
+		t.Fatalf("err %v problems %v", err, problems)
+	}
+	if _, ok := inspectPaths(files)["CLAUDE.md"]; ok {
+		t.Error("CLAUDE.md listed although it links to AGENTS.md")
+	}
+}
+
+func TestInspectSymlinkedSkillDirectory(t *testing.T) {
+	root := initedRoot(t)
+	other := t.TempDir()
+	link := filepath.Join(root, ".claude/skills/docket")
+	if err := os.RemoveAll(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, link); err != nil {
+		t.Fatal(err)
+	}
+	files, problems, err := Inspect(root, assets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(problems) == 0 {
+		t.Fatal("no problems")
+	}
+	for _, p := range problems {
+		if p.Kind != ProblemSymlink || !strings.HasPrefix(p.Path, ".claude/skills/docket/") {
+			t.Errorf("unexpected problem %+v", p)
+		}
+	}
+	got := inspectPaths(files)
+	if _, ok := got["openspec/schemas/docket/schema.yaml"]; !ok {
+		t.Error("schema not returned")
+	}
+	if _, ok := got[".agents/skills/docket/SKILL.md"]; !ok {
+		t.Error("agents skill not returned")
+	}
+	if entries, _ := os.ReadDir(other); len(entries) != 0 {
+		t.Errorf("wrote through the link: %v", entries)
+	}
+}
+
 func TestInitCallsOpenSpecOnlyWhenMissing(t *testing.T) {
 	root := t.TempDir()
 	calls := 0
