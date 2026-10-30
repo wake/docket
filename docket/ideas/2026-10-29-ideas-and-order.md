@@ -40,3 +40,13 @@ be read by hand.
 
 - Which command reports the state of ideas.
 - The exact form of `needs:`.
+- How ideas are classified, so that the order reads as a priority list.
+  Recorded 2026-10-30. The maintainer finds the queue mixes the user's
+  requests, fixes found during development and optimizations. Two
+  proposed axes, to settle when this idea is taken up:
+  - origin: the user's request, found during development (a review
+    finding, a trial, a bug hit while building), maintenance;
+  - nature: new capability, fix, optimization, docs.
+  A `domain:` field is designed with them
+  (`2026-10-30-spec-domains.md`). `dkt` lists and groups by these fields;
+  the order itself stays the maintainer's decision.
