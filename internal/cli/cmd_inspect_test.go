@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -407,6 +408,75 @@ func TestInspectWorkflowUnreadable(t *testing.T) {
 	if o, _ := res["openspec"].(map[string]any); o["version"] != "1.14.3" {
 		t.Errorf("openspec: %v", res["openspec"])
 	}
+}
+
+func hasLine(out, want string) bool {
+	for _, l := range strings.Split(out, "\n") {
+		if l == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestInspectText(t *testing.T) {
+	t.Run("clean", func(t *testing.T) {
+		r := committedRepo(t)
+		env, path := inspectEnv(t)
+		_, so, _ := runInspect(t, r.Dir, env)
+		for _, want := range []string{"openspec 1.14.3", "workflow ok " + path} {
+			if !hasLine(so, want) {
+				t.Errorf("no line %q in %q", want, so)
+			}
+		}
+	})
+	t.Run("unsupported", func(t *testing.T) {
+		r := committedRepo(t)
+		env, _ := inspectEnv(t)
+		fake, _ := testutil.FakeOpenSpec(t, "1.3.0")
+		_, so, _ := runInspect(t, r.Dir, append(env, "DOCKET_OPENSPEC="+fake))
+		if want := "openspec 1.3.0 (unsupported)"; !hasLine(so, want) {
+			t.Errorf("no line %q in %q", want, so)
+		}
+	})
+	t.Run("missing", func(t *testing.T) {
+		r := committedRepo(t)
+		env, _ := inspectEnv(t)
+		_, so, _ := runInspect(t, r.Dir, append(env, "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "missing")))
+		if want := "openspec not found"; !hasLine(so, want) {
+			t.Errorf("no line %q in %q", want, so)
+		}
+	})
+	t.Run("no home", func(t *testing.T) {
+		r := committedRepo(t)
+		env, _ := inspectEnv(t)
+		var bare []string
+		for _, e := range env {
+			if !strings.HasPrefix(e, "HOME=") && !strings.HasPrefix(e, "XDG_CONFIG_HOME=") {
+				bare = append(bare, e)
+			}
+		}
+		var so, se bytes.Buffer
+		Run(Options{Args: []string{"inspect"}, Dir: r.Dir, Env: bare, Stdout: &so, Stderr: &se})
+		if want := "workflow missing"; !hasLine(so.String(), want) {
+			t.Errorf("no line %q in %q", want, so.String())
+		}
+	})
+	t.Run("edited skill", func(t *testing.T) {
+		r := committedRepo(t)
+		if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+			t.Fatalf("init: %d %s", code, so)
+		}
+		const rel = ".claude/skills/docket/SKILL.md"
+		if err := os.WriteFile(filepath.Join(r.Dir, rel), []byte("mine\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		env, _ := inspectEnv(t)
+		_, so, _ := runInspect(t, r.Dir, env)
+		if want := fmt.Sprintf("%-8s %s", "differs", rel); !hasLine(so, want) {
+			t.Errorf("no line %q in %q", want, so)
+		}
+	})
 }
 
 func TestInspectUsage(t *testing.T) {
