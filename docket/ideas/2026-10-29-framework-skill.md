@@ -29,16 +29,13 @@ to bring them in.
 - The **materialized workflow** joins the two: for each path, the template
   brought as close as the user's workflow and tools allow. It is neither the
   template verbatim nor the user's workflow verbatim. It lives at the user
-  level, never in the project repository, in one of two modes chosen at
-  setup:
-  - reference: written into the user's own global workflow, which Docket
-    refers to, so a change there applies everywhere;
-  - fixed: a workflow used by Docket only.
-- Setup: when `dkt init` finds no materialized workflow, the agent checks
-  the environment, reads the templates, guides the user, and shows the
-  result before writing it. `dkt` itself only reports facts and checks
-  structure: whether the materialized workflow exists, and which template
-  version it was made from, so a changed template shows it is out of date.
+  level, never in the project repository (the settlement below says where).
+- Setup: when the agent begins the first piece of development work and
+  finds no materialized workflow, it checks the environment, reads the
+  templates, guides the user, and shows the result before writing it. `dkt`
+  itself only reports facts and checks structure: whether the workflow
+  exists, whether it lacks a path, and which template it was made from (a
+  hash), so a changed template shows it is out of date.
 - Review fallback in the templates: a cross-model review; else a subagent
   review (same model, fresh context); else the work is recorded as having no
   independent review and a person reviews the pull request. A self-review is

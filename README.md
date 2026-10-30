@@ -131,7 +131,7 @@ Changes made by an older dkt still work: their kind, source and base are read fr
 
 In a project set up by an older dkt, run `dkt init` again. It adds the `docket` skill and the Docket block. Delete any "Change workflow" section pasted into `AGENTS.md` from an earlier release, and commit `.claude/skills/docket/`, `.agents/skills/docket/`, `AGENTS.md` and `CLAUDE.md`.
 
-To take the workflow file release, run `dkt init --force` to take the new block and skill (until then `dkt init` reports `agents-block-differs`), and commit them. Expect the agent to set up your workflow file at the first piece of work.
+In a project set up by dkt v0.6.0, run `dkt init --force` to take the new Docket block and skill (until then `dkt init` reports `agents-block-differs`), and commit them. The agent then sets up your workflow file at the first piece of development work.
 
 ## Requirements (planned)
 

@@ -131,7 +131,7 @@ go install github.com/wake/docket/cmd/dkt@latest
 
 舊版 dkt 設定過的專案，請再跑一次 `dkt init`：它會加上 `docket` skill 和 Docket 區塊。把先前版本貼進 `AGENTS.md` 的「Change workflow」章節刪掉，並提交 `.claude/skills/docket/`、`.agents/skills/docket/`、`AGENTS.md` 與 `CLAUDE.md`。
 
-要採用 workflow 檔這一版，請執行 `dkt init --force` 取得新的區塊與 skill（在那之前，`dkt init` 會回報 `agents-block-differs`），然後提交。第一件工作開始時，agent 會幫你設定 workflow 檔。
+dkt v0.6.0 設定過的專案，請執行 `dkt init --force` 換上新的 Docket 區塊與 skill（在那之前 `dkt init` 會回報 `agents-block-differs`），然後提交。之後第一件開發工作開始時，agent 會和你一起設定 workflow 檔。
 
 ## 需求（規劃中）
 
