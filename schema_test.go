@@ -10,8 +10,32 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/setup"
 )
+
+func TestRecordTemplate(t *testing.T) {
+	tpl := RecordTemplate()
+	if strings.HasPrefix(tpl, "---") {
+		t.Error("the record template has front matter")
+	}
+	parts := strings.Split(tpl, "\n## ")
+	if c := strings.TrimSpace(parts[0]); !strings.HasPrefix(c, "<!--") || !strings.HasSuffix(c, "-->") || strings.Count(c, "<!--") != 1 || strings.Contains(c, "\n#") {
+		t.Errorf("the text before the first heading is not one comment: %q", c)
+	}
+	var headings []string
+	for _, p := range parts[1:] {
+		head, body, _ := strings.Cut(p, "\n")
+		headings = append(headings, head)
+		body = strings.TrimSpace(body)
+		if !strings.HasPrefix(body, "<!--") || !strings.HasSuffix(body, "-->") || strings.Count(body, "<!--") != 1 || strings.Count(body, "-->") != 1 {
+			t.Errorf("section %q is not one comment and nothing else: %q", head, body)
+		}
+	}
+	if !slices.Equal(headings, record.Sections) {
+		t.Errorf("headings = %v, want %v", headings, record.Sections)
+	}
+}
 
 func TestTemplateHeadings(t *testing.T) {
 	lines := strings.Split(Template(), "\n")
