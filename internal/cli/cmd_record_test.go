@@ -142,6 +142,9 @@ func TestRecordSameNameSameDay(t *testing.T) {
 		!reflect.DeepEqual(usedOf(t, res), []string{"in " + realDir(t, b.Dir)}) {
 		t.Fatalf("result = %v", res)
 	}
+	if res["path"] != "docket/records/2026-10-30-fix-x-2.md" {
+		t.Errorf("path = %v", res["path"])
+	}
 	if _, err := os.Stat(filepath.Join(r.Dir, "docket/records/2026-10-30-fix-x-2.md")); err != nil {
 		t.Error(err)
 	}
@@ -153,6 +156,36 @@ func TestRecordSameNameSameDay(t *testing.T) {
 	want := "2026-10-30-fix-x is used: in " + realDir(t, b2.Dir) + "; created 2026-10-30-fix-x-2"
 	if code != 0 || !slices.Contains(strings.Split(so, "\n"), want) {
 		t.Fatalf("exit %d, want line %q\n%s\n%s", code, want, so, se)
+	}
+}
+
+func TestRecordSuffixTooLong(t *testing.T) {
+	name := strings.Repeat("a", 189)
+	r := cleanRepo(t)
+	b := r.AddWorktree(filepath.Join(t.TempDir(), "wt-b"), "b")
+	b.Write("docket/records/2026-10-30-"+name+".md", "x\n")
+	code, so, se := runRecord(t, r.Dir, nil, append([]string{name}, fixArgs...)...)
+	if code != 1 || !hasRule(t, so, "slug-invalid") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if ents, _ := os.ReadDir(filepath.Join(r.Dir, "docket/records")); len(ents) != 0 {
+		t.Errorf("records written: %v", ents)
+	}
+}
+
+func TestRecordNameTakenInThisWorktree(t *testing.T) {
+	r := cleanRepo(t)
+	if err := os.MkdirAll(filepath.Join(r.Dir, "docket/records/2026-10-30-fix-x.md"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code, so, se := runRecord(t, r.Dir, nil, append([]string{"fix-x"}, fixArgs...)...)
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := resultOf(t, so)
+	if res["slug"] != "2026-10-30-fix-x-2" ||
+		!reflect.DeepEqual(usedOf(t, res), []string{"docket/records/2026-10-30-fix-x.md exists in this worktree"}) {
+		t.Fatalf("result = %v", res)
 	}
 }
 

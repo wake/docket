@@ -117,6 +117,18 @@ func TestCreate(t *testing.T) {
 	})
 }
 
+func TestCreateAtTheLimit(t *testing.T) {
+	dir := t.TempDir()
+	slug := strings.Repeat("a", 198)
+	got, err := Create(dir, slug, func(s string) bool { return s == slug }, []byte("x"))
+	if err != nil || got != slug+"-2" || len(got) != 200 {
+		t.Fatalf("got %q, %v", got, err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, got+".md")); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestCreateTooLong(t *testing.T) {
 	dir := t.TempDir()
 	slug := strings.Repeat("a", 199)
