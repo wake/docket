@@ -224,7 +224,7 @@ func TestWorkflowStale(t *testing.T) {
 		t.Errorf("result = %v", r)
 	}
 	fs := wfFindings(t, so)
-	if len(fs) != 1 || fs[0]["rule"] != "workflow-stale" {
+	if len(fs) != 1 || fs[0]["rule"] != "workflow-stale" || fs[0]["file"] != r["path"] {
 		t.Errorf("findings = %v", fs)
 	}
 }
@@ -236,6 +236,10 @@ func TestWorkflowNoFrontmatter(t *testing.T) {
 	r := wfResult(t, so)
 	if r["status"] != "stale" || r["recorded"] != nil {
 		t.Errorf("result = %v", r)
+	}
+	fs := wfFindings(t, so)
+	if len(fs) != 1 || fs[0]["rule"] != "workflow-stale" || fs[0]["file"] != r["path"] {
+		t.Errorf("findings = %v", fs)
 	}
 }
 
