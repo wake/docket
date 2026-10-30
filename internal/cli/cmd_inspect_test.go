@@ -449,6 +449,21 @@ func TestInspectText(t *testing.T) {
 			t.Errorf("no line %q in %q", want, so)
 		}
 	})
+	t.Run("skipped change", func(t *testing.T) {
+		r := committedRepo(t)
+		r.Git("checkout", "-q", "-b", "other")
+		o := r.Commit("other", map[string]string{"o.txt": "o\n"})
+		r.Git("checkout", "-q", "main")
+		r.Commit("squashed (#1)", map[string]string{
+			"openspec/changes/add-x/docket.yaml": "title: X\nkind: feature\nsource: s\nbase: " + o + "\n",
+			"openspec/changes/add-x/plan.md":     squashedPlan,
+		})
+		env, _ := inspectEnv(t)
+		_, so, _ := runInspect(t, r.Dir, env)
+		if want := "skipped  add-x: the base " + o + " is not an ancestor of main"; !hasLine(so, want) {
+			t.Errorf("no line %q in %q", want, so)
+		}
+	})
 	t.Run("missing", func(t *testing.T) {
 		r := committedRepo(t)
 		env, _ := inspectEnv(t)

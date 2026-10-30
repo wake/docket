@@ -142,3 +142,25 @@ func TestTrailersNotListed(t *testing.T) {
 		t.Errorf("checks %+v findings %+v", checks, finds)
 	}
 }
+
+func TestTrailersMetadataUnreadable(t *testing.T) {
+	r, _ := trailersRepo(t)
+	r.Commit("squashed (#1)", map[string]string{
+		"openspec/changes/no-meta/plan.md":     trailersPlan,
+		"openspec/changes/not-map/docket.yaml": "- a\n- b\n",
+		"openspec/changes/not-map/plan.md":     trailersPlan,
+	})
+	checks, finds, err := Trailers(trailersEnv(t, r))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(finds) != 0 || len(checks) != 2 {
+		t.Fatalf("checks %+v findings %+v", checks, finds)
+	}
+	for i, slug := range []string{"no-meta", "not-map"} {
+		c := checks[i]
+		if c.Slug != slug || c.Skipped == nil || !strings.HasPrefix(*c.Skipped, "cannot read the base: ") {
+			t.Errorf("%+v", c)
+		}
+	}
+}
