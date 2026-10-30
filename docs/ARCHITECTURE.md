@@ -6,7 +6,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 
 | Path | Role |
 |---|---|
-| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket` skill and the Docket block of `AGENTS.md` |
+| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket` skill, the Docket block of `AGENTS.md` and the workflow template (`workflow/template.md`) |
 | `cmd/dkt` | Entry point; the only place that reads the process environment and working directory |
 | `internal/cli` | Command table, argument handling, text and JSON output, exit codes |
 | `internal/gitx` | Every git call: refs, worktrees, merge-base, file contents at a revision |
@@ -21,6 +21,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/conflicts` | Finds requirements that more than one active change touches |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
 | `internal/safepath` | Refuses a write path that passes through a symbolic link |
+| `internal/workflow` | Locates the user's workflow file and reports its state against the shipped template; never writes it |
 | `internal/testutil` | Test-only helpers: temporary repositories, a fake OpenSpec |
 
 ## Capability index
@@ -64,6 +65,10 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Match commits to plan tasks by trailer | `change.NamedTasks` |
 | List uncommitted paths under given paths | `Git.UncommittedUnder` |
 | List commits with their times, limited to paths | `Git.Commits` (`Commit.Time`, `paths`) |
+| Locate the user's workflow file | `workflow.Locate` |
+| Read the workflow file | `workflow.Read` |
+| Report a workflow file's state | `workflow.Inspect` |
+| Hash the template | `workflow.Hash` |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |
 | Stand in for OpenSpec | `testutil.FakeOpenSpec` |
@@ -72,6 +77,6 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 
 - Only `internal/openspec` starts OpenSpec.
 - Only `internal/gitx` starts git (test helpers excepted).
-- Nothing below `cmd/dkt` reads the process environment; it is passed in through `cli.Options`, the clock (`Options.Now`) included (test helpers excepted).
+- Nothing below `cmd/dkt` reads the process environment; it is passed in through `cli.Options`, the clock (`Options.Now`) and the user lookup (`Options.UserHome`) included (test helpers excepted).
 - Readers take bytes, not paths, so that content can come from any revision.
 - Nothing writes through a symbolic link in the repository: check the path with `safepath.Check` first.

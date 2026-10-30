@@ -4,7 +4,7 @@
 
 Docket 是一個小型命令列工具，負責檢查 [OpenSpec](https://github.com/Fission-AI/OpenSpec) 的 change 資料夾，並幫它們記帳。適用於用 [superpowers](https://github.com/obra/superpowers) 規劃與執行工作的專案。Docket 自己不存任何狀態，指令名稱是 `dkt`。
 
-> **狀態：早期。**`init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`、`status` 已經能用，前面七個指令完成了第一個里程碑。下面其餘的指令還是草案，之後會調整。Docket 本身就是照這份 README 描述的流程開發的。
+> **狀態：早期。**`init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`、`status`、`workflow` 已經能用，前面七個指令完成了第一個里程碑。下面其餘的指令還是草案，之後會調整。Docket 本身就是照這份 README 描述的流程開發的。
 
 ## 為什麼要有它
 
@@ -41,13 +41,13 @@ Docket 讀 repo 裡的檔案和 git 紀錄，做四種工作：
 Docket **不會**：
 
 - **判斷內容。**它不呼叫語言模型，也不判斷內容對不對，那是審查者的工作。
-- **保存狀態。**它回報的一切都能從 repo 和 git 重新算出來。
+- **保存狀態。**它回報的一切都能從 repo 和 git 重新算出來。它唯一會讀的 repo 外檔案是使用者的 workflow 檔，而且絕不寫入。
 - **修改 agent 設定。**它不碰 `.claude/settings.json`；在 `AGENTS.md` 和 `CLAUDE.md` 裡只寫有標記的 Docket 區塊，兩個檔案缺哪個就建哪個。
 - **自己合併規格。**它不重寫 OpenSpec 的合併引擎，而是呼叫一個鎖定版本的 `openspec` CLI。
 
 ## 它假設的流程
 
-由 superpowers 開場。OpenSpec 從不主動啟動任何步驟，只在三個時間點被呼叫：建立 change 資料夾、驗證、封存。這些規則由 `docket` skill 承載，`dkt init` 會把它裝進專案。
+由 superpowers 開場。OpenSpec 從不主動啟動任何步驟，只在三個時間點被呼叫：建立 change 資料夾、驗證、封存。這些規則由 `docket` skill 承載，`dkt init` 會把它裝進專案。每條路徑的審查與驗證步驟，則取自使用者的 workflow 檔（`~/.config/docket/workflow.md`，或在 `XDG_CONFIG_HOME` 底下）。agent 在第一件工作開始時，依 Docket 的範本與使用者一起寫出它；`dkt workflow` 會回報它是缺少、少了某條路徑，還是依舊版範本做的。
 
 1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。同時符合好幾條時，取最重的：
    - 會改到 `openspec/specs/` 裡的句子：開 change，照下面的步驟走。任何設下新預期的改動也一樣，例如說不出「原本該怎樣」的 bug，或斷言新行為的測試：規格沒寫、也沒有既有行為可對照，改它就是在定義行為。
@@ -99,6 +99,7 @@ dkt sync <slug> [--check]         # 依 commit trailer 勾 plan.md
 dkt archive <slug>...             # 發版步驟，在從預設分支開出的分支上
 dkt rebase <slug>                 # 把較新的規格接受為 change 的 base
 dkt status [<slug>...] [--json]   # 階段、任務與其 commit、進度、最後活動、未提交的改動
+dkt workflow [template] [--json]  # 使用者的 workflow 檔，或範本
 dkt brief <slug> --task N         # 給實作 agent 的 brief
 dkt check <slug>                  # scenario 覆蓋與勾選一致性（PR 閘門）
 dkt accept <slug> --round N [--export html]
@@ -129,6 +130,8 @@ go install github.com/wake/docket/cmd/dkt@latest
 舊版 dkt 建立的 change 仍可使用：它們的 kind、source、base 會從 `.openspec.yaml` 的 `x-kind`、`x-source`、`x-base` 讀取。`dkt lint` 會要求為每一個補上帶 title 的 `docket.yaml`，每份主 spec 也各需要一個帶 title 的 `docket.yaml`。
 
 舊版 dkt 設定過的專案，請再跑一次 `dkt init`：它會加上 `docket` skill 和 Docket 區塊。把先前版本貼進 `AGENTS.md` 的「Change workflow」章節刪掉，並提交 `.claude/skills/docket/`、`.agents/skills/docket/`、`AGENTS.md` 與 `CLAUDE.md`。
+
+要採用 workflow 檔這一版，請執行 `dkt init --force` 取得新的區塊與 skill（在那之前，`dkt init` 會回報 `agents-block-differs`），然後提交。第一件工作開始時，agent 會幫你設定 workflow 檔。
 
 ## 需求（規劃中）
 
