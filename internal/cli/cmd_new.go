@@ -65,13 +65,7 @@ func newCommand() Command {
 			var out Outcome
 			active, archived := inv.Uses(slug)
 			if active != nil || len(archived) > 0 {
-				var parts []string
-				if active != nil {
-					parts = append(parts, "active in "+sourceNames(active.Sources))
-				}
-				for _, a := range archived {
-					parts = append(parts, "archived as "+a.Folder+" in "+sourceNames(a.Sources))
-				}
+				parts := usedPlaces(inv, slug)
 				out.Findings = append(out.Findings, Finding{Rule: "slug-used", Change: slug,
 					Message: fmt.Sprintf("slug %q is already used: %s", slug, strings.Join(parts, "; "))})
 			}
@@ -141,6 +135,20 @@ func newCommand() Command {
 			return Outcome{Result: res, Human: []string{"created " + dir}}, nil
 		},
 	}
+}
+
+// usedPlaces lists where a slug is in use: the active change, then each
+// archived use.
+func usedPlaces(inv scan.Inventory, slug string) []string {
+	active, archived := inv.Uses(slug)
+	var parts []string
+	if active != nil {
+		parts = append(parts, "active in "+sourceNames(active.Sources))
+	}
+	for _, a := range archived {
+		parts = append(parts, "archived as "+a.Folder+" in "+sourceNames(a.Sources))
+	}
+	return parts
 }
 
 // lockOpenSpec takes an exclusive lock on <root>/openspec, blocking until it
