@@ -57,11 +57,12 @@ Right after triage, before any other step of the work, run
 - `ok`: on each path below, do the steps under that path's heading in the
   file, and under `## Reviews` where they point to it. On these steps the
   file wins over the user's other instructions.
-- `missing` or `incomplete`: read `setup.md` in this skill's directory and
-  run setup first; then start the work.
+- `missing` or `incomplete`: run the `docket-setup` skill first; then start
+  the work.
 - `stale`: follow the file as for `ok`. Tell the user once in this session
   that it was made from an older template, what the current template
-  (`dkt workflow template`) does differently, and that setup can update it.
+  (`dkt workflow template`) does differently, and that the `docket-setup`
+  skill can update it.
 - anything else, such as the file being unreadable: tell the user what
   `dkt workflow` reported and ask how to go on. Do not write the file.
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -338,6 +339,18 @@ func TestWorkflowThroughLink(t *testing.T) {
 	code, so, _ := runWorkflow(t, nil, env, "workflow", "--json")
 	if code != 0 || wfResult(t, so)["status"] != "ok" {
 		t.Errorf("exit %d: %s", code, so)
+	}
+}
+
+func TestWorkflowText(t *testing.T) {
+	xdg, path := wfConfig(t)
+	wfWrite(t, path, wfFM(wfHash())+wfFour)
+	code, so, _ := runWorkflow(t, nil, xdg, "workflow")
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if want := fmt.Sprintf("%-10s %s", "ok", path); !hasLine(so, want) {
+		t.Errorf("no line %q in %q", want, so)
 	}
 }
 

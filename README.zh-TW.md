@@ -47,7 +47,7 @@ Docket **不會**：
 
 ## 它假設的流程
 
-由 superpowers 開場。OpenSpec 從不主動啟動任何步驟，只在三個時間點被呼叫：建立 change 資料夾、驗證、封存。這些規則由 `docket` skill 承載，`dkt init` 會把它裝進專案。每條路徑的審查與驗證步驟，則取自使用者的 workflow 檔（`~/.config/docket/workflow.md`，或在 `XDG_CONFIG_HOME` 底下）。agent 在第一件工作開始時，依 Docket 的範本與使用者一起寫出它；`dkt workflow` 會回報它是缺少、少了某條路徑，還是依舊版範本做的。
+由 superpowers 開場。OpenSpec 從不主動啟動任何步驟，只在三個時間點被呼叫：建立 change 資料夾、驗證、封存。這些規則由 `docket` skill 承載，`dkt init` 會把它裝進專案。每條路徑的審查與驗證步驟，則取自使用者的 workflow 檔（`~/.config/docket/workflow.md`，或在 `XDG_CONFIG_HOME` 底下）。agent 在第一件工作開始時，依 Docket 的範本與使用者一起寫出它；`dkt workflow` 會回報它是缺少、少了某條路徑，還是依舊版範本做的。設定本身是獨立的 skill `docket-setup`，使用者也可以主動呼叫它來修訂這個檔案（Claude Code 用 `/docket-setup`，Codex 用 `$docket-setup`）。要檢查專案的設定，使用者呼叫 `docket-doctor`：它會執行 `dkt inspect`、檢查需要判斷的項目、列出所有問題，再與使用者逐一修正。
 
 1. **用 brainstorming 分流。**superpowers 的 brainstorming 先讀專案，再把想法談清楚。同時符合好幾條時，取最重的：
    - 會改到 `openspec/specs/` 裡的句子：開 change，照下面的步驟走。任何設下新預期的改動也一樣，例如說不出「原本該怎樣」的 bug，或斷言新行為的測試：規格沒寫、也沒有既有行為可對照，改它就是在定義行為。
@@ -91,7 +91,7 @@ Docket **不會**：
 ## 規劃中的指令（草案）
 
 ```
-dkt init [--force]                # 安裝 docket schema、skill 與 Docket 區塊
+dkt init [--force]                # 安裝 docket schema、各 skill 與 Docket 區塊
 dkt new <slug> --kind feature|change-request|fix|baseline --source "<出處>" --title "<標題>"
 dkt lint [<slug>...]              # 文件規則
 dkt conflicts [<slug>]            # 被多個進行中 change 碰到的需求
@@ -100,6 +100,7 @@ dkt archive <slug>...             # 發版步驟，在從預設分支開出的�
 dkt rebase <slug>                 # 把較新的規格接受為 change 的 base
 dkt status [<slug>...] [--json]   # 階段、任務與其 commit、進度、最後活動、未提交的改動
 dkt workflow [template] [--json]  # 使用者的 workflow 檔，或範本
+dkt inspect [--json]              # 專案的 Docket 設定；不寫入任何檔案
 dkt brief <slug> --task N         # 給實作 agent 的 brief
 dkt check <slug>                  # scenario 覆蓋與勾選一致性（PR 閘門）
 dkt accept <slug> --round N [--export html]

@@ -6,15 +6,15 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 
 | Path | Role |
 |---|---|
-| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket` skill, the Docket block of `AGENTS.md` and the workflow template (`workflow/template.md`) |
+| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket`, `docket-setup` and `docket-doctor` skills, the Docket block of `AGENTS.md` and the workflow template (`workflow/template.md`) |
 | `cmd/dkt` | Entry point; the only place that reads the process environment and working directory |
 | `internal/cli` | Command table, argument handling, text and JSON output, exit codes |
 | `internal/gitx` | Every git call: refs, worktrees, merge-base, file contents at a revision |
 | `internal/openspec` | Locates, version-checks and runs the OpenSpec CLI |
 | `internal/scan` | Finds changes across worktrees and branches; resolves the default branch |
-| `internal/setup` | Installs the schema, the skill and the Docket block (`dkt init`) |
+| `internal/setup` | Installs the schema, the skills and the Docket block (`dkt init`), and decides what it would do without writing (`dkt inspect`) |
 | `internal/change` | Change-folder rules: slug validation, `docket.yaml` metadata, plan steps and ticking |
-| `internal/archive` | Closes changes: `dkt sync`, `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, and `evidence.md` |
+| `internal/archive` | Closes changes: `dkt sync`, `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, the trailer check of `dkt inspect`, and `evidence.md` |
 | `internal/markdown` | Line, heading and table readers that skip code fences and comments |
 | `internal/delta` | Reads delta specs and main specs; makes scenario slugs |
 | `internal/status` | Summarizes each active change: phase, task states from commit trailers, progress, last activity |
@@ -68,6 +68,8 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Locate the user's workflow file | `workflow.Locate` |
 | Read the workflow file | `workflow.Read` |
 | Report a workflow file's state | `workflow.Inspect` |
+| Decide what init would install, without writing | `setup.Inspect` |
+| Check the trailers of the changes on the default branch | `archive.Trailers` |
 | Hash the template | `workflow.Hash` |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |

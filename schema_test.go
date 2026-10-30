@@ -4,10 +4,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/wake/docket/internal/setup"
 )
 
 func TestTemplateHeadings(t *testing.T) {
@@ -56,7 +59,13 @@ func TestSchemaHasTemplates(t *testing.T) {
 }
 
 func TestSkillFrontmatter(t *testing.T) {
-	b, err := fs.ReadFile(Skill(), "SKILL.md")
+	for _, sk := range Skills() {
+		t.Run(sk.Name, func(t *testing.T) { checkSkillFrontmatter(t, sk) })
+	}
+}
+
+func checkSkillFrontmatter(t *testing.T, sk setup.Skill) {
+	b, err := fs.ReadFile(sk.Files, "SKILL.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,17 +79,61 @@ func TestSkillFrontmatter(t *testing.T) {
 		t.Fatal("frontmatter is not closed")
 	}
 	var fm struct {
-		Name        string `yaml:"name"`
-		Description string `yaml:"description"`
+		Name                   string `yaml:"name"`
+		Description            string `yaml:"description"`
+		DisableModelInvocation *bool  `yaml:"disable-model-invocation"`
 	}
 	if err := yaml.Unmarshal([]byte(rest[:end]), &fm); err != nil {
 		t.Fatal(err)
 	}
-	if fm.Name != "docket" {
+	if fm.Name != sk.Name {
 		t.Errorf("name = %q", fm.Name)
 	}
 	if fm.Description == "" || len(fm.Description) > 1024 {
 		t.Errorf("description length %d", len(fm.Description))
+	}
+	if sk.Name == "docket-doctor" {
+		if fm.DisableModelInvocation == nil || !*fm.DisableModelInvocation {
+			t.Error("disable-model-invocation must be true")
+		}
+	} else if fm.DisableModelInvocation != nil {
+		t.Error("disable-model-invocation must be absent")
+	}
+}
+
+func TestSkillNames(t *testing.T) {
+	var got []string
+	for _, sk := range Skills() {
+		got = append(got, sk.Name)
+	}
+	if want := []string{"docket", "docket-setup", "docket-doctor"}; !slices.Equal(got, want) {
+		t.Errorf("names = %v, want %v", got, want)
+	}
+}
+
+func TestDoctorHiddenFromCodex(t *testing.T) {
+	for _, sk := range Skills() {
+		b, err := fs.ReadFile(sk.Files, "agents/openai.yaml")
+		if sk.Name != "docket-doctor" {
+			if err == nil {
+				t.Errorf("%s has agents/openai.yaml", sk.Name)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		var y struct {
+			Policy struct {
+				AllowImplicitInvocation *bool `yaml:"allow_implicit_invocation"`
+			} `yaml:"policy"`
+		}
+		if err := yaml.Unmarshal(b, &y); err != nil {
+			t.Fatal(err)
+		}
+		if a := y.Policy.AllowImplicitInvocation; a == nil || *a {
+			t.Error("policy.allow_implicit_invocation must be false")
+		}
 	}
 }
 
@@ -110,25 +163,44 @@ func TestPlanTemplateReviewLine(t *testing.T) {
 }
 
 func TestInstalledSkillMatchesShipped(t *testing.T) {
-	err := fs.WalkDir(Skill(), ".", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		want, err := fs.ReadFile(Skill(), p)
-		if err != nil {
-			return err
-		}
-		got, err := os.ReadFile(filepath.Join(".claude", "skills", "docket", filepath.FromSlash(p)))
-		if err != nil {
-			t.Errorf("%s: %v", p, err)
+	for _, sk := range Skills() {
+		dir := filepath.Join(".claude", "skills", sk.Name)
+		err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || !d.Type().IsRegular() {
+				return err
+			}
+			rel, err := filepath.Rel(dir, p)
+			if err != nil {
+				return err
+			}
+			if _, err := fs.Stat(sk.Files, filepath.ToSlash(rel)); err != nil {
+				t.Errorf("%s is installed but not shipped", p)
+			}
 			return nil
+		})
+		if err != nil {
+			t.Errorf("%s: %v", dir, err)
 		}
-		if string(got) != string(want) {
-			t.Errorf("%s differs from the shipped copy", p)
+		err = fs.WalkDir(sk.Files, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			want, err := fs.ReadFile(sk.Files, p)
+			if err != nil {
+				return err
+			}
+			got, err := os.ReadFile(filepath.Join(".claude", "skills", sk.Name, filepath.FromSlash(p)))
+			if err != nil {
+				t.Errorf("%s/%s: %v", sk.Name, p, err)
+				return nil
+			}
+			if string(got) != string(want) {
+				t.Errorf("%s/%s differs from the shipped copy", sk.Name, p)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
 		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
 	}
 }

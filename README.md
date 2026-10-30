@@ -34,7 +34,7 @@ Docket reads the files in the repository and the git history. It does four kinds
 | Assemble | `brief`, `accept --export` | Gathers pieces from several files into a brief for an implementing agent, or into a page a client can review |
 | Wrap | `init`, `new`, `archive`, `rebase` | Installs the schema, runs the OpenSpec CLI and the checks above in a fixed order, and records the base commit and the evidence |
 
-The commands that write files are `init` (the schema, the skill and the Docket block), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
+The commands that write files are `init` (the schema, the skills and the Docket block), `new` (the change folder), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
 
 ## What Docket is not
 
@@ -47,7 +47,7 @@ Docket does **not**:
 
 ## The workflow it assumes
 
-superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it. The `docket` skill carries these rules, and `dkt init` installs it. The review and verification steps of each path come from the user's workflow file (`~/.config/docket/workflow.md`, or under `XDG_CONFIG_HOME`). The agent writes it with the user from Docket's template at the first piece of work, and `dkt workflow` reports whether it is missing, lacks a path or was made from an older template.
+superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it. The `docket` skill carries these rules, and `dkt init` installs it. The review and verification steps of each path come from the user's workflow file (`~/.config/docket/workflow.md`, or under `XDG_CONFIG_HOME`). The agent writes it with the user from Docket's template at the first piece of work, and `dkt workflow` reports whether it is missing, lacks a path or was made from an older template. Setup is its own skill, `docket-setup`, which the user can also invoke to revise the file (`/docket-setup` in Claude Code, `$docket-setup` in Codex). To check a project's setup, the user invokes `docket-doctor`: it runs `dkt inspect`, checks what needs judgment, lists every problem and then fixes them with the user one at a time.
 
 1. **Triage with brainstorming.** superpowers brainstorming reads the project and talks the idea through. When several paths apply, take the heaviest:
    - It changes a sentence in `openspec/specs/`: open a change and follow the steps below. So does any edit that sets an expectation no spec states and no existing behavior shows, such as a bug fix with no specified answer or a test that asserts new behavior, since it defines behavior.
@@ -91,7 +91,7 @@ We found no public project that uses a single list this way; most keep both file
 ## Planned commands (draft)
 
 ```
-dkt init [--force]                # install the docket schema, the skill and the Docket block
+dkt init [--force]                # install the docket schema, the skills and the Docket block
 dkt new <slug> --kind feature|change-request|fix|baseline --source "<origin>" --title "<title>"
 dkt lint [<slug>...]              # document rules
 dkt conflicts [<slug>]            # requirements touched by more than one active change
@@ -100,6 +100,7 @@ dkt archive <slug>...             # release step, on a branch made from the defa
 dkt rebase <slug>                 # accept the newer specs as the change's base
 dkt status [<slug>...] [--json]   # phase, tasks and their commits, progress, last activity, uncommitted work
 dkt workflow [template] [--json]  # the user's workflow file, or the template
+dkt inspect [--json]              # the project's Docket setup; writes nothing
 dkt brief <slug> --task N         # brief for an implementing agent
 dkt check <slug>                  # scenario coverage and checkbox consistency (pull request gate)
 dkt accept <slug> --round N [--export html]

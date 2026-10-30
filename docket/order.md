@@ -1,7 +1,7 @@
 # Order
 
 1. [x] `docket/ideas/2026-10-29-document-titles.md`
-2. [ ] `docket/ideas/2026-10-29-framework-skill.md`
+2. [x] `docket/ideas/2026-10-29-framework-skill.md`
 3. [ ] `docket/ideas/2026-10-29-records.md`
 4. [ ] `docket/ideas/2026-10-29-ideas-and-order.md`
 5. [ ] `docket/ideas/2026-10-29-commit-gate.md`

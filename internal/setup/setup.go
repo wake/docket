@@ -1,4 +1,4 @@
-// Package setup installs the docket schema and skill into a repository.
+// Package setup installs the docket schema and skills into a repository.
 package setup
 
 import (
@@ -48,11 +48,18 @@ type Result struct {
 	Files               []File `json:"files"`
 }
 
+// Skill is one skill folder: its name, and its files with paths relative to
+// that folder (SKILL.md, ...).
+type Skill struct {
+	Name  string
+	Files fs.FS
+}
+
 // Assets are the files Init installs.
 type Assets struct {
-	Schema fs.FS  // installed under schemaDir
-	Skill  fs.FS  // installed under each of skillDirs
-	Block  string // the Docket block kept in AGENTS.md and CLAUDE.md
+	Schema fs.FS   // installed under schemaDir
+	Skills []Skill // each installed under <root>/<name> for each of skillRoots
+	Block  string  // the Docket block kept in AGENTS.md and CLAUDE.md
 }
 
 // ProblemKind says why a path stopped Init.
@@ -91,8 +98,9 @@ const (
 	claudeFile = "CLAUDE.md"
 )
 
-// skillDirs are the directories that receive the skill.
-var skillDirs = []string{".claude/skills/docket", ".agents/skills/docket"}
+// skillRoots are the directories that receive each skill, in a folder named
+// after it.
+var skillRoots = []string{".claude/skills", ".agents/skills"}
 
 // target is one file Init installs.
 type target struct {
@@ -108,9 +116,12 @@ type decided struct {
 	status  FileStatus
 	data    []byte
 	existed bool
+	// viaAgents marks a CLAUDE.md that already leads to AGENTS.md (an import
+	// or a link); Inspect leaves it out and Init ignores it.
+	viaAgents bool
 }
 
-// Init installs the schema and the skill under root. It first decides the
+// Init installs the schema and the skills under root. It first decides the
 // status of every file and checks every path; only when all checks pass does
 // it call initOpenSpec (when <root>/openspec is missing) and write. A refused
 // run writes nothing and returns *Refused. A differing file is left alone
@@ -120,19 +131,9 @@ func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result,
 	if err := safepath.Check(root, "openspec"); err != nil {
 		return res, &Refused{Problems: []Problem{problemFor("openspec", err)}}
 	}
-	targets, err := targetsOf(a)
+	plan, problems, err := decideAll(root, a, force)
 	if err != nil {
 		return res, err
-	}
-	var problems []Problem
-	plan := make([]decided, 0, len(targets))
-	for _, t := range targets {
-		d, p := decide(root, t, a.Block, force)
-		if p != nil {
-			problems = append(problems, *p)
-			continue
-		}
-		plan = append(plan, d)
 	}
 	if len(problems) > 0 {
 		return res, &Refused{Problems: problems}
@@ -154,8 +155,54 @@ func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result,
 	return res, nil
 }
 
-// targetsOf lists every file to install: the schema, the skill in each of
-// skillDirs, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
+// decideAll settles every target. It returns the decisions that passed and
+// the problems that would make Init refuse. It does not check the openspec
+// directory itself: Init does that first, and Inspect adds it to the problems
+// it reports. It changes nothing.
+func decideAll(root string, a Assets, force bool) ([]decided, []Problem, error) {
+	targets, err := targetsOf(a)
+	if err != nil {
+		return nil, nil, err
+	}
+	var problems []Problem
+	plan := make([]decided, 0, len(targets))
+	for _, t := range targets {
+		d, p := decide(root, t, a.Block, force)
+		if p != nil {
+			problems = append(problems, *p)
+			continue
+		}
+		plan = append(plan, d)
+	}
+	return plan, problems, nil
+}
+
+// Inspect reports what Init without force would do under root, writing and
+// starting nothing: the files it would install or keep with Init's statuses,
+// and the problems that would make it refuse. Unlike Init it still returns
+// the files that passed. A CLAUDE.md that imports AGENTS.md, or links to it,
+// is left out. An unsafe openspec path is one of the problems, and the other
+// files are still decided. The error is for failing to read the assets.
+func Inspect(root string, a Assets) ([]File, []Problem, error) {
+	plan, problems, err := decideAll(root, a, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := safepath.Check(root, "openspec"); err != nil {
+		problems = append([]Problem{problemFor("openspec", err)}, problems...)
+	}
+	files := make([]File, 0, len(plan))
+	for _, d := range plan {
+		if d.viaAgents {
+			continue
+		}
+		files = append(files, File{Path: d.rel, Status: d.status, Kind: d.kind})
+	}
+	return files, problems, nil
+}
+
+// targetsOf lists every file to install: the schema, the skills in each of
+// skillRoots, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
 func targetsOf(a Assets) ([]target, error) {
 	var out []target
 	add := func(src fs.FS, dir string, kind FileKind) error {
@@ -174,9 +221,11 @@ func targetsOf(a Assets) ([]target, error) {
 	if err := add(a.Schema, schemaDir, KindSchema); err != nil {
 		return nil, err
 	}
-	for _, dir := range skillDirs {
-		if err := add(a.Skill, dir, KindSkill); err != nil {
-			return nil, err
+	for _, root := range skillRoots {
+		for _, sk := range a.Skills {
+			if err := add(sk.Files, path.Join(root, sk.Name), KindSkill); err != nil {
+				return nil, err
+			}
 		}
 	}
 	out = append(out, target{rel: agentsFile, kind: KindBlock}, target{rel: claudeFile, kind: KindBlock})
@@ -199,7 +248,7 @@ func decide(root string, t target, block string, force bool) (decided, *Problem)
 	abs := filepath.Join(root, filepath.FromSlash(t.rel))
 	if t.rel == claudeFile {
 		if tgt, err := os.Readlink(abs); err == nil && filepath.Clean(tgt) == agentsFile {
-			d.status = Unchanged
+			d.status, d.viaAgents = Unchanged, true
 			return d, nil
 		}
 	}
@@ -241,7 +290,7 @@ func decideBlock(d decided, got []byte, block string, force bool) (decided, *Pro
 		if _, _, _, err := FindBlock(got); err != nil {
 			return d, &Problem{Path: d.rel, Kind: ProblemMalformed, Err: err}
 		}
-		d.status = Unchanged
+		d.status, d.viaAgents = Unchanged, true
 		return d, nil
 	}
 	next, status, err := placeBlock(got, block, force)

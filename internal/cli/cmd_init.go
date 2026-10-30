@@ -11,6 +11,36 @@ import (
 	"github.com/wake/docket/internal/setup"
 )
 
+// shippedAssets are the files this build of dkt installs.
+func shippedAssets() setup.Assets {
+	return setup.Assets{Schema: docket.Schema(), Skills: docket.Skills(), Block: docket.Block()}
+}
+
+// problemFindings maps the problems that stopped a check to findings and
+// unreadable sources.
+func problemFindings(ps []setup.Problem) ([]Finding, []Unreadable) {
+	var findings []Finding
+	var unreadable []Unreadable
+	seenLink := map[string]bool{}
+	for _, p := range ps {
+		var sl *safepath.SymlinkError
+		switch {
+		case p.Kind == setup.ProblemSymlink && errors.As(p.Err, &sl):
+			// One linked directory refuses every file under it.
+			if seenLink[sl.Path] {
+				continue
+			}
+			seenLink[sl.Path] = true
+			findings = append(findings, Finding{Rule: "symlink-refused", Message: sl.Error(), File: sl.Path})
+		case p.Kind == setup.ProblemMalformed:
+			findings = append(findings, Finding{Rule: "agents-block-malformed", Message: p.Err.Error(), File: p.Path})
+		default:
+			unreadable = append(unreadable, Unreadable{Source: p.Path, Reason: p.Err.Error()})
+		}
+	}
+	return findings, unreadable
+}
+
 func initCommand() Command {
 	var force bool
 	return Command{
@@ -33,27 +63,11 @@ func initCommand() Command {
 				_, err = r.Run("init", "--tools", "none")
 				return err
 			}
-			res, err := setup.Init(c.Repo.Root, setup.Assets{Schema: docket.Schema(), Skill: docket.Skill(), Block: docket.Block()}, force, initOpenSpec)
+			res, err := setup.Init(c.Repo.Root, shippedAssets(), force, initOpenSpec)
 			var ref *setup.Refused
 			if errors.As(err, &ref) {
 				out := Outcome{Result: res}
-				seenLink := map[string]bool{}
-				for _, p := range ref.Problems {
-					var sl *safepath.SymlinkError
-					switch {
-					case p.Kind == setup.ProblemSymlink && errors.As(p.Err, &sl):
-						// One linked directory refuses every file under it.
-						if seenLink[sl.Path] {
-							continue
-						}
-						seenLink[sl.Path] = true
-						out.Findings = append(out.Findings, Finding{Rule: "symlink-refused", Message: sl.Error(), File: sl.Path})
-					case p.Kind == setup.ProblemMalformed:
-						out.Findings = append(out.Findings, Finding{Rule: "agents-block-malformed", Message: p.Err.Error(), File: p.Path})
-					default:
-						out.Unreadable = append(out.Unreadable, Unreadable{Source: p.Path, Reason: p.Err.Error()})
-					}
-				}
+				out.Findings, out.Unreadable = problemFindings(ref.Problems)
 				return out, nil
 			}
 			if err != nil {
