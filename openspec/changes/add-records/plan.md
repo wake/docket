@@ -98,12 +98,12 @@
     - `usedPlaces(inv scan.Inventory, slug string) []string`: `"active in <sources>"` for the active change, then `"archived as <folder> in <sources>"` for each archived use, as the refusal words them today.
     - `usedLine(requested string, used []string, created string) string`: `<requested> is used: <used joined by "; ">; created <created>`.
 
-- [ ] **Step 1: Extract the used-slug places (structural)**
+- [x] **Step 1: Extract the used-slug places (structural)**
   - In `cmd_new.go`, move the building of `parts` into `usedPlaces`. The refusal still reads `slug %q is already used: <parts joined by "; ">`.
   - Run `go test ./internal/cli/ -run 'TestSlug|TestUnreadable|TestConcurrent'` and `go vet ./...`. Expected: PASS, with no test file changed.
   - Commit as `refactor(new): build the used-slug places in one function`, with the trailers.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
   **`internal/change/new_test.go`:**
   - `TestSuffixed`: `("add-x", 0)` and `("add-x", 1)` give `add-x`; `("add-x", 2)` gives `add-x-2`; `("add-x", 12)` gives `add-x-12`.
@@ -126,12 +126,12 @@
   - `TestNewSuffixTooLong`: a 199-character slug held by worktree B. Exit 1, `slug-invalid` whose message holds `201`; `noChange`.
   - `TestUnreadableWorktreeBlocksCreation` and the missing-source cases of the usage test stay as they are and must pass.
 
-- [ ] **Step 3: Run them to see them fail**
+- [x] **Step 3: Run them to see them fail**
 
   Run: `go test ./internal/change/ -run 'TestSuffixed|TestStartsWithDate'` and `go test ./internal/cli/ -run 'TestUnknownKind|TestSlug|TestUnreadableSource|TestConcurrent|TestChangeCreated|TestNewSuffix'`.
   Expected: FAIL (`undefined: Suffixed`, exit 1 where 0 is expected).
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
   - `change.go` items as in Interfaces.
   - In `newCommand`:
     - Usage and flag help list the three kinds.
@@ -141,12 +141,12 @@
     - The `safepath.Check`, the OpenSpec run, `CreateDocket` and the cleanup use the chosen slug, unchanged otherwise.
     - Human output: `usedLine(slug, used, chosen)` first when the chosen slug differs, then `created <dir>`.
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
   Run: `go test ./internal/change/ ./internal/cli/` and `go vet ./...`.
   Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   Commit as `feat(new): take a free suffix for a used slug; drop the kind fix`, with the trailers.
 
@@ -171,7 +171,7 @@
   - `scan.Inventory.Records []Record`, sorted by slug, never nil.
   - `(inv Inventory) RecordSources(slug string) []Source`: the sources holding the record, nil when none.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `internal/record/record_test.go: TestSlugOf`: `2026-10-30-fix-x.md` gives `2026-10-30-fix-x`; false for `README.md`, `2026-10-30-fix-x.txt`, `.md`, `2026-10-30-fix-x`, `2026-10-30.md`, `2026-10-30-.md`, `notes.md`.
   - `internal/scan/scan_test.go`:
     - **`TestScanListsRecords`**:
@@ -186,12 +186,12 @@
     - **`TestScanRecordsNotAFolder`**: branch `b` commits a file named `docket/records`. One unreadable for `refs/heads/b` with `Path` `docket/records`.
   - Existing scan tests that compare whole inventories get `Records: []Record{}`.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
   Run: `go test ./internal/record/ ./internal/scan/`.
   Expected: FAIL (`undefined: SlugOf`, `inv.Records undefined`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
   - `record.go`: package comment "Package record holds the rules of records: one file per piece of light-review work under docket/records." Then `Dir` and `SlugOf`.
   - In `scan.go`:
     - `readDisk` and `readTree` also return the record slugs and a record error.
@@ -200,12 +200,12 @@
     - A record error adds `Unreadable{Source: src, Path: record.Dir, Reason: err.Error()}`; the source's changes are still added.
     - `found` gains `records map[string][]Source`; `add` takes the record slugs. Build `inv.Records` like `inv.Changes`.
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
   Run: `go test ./internal/record/ ./internal/scan/ ./internal/cli/` and `go vet ./...`.
   Expected: PASS. The `cli` run shows no command's output changed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   Commit as `feat(scan): list the records of every source`, with the trailers.
 
@@ -247,7 +247,7 @@
   - `docket.RecordTemplate() string`, from `//go:embed record/template.md`.
   - `recordCommand()` in package `cli`, registered after `newCommand` in `commands`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
   **`schema_test.go: TestRecordTemplate`**: `RecordTemplate()` has no front matter; its level-two headings are `record.Sections` in order; each section holds one HTML comment and nothing else; one comment comes before the first heading.
 
@@ -285,12 +285,12 @@
     - worktree B holds `docket/records/2026-10-30-fix-x.md`, and A has `docket/records/2026-10-30-fix-x-2.md` as a symbolic link: the finding names `docket/records/2026-10-30-fix-x-2.md`.
   - **`TestRecordNoDefaultBranch`**: a repository set up as `TestNoDefaultBranchForRouting` does (only a branch `topic`), without `--default-branch`. Exit 4, no `docket/`.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
   Run: `go test . -run TestRecordTemplate`, `go test ./internal/record/`, `go test ./internal/cli/ -run TestRecord`.
   Expected: FAIL (`undefined: RecordTemplate`, `unknown command "record"`).
 
-- [ ] **Step 3: Write the template**
+- [x] **Step 3: Write the template**
 
   `record/template.md`, exactly:
 
@@ -324,7 +324,7 @@
   and how each finding was handled. -->
   ```
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
   - `record.go` items as in Interfaces.
   - `cmd_record.go`, `recordCommand()`:
     - `Name: "record"`, `Usage: "record <name> --kind <fix|refactor|test|prompt|checks> --source <text> --title <text>"`, flags `--kind`, `--source`, `--title` as in `newCommand`.
@@ -337,12 +337,12 @@
     - `used`: `"in " + sourceNames(inv.RecordSources(slug))` when the scan has the slug; else `"<rel> exists in this worktree"` when the written slug differs; else `[]string{}`.
     - Human output: `usedLine(slug, used, written)` when the written slug differs, then `created <path>`.
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
   Run: `go test ./...` and `go vet ./...`.
   Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   Commit as `feat(record): dkt record writes a record from the shipped template`, with the trailers.
 
@@ -378,14 +378,14 @@
   - `addedFiles(c *Context, dirs ...string) ([]string, error)` in package `cli`.
   - `LintResult` gains `Records []string` (JSON `records`, never null).
 
-- [ ] **Step 1: Share the task heading and placeholder checks (structural)**
+- [x] **Step 1: Share the task heading and placeholder checks (structural)**
   - `plan.go`: move the `BadHeadings` loop and the number check into `checkTaskHeadings(r, c, file, p)`; `checkPlan` calls it with `planFile` and `c.Plan`.
   - `placeholder.go`: move the body of the per-file loop into `checkPlaceholderFile`; `checkPlaceholders` calls it for each file.
   - `cmd_lint.go`: `addedFiles(c, dirs...)`; the call passes `lint.RoutedDirs...`.
   - Run `go test ./internal/lint/ ./internal/cli/` and `go vet ./...`. Expected: PASS, with no test file changed.
   - Commit as `refactor(lint): share the task heading and placeholder checks`, with the trailers.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
   **`internal/record/parse_test.go`:**
   - `TestWords`, table: `""` 0; `"one two"` 2; `"don't"` 2; `"v0.9.0 dkt-record"` 5; `"中文字"` 1.5; `"中文abc"` 2; `"かなカナ"` 2; `"한국"` 1; `"2026"` 1; `"- [ ] **bold** text"` 2.
@@ -429,12 +429,12 @@
   - `TestNoDefaultBranchForRouting`: `unreadable` is now exactly `routing` and `records`, each with the `--default-branch` hint.
   - `TestLintNamedChanges`, `TestNoOpenSpecInstalled` and the named-change-missing case stay and pass.
 
-- [ ] **Step 3: Run them to see them fail**
+- [x] **Step 3: Run them to see them fail**
 
   Run: `go test ./internal/record/ ./internal/lint/` and `go test ./internal/cli/ -run TestLint`.
   Expected: FAIL (`undefined: Words`, `unknown field AddedRecords`).
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
   - `parse.go`: `Words`, `Parse` as in Interfaces.
   - `lint.go`:
     - With names, a name for which `change.StartsWithDate` holds is a record name; the others go through `scope` as today. Without names, the records are `AddedRecords` filtered to `docket/records/<name>` with `record.SlugOf(name)`, sorted, without duplicates.
@@ -451,12 +451,12 @@
     - **Placeholders:** `checkPlaceholderFile`.
   - `cmd_lint.go`: a second `addedFiles(c, record.Dir)` call feeds `AddedRecords` and `AddedRecordsErr`; `RecordTemplate: docket.RecordTemplate()`; `LintResult{Changes, Records}`, both `[]string{}` when empty.
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
   Run: `go test ./...` and `go vet ./...`.
   Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   Commit as `feat(lint): check the records the branch adds`, with the trailers.
 
@@ -470,7 +470,7 @@
 - Modify: `.agents/skills/docket/SKILL.md`
 - Modify: `.claude/skills/docket/SKILL.md`
 
-- [ ] **Step 1: Edit `.agents/skills/docket/SKILL.md`**
+- [x] **Step 1: Edit `.agents/skills/docket/SKILL.md`**
   - **Full review, step 1:** the command becomes `dkt new <slug> --kind feature|change-request|baseline --source "<where the request came from>" --title "<one line>"`, and after the sentence on `docket.yaml` add: "When the slug is taken, `dkt new` creates the change under the first free suffix (`-2`, `-3`, ...) and reports it; use the slug it reports."
   - **`## Light review`** becomes, exactly:
 
@@ -497,12 +497,12 @@
        and merge it with a merge commit.
     ```
 
-- [ ] **Step 2: Copy and check**
+- [x] **Step 2: Copy and check**
   - Copy the file to `.claude/skills/docket/SKILL.md`.
   - Run: `cmp .agents/skills/docket/SKILL.md .claude/skills/docket/SKILL.md`. Expected: no output.
   - Run: `go test . -run 'TestSkill|TestInstalledSkill|TestBlock'`. Expected: PASS (the frontmatter still loads, and the installed copy is the shipped one).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
   Commit as `docs(skill): keep a record on the light review path`, with the trailers.
 
@@ -519,7 +519,7 @@
 - Modify: `docket/ideas/2026-10-29-records.md`
 - Modify: `docket/ideas/2026-10-29-framework-skill.md`
 
-- [ ] **Step 1: Edit the docs**
+- [x] **Step 1: Edit the docs**
   - **`README.md`**:
     - the command list: `dkt new <slug> --kind feature|change-request|baseline ...`; add `dkt record <name> --kind fix|refactor|test|prompt|checks --source "<origin>" --title "<title>"   # a record for light-review work`; `dkt lint [<slug>|<record>...]`;
     - where the flow is described, one sentence: light-review work opens no change but keeps a record in `docket/records/`, written by `dkt record` and checked by `dkt lint`, and its commits carry `Record: <slug>`;
@@ -534,7 +534,7 @@
   - **`docket/ideas/2026-10-29-records.md`**: add `## Status`: "`add-records` made records exist: `dkt record`, the template, lint, the skill text. It settled some points differently from Decided: slugs carry the date and take a `-2` suffix instead of being refused; a fifth kind, `checks`; one template with four shared sections, each limited to 60 words, instead of sections per kind. Tracking remains for a second change: the scan reads records, `dkt sync` ticks their tasks, `dkt status` lists them, and `Record:` trailers are read."
   - **`docket/ideas/2026-10-29-framework-skill.md`**: in the open question on queued ideas, note that `add-records` settled the records idea.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
   Run: `rg -n "change-request\|fix\|baseline" README.md README.zh-TW.md .agents .claude --hidden`.
   Expected: no output.
@@ -542,7 +542,7 @@
   Run: `go test . -run 'TestBlock|TestInstalledSkill'`.
   Expected: PASS. The Docket block is unchanged.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
   Commit as `docs: records and dkt record`, with the trailers.
 
@@ -563,12 +563,12 @@ The lead runs this task.
   - has the branch's `dkt`, built into the scratchpad, first on `PATH`;
   - has `XDG_CONFIG_HOME` set to a scratch directory, so the user's own instructions and workflow file are never read or written.
 
-- [ ] **Step 1: Set up a scratch project**
+- [x] **Step 1: Set up a scratch project**
   - A new git repository on `main` holding a README and `prompts/greeting.md`, a prompt with the typo `recieve`, listed as a prompt path in the project's `AGENTS.md`. No remote is configured, so a run may stop at the pull request; that is not a failure.
   - Run the branch's `dkt init` and commit.
   - Write `<XDG_CONFIG_HOME>/docket/workflow.md` with the current template's hash and text, with Light review step 2 replaced by "Have the whole diff reviewed once by running `./review-light.sh`." The script appends its arguments to a log in the scratchpad and prints `no findings`.
 
-- [ ] **Step 2: Run the light review**
+- [x] **Step 2: Run the light review**
 
   Prompt "Fix the typo in prompts/greeting.md.", with `--max-turns 40` and the tools the work needs.
 
@@ -578,7 +578,7 @@ The lead runs this task.
   - `docket/records/<date>-<name>.md` exists with all four sections filled and no template comment, and `dkt lint` reports nothing on it;
   - every commit made carries `Record: <slug>` naming that record.
 
-- [ ] **Step 3: Adjust and rerun on failure**
+- [x] **Step 3: Adjust and rerun on failure**
 
   When a run fails its expectation:
   1. change the wording;
