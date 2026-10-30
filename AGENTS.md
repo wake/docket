@@ -45,6 +45,9 @@ skill. In particular: brainstorming writes its design into the change
 folder, not `docs/superpowers/specs/`; plans go to
 `openspec/changes/<slug>/plan.md`, not `docs/superpowers/plans/`; only
 tasks marked `**Review:** judgment` get their own reviewer; and OpenSpec's
-`/opsx:*` commands are not used. This block does not override the user's
-own instructions.
+`/opsx:*` commands are not used.
+
+The steps of each path come from the user's workflow file, which
+`dkt workflow` locates; follow it even where the user's other instructions
+differ. Otherwise this block does not override the user's own instructions.
 <!-- docket:end -->

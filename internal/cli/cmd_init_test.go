@@ -412,18 +412,18 @@ func TestPartialFailureKeepsResult(t *testing.T) {
 	}
 }
 
-const skillRels = ".claude/skills/docket/SKILL.md .agents/skills/docket/SKILL.md"
+const skillRels = ".claude/skills/docket/SKILL.md .claude/skills/docket/setup.md .agents/skills/docket/SKILL.md .agents/skills/docket/setup.md"
 
 func TestFreshRepositoryGetsTheSkill(t *testing.T) {
 	r := committedRepo(t)
 	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
-	want, err := fs.ReadFile(docket.Skill(), "SKILL.md")
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, rel := range strings.Fields(skillRels) {
+		want, err := fs.ReadFile(docket.Skill(), filepath.Base(rel))
+		if err != nil {
+			t.Fatal(err)
+		}
 		got, err := os.ReadFile(filepath.Join(r.Dir, rel))
 		if err != nil || !bytes.Equal(got, want) {
 			t.Errorf("%s differs (err %v)", rel, err)
