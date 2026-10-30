@@ -126,3 +126,55 @@ func TestReadFilesBranch(t *testing.T) {
 		t.Fatalf("missing dir = %v, %v, %v", got, unread, err)
 	}
 }
+
+func TestReadFilesBranchContent(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("checkout", "-q", "-b", "feature")
+	sha := r.Commit("specs", map[string]string{
+		"d/plain.md":      "text\n",
+		"d/empty.md":      "",
+		"d/no-newline.md": "no newline",
+		"d/bin.dat":       "a\x00b\n\x00\x00c",
+		"d/with space.md": "spaced\n",
+		"d/sub/deep.md":   "deep\n\n",
+		"d/skip.md":       "skipped\n",
+	})
+	src := scan.Source{Kind: scan.KindLocalBranch, Name: "refs/heads/feature", Commit: sha}
+
+	got, unread, err := scan.ReadFiles(newGit(r), src, "d", func(rel string) bool { return rel != "skip.md" })
+	if err != nil || len(unread) != 0 {
+		t.Fatalf("ReadFiles = %v, %v, %v", got, unread, err)
+	}
+	sameFiles(t, got, map[string]string{
+		"plain.md": "text\n", "empty.md": "", "no-newline.md": "no newline",
+		"bin.dat": "a\x00b\n\x00\x00c", "with space.md": "spaced\n", "sub/deep.md": "deep\n\n",
+	})
+}
+
+func TestReadFilesBranchUnreadableFile(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("checkout", "-q", "-b", "feature")
+	sha := r.Commit("specs", map[string]string{"d/a.md": "a\n", "d/lost.md": "lost content\n", "d/z.md": "z\n"})
+	blob := r.Git("rev-parse", sha+":d/lost.md")
+	obj := filepath.Join(r.Dir, ".git", "objects", blob[:2], blob[2:])
+	if err := os.Chmod(obj, 0o644); err != nil {
+		t.Fatalf("loose object not found: %v", err)
+	}
+	if err := os.Remove(obj); err != nil {
+		t.Fatal(err)
+	}
+	src := scan.Source{Kind: scan.KindLocalBranch, Name: "refs/heads/feature", Commit: sha}
+
+	got, unread, err := scan.ReadFiles(newGit(r), src, "d", keepAll)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sameFiles(t, got, map[string]string{"a.md": "a\n", "z.md": "z\n"})
+	if len(unread) != 1 || unread[0].Path != "d/lost.md" || unread[0].Source != src || unread[0].Reason == "" {
+		t.Fatalf("unreadable = %+v, want one for d/lost.md", unread)
+	}
+	want := "git show " + sha + ":d/lost.md: exit status 128: fatal: bad object " + sha + ":d/lost.md"
+	if unread[0].Reason != want {
+		t.Fatalf("reason = %q, want %q", unread[0].Reason, want)
+	}
+}
