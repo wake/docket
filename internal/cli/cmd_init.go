@@ -41,6 +41,11 @@ func problemFindings(ps []setup.Problem) ([]Finding, []Unreadable) {
 	return findings, unreadable
 }
 
+// projectCopyPath is the project's copy of the schema, as findings name it.
+const projectCopyPath = "openspec/schemas/docket"
+
+const msgSchemaEdited = "differs from every schema Docket shipped, and is used instead of the per-machine one"
+
 func initCommand() Command {
 	var force bool
 	return Command{
@@ -96,6 +101,16 @@ func initCommand() Command {
 					}
 					out.Findings = append(out.Findings, Finding{Rule: rule, Message: msg, File: f.Path})
 				}
+			}
+			removed := false
+			for _, f := range res.Files {
+				removed = removed || f.Status == setup.Removed
+			}
+			switch {
+			case res.ProjectCopy == setup.EditedCopy:
+				out.Findings = append(out.Findings, Finding{Rule: "schema-edited", Message: msgSchemaEdited, File: projectCopyPath})
+			case res.ProjectCopy == setup.ShippedCopy && !removed:
+				out.Findings = append(out.Findings, Finding{Rule: "schema-project-copy", Message: "a copy of a shipped schema, used instead of the per-machine one; dkt init removes it once the per-machine copy matches the shipped schema", File: projectCopyPath})
 			}
 			return out, nil
 		},

@@ -49,6 +49,8 @@ type File struct {
 type Result struct {
 	OpenSpecInitialized bool   `json:"openspec_initialized"`
 	Files               []File `json:"files"`
+	// ProjectCopy is what openspec/schemas/docket was before Init.
+	ProjectCopy CopyState `json:"-"`
 }
 
 // Skill is one skill folder: its name, and its files with paths relative to
@@ -140,11 +142,12 @@ type decided struct {
 }
 
 // Init installs the schema into schemaDir (the per-machine directory) and the
-// skills under root. It first decides the
-// status of every file and checks every path; only when all checks pass does
-// it call initOpenSpec (when <root>/openspec is missing) and write. A refused
-// run writes nothing and returns *Refused. A differing file is left alone
-// (Differs) unless force is set (Overwritten).
+// skills under root. It first decides the status of every file and checks
+// every path; only when all checks pass does it call initOpenSpec (when
+// <root>/openspec is missing) and write. A refused run writes nothing and
+// returns *Refused. A differing file is left alone (Differs) unless force is
+// set (Overwritten). As its last step it removes the project's copy of a
+// shipped schema, once the per-machine copy matches.
 func Init(root, schemaDir string, a Assets, force bool, initOpenSpec func() error) (Result, error) {
 	res := Result{Files: []File{}}
 	if err := safepath.Check(root, "openspec"); err != nil {
@@ -155,6 +158,11 @@ func Init(root, schemaDir string, a Assets, force bool, initOpenSpec func() erro
 	if err != nil {
 		return res, err
 	}
+	cp, cpProblem := decideCopy(root)
+	if cpProblem != nil {
+		problems = append(problems, *cpProblem)
+	}
+	res.ProjectCopy = cp
 	if len(problems) > 0 {
 		return res, &Refused{Problems: problems}
 	}
@@ -178,7 +186,25 @@ func Init(root, schemaDir string, a Assets, force bool, initOpenSpec func() erro
 		}
 		res.Files = append(res.Files, File{Path: d.shown(), Status: d.status, Kind: d.kind})
 	}
+	if cp == ShippedCopy && machineMatches(plan) {
+		removed, err := removeProjectCopy(root)
+		res.Files = append(res.Files, removed...)
+		if err != nil {
+			return res, err
+		}
+	}
 	return res, nil
+}
+
+// machineMatches reports whether every per-machine schema file in plan is, or
+// has just been made, identical to the shipped one.
+func machineMatches(plan []decided) bool {
+	for _, d := range plan {
+		if d.kind == KindSchema && d.status == Differs {
+			return false
+		}
+	}
+	return true
 }
 
 // decideAll settles every target. It returns the decisions that passed and
@@ -210,6 +236,8 @@ type Report struct {
 	// Config is what openspec/config.yaml names; empty when it could not be
 	// read.
 	Config ConfigSchema
+	// ProjectCopy is what openspec/schemas/docket is.
+	ProjectCopy CopyState
 }
 
 // Inspect reports what Init without force would do under root, writing and
@@ -227,7 +255,11 @@ func Inspect(root, schemaDir string, a Assets) (Report, error) {
 	if err := safepath.Check(root, "openspec"); err != nil {
 		problems = append([]Problem{problemFor("openspec", err)}, problems...)
 	}
-	rep := Report{Files: make([]File, 0, len(plan)), Problems: problems}
+	cp, cpProblem := decideCopy(root)
+	if cpProblem != nil {
+		problems = append(problems, *cpProblem)
+	}
+	rep := Report{Files: make([]File, 0, len(plan)), Problems: problems, ProjectCopy: cp}
 	for _, d := range plan {
 		if d.kind == KindConfig {
 			rep.Config = d.config

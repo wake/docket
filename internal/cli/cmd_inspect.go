@@ -72,6 +72,12 @@ func inspectCommand() Command {
 				out.Human = append(out.Human, fmt.Sprintf("%-8s %s", status, f.Path))
 				out.Findings = append(out.Findings, Finding{Rule: rule, Message: msg, File: f.Path})
 			}
+			switch rep.ProjectCopy {
+			case setup.ShippedCopy:
+				out.Findings = append(out.Findings, Finding{Rule: "schema-project-copy", Message: "a copy of a shipped schema, used instead of the per-machine one; dkt init removes it", File: projectCopyPath})
+			case setup.EditedCopy:
+				out.Findings = append(out.Findings, Finding{Rule: "schema-edited", Message: msgSchemaEdited, File: projectCopyPath})
+			}
 			pf, pu := problemFindings(problems)
 			out.Findings = append(out.Findings, pf...)
 			out.Unreadable = append(out.Unreadable, pu...)

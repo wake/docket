@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -102,11 +103,24 @@ func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 // <root>/openspec/schemas/docket/, so a real OpenSpec CLI accepts it.
 func InstallSchema(t testing.TB, root string) {
 	t.Helper()
-	err := fs.WalkDir(docket.Schema(), ".", func(p string, d fs.DirEntry, err error) error {
+	installTree(t, docket.Schema(), root)
+}
+
+// InstallOldSchema writes the docket schema of v0.9.1, an older shipped one,
+// under <root>/openspec/schemas/docket/.
+func InstallOldSchema(t testing.TB, root string) {
+	t.Helper()
+	_, here, _, _ := runtime.Caller(0)
+	installTree(t, os.DirFS(filepath.Join(filepath.Dir(here), "testdata", "schema-v0.9.1")), root)
+}
+
+func installTree(t testing.TB, src fs.FS, root string) {
+	t.Helper()
+	err := fs.WalkDir(src, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		data, err := fs.ReadFile(docket.Schema(), p)
+		data, err := fs.ReadFile(src, p)
 		if err != nil {
 			return err
 		}

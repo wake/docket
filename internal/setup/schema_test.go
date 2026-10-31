@@ -133,3 +133,10 @@ func TestFindSchema(t *testing.T) {
 		}
 	})
 }
+
+func TestOldSchemaIsShipped(t *testing.T) {
+	got, err := HashDir("../testutil/testdata/schema-v0.9.1")
+	if err != nil || got != "edc92ac411c0e925656d58d8ac7de51b08bdd47b9e92356c4cca073b58bcefde" || !IsShipped(got) {
+		t.Errorf("got %q, %v", got, err)
+	}
+}

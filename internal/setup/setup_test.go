@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -440,5 +441,58 @@ func TestInitWriteFailureThenRerun(t *testing.T) {
 	st = statuses(r)
 	if st[".agents/skills/docket/SKILL.md"] != Written || st[filepath.Join(mdir(root), "schema.yaml")] != Unchanged || st[".claude/skills/docket/SKILL.md"] != Unchanged {
 		t.Errorf("rerun = %v", st)
+	}
+}
+
+// oldCopyRoot is a repository holding the project copy of an older shipped
+// schema.
+func oldCopyRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	if err := os.CopyFS(filepath.Join(root, "openspec/schemas/docket"), os.DirFS("../testutil/testdata/schema-v0.9.1")); err != nil {
+		t.Fatal(err)
+	}
+	return root
+}
+
+func TestRemovalRenameFails(t *testing.T) {
+	root := oldCopyRoot(t)
+	orig := rename
+	t.Cleanup(func() { rename = orig })
+	rename = func(from, to string) error {
+		if strings.Contains(to, ".docket-removed-") {
+			return errors.New("no rename")
+		}
+		return orig(from, to)
+	}
+	if _, err := Init(root, mdir(root), assets, false, nil); err == nil || !strings.Contains(err.Error(), "no rename") {
+		t.Fatalf("err = %v", err)
+	}
+	for _, p := range []string{"schema.yaml", "templates/design.md", "templates/plan.md", "templates/proposal.md", "templates/spec.md"} {
+		if _, err := os.Stat(filepath.Join(root, "openspec/schemas/docket", p)); err != nil {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
+}
+
+func TestRemovalCleanupFails(t *testing.T) {
+	root := oldCopyRoot(t)
+	other := filepath.Join(root, "openspec", ".docket-removed-1")
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	orig := removeAll
+	t.Cleanup(func() { removeAll = orig })
+	removeAll = func(string) error { return errors.New("no delete") }
+	_, err := Init(root, mdir(root), assets, false, nil)
+	want := filepath.Join("openspec", ".docket-removed-"+strconv.Itoa(os.Getpid()))
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("err = %v, want it to name %s", err, want)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "openspec/schemas/docket")); err == nil {
+		t.Error("the project copy remains")
+	}
+	if _, err := os.Stat(other); err != nil {
+		t.Errorf("another folder was touched: %v", err)
 	}
 }

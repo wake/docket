@@ -840,3 +840,59 @@ func TestInspectOtherSchemaKey(t *testing.T) {
 		t.Errorf("no config-schema-other: %s", so)
 	}
 }
+
+func TestInspectProjectCopyReported(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	testutil.InstallOldSchema(t, r.Dir)
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	f := findingOf(t, so, "schema-project-copy")
+	if f == nil || f["file"] != "openspec/schemas/docket" || f["message"] != "a copy of a shipped schema, used instead of the per-machine one; dkt init removes it" {
+		t.Errorf("finding: %v", f)
+	}
+}
+
+func TestInspectEditedProjectCopy(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	testutil.InstallSchema(t, r.Dir)
+	appendLine(t, r.Dir, "openspec/schemas/docket/templates/proposal.md")
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	f := findingOf(t, so, "schema-edited")
+	if f == nil || f["file"] != "openspec/schemas/docket" || f["message"] != msgSchemaEdited {
+		t.Errorf("finding: %v", f)
+	}
+}
+
+func TestInspectNothingWrittenWithProjectCopy(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	testutil.InstallOldSchema(t, r.Dir)
+	r.Write("openspec/config.yaml", "schema: spec-driven\n")
+	env, path := inspectEnv(t)
+	dirs := []string{r.Dir, dataHome(r.Dir), filepath.Dir(path)}
+	var before []map[string]string
+	for _, d := range dirs {
+		before = append(before, snapshot(t, d))
+	}
+	if code, so, _ := runInspect(t, r.Dir, env, "--json"); code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	for i, d := range dirs {
+		sameSnapshot(t, before[i], snapshot(t, d))
+	}
+}
