@@ -145,7 +145,8 @@ changed the schema, and each cost every project a pull request.
 - `XDG_DATA_HOME` set to a relative path, or no home directory: `dkt init`
   exits with 4 naming the reason and writes nothing; `dkt new` and
   `dkt archive` do the same only when the project has no copy of the schema
-  (with one they do not need the per-machine directory); `dkt inspect` reports `schema-missing` with the reason.
+  (with one they do not need the per-machine directory); `dkt inspect`
+  reports `schema-missing` with the reason.
 - A symbolic link in the repository, or at or below the per-machine
   `openspec/schemas/docket/`: `dkt init` changes nothing and names the
   link. Links above it, such as `XDG_DATA_HOME` itself, are followed.
@@ -194,3 +195,5 @@ changed the schema, and each cost every project a pull request.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-11-01 | Plan review (codex), agreed by the maintainer in the session | A folder `openspec/schemas/docket/` without `schema.yaml` is not a copy (new scenario); `dkt new` gives `result.schema` only with a created change | Task 3 gained a test; no new task |
+| 2026-11-01 | Pre-merge review (codex and spec reviewer) | `config.yaml`'s key is cross-checked with the YAML parser; the removal re-checks both trees after renaming the copy aside; `dkt new` and `dkt archive` exit with 4 only without a project copy (wording); a link inside a copy no longer stops `new` or `archive` | One fix wave on Tasks 2, 3, 4 and 6; no schedule change |
