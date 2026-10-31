@@ -10,7 +10,7 @@ import (
 	"github.com/wake/docket/internal/setup"
 )
 
-//go:embed openspec/schemas/docket
+//go:embed schema/docket
 var schemaFS embed.FS
 
 //go:embed AGENTS.md
@@ -30,10 +30,10 @@ var recordTemplate string
 // four sections, each holding a comment that says what to write.
 func RecordTemplate() string { return recordTemplate }
 
-// Schema returns the files of openspec/schemas/docket, with paths relative
+// Schema returns the files of schema/docket, with paths relative
 // to that directory (schema.yaml, templates/proposal.md, ...).
 func Schema() fs.FS {
-	sub, err := fs.Sub(schemaFS, "openspec/schemas/docket")
+	sub, err := fs.Sub(schemaFS, "schema/docket")
 	if err != nil {
 		panic(err)
 	}
