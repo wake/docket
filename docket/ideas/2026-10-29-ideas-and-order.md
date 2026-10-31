@@ -36,6 +36,43 @@ be read by hand.
   archived), dropped. The version that shipped an idea comes from
   `git tag --contains`.
 
+## Parallel work
+
+Recorded 2026-10-31, from a discussion with the maintainer. This is a
+proposal, not decided; it would replace two of the decided points above, to
+be settled when this idea is taken up.
+
+Two decided points have each change's worktree write files that every
+change shares:
+
+- `dkt sync` ticks the order line. Sync runs in the change's worktree
+  before its pull request opens, so two changes made in parallel edit
+  adjacent lines of `docket/order.md`, which git reports as a conflict, and
+  a line is ticked before its pull request merges.
+- `to:` is written when work starts, in that worktree. An idea that becomes
+  several pieces of work, as records did (`add-records`, then the change
+  that reads records), has no single value to write.
+
+A plan has neither problem, since its ticks live in the change's own folder.
+The proposal applies the same rule to ideas:
+
+- A worktree writes only the files of its own work: its change folder or
+  its record. `docket/order.md` and the idea files change only by the
+  maintainer's decisions, written from one place.
+- `docket/order.md` holds the order. Nothing ticks it; `dkt` derives
+  whether each line is done, from the change or record whose `source`
+  names the idea having merged or been archived. The next piece of work is
+  the first line not done, reported by a command (the open question below
+  on which command reports the state of ideas). AGENTS.md's "the first
+  unticked line" changes with it.
+- `to:` is derived from the `source` of changes and records, not written.
+- One idea is one piece of work. When an idea has a further part, that
+  part becomes an idea of its own, whose `needs:` names the first.
+
+With no worktree writing them, ideas and the order have one writer. As a
+trial from 2026-10-31, edits to ideas in this repository are pushed straight
+to the default branch, without a pull request.
+
 ## Open questions
 
 - Which command reports the state of ideas.
