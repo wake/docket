@@ -142,9 +142,10 @@ changed the schema, and each cost every project a pull request.
 
 ### Failure Modes
 
-- `XDG_DATA_HOME` set to a relative path, or no home directory: `dkt init`,
-  `dkt new` and `dkt archive` exit with 4 naming the reason and write
-  nothing; `dkt inspect` reports `schema-missing` with the reason.
+- `XDG_DATA_HOME` set to a relative path, or no home directory: `dkt init`
+  exits with 4 naming the reason and writes nothing; `dkt new` and
+  `dkt archive` do the same only when the project has no copy of the schema
+  (with one they do not need the per-machine directory); `dkt inspect` reports `schema-missing` with the reason.
 - A symbolic link in the repository, or at or below the per-machine
   `openspec/schemas/docket/`: `dkt init` changes nothing and names the
   link. Links above it, such as `XDG_DATA_HOME` itself, are followed.

@@ -378,6 +378,19 @@ func TestArchiveSchemaInResult(t *testing.T) {
 	}
 }
 
+func TestArchiveRelativeDataHomeWithCopy(t *testing.T) {
+	r := archiveFixture(t)
+	env := append(archiveEnv(t, r), "XDG_DATA_HOME=data")
+	code, so, se := runArchive(t, r, env, "add-x", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := decode(t, so)["result"].(map[string]any)
+	if a, _ := res["archived"].([]any); len(a) != 1 {
+		t.Fatalf("result %v", res)
+	}
+}
+
 func TestArchiveRelativeDataHome(t *testing.T) {
 	r := archiveFixtureWith(t, false)
 	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")

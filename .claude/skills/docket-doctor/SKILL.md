@@ -80,7 +80,8 @@ and do it only after the user agrees; when they decline, go to the next.
   `agents-block-missing`, `schema-differs`, `skill-differs`,
   `agents-block-differs`, `schema-project-copy`, `config-schema-default`):
   take them together, since one command fixes them all. `dkt init` writes
-  every missing file, removes the project copy of the schema and sets
+  every missing file, removes a project copy of a shipped schema once the
+  per-machine copy matches the shipped one, sets
   `schema: docket` in `openspec/config.yaml`, and leaves differing files
   alone; when there is no `openspec` directory it first runs
   `openspec init`. `dkt init --force` also replaces every differing file.
