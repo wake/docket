@@ -13,7 +13,7 @@ artifacts:
       - **Why**: 1-2 sentences on the problem or opportunity. What problem does this solve? Why now?
       - **What Changes**: Bullet list of changes. Be specific about new capabilities, modifications, or removals. Mark breaking changes with **BREAKING**.
       - **Non-Goals**: What this change deliberately does not do, one bullet each. Must not be empty: if nothing is excluded, the scope has not been thought through.
-      - **Builds On**: What already exists that this change builds on, extends, or must not duplicate, named as `path:symbol` or by capability. Read docs/ARCHITECTURE.md and the capability index (`dkt index` when available; otherwise search the code) before writing it. If nothing relevant exists, say so and say what you searched. Must not be empty.
+      - **Builds On**: What already exists that this change builds on, extends, or must not duplicate, named as `path:symbol` or by capability. Before writing it, search the code and `openspec/specs/`, and read the project's own architecture notes if its instructions name any. If nothing relevant exists, say so and say what you searched. Must not be empty.
       - **Capabilities**: Identify which specs will be created or modified:
         - **New Capabilities**: List capabilities being introduced. Each becomes a new `specs/<capability-path>/spec.md`. Name each capability for a durable system behavior (for example, `user-auth`), not the work in this change (for example, `add-login-endpoint`). Choose a cohesive boundary that can own related requirements as the system evolves; avoid broad catch-all capabilities. Use kebab-case for path segments you introduce (e.g., `user-auth` or `identity/user-auth`) and follow the project's existing spec organization.
         - **Modified Capabilities**: List existing capabilities whose REQUIREMENTS are changing. Only include if spec-level behavior changes (not just implementation details). Each needs a delta spec file. Use the exact existing path under `openspec/specs/`. Leave empty if no requirement changes.
@@ -226,8 +226,8 @@ artifacts:
         `extend` or `new`. A `reuse` or `extend` row names a path that exists
         in the repository, or a dependency from outside it written as
         `external: <name>` (a CLI, a library). A `new` row says in Reason why
-        nothing that exists fits. Evidence is the search or index lookup behind the decision, for
-        example `rg -n "func Run" internal/` or `dkt index: gitx.Run`. This is
+        nothing that exists fits. Evidence is the search behind the decision,
+        for example `rg -n "func Run" internal/`. This is
         the main reuse decision of the change: make it here, not during
         implementation.
       - Every task heading is exactly `### Task N: <name>`. Task numbers start
