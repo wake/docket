@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 	"slices"
+	"strconv"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/record"
@@ -18,10 +20,34 @@ type StatusResult struct {
 }
 
 func statusCommand() Command {
+	var merged bool
+	var since, limit string
+	var limitSet bool
 	return Command{
 		Name:  "status",
-		Usage: "status [<slug>...]",
+		Usage: "status [<slug>...] [--merged [--since <rev>] [--limit <n>]]",
+		Define: func(fs *flag.FlagSet) {
+			fs.BoolVar(&merged, "merged", false, "list merged records too")
+			fs.StringVar(&since, "since", "", "with --merged, only records merged after `rev`")
+			fs.Func("limit", "with --merged, list the newest `n` merged records", func(v string) error {
+				limit, limitSet = v, true
+				return nil
+			})
+		},
 		Run: func(c *Context, args []string) (Outcome, error) {
+			if (since != "" || limitSet) && !merged {
+				return Outcome{}, UsageError{Msg: "--since and --limit need --merged"}
+			}
+			if (merged || since != "" || limitSet) && len(args) > 0 {
+				return Outcome{}, UsageError{Msg: "--merged, --since and --limit take no slugs"}
+			}
+			n := 0
+			if limitSet {
+				var err error
+				if n, err = strconv.Atoi(limit); err != nil || n < 1 {
+					return Outcome{}, UsageError{Msg: "--limit needs a positive integer"}
+				}
+			}
 			var out Outcome
 			var slugs, recSlugs []string
 			for _, slug := range args {
@@ -71,7 +97,14 @@ func statusCommand() Command {
 			if err != nil {
 				return Outcome{}, err
 			}
-			q := status.RecordQuery{}
+			q := status.RecordQuery{Merged: merged, Since: since, Limit: n}
+			if since != "" {
+				if ok, err := c.Git.RefExists(since + "^{commit}"); err != nil {
+					return Outcome{}, err
+				} else if !ok {
+					return Outcome{}, UsageError{Msg: fmt.Sprintf("--since %q does not name a commit", since)}
+				}
+			}
 			for _, slug := range recSlugs {
 				if _, ok := record.SlugOf(slug + ".md"); !ok {
 					continue
@@ -99,6 +132,9 @@ func statusCommand() Command {
 				for _, s := range r.Sources {
 					out.Human = append(out.Human, "  "+s.Name+"@"+shortCommit(s.Commit))
 				}
+			}
+			if cut := total - len(records); cut > 0 {
+				out.Human = append(out.Human, fmt.Sprintf("%d more merged records not listed; raise --limit", cut))
 			}
 			out.Result = StatusResult{Changes: changes, Records: records, RecordsTotal: total}
 			return out, nil
