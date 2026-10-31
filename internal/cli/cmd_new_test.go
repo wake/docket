@@ -717,6 +717,34 @@ func TestNewOlderProjectCopy(t *testing.T) {
 	}
 }
 
+func TestNewProjectCopyWithLink(t *testing.T) {
+	r := cleanRepoWith(t, false)
+	testutil.InstallSchema(t, r.Dir)
+	prop := filepath.Join(r.Dir, "openspec/schemas/docket/templates/proposal.md")
+	b, err := os.ReadFile(prop)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "proposal.md")
+	if err := os.WriteFile(outside, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(prop); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, prop); err != nil {
+		t.Fatal(err)
+	}
+	code, out, se := runNewText(t, r.Dir, "add-x")
+	if code != 0 || !strings.Contains(out, "openspec/schemas/docket differs from every shipped schema and is used instead of the per-machine one") {
+		t.Fatalf("exit %d\n%s\n%s", code, out, se)
+	}
+	code, js, se2 := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-y", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 0 || schemaOf(t, js)["matches"] != false {
+		t.Fatalf("exit %d\n%s\n%s", code, js, se2)
+	}
+}
+
 func TestNewRelativeDataHome(t *testing.T) {
 	r := cleanRepoWith(t, false)
 	rel := []string{"XDG_DATA_HOME=data"}

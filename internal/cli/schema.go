@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/wake/docket"
@@ -34,7 +35,7 @@ func findSchema(c *Context) (*SchemaState, []string, error) {
 		}
 		return nil, nil, nil
 	}
-	hash, err := setup.HashDir(dir)
+	hash, err := setup.TreeHash(os.DirFS(dir)) // reads only: a link makes the copy differ
 	if err != nil {
 		return nil, nil, err
 	}
