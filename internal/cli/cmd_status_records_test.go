@@ -131,7 +131,7 @@ func TestFilterFlagsNeedMerged(t *testing.T) {
 	for _, args := range [][]string{
 		{"--limit", "2"}, {"--since", "main"}, {"--merged", "2026-10-30-fix-a"},
 		{"--merged", "--limit", "0"}, {"--merged", "--limit", "x"}, {"--merged", "--since", "nosuch"},
-		{"--limit", "2", "2026-10-30-fix-a"},
+		{"--limit", "2", "2026-10-30-fix-a"}, {"--merged", "--since=--all"}, {"--merged", "--since=-x"},
 	} {
 		if code, so, se := runStatus(t, r.Dir, true, args...); code != 2 {
 			t.Errorf("%v: exit %d\n%s\n%s", args, code, so, se)

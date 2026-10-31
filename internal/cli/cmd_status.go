@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/record"
@@ -40,6 +41,9 @@ func statusCommand() Command {
 			}
 			if (merged || since != "" || limitSet) && len(args) > 0 {
 				return Outcome{}, UsageError{Msg: "--merged, --since and --limit take no slugs"}
+			}
+			if strings.HasPrefix(since, "-") {
+				return Outcome{}, UsageError{Msg: fmt.Sprintf("--since %q does not name a commit", since)}
 			}
 			n := 0
 			if limitSet {
