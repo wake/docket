@@ -2,6 +2,7 @@ package record
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -245,6 +246,59 @@ func TestCreateFailedCleanupNamesLeftover(t *testing.T) {
 	_, err := Create(dir, "x", never, []byte("x"))
 	if err == nil || !strings.Contains(err.Error(), filepath.Join(dir, "x.md")+" was left: busy") {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestCreateMkdirFailsLeavesNothing(t *testing.T) {
+	root := t.TempDir()
+	old := makeDirs
+	makeDirs = func(p string, m os.FileMode) error {
+		if err := os.Mkdir(filepath.Join(root, "docket"), m); err != nil {
+			t.Error(err)
+		}
+		return errors.New("no permission")
+	}
+	t.Cleanup(func() { makeDirs = old })
+	_, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), "no permission") {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket was left")
+	}
+}
+
+func TestCreateOpenFailsLeavesNothing(t *testing.T) {
+	root := t.TempDir()
+	old := openFile
+	openFile = func(string, int, os.FileMode) (*os.File, error) { return nil, errors.New("too many open files") }
+	t.Cleanup(func() { openFile = old })
+	_, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), "too many open files") {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket was left")
+	}
+}
+
+func TestCreateLaterCandidateKeepsTheBookkeeping(t *testing.T) {
+	root := t.TempDir()
+	failWrite(t, nil)
+	dir := filepath.Join(root, "docket", "records")
+	old := openFile
+	openFile = func(p string, fl int, m os.FileMode) (*os.File, error) {
+		if strings.HasSuffix(p, "x.md") {
+			return nil, fs.ErrExist
+		}
+		return old(p, fl, m)
+	}
+	t.Cleanup(func() { openFile = old })
+	if _, err := Create(dir, "x", never, []byte("x")); err == nil {
+		t.Fatal("no error")
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket was left")
 	}
 }
 

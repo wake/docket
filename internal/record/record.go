@@ -101,6 +101,8 @@ func (e *LinkError) Error() string {
 var (
 	writeRecord = func(f *os.File, b []byte) error { _, err := f.Write(b); return err }
 	removePath  = os.Remove
+	makeDirs    = os.MkdirAll
+	openFile    = os.OpenFile
 )
 
 // Create writes content to the first free record file in dir, creating dir
@@ -114,6 +116,22 @@ var (
 // then each folder this call made, deepest first; whatever it cannot remove is
 // named in the error.
 func Create(dir, slug string, used func(slug string) bool, content []byte) (string, error) {
+	var made []string // folders on the way to dir that do not exist yet, deepest first
+	planned := false
+	// fail removes the file (when path is not empty), then every folder this call made.
+	fail := func(path string, err error) (string, error) {
+		errs := []error{err}
+		rm := made
+		if path != "" {
+			rm = append([]string{path}, made...)
+		}
+		for _, p := range rm {
+			if rerr := removePath(p); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+				errs = append(errs, fmt.Errorf("%s was left: %w", p, rerr))
+			}
+		}
+		return "", errors.Join(errs...)
+	}
 	for n := 1; ; n++ {
 		cand := change.Suffixed(slug, n)
 		if len(cand) > change.MaxSlug {
@@ -123,17 +141,19 @@ func Create(dir, slug string, used func(slug string) bool, content []byte) (stri
 			continue
 		}
 		path := filepath.Join(dir, cand+".md")
-		var made []string // folders on the way to dir that do not exist yet, deepest first
-		for p := dir; ; p = filepath.Dir(p) {
-			if _, err := os.Lstat(p); err == nil || filepath.Dir(p) == p {
-				break
+		if !planned {
+			planned = true
+			for p := dir; ; p = filepath.Dir(p) {
+				if _, err := os.Lstat(p); err == nil || filepath.Dir(p) == p {
+					break
+				}
+				made = append(made, p)
 			}
-			made = append(made, p)
 		}
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return "", err
+		if err := makeDirs(dir, 0o755); err != nil {
+			return fail("", err)
 		}
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+		f, err := openFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
 		if errors.Is(err, fs.ErrExist) {
 			fi, lerr := os.Lstat(path)
 			if lerr == nil && fi.Mode()&fs.ModeSymlink != 0 {
@@ -142,20 +162,14 @@ func Create(dir, slug string, used func(slug string) bool, content []byte) (stri
 			continue
 		}
 		if err != nil {
-			return "", err
+			return fail("", err)
 		}
 		werr := writeRecord(f, content)
 		if cerr := f.Close(); werr == nil {
 			werr = cerr
 		}
 		if werr != nil {
-			errs := []error{werr}
-			for _, p := range append([]string{path}, made...) {
-				if rerr := removePath(p); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
-					errs = append(errs, fmt.Errorf("%s was left: %w", p, rerr))
-				}
-			}
-			return "", errors.Join(errs...)
+			return fail(path, werr)
 		}
 		return cand, nil
 	}
