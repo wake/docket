@@ -359,29 +359,10 @@ func (g Git) ShowAll(rev string, paths []string) (files map[string][]byte, misse
 	if err != nil {
 		return nil, nil, err
 	}
-	// Each answer is a header line; an object adds its content and a newline,
-	// and the size in the header says where the content ends.
 	next := func() (typ string, content []byte, ok bool) {
-		nl := bytes.IndexByte(out, '\n')
-		if nl < 0 {
-			return "", nil, false
-		}
-		header := string(out[:nl])
-		out = out[nl+1:]
-		if strings.HasSuffix(header, " missing") || strings.HasSuffix(header, " ambiguous") {
-			return "", nil, true
-		}
-		f := strings.Fields(header)
-		if len(f) != 3 {
-			return "", nil, false
-		}
-		size, err := strconv.Atoi(f[2])
-		if err != nil || size < 0 || size+1 > len(out) {
-			return "", nil, false
-		}
-		content = out[:size]
-		out = out[size+1:]
-		return f[1], content, true
+		var a batchAnswer
+		a, out, ok = nextBatchAnswer(out)
+		return a.Type, a.Content, ok
 	}
 	if typ, _, ok := next(); !ok || typ == "" {
 		return nil, nil, fmt.Errorf("git cat-file: unknown revision %q", rev)
@@ -402,6 +383,132 @@ func (g Git) ShowAll(rev string, paths []string) (files map[string][]byte, misse
 		}
 	}
 	return files, missed, nil
+}
+
+// batchAnswer is one answer of `git cat-file --batch`. Type is empty when
+// the object is missing or the name is ambiguous.
+type batchAnswer struct {
+	Type, OID string
+	Content   []byte
+}
+
+// nextBatchAnswer reads the first answer of out and returns the rest. Each
+// answer is a header line; an object adds its content and a newline, and the
+// size in the header says where the content ends. ok is false when out does
+// not hold a whole answer.
+func nextBatchAnswer(out []byte) (a batchAnswer, rest []byte, ok bool) {
+	nl := bytes.IndexByte(out, '\n')
+	if nl < 0 {
+		return a, out, false
+	}
+	header := string(out[:nl])
+	out = out[nl+1:]
+	if strings.HasSuffix(header, " missing") || strings.HasSuffix(header, " ambiguous") {
+		return a, out, true
+	}
+	f := strings.Fields(header)
+	if len(f) != 3 {
+		return a, out, false
+	}
+	size, err := strconv.Atoi(f[2])
+	if err != nil || size < 0 || size+1 > len(out) {
+		return a, out, false
+	}
+	return batchAnswer{Type: f[1], OID: f[0], Content: out[:size]}, out[size+1:], true
+}
+
+// TreeObject is one entry of a tree object, as `git ls-tree` prints it: Mode
+// is six octal digits, Type is blob, tree or commit, OID is in hex.
+type TreeObject struct{ Mode, Type, OID, Name string }
+
+// ReadTrees reads the tree objects the names resolve to (an object id or any
+// revision, such as "<commit>^{tree}") with one `git cat-file --batch`. The
+// map holds, for each name that is a tree, its entries in tree order. A name
+// that is missing, ambiguous or not a tree is absent from the map, and so is
+// a name holding a newline, which cannot go on a line of the batch input and
+// is not sent. When no name can be sent, no git runs. git failing as a whole,
+// or output that cannot be parsed, is an error.
+func (g Git) ReadTrees(names []string) (map[string][]TreeObject, error) {
+	trees := map[string][]TreeObject{}
+	var in strings.Builder
+	var sent []string
+	for _, n := range names {
+		if !strings.Contains(n, "\n") {
+			in.WriteString(n + "\n")
+			sent = append(sent, n)
+		}
+	}
+	if len(sent) == 0 {
+		return trees, nil
+	}
+	out, err := g.outputIn(in.String(), "cat-file", "--batch")
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range sent {
+		var a batchAnswer
+		var ok bool
+		if a, out, ok = nextBatchAnswer(out); !ok {
+			return nil, fmt.Errorf("git cat-file: unexpected output at %q", n)
+		}
+		if a.Type != "tree" {
+			continue
+		}
+		entries, err := parseTree(a.Content, len(a.OID)/2)
+		if err != nil {
+			return nil, fmt.Errorf("git cat-file: tree %s: %w", a.OID, err)
+		}
+		trees[n] = entries
+	}
+	return trees, nil
+}
+
+// parseTree parses the raw format of a tree: `<octal mode> <name>\0<raw id>`,
+// repeated, where a raw id is rawLen bytes.
+func parseTree(b []byte, rawLen int) ([]TreeObject, error) {
+	var entries []TreeObject
+	for len(b) > 0 {
+		sp := bytes.IndexByte(b, ' ')
+		if sp < 0 {
+			return nil, errors.New("entry without a mode")
+		}
+		mode, err := strconv.ParseUint(string(b[:sp]), 8, 32)
+		if err != nil {
+			return nil, fmt.Errorf("bad mode %q", b[:sp])
+		}
+		b = b[sp+1:]
+		nul := bytes.IndexByte(b, 0)
+		if nul < 0 || nul+1+rawLen > len(b) {
+			return nil, errors.New("truncated entry")
+		}
+		name := string(b[:nul])
+		oid := fmt.Sprintf("%x", b[nul+1:nul+1+rawLen])
+		b = b[nul+1+rawLen:]
+		// Canonicalize the stored mode as git does.
+		var canon uint32
+		switch mode & 0o170000 {
+		case 0o100000:
+			canon = 0o100644
+			if mode&0o100 != 0 {
+				canon = 0o100755
+			}
+		case 0o120000:
+			canon = 0o120000
+		case 0o040000:
+			canon = 0o040000
+		default:
+			canon = 0o160000
+		}
+		typ := "blob"
+		switch canon {
+		case 0o040000:
+			typ = "tree"
+		case 0o160000:
+			typ = "commit"
+		}
+		entries = append(entries, TreeObject{Mode: fmt.Sprintf("%06o", canon), Type: typ, OID: oid, Name: name})
+	}
+	return entries, nil
 }
 
 // ListFiles returns, sorted, the paths (relative to the repository root) of

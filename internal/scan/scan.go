@@ -130,12 +130,8 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			continue
 		}
 		active, archived, records, recErr, err := readDisk(w.Path)
-		if err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
+		if !inv.noteRead(src, recErr, err) {
 			continue
-		}
-		if recErr != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Path: record.Dir, Reason: recErr.Error()})
 		}
 		rank := rankContainedWorktree
 		if !unbornHead(w.Head) {
@@ -155,6 +151,15 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	if err != nil {
 		return inv, err
 	}
+	// One batch per level of the trees reads every commit: the unmerged refs
+	// and the default tip.
+	commits := []string{db.Commit}
+	for _, u := range unmerged {
+		if u.Err == nil {
+			commits = append(commits, u.Ref.SHA)
+		}
+	}
+	trees := readTrees(g, commits)
 	for _, u := range unmerged {
 		r := u.Ref
 		kind, rank := KindLocalBranch, rankLocalBranch
@@ -166,26 +171,16 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: u.Err.Error()})
 			continue
 		}
-		active, archived, records, recErr, err := readTree(g, r.SHA)
-		if err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
+		t := trees[r.SHA]
+		if !inv.noteRead(src, t.recErr, t.err) {
 			continue
 		}
-		if recErr != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Path: record.Dir, Reason: recErr.Error()})
-		}
-		f.add(src, rank, active, archived, records)
+		f.add(src, rank, t.active, t.archived, t.records)
 	}
 
 	dbSrc := Source{Kind: KindDefaultBranch, Name: db.Ref, Commit: db.Commit}
-	active, archived, records, recErr, err := readTree(g, db.Commit)
-	if err != nil {
-		inv.Unreadable = append(inv.Unreadable, Unreadable{Source: dbSrc, Reason: err.Error()})
-	} else {
-		if recErr != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: dbSrc, Path: record.Dir, Reason: recErr.Error()})
-		}
-		f.add(dbSrc, rankDefaultBranch, active, archived, records)
+	if t := trees[db.Commit]; inv.noteRead(dbSrc, t.recErr, t.err) {
+		f.add(dbSrc, rankDefaultBranch, t.active, t.archived, t.records)
 	}
 
 	for slug, srcs := range f.active {
@@ -208,6 +203,20 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	}
 	sort.Slice(inv.Records, func(i, j int) bool { return inv.Records[i].Slug < inv.Records[j].Slug })
 	return inv, nil
+}
+
+// noteRead files what reading a source failed on: err makes the whole source
+// unreadable, recErr only its records folder. It reports whether the
+// source's changes were read.
+func (inv *Inventory) noteRead(src Source, recErr, err error) bool {
+	if err != nil {
+		inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
+		return false
+	}
+	if recErr != nil {
+		inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Path: record.Dir, Reason: recErr.Error()})
+	}
+	return true
 }
 
 // unmergedRef is a ref to read, or, when Err is set, one whose ancestry

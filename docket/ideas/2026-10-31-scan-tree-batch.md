@@ -38,3 +38,11 @@ left one `ls-tree` per unmerged ref.
 
 - `2026-10-24-scan-git-calls.md`: the first part.
 - `2026-10-31-existing-project-adoption.md`: the same trial.
+
+## Status
+
+Done by the record `docket/records/2026-10-31-scan-tree-batch.md` (leads 1
+and 2): on the Purdex copy `dkt status` went from 322 git processes and
+22.1 s to 18 and 1.7 s. Reading the trees takes at most four `cat-file`
+processes, however many refs there are; a commit with a missing object or a
+malformed tree still costs one `ls-tree`.
