@@ -233,3 +233,12 @@ func TestRecordSyncBadSlug(t *testing.T) {
 		t.Fatalf("exit %d\n%s", code, so)
 	}
 }
+
+func TestRecordSyncBadSlugWithoutDefaultBranch(t *testing.T) {
+	r := cleanRepo(t)
+	r.Git("branch", "-m", "main", "trunk")
+	code, so, _ := runSync(t, r, nil, "2026-11-01-", "--json")
+	if code != 1 || !hasRule(t, so, "slug-invalid") {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+}

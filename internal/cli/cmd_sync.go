@@ -6,6 +6,8 @@ import (
 
 	"github.com/wake/docket/internal/archive"
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/record"
+	"github.com/wake/docket/internal/scan"
 )
 
 // SyncResult is the result object of dkt sync.
@@ -36,9 +38,13 @@ func syncCommand() Command {
 			res := SyncResult{Check: check}
 			if change.StartsWithDate(slug) {
 				// No lock: ticks come from commits, so two runs write the same bytes.
-				db, err := resolveDefaultBranch(c)
-				if err != nil {
-					return Outcome{}, err
+				// SyncRecord reports an invalid slug before it reads Default.
+				var db scan.DefaultBranch
+				var err error
+				if _, ok := record.SlugOf(slug + ".md"); ok {
+					if db, err = resolveDefaultBranch(c); err != nil {
+						return Outcome{}, err
+					}
 				}
 				if rep, err = archive.SyncRecord(archive.Env{Git: c.Git, Root: c.Repo.Root, Default: db}, slug, check); err != nil {
 					return Outcome{}, err
