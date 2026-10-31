@@ -109,12 +109,12 @@
   - `var setup.ShippedSchemas = []string{...}` (the four hashes) and `setup.IsShipped(hash string) bool`.
   - `setup.FindSchema(root, machineDir string) (dir string, found bool, err error)`: the Global Constraints' lookup order; `machineDir` `""` is skipped.
 
-- [ ] **Step 1: Move the home lookup (structural)**
+- [x] **Step 1: Move the home lookup (structural)**
   - Create `internal/userdirs` with `Lookup`, `ErrNoHome` and `Home`, moved from `workflow.go`; `Locate` calls them.
   - Run `go test ./internal/workflow/ ./internal/cli/` and `go vet ./...`. Expected: PASS, with no test file changed.
   - Commit as `refactor(userdirs): find the home outside the workflow package`, with the trailers.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
   - `TestDataHome` (`userdirs`), rows `env → want`: `HOME=/h` → `/h/.local/share`; `HOME=/h XDG_DATA_HOME=/d` → `/d`; `XDG_DATA_HOME=/d/` → `/d/`; `XDG_DATA_HOME=/a XDG_DATA_HOME=/b` → `/b`; `HOME=/h XDG_DATA_HOME=` → `/h/.local/share`; `XDG_DATA_HOME=data` → `*RelativeError{"XDG_DATA_HOME", "data"}`; no `HOME`, nil lookup → `ErrNoHome`.
   - `TestSchemaDir` (`setup`): `XDG_DATA_HOME=/d` → `/d/openspec/schemas/docket`; `HOME=/h` → `/h/.local/share/openspec/schemas/docket`.
   - `TestTreeHash`: `fstest.MapFS{"schema.yaml": "name: x\n", "templates/a.md": "# A\n"}` → `4064fdd3e0cd59ca75b75ea1c50f23471e66cc72d1dfe5da6db79e5ddfb7160e`; the same files written in the other order give the same hash.
@@ -123,16 +123,16 @@
   - `TestFindSchema`: project and machine both hold `schema.yaml` → the project directory; only machine → machine; project folder without `schema.yaml` and machine with it → machine; neither → `found` false; machine `""` and no project copy → `found` false.
   - `TestSchemaIsShipped` (root `schema_test.go`): `setup.TreeHash(docket.Schema())` is `886ab9e7c68599e1049119c8ae6616629a513b1319602f15ecb2643b8e951c21` and `setup.IsShipped` reports it. The failure message prints the hash and says to append it to `setup.ShippedSchemas`.
 
-- [ ] **Step 3: Run them to see them fail**
+- [x] **Step 3: Run them to see them fail**
 
   Run: `go test ./internal/userdirs/ ./internal/setup/ -run 'TestDataHome|TestSchemaDir|TestTreeHash|TestHashDir|TestFindSchema'` and `go test . -run TestSchemaIsShipped`.
   Expected: FAIL (`undefined: DataHome`, `undefined: setup.TreeHash`).
 
-- [ ] **Step 4: Implement** the Interfaces in `userdirs.go` and `internal/setup/schema.go`. `HashDir` walks with `filepath.WalkDir` (which does not follow links) and reads with `readNoFollow`.
+- [x] **Step 4: Implement** the Interfaces in `userdirs.go` and `internal/setup/schema.go`. `HashDir` walks with `filepath.WalkDir` (which does not follow links) and reads with `readNoFollow`.
 
-- [ ] **Step 5: Run the tests and `go vet ./...`.** Expected: PASS.
+- [x] **Step 5: Run the tests and `go vet ./...`.** Expected: PASS.
 
-- [ ] **Step 6: Commit** as `feat(setup): the per-machine schema directory and shipped schema hashes`, with the trailers.
+- [x] **Step 6: Commit** as `feat(setup): the per-machine schema directory and shipped schema hashes`, with the trailers.
 
 ### Task 2: `dkt init` and `dkt inspect`: the per-machine copy and the `schema` key
 
@@ -164,7 +164,7 @@
   - `type setup.Report struct { Files []File; Problems []Problem; Config ConfigSchema }` and `setup.Inspect(root, schemaDir string, a Assets) (Report, error)`; `schemaDir` `""` leaves the per-machine files out.
   - `InspectFile.Kind` may be `config`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
   **`internal/setup/config_test.go`:**
   - `TestSchemaKey`, rows `input → value, line | error`: `schema: spec-driven\n# x\n` → `spec-driven, 0`; `context: |\n  schema: no\nschema: docket\n` → `docket, 2`; `# c\n` → `"", -1`; `schema: "spec-driven" # why\n` → `spec-driven, 0`; `schema: 'docket'\n` → `docket, 0`; `schema: docket\r\n` → `docket, 0`; errors for `schema:\n  docket\n`, `schema: a\nschema: b\n`, `schema: a b\n`.
@@ -201,20 +201,20 @@
 
   **`internal/setup/*_test.go`:** calls take a per-machine directory under `t.TempDir()`; assertions on `openspec/schemas/docket/...` move to that directory.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
   Run: `go test ./internal/setup/ ./internal/cli/ -run 'TestSchemaKey|TestNameDocket|TestFresh|TestJSONOnSuccess|TestInit|TestLocally|TestForce|TestSymlinked|TestOtherConfiguration|TestDefaultSchema|TestConfigFile|TestOtherSchema|TestUnreadableSchemaKey|TestInspect'`.
   Expected: FAIL (`undefined: SchemaKey`, the schema found in the repository).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
   - `config.go`: `SchemaKey`, `NameDocket`, and the config target's decision: missing → `written` with `schema: docket\n` (`ConfigNoFile`); `docket` → `unchanged`; no key or `spec-driven` → `written` with `NameDocket` (`ConfigDefault`); other → `differs` (`ConfigOther`); a `SchemaKey` error → a `ProblemUnreadable`.
   - `setup.go`: a target resolves `rel` against its own base: the repository root, or `filepath.Dir(schemaDir)` with `rel` `docket/<p>` for per-machine files, whose `File.Path` is `filepath.Join(base, rel)`. The schema is no longer a repository target. `openspec/config.yaml` is decided with the other targets when `openspec/` exists, and right after `initOpenSpec` when it did not.
   - `cmd_init.go`: `setup.SchemaDir(c.Env, c.UserHome)` first; its error is an `EnvError` with the error's text. `differs` of kind `config` gives `config-schema-other`. The `--force` help says `overwrite installed files that differ from the shipped ones`.
   - `cmd_inspect.go`: a `SchemaDir` error becomes the `schema-missing` finding and `""` is passed to `setup.Inspect`. `inspectStatus` handles kind `config` with `Report.Config`: `ConfigNoFile` → `missing`, `ConfigDefault` → `differs`, both with `config-schema-default`; `ConfigOther` → `differs` with `config-schema-other`. Human lines print the absolute paths.
 
-- [ ] **Step 4: Run the tests above, then `go test ./...` and `go vet ./...`.** Expected: PASS.
+- [x] **Step 4: Run the tests above, then `go test ./...` and `go vet ./...`.** Expected: PASS.
 
-- [ ] **Step 5: Commit** as `feat(init, inspect): the schema per machine and its name in config.yaml`, with the trailers.
+- [x] **Step 5: Commit** as `feat(init, inspect): the schema per machine and its name in config.yaml`, with the trailers.
 
 ### Task 3: `dkt init` removes an unedited project copy, and `dkt inspect` reports one
 
@@ -240,9 +240,9 @@
   - `Result` and `Report` gain `ProjectCopy CopyState` (`json:"-"` on `Result`).
   - `testutil.InstallOldSchema(t testing.TB, root string)`: copies the v0.9.1 tree to `<root>/openspec/schemas/docket/`.
 
-- [ ] **Step 1: Add the test data.** `mkdir -p internal/testutil/testdata/schema-v0.9.1 && git archive v0.9.1 openspec/schemas/docket | tar -x --strip-components=3 -C internal/testutil/testdata/schema-v0.9.1`, then `git add` it.
+- [x] **Step 1: Add the test data.** `mkdir -p internal/testutil/testdata/schema-v0.9.1 && git archive v0.9.1 openspec/schemas/docket | tar -x --strip-components=3 -C internal/testutil/testdata/schema-v0.9.1`, then `git add` it.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
   - `TestOldSchemaIsShipped` (`internal/setup/schema_test.go`): `HashDir("../testutil/testdata/schema-v0.9.1")` is `edc92ac411c0e925656d58d8ac7de51b08bdd47b9e92356c4cca073b58bcefde`.
   - `TestShippedProjectCopyRemoved` (cli): `InstallOldSchema`, empty data directory → exit 0; the per-machine copy matches; each of the five copy files is listed `removed` by its repository path; `openspec/schemas/docket` does not exist; no `openspec/.docket-removed-*` remains.
   - `TestEditedProjectCopyKept`: `InstallSchema`, then append a line to its `templates/proposal.md`; `--force` → the copy byte-for-byte unchanged, `schema-edited` with `file` `openspec/schemas/docket`, exit 1.
@@ -256,21 +256,21 @@
   - `TestInspectEditedProjectCopy`: `InstallSchema` plus an appended line in `templates/proposal.md` → `schema-edited`.
   - `TestInspectNothingWritten`: add an old project copy and a `spec-driven` config; snapshot the repository, the config directory and `<dataHome>` (paths, modes, bytes) before and after: identical.
 
-- [ ] **Step 3: Run them to see them fail**
+- [x] **Step 3: Run them to see them fail**
 
   Run: `go test ./internal/setup/ ./internal/cli/ -run 'TestOldSchemaIsShipped|ProjectCopy|TestFolderWithoutSchema|TestRemoval|TestSymlinkInProjectCopy|TestInspectNothingWritten'`.
   Expected: FAIL (`undefined: InstallOldSchema`, the copy not removed).
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
   - Decide the copy with the other targets: a link on `openspec/schemas/docket` or under it is a `ProblemSymlink`; otherwise `HashDir` and `IsShipped` give the state.
   - After every write, when the copy is `ShippedCopy` and every per-machine file is `unchanged`, `written` or `overwritten`: rename `openspec/schemas/docket` to `openspec/.docket-removed-<pid>` through `rename`, list each file `removed` (sorted), and remove the renamed folder through a new `var removeAll = os.RemoveAll`, whose error names that folder. Nothing else under `openspec/` is removed.
   - `cmd_init.go`: `EditedCopy` gives `schema-edited`; `ShippedCopy` with nothing `removed` gives `schema-project-copy` with the init message.
   - `cmd_inspect.go`: `ShippedCopy` and `EditedCopy` give their findings with the inspect messages.
   - `InstallOldSchema` copies from the test data, found through the source file's directory (`runtime.Caller`).
 
-- [ ] **Step 5: Run the tests above, then `go test ./...` and `go vet ./...`.** Expected: PASS.
+- [x] **Step 5: Run the tests above, then `go test ./...` and `go vet ./...`.** Expected: PASS.
 
-- [ ] **Step 6: Commit** as `feat(init, inspect): remove or report a project copy of the schema`, with the trailers; the test data goes in the same commit.
+- [x] **Step 6: Commit** as `feat(init, inspect): remove or report a project copy of the schema`, with the trailers; the test data goes in the same commit.
 
 ### Task 4: `dkt new` and `dkt archive` find the schema as OpenSpec does
 
@@ -296,7 +296,7 @@
   - `ArchiveResult` gains `Schema *SchemaState` (`json:"schema"`).
   - `testutil.InstallDataSchema(t testing.TB, dataHome string)`: the shipped schema under `<dataHome>/openspec/schemas/docket/`.
 
-- [ ] **Step 1: Write the failing tests.** `runNew` and `runArchive` pass `XDG_DATA_HOME=<dataHome(r.Dir)>`. Paths are compared after `filepath.EvalSymlinks`.
+- [x] **Step 1: Write the failing tests.** `runNew` and `runArchive` pass `XDG_DATA_HOME=<dataHome(r.Dir)>`. Paths are compared after `filepath.EvalSymlinks`.
 
   **`internal/cli/cmd_new_test.go`:**
   - `TestSchemaNotInstalled`: a repository without `testutil.InstallSchema` and an empty data directory → exit 1, `schema-missing` with the new/archive message, the fake OpenSpec log empty, `noChange`.
@@ -314,19 +314,19 @@
   - `TestArchiveRelativeDataHome`: `XDG_DATA_HOME=data`, no project copy → exit 4, the fake OpenSpec log empty, the working tree unchanged.
   - The precondition tests (uncommitted, behind, not merged) keep their assertions and must pass.
 
-- [ ] **Step 2: Run them to see them fail**
+- [x] **Step 2: Run them to see them fail**
 
   Run: `go test ./internal/cli/ -run 'TestSchemaNotInstalled|TestNew|TestChangeCreated|TestArchiveSchema'`.
   Expected: FAIL (`undefined: testutil.InstallDataSchema`, no `result.schema`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
   - `schema.go`: `findSchema` per the Global Constraints. `Matches` compares `HashDir(dir)` with `TreeHash(docket.Schema())`. The human line depends on where the copy is and, for a project copy, on `IsShipped`.
   - `cmd_new.go`: `findSchema` replaces the `os.Stat` check, in the same place; the result is `newResult`, the line follows `created <dir>`.
   - `cmd_archive.go`: `findSchema` runs before `openspec.New`; when it finds nothing, return the precondition stop with `schema-missing` and empty arrays; otherwise every outcome carries `Schema`, and the line goes after the archive lines.
 
-- [ ] **Step 4: Run the tests above, then `go test ./...` and `go vet ./...`.** Expected: PASS. With OpenSpec 1.14.3 at hand, also `DOCKET_TEST_OPENSPEC="npx -y @fission-ai/openspec@1.14.3" go test ./internal/cli/ -run TestNewWithMachineSchemaOpenSpec`. Expected: PASS.
+- [x] **Step 4: Run the tests above, then `go test ./...` and `go vet ./...`.** Expected: PASS. With OpenSpec 1.14.3 at hand, also `DOCKET_TEST_OPENSPEC="npx -y @fission-ai/openspec@1.14.3" go test ./internal/cli/ -run TestNewWithMachineSchemaOpenSpec`. Expected: PASS.
 
-- [ ] **Step 5: Commit** as `feat(new, archive): find the schema as OpenSpec resolves it`, with the trailers.
+- [x] **Step 5: Commit** as `feat(new, archive): find the schema as OpenSpec resolves it`, with the trailers.
 
 ### Task 5: Move this repository's schema source and update the docs
 
@@ -344,12 +344,12 @@
 - Modify: `docket/ideas/2026-10-31-global-schema.md`
 - Modify: `docket/order.md`
 
-- [ ] **Step 1: Move the source (structural)**
+- [x] **Step 1: Move the source (structural)**
   - `git mv openspec/schemas/docket schema/docket`; the embed and `fs.Sub` in `schema.go` read `schema/docket`, and the comments name it.
   - Run `go test ./...` and `go vet ./...`. Expected: PASS, with no test changed.
   - Commit as `refactor: ship the schema from schema/docket`, with the trailers.
 
-- [ ] **Step 2: Update the docs**
+- [x] **Step 2: Update the docs**
   - `AGENTS.md`, outside the Docket block: the schema Docket ships is `schema/docket/`; `dkt init` installs it once per machine; the prompt paths list `schema/docket/` instead of `openspec/schemas/docket/`.
   - `docs/ARCHITECTURE.md`: `schema.go` embeds `schema/docket`; `internal/setup` installs the schema per machine and removes project copies; a row for `internal/userdirs`; capability rows for `userdirs.Home`, `userdirs.DataHome`, `setup.SchemaDir`, `setup.FindSchema`, `setup.TreeHash`, `setup.HashDir`, `setup.IsShipped`, `setup.SchemaKey`.
   - `README.md`:
@@ -360,12 +360,12 @@
   - The idea file: a `## Status` section saying the change `install-schema-per-machine` did it and forks are in `2026-10-31-schema-fork.md`; "Of the eleven releases" becomes "Of the twelve releases".
   - `docket/order.md`: tick item 5.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
   - `go test ./...`, `go vet ./...` and `go run ./cmd/dkt lint --default-branch main`. Expected: PASS and `dkt lint: ok`.
   - `rg -n "openspec/schemas/docket" --type go -g '!*_test.go'` lists only the project-copy path in `internal/setup` and `internal/cli`.
   - With `DOCKET_OPENSPEC` naming OpenSpec 1.14.x and `XDG_DATA_HOME` set to the directory that OpenSpec uses: `go run ./cmd/dkt init`, then `openspec validate install-schema-per-machine --strict`. Expected: valid.
 
-- [ ] **Step 4: Commit** as `docs: the schema is installed per machine`, with the trailers.
+- [x] **Step 4: Commit** as `docs: the schema is installed per machine`, with the trailers.
 
 ### Task 6: `docket-doctor` handles the new findings
 
@@ -377,14 +377,14 @@
 - Modify: `.agents/skills/docket-doctor/SKILL.md`
 - Modify: `.claude/skills/docket-doctor/SKILL.md`
 
-- [ ] **Step 1: Edit `.agents/skills/docket-doctor/SKILL.md`**, then copy it byte for byte to `.claude/skills/docket-doctor/SKILL.md`:
+- [x] **Step 1: Edit `.agents/skills/docket-doctor/SKILL.md`**, then copy it byte for byte to `.claude/skills/docket-doctor/SKILL.md`:
   - The installed-files item also lists `schema-project-copy`, `config-schema-default`, and per-machine paths in `schema-missing` and `schema-differs`. Its comparison runs `dkt init` in the new temporary directory with `XDG_DATA_HOME` set to a second new temporary directory, so the user's per-machine copy is not written, and compares per-machine files under that second directory.
   - A new item for `schema-edited`: show how the copy differs from the shipped schema; say that it is used instead of the per-machine one and that forks are not supported yet; removing it loses the edits, so only remove it, then run `dkt init`, after the user agrees.
   - A new item for `config-schema-other`: say that `dkt new` uses `docket` either way; propose setting `schema: docket`, and edit `openspec/config.yaml` only after the user agrees.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
   - `go test . -run 'TestInstalledSkillMatchesShipped|TestSkillFrontmatter|TestDoctorHiddenFromCodex'`. Expected: PASS.
   - `diff .agents/skills/docket-doctor/SKILL.md .claude/skills/docket-doctor/SKILL.md` prints nothing.
   - `rg -n -e schema-project-copy -e schema-edited -e config-schema-default -e config-schema-other .agents/skills/docket-doctor/SKILL.md` finds each rule.
 
-- [ ] **Step 3: Commit** as `docs(doctor): the per-machine schema findings`, with the trailers.
+- [x] **Step 3: Commit** as `docs(doctor): the per-machine schema findings`, with the trailers.
