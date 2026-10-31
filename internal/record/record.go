@@ -97,6 +97,12 @@ func (e *LinkError) Error() string {
 	return e.Name + " is a symbolic link; Docket does not write through links"
 }
 
+// writeRecord and removePath are replaced by tests to inject failures.
+var (
+	writeRecord = func(f *os.File, b []byte) error { _, err := f.Write(b); return err }
+	removePath  = os.Remove
+)
+
 // Create writes content to the first free record file in dir, creating dir
 // when it first needs to open a file (so nothing is created when it returns
 // ErrTooLong without trying one): slug, then
@@ -104,7 +110,9 @@ func (e *LinkError) Error() string {
 // when its file exists; the file is created exclusively, so concurrent runs
 // never take the same one. It returns the slug written. A symbolic link in
 // the way stops it with a *LinkError; a candidate past change.MaxSlug stops it
-// with an error wrapping ErrTooLong. When the write fails the file is removed.
+// with an error wrapping ErrTooLong. When the write fails the file is removed,
+// then each folder this call made, deepest first; whatever it cannot remove is
+// named in the error.
 func Create(dir, slug string, used func(slug string) bool, content []byte) (string, error) {
 	for n := 1; ; n++ {
 		cand := change.Suffixed(slug, n)
@@ -115,6 +123,13 @@ func Create(dir, slug string, used func(slug string) bool, content []byte) (stri
 			continue
 		}
 		path := filepath.Join(dir, cand+".md")
+		var made []string // folders on the way to dir that do not exist yet, deepest first
+		for p := dir; ; p = filepath.Dir(p) {
+			if _, err := os.Lstat(p); err == nil || filepath.Dir(p) == p {
+				break
+			}
+			made = append(made, p)
+		}
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return "", err
 		}
@@ -129,12 +144,18 @@ func Create(dir, slug string, used func(slug string) bool, content []byte) (stri
 		if err != nil {
 			return "", err
 		}
-		_, werr := f.Write(content)
+		werr := writeRecord(f, content)
 		if cerr := f.Close(); werr == nil {
 			werr = cerr
 		}
 		if werr != nil {
-			return "", errors.Join(werr, os.Remove(path))
+			errs := []error{werr}
+			for _, p := range append([]string{path}, made...) {
+				if rerr := removePath(p); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+					errs = append(errs, fmt.Errorf("%s was left: %w", p, rerr))
+				}
+			}
+			return "", errors.Join(errs...)
 		}
 		return cand, nil
 	}

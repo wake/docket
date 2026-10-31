@@ -170,6 +170,84 @@ func TestCreateMakesTheFolder(t *testing.T) {
 	}
 }
 
+func failWrite(t *testing.T, before func()) {
+	t.Helper()
+	old := writeRecord
+	writeRecord = func(f *os.File, b []byte) error {
+		if before != nil {
+			before()
+		}
+		return errors.New("disk full")
+	}
+	t.Cleanup(func() { writeRecord = old })
+}
+
+func exists(p string) bool { _, err := os.Lstat(p); return err == nil }
+
+func TestCreateFailedWriteLeavesNothing(t *testing.T) {
+	root := t.TempDir()
+	failWrite(t, nil)
+	_, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket was left")
+	}
+}
+
+func TestCreateFailedWriteKeepsExistingFolders(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "docket"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	failWrite(t, nil)
+	if _, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x")); err == nil {
+		t.Fatal("no error")
+	}
+	if !exists(filepath.Join(root, "docket")) || exists(filepath.Join(root, "docket", "records")) {
+		t.Error("want docket kept and docket/records removed")
+	}
+}
+
+func TestCreateFailedWriteKeepsOtherRecords(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "docket", "records")
+	other := filepath.Join(dir, "other.md")
+	failWrite(t, func() {
+		if err := os.WriteFile(other, []byte("o"), 0o644); err != nil {
+			t.Error(err)
+		}
+	})
+	_, err := Create(dir, "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), dir+" was left") {
+		t.Fatalf("err = %v", err)
+	}
+	if !exists(other) || exists(filepath.Join(dir, "x.md")) {
+		t.Error("want the other record kept and ours removed")
+	}
+	if !exists(filepath.Join(root, "docket")) {
+		t.Error("docket removed")
+	}
+}
+
+func TestCreateFailedCleanupNamesLeftover(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "docket", "records")
+	failWrite(t, nil)
+	old := removePath
+	removePath = func(p string) error {
+		if strings.HasSuffix(p, "x.md") {
+			return errors.New("busy")
+		}
+		return old(p)
+	}
+	t.Cleanup(func() { removePath = old })
+	_, err := Create(dir, "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), filepath.Join(dir, "x.md")+" was left: busy") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestRender(t *testing.T) {
 	const tpl = "<!-- c -->\n\n## What\n\n<!-- x -->\n"
 	title := "Fix: the #1 timeout"
