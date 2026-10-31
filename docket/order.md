@@ -4,7 +4,7 @@
 2. [x] `docket/ideas/2026-10-29-framework-skill.md`
 3. [x] `docket/ideas/2026-10-24-scan-git-calls.md`
 4. [x] `docket/ideas/2026-10-31-scan-tree-batch.md`
-5. [ ] `docket/ideas/2026-10-31-global-schema.md`
+5. [x] `docket/ideas/2026-10-31-global-schema.md`
 6. [ ] `docket/ideas/2026-10-31-existing-project-adoption.md`
 7. [ ] `docket/ideas/2026-10-29-records.md`
 8. [ ] `docket/ideas/2026-10-29-ideas-and-order.md`

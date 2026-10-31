@@ -31,7 +31,7 @@ out of date. Forks are left for later: `2026-10-31-schema-fork.md`.
   copy from a newer one. On a machine with an older `dkt`, the advice to
   run `dkt init --force` overwrites a newer committed copy.
 - Every schema change costs every project a pull request, reviewed as
-  prompt text. Of the eleven releases after v0.1.0, three changed the
+  prompt text. Of the twelve releases after v0.1.0, three changed the
   schema.
 
 ## How OpenSpec does it
@@ -103,3 +103,7 @@ Accepted costs:
 
 - What `dkt init` does when `config.yaml` already names another schema,
   as in a project with `spec-driven` changes.
+
+## Status
+
+Done by the change `install-schema-per-machine`: `dkt init` installs the schema once per machine and removes a project copy of a shipped schema. Forks are in `2026-10-31-schema-fork.md`.

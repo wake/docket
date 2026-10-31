@@ -6,13 +6,13 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 
 | Path | Role |
 |---|---|
-| `schema.go` | Root package `docket`: embeds the OpenSpec schema, the `docket`, `docket-setup` and `docket-doctor` skills, the Docket block of `AGENTS.md`, the workflow template (`workflow/template.md`) and the record template (`record/template.md`) |
+| `schema.go` | Root package `docket`: embeds the OpenSpec schema (`schema/docket`), the `docket`, `docket-setup` and `docket-doctor` skills, the Docket block of `AGENTS.md`, the workflow template (`workflow/template.md`) and the record template (`record/template.md`) |
 | `cmd/dkt` | Entry point; the only place that reads the process environment and working directory |
 | `internal/cli` | Command table, argument handling, text and JSON output, exit codes |
 | `internal/gitx` | Every git call: refs, worktrees, merge-base, file contents at a revision |
 | `internal/openspec` | Locates, version-checks and runs the OpenSpec CLI |
 | `internal/scan` | Finds changes across worktrees and branches; resolves the default branch |
-| `internal/setup` | Installs the schema, the skills and the Docket block (`dkt init`), and decides what it would do without writing (`dkt inspect`) |
+| `internal/setup` | Installs the schema once per machine, the skills and the Docket block (`dkt init`), removes a project copy of a shipped schema, and decides what it would do without writing (`dkt inspect`) |
 | `internal/change` | Change-folder rules: slug validation, `docket.yaml` metadata, plan steps and ticking |
 | `internal/archive` | Closes changes: `dkt sync`, `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, the trailer check of `dkt inspect`, and `evidence.md` |
 | `internal/markdown` | Line, heading and table readers that skip code fences and comments |
@@ -21,6 +21,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/conflicts` | Finds requirements that more than one active change touches |
 | `internal/record` | Records: kinds, name and slug, the template rendering, creating a file under a free name, parsing and word counting |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
+| `internal/userdirs` | Finds the home and the data directory (`XDG_DATA_HOME`) from values `cmd/dkt` passes in |
 | `internal/safepath` | Refuses a write path that passes through a symbolic link |
 | `internal/workflow` | Locates the user's workflow file and reports its state against the shipped template; never writes it |
 | `internal/testutil` | Test-only helpers: temporary repositories, a fake OpenSpec |
@@ -37,6 +38,13 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Validate a slug | `change.ValidateSlug` |
 | Record title, kind, source and base | `change.CreateDocket` |
 | Install the schema | `setup.Init` |
+| Find the home directory | `userdirs.Home` |
+| Find the data directory | `userdirs.DataHome` |
+| Find the per-machine schema directory | `setup.SchemaDir` |
+| Find the schema as OpenSpec does | `setup.FindSchema` |
+| Hash a schema tree or a directory | `setup.TreeHash`, `setup.HashDir` |
+| Tell whether a tree is a shipped schema | `setup.IsShipped` |
+| Read or set `schema:` in `openspec/config.yaml` | `setup.SchemaKey` |
 | Check a path before writing to it | `safepath.Check` |
 | Read Markdown lines, headings and tables | `markdown.Lines`, `markdown.Headings`, `markdown.FindTable` |
 | Blank out HTML comments outside fenced code | `markdown.BlankComments` |

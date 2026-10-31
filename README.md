@@ -129,6 +129,8 @@ go install github.com/wake/docket/cmd/dkt@latest
 
 `dkt init` and `dkt new` need the OpenSpec CLI 1.14.x on `PATH`, or set `DOCKET_OPENSPEC` to the command to run.
 
+`dkt init` writes the `docket` schema once per machine, to `$XDG_DATA_HOME/openspec/schemas/docket/` (by default `~/.local/share/openspec/schemas/docket/`), where OpenSpec looks for it. It sets `schema: docket` in `openspec/config.yaml`. A wrapper that gives OpenSpec another `XDG_DATA_HOME` or `HOME` needs `dkt` run with the same values. CI that runs `openspec` on a change runs `dkt init` first.
+
 ### Upgrading
 
 Changes made by an older dkt still work: their kind, source and base are read from `x-kind`, `x-source` and `x-base` in `.openspec.yaml`. `dkt lint` asks for a `docket.yaml` with a title for each of them, and each main spec needs a `docket.yaml` with its title too.
@@ -136,6 +138,8 @@ Changes made by an older dkt still work: their kind, source and base are read fr
 In a project set up by an older dkt, run `dkt init` again. It adds the `docket` skill and the Docket block. Delete any "Change workflow" section pasted into `AGENTS.md` from an earlier release, and commit `.claude/skills/docket/`, `.agents/skills/docket/`, `AGENTS.md` and `CLAUDE.md`.
 
 In a project set up by dkt v0.6.0, run `dkt init --force` to take the new Docket block and skill (until then `dkt init` reports `agents-block-differs`), and commit them. The agent then sets up your workflow file at the first piece of development work.
+
+In a project set up by dkt v0.9.2 or earlier, the schema is a copy in `openspec/schemas/docket/`. Run `dkt init`. Check that it removed `openspec/schemas/docket/` and set `schema: docket` in `openspec/config.yaml`, and commit both. Everyone who works on the project upgrades dkt and runs `dkt init`, once per machine. A copy that you edited is left alone, and `dkt init` reports it as `schema-edited`.
 
 ## Requirements (planned)
 
