@@ -1,0 +1,4 @@
+title: Install the shipped schema once per machine
+kind: change-request
+source: docket/ideas/2026-10-31-global-schema.md (order 5)
+base: 1c6ca8d4a951ee2a2e2e1d028c0298ce8cf15e9b
