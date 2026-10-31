@@ -24,7 +24,7 @@
   - after the records, when `--limit` cut: `<n> more merged records not listed; raise --limit`
 - Finding rules: `record-missing`, `record-trailer`, `task-unknown`, `plan-unsynced`, `symlink-refused`, `slug-invalid`; record findings carry `change` set to the record slug, as `dkt lint`'s record findings do.
 - Usage errors (exit 2): `--since` or `--limit` without `--merged`; any of the three with slugs; `--since` that does not name a commit (`RefExists(rev + "^{commit}")`); `--limit` that is not a positive integer.
-- Files that `install-schema-per-machine` changes are not edited here: `internal/cli/cmd_{new,archive,init,inspect}*.go`, `internal/setup/`, `internal/userdirs/`, `internal/workflow/`, `internal/testutil/openspec.go`, `schema.go`, `schema_test.go`, `AGENTS.md`. They may be called (`resolveDefaultBranch`, `cleanRepo`, `testutil.InstallSchema`). `README.md`, `docs/ARCHITECTURE.md` and `docket/order.md` are edited only in Task 10, after that change merges.
+- Until `install-schema-per-machine` merges (it merged at `b5db90f`; Task 5 then edits `internal/cli/cmd_archive.go`), files that it changes are not edited here: `internal/cli/cmd_{new,archive,init,inspect}*.go`, `internal/setup/`, `internal/userdirs/`, `internal/workflow/`, `internal/testutil/openspec.go`, `schema.go`, `schema_test.go`, `AGENTS.md`. They may be called (`resolveDefaultBranch`, `cleanRepo`, `testutil.InstallSchema`). `README.md`, `docs/ARCHITECTURE.md` and `docket/order.md` are edited only in Task 10, after that change merges.
 - Only `internal/gitx` starts git (test helpers excepted); nothing below `cmd/dkt` reads the process environment; readers take bytes; nothing writes through a link (`safepath.Check`).
 - Everything in the repository is in English.
 - TDD, one item per round: take one test from a task's list, see it fail, make it pass, then take the next.
@@ -237,6 +237,7 @@
 **Files:**
 - Modify: `internal/cli/cmd_lint.go`
 - Modify: `internal/cli/cmd_lint_test.go`
+- Modify: `internal/cli/cmd_archive.go` (its one `addedFiles` call)
 - Modify: `internal/lint/lint.go`
 - Modify: `internal/lint/routing.go`
 - Modify: `internal/lint/routing_test.go`
