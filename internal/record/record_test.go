@@ -251,14 +251,14 @@ func TestCreateFailedCleanupNamesLeftover(t *testing.T) {
 
 func TestCreateMkdirFailsLeavesNothing(t *testing.T) {
 	root := t.TempDir()
-	old := makeDirs
-	makeDirs = func(p string, m os.FileMode) error {
-		if err := os.Mkdir(filepath.Join(root, "docket"), m); err != nil {
-			t.Error(err)
+	old := makeDir
+	makeDir = func(p string, m os.FileMode) error {
+		if strings.HasSuffix(p, "records") {
+			return errors.New("no permission")
 		}
-		return errors.New("no permission")
+		return old(p, m)
 	}
-	t.Cleanup(func() { makeDirs = old })
+	t.Cleanup(func() { makeDir = old })
 	_, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x"))
 	if err == nil || !strings.Contains(err.Error(), "no permission") {
 		t.Fatalf("err = %v", err)
@@ -299,6 +299,57 @@ func TestCreateLaterCandidateKeepsTheBookkeeping(t *testing.T) {
 	}
 	if exists(filepath.Join(root, "docket")) {
 		t.Error("docket was left")
+	}
+}
+
+func TestCreateDoesNotOwnAFolderAnotherRunMade(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "docket", "records")
+	old := makeDir
+	makeDir = func(p string, m os.FileMode) error {
+		if p == dir { // another run makes it first
+			if err := os.Mkdir(p, m); err != nil {
+				t.Error(err)
+			}
+		}
+		return old(p, m)
+	}
+	t.Cleanup(func() { makeDir = old })
+	failWrite(t, nil)
+	if _, err := Create(dir, "x", never, []byte("x")); err == nil {
+		t.Fatal("no error")
+	}
+	if !exists(dir) {
+		t.Error("docket/records, made by another run, was removed")
+	}
+}
+
+func TestCreateLinkCandidateCleansUp(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "docket", "records")
+	old := openFile
+	openFile = func(p string, fl int, m os.FileMode) (*os.File, error) {
+		if err := os.Symlink(filepath.Join(root, "nowhere"), p); err != nil {
+			t.Error(err)
+		}
+		return nil, fs.ErrExist
+	}
+	t.Cleanup(func() { openFile = old })
+	// The link is not ours to delete; take it away as its owner would, so the
+	// folders can go.
+	oldRm := removePath
+	removePath = func(p string) error {
+		_ = os.Remove(filepath.Join(dir, "x.md"))
+		return oldRm(p)
+	}
+	t.Cleanup(func() { removePath = oldRm })
+	_, err := Create(dir, "x", never, []byte("x"))
+	var le *LinkError
+	if !errors.As(err, &le) {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Errorf("folders were left: %v", err)
 	}
 }
 

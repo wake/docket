@@ -101,7 +101,7 @@ func (e *LinkError) Error() string {
 var (
 	writeRecord = func(f *os.File, b []byte) error { _, err := f.Write(b); return err }
 	removePath  = os.Remove
-	makeDirs    = os.MkdirAll
+	makeDir     = os.Mkdir
 	openFile    = os.OpenFile
 )
 
@@ -143,21 +143,31 @@ func Create(dir, slug string, used func(slug string) bool, content []byte) (stri
 		path := filepath.Join(dir, cand+".md")
 		if !planned {
 			planned = true
+			var missing []string // outermost last
 			for p := dir; ; p = filepath.Dir(p) {
 				if _, err := os.Lstat(p); err == nil || filepath.Dir(p) == p {
 					break
 				}
-				made = append(made, p)
+				missing = append(missing, p)
 			}
-		}
-		if err := makeDirs(dir, 0o755); err != nil {
-			return fail("", err)
+			// Only a folder this call's Mkdir made is ours to remove; ErrExist
+			// means another run made it between the walk and here.
+			for i := len(missing) - 1; i >= 0; i-- {
+				err := makeDir(missing[i], 0o755)
+				if errors.Is(err, fs.ErrExist) {
+					continue
+				}
+				if err != nil {
+					return fail("", err)
+				}
+				made = append([]string{missing[i]}, made...)
+			}
 		}
 		f, err := openFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
 		if errors.Is(err, fs.ErrExist) {
 			fi, lerr := os.Lstat(path)
 			if lerr == nil && fi.Mode()&fs.ModeSymlink != 0 {
-				return "", &LinkError{Name: cand + ".md"}
+				return fail("", &LinkError{Name: cand + ".md"})
 			}
 			continue
 		}
