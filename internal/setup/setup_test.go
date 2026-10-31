@@ -496,3 +496,69 @@ func TestRemovalCleanupFails(t *testing.T) {
 		t.Errorf("another folder was touched: %v", err)
 	}
 }
+
+// interfereOnRemoval makes rename append a line to path just before the
+// project copy is renamed aside.
+func interfereOnRemoval(t *testing.T, path string) {
+	t.Helper()
+	orig := rename
+	t.Cleanup(func() { rename = orig })
+	rename = func(from, to string) error {
+		if strings.Contains(to, ".docket-removed-") {
+			f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+			if err != nil {
+				t.Error(err)
+			} else {
+				f.WriteString("# edited\n")
+				f.Close()
+			}
+		}
+		return orig(from, to)
+	}
+}
+
+func noneRemoved(t *testing.T, root string, r Result) {
+	t.Helper()
+	for _, f := range r.Files {
+		if f.Status == Removed {
+			t.Errorf("%s was removed", f.Path)
+		}
+	}
+	if m, _ := filepath.Glob(filepath.Join(root, "openspec", ".docket-removed-*")); len(m) > 0 {
+		t.Errorf("left behind: %v", m)
+	}
+}
+
+func TestRemovalRechecksTheCopy(t *testing.T) {
+	root := oldCopyRoot(t)
+	proposal := filepath.Join(root, "openspec/schemas/docket/templates/proposal.md")
+	interfereOnRemoval(t, proposal)
+	r, err := Init(root, mdir(root), assets, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(proposal)
+	if err != nil || !strings.HasSuffix(string(b), "# edited\n") {
+		t.Errorf("the edited copy is not back: %v", err)
+	}
+	if r.ProjectCopy != EditedCopy {
+		t.Errorf("ProjectCopy = %v", r.ProjectCopy)
+	}
+	noneRemoved(t, root, r)
+}
+
+func TestRemovalRechecksTheMachineCopy(t *testing.T) {
+	root := oldCopyRoot(t)
+	interfereOnRemoval(t, filepath.Join(mdir(root), "schema.yaml"))
+	r, err := Init(root, mdir(root), assets, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "openspec/schemas/docket/schema.yaml")); err != nil {
+		t.Errorf("the copy is not back: %v", err)
+	}
+	if r.ProjectCopy != ShippedCopy {
+		t.Errorf("ProjectCopy = %v", r.ProjectCopy)
+	}
+	noneRemoved(t, root, r)
+}

@@ -187,7 +187,8 @@ func Init(root, schemaDir string, a Assets, force bool, initOpenSpec func() erro
 		res.Files = append(res.Files, File{Path: d.shown(), Status: d.status, Kind: d.kind})
 	}
 	if cp == ShippedCopy && machineMatches(plan) {
-		removed, err := removeProjectCopy(root)
+		removed, state, err := removeProjectCopy(root, schemaDir, a)
+		res.ProjectCopy = state
 		res.Files = append(res.Files, removed...)
 		if err != nil {
 			return res, err
