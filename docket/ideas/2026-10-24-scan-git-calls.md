@@ -51,4 +51,5 @@ to 3): `dkt status` here went from 46 git processes and 3.3 s to 21 and
 each unmerged ref still costs one `ls-tree`, which matters in a repository
 that merges by squash (its old branches stay unmerged); each worktree still
 costs one `merge-base`; `Toplevel` still runs git twice; and lead 4,
-bounded parallelism.
+bounded parallelism. The `ls-tree` per unmerged ref is measured and taken up
+in `2026-10-31-scan-tree-batch.md`.
