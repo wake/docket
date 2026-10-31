@@ -8,7 +8,7 @@ not copied into projects; a project names it, and a project that wants
 other rules forks it under a new name. Also decided: nothing writes the
 per-machine copy unless the user runs a command for it or agrees to it,
 and that command is `dkt init`; other commands only report it missing or
-out of date.
+out of date. Forks are left for later: `2026-10-31-schema-fork.md`.
 
 ## Today
 
@@ -73,17 +73,15 @@ To settle in the change:
    - a separate command for the per-machine copy: one command keeps
      adoption to one step.
 
-   Nobody edits it in place: other rules are a fork.
+   Nobody edits it in place.
 3. `dkt init` sets `schema: docket` in `openspec/config.yaml`. That also
    marks the project as one that uses Docket.
-4. A project with a fork names it in `config.yaml`, and `dkt new` uses the
-   schema `config.yaml` names.
-5. A project's `openspec/schemas/docket/` wins over the user directory, so
+4. A project's `openspec/schemas/docket/` wins over the user directory, so
    the copies made so far go:
    - one equal to a shipped version is removed by `dkt init`, which needs
      the hashes of every shipped version;
-   - one equal to none counts as edited in place, and `docket-doctor`
-     helps fork it under a new name;
+   - one equal to none counts as edited in place: it stays and keeps
+     winning, as today, and `dkt inspect` reports it;
    - Docket's own repository keeps its copy, which is the source.
 
 Accepted costs:
@@ -98,12 +96,10 @@ Accepted costs:
 
 - `2026-10-31-existing-project-adoption.md` builds on this: its `init`
   and `inspect` checks and the lint that reads a change's `schema`.
+- `2026-10-31-schema-fork.md`: a project's own fork of the schema, left
+  for later.
 
 ## Open questions
 
-- How `dkt` tells that a fork is Docket's, since the fork does not say
-  what it came from.
 - What `dkt init` does when `config.yaml` already names another schema,
   as in a project with `spec-driven` changes.
-- Whether the record and workflow templates, already in the binary, get a
-  project override too.
