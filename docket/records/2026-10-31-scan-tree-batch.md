@@ -23,7 +23,7 @@ refs holds a change.
 Tests pinned first, passing on the old code: non-folder entries, record
 modes, refs sharing a commit, one missing object per level, the default
 tip, a SHA-256 repository. Mutating the changed lines failed a test except
-two equivalent mutants. Purdex copy: 322 git processes and 22.1 s before,
+three equivalent mutants. Purdex copy: 322 git processes and 22.1 s before,
 18 and 1.7 s after; `dkt status --json` identical.
 
 ## Review
