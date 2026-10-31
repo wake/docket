@@ -355,6 +355,7 @@
 
 **Files:**
 - Modify: `README.md`
+- Modify: `README.zh-TW.md` (the same edits, in Traditional Chinese)
 - Modify: `docs/ARCHITECTURE.md`
 - Modify: `docket/ideas/2026-10-29-records.md`
 - Modify: `docket/order.md`
