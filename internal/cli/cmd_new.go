@@ -16,6 +16,12 @@ import (
 	"github.com/wake/docket/internal/scan"
 )
 
+// newResult is the result object of dkt new.
+type newResult struct {
+	change.NewResult
+	Schema *SchemaState `json:"schema"`
+}
+
 func newCommand() Command {
 	var kind, source, title string
 	return Command{
@@ -52,10 +58,11 @@ func newCommand() Command {
 			if c.Repo.Head == nil {
 				return fail("no-commits", "the repository has no commits; commit first")
 			}
-			if _, err := os.Stat(filepath.Join(c.Repo.Root, "openspec/schemas/docket/schema.yaml")); err != nil {
-				if !errors.Is(err, os.ErrNotExist) {
-					return Outcome{}, err
-				}
+			schema, schemaLines, err := findSchema(c)
+			if err != nil {
+				return Outcome{}, err
+			}
+			if schema == nil {
 				return fail("schema-missing", "the docket schema is not installed; run dkt init")
 			}
 			db, inv, err := scanDefaultBranch(c)
@@ -151,11 +158,12 @@ func newCommand() Command {
 			if err := change.CreateDocket(filepath.Join(dir, change.DocketFile), change.Docket{Title: title, Kind: kind, Source: source, Base: base}); err != nil {
 				return fail("metadata-failed", cleanup(err).Error())
 			}
-			res := change.NewResult{Slug: slug, Title: title, Path: dir, Kind: kind, Source: source, Base: base, Requested: requested, Used: used}
+			res := newResult{NewResult: change.NewResult{Slug: slug, Title: title, Path: dir, Kind: kind, Source: source, Base: base, Requested: requested, Used: used}, Schema: schema}
 			human := []string{"created " + dir}
 			if slug != requested {
 				human = append([]string{usedLine(requested, used, slug)}, human...)
 			}
+			human = append(human, schemaLines...)
 			return Outcome{Result: res, Human: human}, nil
 		},
 	}

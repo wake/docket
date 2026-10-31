@@ -114,6 +114,13 @@ func InstallOldSchema(t testing.TB, root string) {
 	installTree(t, os.DirFS(filepath.Join(filepath.Dir(here), "testdata", "schema-v0.9.1")), root)
 }
 
+// InstallDataSchema writes the shipped docket schema under
+// <dataHome>/openspec/schemas/docket/, the per-machine place.
+func InstallDataSchema(t testing.TB, dataHome string) {
+	t.Helper()
+	installTree(t, docket.Schema(), dataHome)
+}
+
 func installTree(t testing.TB, src fs.FS, root string) {
 	t.Helper()
 	err := fs.WalkDir(src, ".", func(p string, d fs.DirEntry, err error) error {
