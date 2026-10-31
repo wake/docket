@@ -150,8 +150,9 @@ The schema's source moves to `schema/docket/` with `git mv`, the embed in
 repository uses the per-machine copy like any project. The move is not
 split into its own pull request: without the per-machine copy it would
 leave this repository's own `openspec` commands without a schema.
-`testutil.InstallSchema` writes into the data directory under the test's
-`HOME`.
+Tests keep `testutil.InstallSchema` for a project copy and gain
+`testutil.InstallDataSchema` for a per-machine one, under the test's
+temporary data directory.
 
 ## Risks / Trade-offs
 
