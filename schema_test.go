@@ -14,6 +14,20 @@ import (
 	"github.com/wake/docket/internal/setup"
 )
 
+func TestSchemaIsShipped(t *testing.T) {
+	got, err := setup.TreeHash(Schema())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const want = "886ab9e7c68599e1049119c8ae6616629a513b1319602f15ecb2643b8e951c21"
+	if got != want {
+		t.Errorf("the embedded schema hashes to %s, not %s", got, want)
+	}
+	if !setup.IsShipped(got) {
+		t.Errorf("the embedded schema's hash %s is not in setup.ShippedSchemas; append it", got)
+	}
+}
+
 func TestRecordTemplate(t *testing.T) {
 	tpl := RecordTemplate()
 	if strings.HasPrefix(tpl, "---") {

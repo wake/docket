@@ -39,3 +39,27 @@ func Home(env []string, userHome func() (string, error)) (string, error) {
 	}
 	return home, nil
 }
+
+// RelativeError says an environment variable that must be an absolute path
+// is not one.
+type RelativeError struct{ Name, Value string }
+
+func (e *RelativeError) Error() string {
+	return e.Name + " is not an absolute path: " + e.Value
+}
+
+// DataHome returns the user data directory: XDG_DATA_HOME when it is not
+// empty (a *RelativeError when it is relative), else <home>/.local/share.
+func DataHome(env []string, userHome func() (string, error)) (string, error) {
+	if x, _ := Lookup(env, "XDG_DATA_HOME"); x != "" {
+		if !filepath.IsAbs(x) {
+			return "", &RelativeError{"XDG_DATA_HOME", x}
+		}
+		return x, nil
+	}
+	home, err := Home(env, userHome)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "share"), nil
+}
