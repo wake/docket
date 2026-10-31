@@ -133,8 +133,10 @@ changed the schema, and each cost every project a pull request.
   `schema-missing` and `schema-differs` also name per-machine files.
 - `dkt new` and `dkt archive`: `result.schema` is
   `{"path": "<absolute directory>", "matches": <bool>}`, the copy OpenSpec
-  reads and whether it is byte-for-byte the shipped schema; `null` when
-  the command stopped before finding one.
+  reads and whether it is byte-for-byte the shipped schema. `dkt new`
+  gives it with the change it created; a later failure has no result, as
+  today. `dkt archive` gives it in every result once it found the schema,
+  and `null` before.
 - `dkt inspect`: `result.files[]` gains the per-machine files (kind
   `schema`, absolute path) and `openspec/config.yaml` (kind `config`).
 
@@ -169,6 +171,7 @@ changed the schema, and each cost every project a pull request.
 - `project-setup#symlinked-schema-file-refused`
 - `project-setup#shipped-project-copy-removed`
 - `project-setup#edited-project-copy-kept`
+- `project-setup#folder-without-a-schema`
 - `project-setup#removal-waits-for-the-machine-copy`
 - `project-setup#default-schema-replaced`
 - `project-setup#config-file-created`

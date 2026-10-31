@@ -31,7 +31,7 @@
   - `config-schema-other`: `names another schema; dkt init leaves it, and dkt new still uses docket`
   - `schema-differs` and per-machine `schema-missing` in init and inspect keep today's messages.
   - `schema-project-copy` and `schema-edited` carry `file` `openspec/schemas/docket`; config findings carry `file` `openspec/config.yaml`.
-- `result.schema` of `new` and `archive`: `{"path": "<absolute directory>", "matches": <bool>}`, `null` when the command stopped before finding one. When `matches` is false, one human line:
+- `result.schema` of `new` and `archive`: `{"path": "<absolute directory>", "matches": <bool>}`. `dkt new` gives it only with a created change (its failures keep having no result); `dkt archive` gives it in every result once the schema is found, `null` before. When `matches` is false, one human line:
   - per-machine copy: `the docket schema at <path> differs from the shipped one; dkt init --force overwrites it`
   - project copy of a shipped schema: `openspec/schemas/docket is a copy of an older shipped schema and is used instead of the per-machine one; dkt init removes it`
   - edited project copy: `openspec/schemas/docket differs from every shipped schema and is used instead of the per-machine one`
@@ -50,7 +50,7 @@
 - `XDG_DATA_HOME` with a trailing slash, set twice, or set empty: the slash is harmless, the last value counts, empty means the default. Test: Task 1 (`TestDataHome`).
 - A project copy with one extra file, such as a user's own template: edited, kept. Test: Task 3 (`TestProjectCopyWithExtraFileKept`).
 - `config.yaml` with CRLF line endings and a comment on the `schema` line: only the value changes. Test: Task 2 (`TestNameDocket`).
-- A run that fails after renaming the project copy aside: the next run sweeps the leftover; a failed rename leaves the copy where it was. Test: Task 3 (`TestLeftoverSwept`, `TestRemovalRenameFails`).
+- A run that fails while removing the project copy: a failed rename leaves the copy where it was; a failure after the rename leaves only `openspec/.docket-removed-<pid>`, which the error names and no run deletes by name. Test: Task 3 (`TestRemovalRenameFails`, `TestRemovalCleanupFails`).
 
 ## Reuse
 
@@ -176,6 +176,7 @@
   - `TestInitDataHomeFromXDG`: with `XDG_DATA_HOME=<tmp>/d`, `<tmp>/d/openspec/schemas/docket/schema.yaml` matches the shipped file.
   - `TestInitDataHomeDefault`: no `XDG_DATA_HOME`, `HOME=<tmp>/h` → `<tmp>/h/.local/share/openspec/schemas/docket/schema.yaml` matches.
   - `TestInitRelativeDataHome`: `XDG_DATA_HOME=data` → exit 4, stderr names `XDG_DATA_HOME`; the repository has no `openspec/`, `.claude/` or `AGENTS.md`, and the fake OpenSpec log is empty.
+  - `TestInitNoHome`: no `HOME`, no `XDG_DATA_HOME`, nil user lookup → exit 4 with `userdirs.ErrNoHome`'s text, and the same nothing-written checks.
   - `TestInitLinkedDataDirectoryFollowed`: `XDG_DATA_HOME` a link to `<tmp>/real` → exit 0 and `<tmp>/real/openspec/schemas/docket/schema.yaml` matches.
   - `TestLocallyEditedTemplate`: after one run, edit the per-machine `templates/proposal.md`; the next run leaves it, reports `schema-differs` with its absolute path, exits 1.
   - `TestForceOverwrites` (scenario Machine copy forced): edit the per-machine `templates/proposal.md` and `.agents/skills/docket/SKILL.md`; `--force` restores both, lists both `overwritten`, exits 0.
@@ -217,7 +218,7 @@
 
 ### Task 3: `dkt init` removes an unedited project copy, and `dkt inspect` reports one
 
-**Scenarios:** project-setup#shipped-project-copy-removed, project-setup#edited-project-copy-kept, project-setup#removal-waits-for-the-machine-copy, setup-inspection#project-copy-reported, setup-inspection#nothing-written
+**Scenarios:** project-setup#shipped-project-copy-removed, project-setup#edited-project-copy-kept, project-setup#folder-without-a-schema, project-setup#removal-waits-for-the-machine-copy, setup-inspection#project-copy-reported, setup-inspection#nothing-written
 
 **Review:** judgment
 
@@ -248,20 +249,21 @@
   - `TestProjectCopyWithExtraFileKept`: `InstallSchema` plus `templates/extra.md` → `schema-edited`, nothing removed.
   - `TestRemovalWaitsForTheMachineCopy`: one run installs the per-machine copy; then `InstallSchema` and append a line to the per-machine `schema.yaml`; a run without `--force` → the copy unchanged, findings `schema-differs` and `schema-project-copy`, exit 1.
   - `TestSymlinkInProjectCopyRefused`: `InstallSchema`, then make its `templates/proposal.md` a link → exit 1, `symlink-refused` naming `openspec/schemas/docket/templates/proposal.md`, the per-machine directory not created.
+  - `TestFolderWithoutSchemaLeft`: `openspec/schemas/docket/templates/proposal.md` and no `schema.yaml` → exit 0, the folder byte-for-byte unchanged, no `schema-*` finding names it.
   - `TestRemovalRenameFails` (`setup`): `rename` fails when the destination name holds `.docket-removed-` → `Init` returns an error and `openspec/schemas/docket` still holds every file.
-  - `TestLeftoverSwept` (`setup`): `openspec/.docket-removed-7/schema.yaml` exists → after `Init`, the folder is gone; a link `openspec/.docket-removed-8` to an outside folder is left, and the folder it points to is unchanged.
+  - `TestRemovalCleanupFails` (`setup`): `removeAll` fails → `Init` returns an error naming `openspec/.docket-removed-<pid>`; `openspec/schemas/docket` does not exist; a folder `openspec/.docket-removed-1` made before the run is still there afterwards.
   - `TestInspectProjectCopyReported`: `InstallOldSchema` → `schema-project-copy`, `file` `openspec/schemas/docket`, message ending `dkt init removes it`.
   - `TestInspectEditedProjectCopy`: `InstallSchema` plus an appended line in `templates/proposal.md` → `schema-edited`.
   - `TestInspectNothingWritten`: add an old project copy and a `spec-driven` config; snapshot the repository, the config directory and `<dataHome>` (paths, modes, bytes) before and after: identical.
 
 - [ ] **Step 3: Run them to see them fail**
 
-  Run: `go test ./internal/setup/ ./internal/cli/ -run 'TestOldSchemaIsShipped|ProjectCopy|TestRemoval|TestSymlinkInProjectCopy|TestLeftover|TestInspectNothingWritten'`.
+  Run: `go test ./internal/setup/ ./internal/cli/ -run 'TestOldSchemaIsShipped|ProjectCopy|TestFolderWithoutSchema|TestRemoval|TestSymlinkInProjectCopy|TestInspectNothingWritten'`.
   Expected: FAIL (`undefined: InstallOldSchema`, the copy not removed).
 
 - [ ] **Step 4: Implement**
   - Decide the copy with the other targets: a link on `openspec/schemas/docket` or under it is a `ProblemSymlink`; otherwise `HashDir` and `IsShipped` give the state.
-  - After every write, sweep `openspec/.docket-removed-*` entries that are directories, not links. Then, when the copy is `ShippedCopy` and every per-machine file is `unchanged`, `written` or `overwritten`: rename `openspec/schemas/docket` to `openspec/.docket-removed-<pid>` through `rename`, list each file `removed` (sorted), and `os.RemoveAll` the renamed folder.
+  - After every write, when the copy is `ShippedCopy` and every per-machine file is `unchanged`, `written` or `overwritten`: rename `openspec/schemas/docket` to `openspec/.docket-removed-<pid>` through `rename`, list each file `removed` (sorted), and remove the renamed folder through a new `var removeAll = os.RemoveAll`, whose error names that folder. Nothing else under `openspec/` is removed.
   - `cmd_init.go`: `EditedCopy` gives `schema-edited`; `ShippedCopy` with nothing `removed` gives `schema-project-copy` with the init message.
   - `cmd_inspect.go`: `ShippedCopy` and `EditedCopy` give their findings with the inspect messages.
   - `InstallOldSchema` copies from the test data, found through the source file's directory (`runtime.Caller`).
@@ -308,7 +310,8 @@
 
   **`internal/cli/cmd_archive_test.go`:**
   - `TestArchiveSchemaNotInstalled`: `add-x` merged, no project copy, empty data directory → exit 1, `schema-missing`, `result.stopped` `{"change": "", "step": "preconditions"}`, `result.schema` null, the fake OpenSpec log empty, the working tree unchanged.
-  - `TestArchiveSchemaDiffers`: an edited project copy committed, `add-x` passing every step → `add-x` archived, `result.schema.matches` false, stdout has the edited-copy line, exit 0.
+  - `TestArchiveSchemaDiffers`: no project copy; `InstallDataSchema` with a line appended to the per-machine `schema.yaml`; `add-x` passing every step → `add-x` archived, `result.schema.path` the per-machine directory, `matches` false, stdout has the per-machine line, exit 0.
+  - `TestArchiveRelativeDataHome`: `XDG_DATA_HOME=data`, no project copy → exit 4, the fake OpenSpec log empty, the working tree unchanged.
   - The precondition tests (uncommitted, behind, not merged) keep their assertions and must pass.
 
 - [ ] **Step 2: Run them to see them fail**

@@ -110,10 +110,15 @@ with the embedded tree by the same hash.
 
 Removal first renames `openspec/schemas/docket` to
 `openspec/.docket-removed-<pid>`, which OpenSpec does not read, and then
-removes that tree. A failure after the rename leaves only that folder;
-the next run removes a leftover `openspec/.docket-removed-*` tree.
-Removing file by file instead could leave a partial copy that OpenSpec
-would still resolve and that would then count as edited.
+removes that tree. A failure after the rename leaves only that folder,
+and the error names it for the user to delete; no later run deletes a
+folder by its name alone, since its content was not checked. Removing
+file by file instead could leave a partial copy that OpenSpec would
+still resolve and that would then count as edited.
+
+A folder `openspec/schemas/docket/` without `schema.yaml` is not a copy:
+OpenSpec does not read it as a schema, so `dkt init` leaves it and
+reports nothing.
 
 ### The `schema` key of `config.yaml`
 

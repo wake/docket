@@ -68,6 +68,10 @@ Apart from what `openspec init --tools none` creates, `dkt init` SHALL write onl
 - **WHEN** the project's `openspec/schemas/docket/templates/proposal.md` differs from that file in every shipped schema and a user runs `dkt init --force`
 - **THEN** the project copy is byte-for-byte unchanged, the result reports `schema-edited` naming `openspec/schemas/docket`, and the command exits with 1
 
+#### Scenario: Folder without a schema
+- **WHEN** the project's `openspec/schemas/docket/` holds `templates/proposal.md` but no `schema.yaml`, which OpenSpec does not read as a schema, and a user runs `dkt init`
+- **THEN** the folder is byte-for-byte unchanged and no finding names it
+
 #### Scenario: Removal waits for the machine copy
 - **WHEN** the project copy equals the shipped schema, the per-machine `schema.yaml` differs from it, and `--force` is absent
 - **THEN** the project copy is unchanged, the result reports `schema-differs` and `schema-project-copy`, and the command exits with 1
