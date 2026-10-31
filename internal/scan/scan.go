@@ -155,6 +155,15 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	if err != nil {
 		return inv, err
 	}
+	// One batch per level of the trees reads every commit: the unmerged refs
+	// and the default tip.
+	commits := []string{db.Commit}
+	for _, u := range unmerged {
+		if u.Err == nil {
+			commits = append(commits, u.Ref.SHA)
+		}
+	}
+	trees := readTrees(g, commits)
 	for _, u := range unmerged {
 		r := u.Ref
 		kind, rank := KindLocalBranch, rankLocalBranch
@@ -166,7 +175,8 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: u.Err.Error()})
 			continue
 		}
-		active, archived, records, recErr, err := readTree(g, r.SHA)
+		t := trees[r.SHA]
+		active, archived, records, recErr, err := t.active, t.archived, t.records, t.recErr, t.err
 		if err != nil {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
 			continue
@@ -178,7 +188,8 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 	}
 
 	dbSrc := Source{Kind: KindDefaultBranch, Name: db.Ref, Commit: db.Commit}
-	active, archived, records, recErr, err := readTree(g, db.Commit)
+	t := trees[db.Commit]
+	active, archived, records, recErr, err := t.active, t.archived, t.records, t.recErr, t.err
 	if err != nil {
 		inv.Unreadable = append(inv.Unreadable, Unreadable{Source: dbSrc, Reason: err.Error()})
 	} else {
