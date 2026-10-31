@@ -345,3 +345,17 @@ func TestNamedRecordBadSlug(t *testing.T) {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 }
+
+func TestMergedKeepsTheMergeCommitsZone(t *testing.T) {
+	r := cleanRepo(t)
+	mergeRecord(t, r, "2026-10-30-fix-a", "2026-10-30T20:00:00+08:00")
+	_, so, _ := runStatus(t, r.Dir, true, "--merged")
+	recs := statusRecords(t, so)
+	if len(recs) != 1 || recs[0]["merge"].(map[string]any)["time"] != "2026-10-30T20:00:00+08:00" {
+		t.Fatalf("%s", so)
+	}
+	_, hs, _ := runStatus(t, r.Dir, false, "--merged")
+	if !strings.Contains(hs, "  merged 2026-10-30  ") {
+		t.Fatalf("human:\n%s", hs)
+	}
+}

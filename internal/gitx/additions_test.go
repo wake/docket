@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/wake/docket/internal/testutil"
 )
@@ -109,5 +110,16 @@ func TestTagsMissingObject(t *testing.T) {
 	}
 	if _, err := g.Tags(); err == nil {
 		t.Fatal("no error")
+	}
+}
+
+func TestAdditionsKeepsTheCommittersOffset(t *testing.T) {
+	r, g := addRepo(t)
+	const date = "2026-10-30T20:00:00+08:00"
+	r.Env = append(r.Env, "GIT_COMMITTER_DATE="+date)
+	r.Commit("add a", map[string]string{recA: "a\n"})
+	got, err := g.Additions("main", "", "docket/records")
+	if err != nil || len(got) != 1 || got[0].Time.Format(time.RFC3339) != date {
+		t.Fatalf("got %+v, err %v", got, err)
 	}
 }
