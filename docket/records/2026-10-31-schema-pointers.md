@@ -21,12 +21,15 @@ missing in its proposal.
 
 ## Verification
 
-<!-- How it was checked and the result, by the light review steps of the
-workflow file: the regression test seen failing, then passing; the
-mutation that made a test fail; the mechanical check of the prompt; the
-pull request's own check run. -->
+In a throwaway repository set up by v0.9.1, the branch build reports both
+files as differing and `dkt init --force` updates them. OpenSpec 1.14.3
+prints the new proposal and plan instructions and template; no shipped
+schema file names `ARCHITECTURE` or `dkt index`. `go vet` and
+`go test ./...` pass.
 
 ## Review
 
-<!-- Who reviewed the diff (a model, or a person), what the review found,
-and how each finding was handled. -->
+Codex (gpt-5.6-sol) attacked the whole diff once and approved with no
+findings: the schema and template agree, no other shipped prompt points to
+something only Docket's repository has, and Docket's own AGENTS.md still
+names `docs/ARCHITECTURE.md`.
