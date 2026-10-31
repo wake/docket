@@ -30,6 +30,18 @@ type UnknownTrailer struct {
 // some commit names; unknown lists the other values in commit order.
 // anyTrailer is true when any commit for the change carries a Task trailer.
 func NamedTasks(p Plan, slug string, commits []gitx.Commit) (named []NamedTask, unknown []UnknownTrailer, anyTrailer bool) {
+	var chosen []gitx.Commit
+	for _, cm := range commits {
+		if slices.Contains(cm.Change, slug) {
+			chosen = append(chosen, cm)
+		}
+	}
+	return MatchTasks(p, chosen)
+}
+
+// MatchTasks matches the Task trailers of every commit it is given, as
+// NamedTasks does for the commits of one change.
+func MatchTasks(p Plan, commits []gitx.Commit) (named []NamedTask, unknown []UnknownTrailer, anyTrailer bool) {
 	first := map[int]Task{}
 	for _, t := range p.Tasks {
 		if _, dup := first[t.Number]; !dup {
@@ -38,9 +50,6 @@ func NamedTasks(p Plan, slug string, commits []gitx.Commit) (named []NamedTask, 
 	}
 	commitsOf := map[int][]gitx.Commit{}
 	for _, cm := range commits {
-		if !slices.Contains(cm.Change, slug) {
-			continue
-		}
 		seen := map[string]bool{}
 		for _, v := range cm.Task {
 			anyTrailer = true

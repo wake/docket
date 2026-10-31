@@ -50,3 +50,11 @@ func TestNamedTasks(t *testing.T) {
 		t.Errorf("no commit for slug: %v %v %v", named, unknown, anyTrailer)
 	}
 }
+
+func TestMatchTasksTakesEveryCommit(t *testing.T) {
+	p := Plan{Tasks: []Task{{Number: 1, Name: "one"}}}
+	named, unknown, anyTrailer := MatchTasks(p, []gitx.Commit{{SHA: "a1", Task: []string{"1"}}})
+	if len(named) != 1 || named[0].Task.Name != "one" || len(unknown) != 0 || !anyTrailer {
+		t.Fatalf("named = %+v, unknown = %+v, anyTrailer = %v", named, unknown, anyTrailer)
+	}
+}
