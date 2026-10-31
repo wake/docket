@@ -9,7 +9,16 @@ import (
 	"time"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/gitx"
 )
+
+func TestCommitsFor(t *testing.T) {
+	cs := []gitx.Commit{{SHA: "1", Record: []string{"a"}}, {SHA: "2", Record: []string{"b"}}, {SHA: "3", Record: []string{"a", "b"}}}
+	got := CommitsFor("a", cs)
+	if len(got) != 2 || got[0].SHA != "1" || got[1].SHA != "3" {
+		t.Fatalf("got %+v", got)
+	}
+}
 
 func TestSlugOf(t *testing.T) {
 	if got, ok := SlugOf("2026-10-30-fix-x.md"); !ok || got != "2026-10-30-fix-x" {

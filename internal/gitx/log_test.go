@@ -45,6 +45,24 @@ func TestCommits(t *testing.T) {
 	}
 }
 
+func TestCommitsRecordTrailer(t *testing.T) {
+	r := testutil.NewRepo(t)
+	base := r.Commit("base", map[string]string{"a": "1"})
+	r.Commit("x\n\nRecord: 2026-11-01-fix-x\nTask: 2", map[string]string{"a": "2"})
+	r.Commit("y\n\nrecord: a", map[string]string{"a": "3"})
+	r.Commit("z", map[string]string{"a": "4"})
+	g := Git{Dir: r.Dir, Env: r.Env}
+	got, err := g.Commits(base, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 ||
+		!reflect.DeepEqual(got[0].Record, []string{"2026-11-01-fix-x"}) || !reflect.DeepEqual(got[0].Task, []string{"2"}) ||
+		!reflect.DeepEqual(got[1].Record, []string{"a"}) || got[2].Record != nil {
+		t.Fatalf("got %+v", got)
+	}
+}
+
 func TestCommitsWithControlCharacters(t *testing.T) {
 	r := testutil.NewRepo(t)
 	base := r.Commit("base", map[string]string{"a": "1"})

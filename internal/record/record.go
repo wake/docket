@@ -8,12 +8,25 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/gitx"
 )
+
+// CommitsFor returns the commits whose Record trailers hold slug, in order.
+func CommitsFor(slug string, commits []gitx.Commit) []gitx.Commit {
+	var out []gitx.Commit
+	for _, c := range commits {
+		if slices.Contains(c.Record, slug) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
 
 // Kinds are the values --kind accepts for a record.
 var Kinds = []string{"fix", "refactor", "test", "prompt", "checks"}
