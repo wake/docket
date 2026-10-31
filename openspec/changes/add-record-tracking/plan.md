@@ -98,15 +98,15 @@
   - `gitx.Commit.Record []string`: the `Record` trailer values, read like `Change`.
   - `record.CommitsFor(slug string, commits []gitx.Commit) []gitx.Commit`: the commits whose `Record` holds `slug`, in order.
 
-- [ ] **Step 1: Pin `MatchTasks` first.** Write `TestMatchTasksTakesEveryCommit` (`change`): a commit with `Task: 1` and no `Change` trailer names Task 1. Run `go test ./internal/change/`: FAIL (`MatchTasks` undefined).
-- [ ] **Step 2: Extract the exported `MatchTasks` (structural).** Run `go test ./internal/change/ ./internal/status/ ./internal/archive/` and `go vet ./...`: PASS, with no existing test changed. Commit the test and the extraction as `refactor(change): match Task trailers over commits already chosen`.
-- [ ] **Step 3: Write the failing tests**
+- [x] **Step 1: Pin `MatchTasks` first.** Write `TestMatchTasksTakesEveryCommit` (`change`): a commit with `Task: 1` and no `Change` trailer names Task 1. Run `go test ./internal/change/`: FAIL (`MatchTasks` undefined).
+- [x] **Step 2: Extract the exported `MatchTasks` (structural).** Run `go test ./internal/change/ ./internal/status/ ./internal/archive/` and `go vet ./...`: PASS, with no existing test changed. Commit the test and the extraction as `refactor(change): match Task trailers over commits already chosen`.
+- [x] **Step 3: Write the failing tests**
   - `TestCommitsRecordTrailer` (`gitx`): a commit with message `x\n\nRecord: 2026-11-01-fix-x\nTask: 2` has `Record` `[2026-11-01-fix-x]` and `Task` `[2]`; a commit with `record: a` has `Record` `[a]`; a commit with neither has `Record` nil.
   - `TestCommitsFor` (`record`): of three commits with `Record` `[a]`, `[b]`, `[a b]`, slug `a` gives the first and third.
-- [ ] **Step 4: Run them.** `go test ./internal/gitx/ ./internal/record/`: FAIL (`Record` and `CommitsFor` undefined).
-- [ ] **Step 5: Implement** the `Record` field, read with `%(trailers:key=Record,valueonly,unfold)` as a seventh NUL-separated field, and `CommitsFor`.
-- [ ] **Step 6: Run** `go test ./...` and `go vet ./...`: PASS.
-- [ ] **Step 7: Commit** `feat(gitx, record): read Record trailers`.
+- [x] **Step 4: Run them.** `go test ./internal/gitx/ ./internal/record/`: FAIL (`Record` and `CommitsFor` undefined).
+- [x] **Step 5: Implement** the `Record` field, read with `%(trailers:key=Record,valueonly,unfold)` as a seventh NUL-separated field, and `CommitsFor`.
+- [x] **Step 6: Run** `go test ./...` and `go vet ./...`: PASS.
+- [x] **Step 7: Commit** `feat(gitx, record): read Record trailers`.
 
 ### Task 2: `dkt sync` ticks a record's tasks
 
@@ -126,7 +126,7 @@
   - `archive.SyncRecord(e Env, slug string, check bool) (SyncReport, error)`: reads `docket/records/<slug>.md` under `e.Root` after `safepath.Check`, takes `record.CommitsFor(slug, e.Git.Commits(e.Default.Commit, "HEAD"))`, ticks as `Sync` does, and writes with `writeOrRefuse`. Findings: `record-missing` (file `docket/records/<slug>.md`), `task-unknown` (as `computeSync` words it, `File` the record), `plan-unsynced` with `check` (message `Task <N> has commits and <n> unticked steps; run dkt sync <slug>`), `symlink-refused`. `SyncReport.Change` holds the slug.
   - `cli.SyncResult` becomes `{Change *string "change"; Record *string "record"; Check bool "check"; Ticked []archive.TaskTicks "ticked"}`.
 
-- [ ] **Step 1: Write the failing tests** (`internal/cli/cmd_sync_test.go`; each builds on `cleanRepo`, then `git checkout -b fix-x`; the record has `## Tasks` with `### Task 1: A` (one step) and `### Task 2: B` (two steps), all unticked):
+- [x] **Step 1: Write the failing tests** (`internal/cli/cmd_sync_test.go`; each builds on `cleanRepo`, then `git checkout -b fix-x`; the record has `## Tasks` with `### Task 1: A` (one step) and `### Task 2: B` (two steps), all unticked):
   - `TestRecordTasksTicked`: a branch commit `work\n\nRecord: 2026-11-01-fix-x\nTask: 2` → exit 0; Task 2's two steps are `[x]`, Task 1's is not; `result.record` `2026-11-01-fix-x`, `result.change` null; `git diff` changes only those two `[ ]`; `git status --porcelain` lists only the record.
   - `TestRecordSyncIgnoresMergedCommits`: the commit with `Record: <slug>` and `Task: 1` is made on `main` before branching → Task 1 stays unticked.
   - `TestRecordSyncCheck`: as `TestRecordTasksTicked` with `--check` → the record byte-for-byte unchanged, a `plan-unsynced` finding naming Task 2, exit 1.
@@ -135,10 +135,10 @@
   - `TestRecordSyncThroughLink`: `docket/records` is a link to a folder outside the repository holding the record → exit 1, `symlink-refused` naming the link, the outside file unchanged.
   - `TestRecordSyncMissing`: no record file → `record-missing`, exit 1.
   - `TestRecordSyncBadSlug`: `dkt sync 2026-11-01-` → `slug-invalid`, exit 1.
-- [ ] **Step 2: Run them.** `go test ./internal/cli/ -run 'TestRecordSync|TestRecordTasksTicked'`: FAIL.
-- [ ] **Step 3: Implement** `SyncRecord` and the routing in `cmd_sync.go`: a dated slug takes `resolveDefaultBranch(c)` (its error exits with 4) and no lock; any other slug runs as today with `result.change` set and `result.record` null.
-- [ ] **Step 4: Run** `go test ./internal/archive/ ./internal/cli/`: PASS, the existing sync tests included (they claim the `plan-sync` scenarios that keep their wording).
-- [ ] **Step 5: Commit** `feat(sync): tick a record's tasks from its commits`.
+- [x] **Step 2: Run them.** `go test ./internal/cli/ -run 'TestRecordSync|TestRecordTasksTicked'`: FAIL.
+- [x] **Step 3: Implement** `SyncRecord` and the routing in `cmd_sync.go`: a dated slug takes `resolveDefaultBranch(c)` (its error exits with 4) and no lock; any other slug runs as today with `result.change` set and `result.record` null.
+- [x] **Step 4: Run** `go test ./internal/archive/ ./internal/cli/`: PASS, the existing sync tests included (they claim the `plan-sync` scenarios that keep their wording).
+- [x] **Step 5: Commit** `feat(sync): tick a record's tasks from its commits`.
 
 ### Task 3: `dkt status` lists open records and named ones
 
@@ -163,7 +163,7 @@
   - `cli.StatusResult` gains `Records []status.Record "records"` and `RecordsTotal int "records_total"`.
   - `statusRecordLine(r status.Record) string` in `cmd_status.go`.
 
-- [ ] **Step 1: Write the failing tests** (`internal/cli/cmd_status_records_test.go`, with `runStatus`):
+- [x] **Step 1: Write the failing tests** (`internal/cli/cmd_status_records_test.go`, with `runStatus`):
   - `TestOpenRecordsListed`: worktree B holds an uncommitted `docket/records/2026-11-01-fix-x.md`; branch `fix-y` commits `2026-11-01-fix-y.md`; run in the main worktree → `result.records` slugs `[2026-11-01-fix-x 2026-11-01-fix-y]`, each `state` `open` with its title, kind and source; fix-x's `sources[0].kind` `worktree`, fix-y's `local-branch`; the human output has `2026-11-01-fix-x  "<title>"  fix  open  0/0 tasks` after the change lines.
   - `TestMergedRecordsHidden`: `main` holds `2026-10-31-fix-a.md` only → `records` `[]`, `records_total` 0, exit 0.
   - `TestMergedRecordEditedOnBranchHidden`: as above, plus branch `edit` changes that file → still `[]`.
@@ -174,10 +174,10 @@
   - `TestRecordInFocus`: `statusChange` for `add-x` and `add-y`, an open record → `dkt status add-y 2026-11-01-fix-x --json` gives `changes` `[add-y]`, `records` `[2026-11-01-fix-x]`, exit 0.
   - `TestNamedRecordBadSlug`: `dkt status 2026-11-01-` → `slug-invalid`, exit 1.
   - `TestTwoRecordsOnOneBranch` (`internal/status/records_test.go`): two open records on one branch, each named by its own commit's `Record` and `Task: 1` → each lists only its own commit.
-- [ ] **Step 2: Run them.** `go test ./internal/cli/ ./internal/status/ -run 'Record'`: FAIL.
-- [ ] **Step 3: Implement** `LoadRecords` (group the picked records by first source, one `scan.ReadFiles` and at most one `Commits` per source) and the routing in `cmd_status.go`: dated slugs go to `RecordQuery.Slugs`, undated ones to the change path as today; `records_total` is `len(records)` here.
-- [ ] **Step 4: Run** `go test ./...`: PASS, existing status tests included.
-- [ ] **Step 5: Commit** `feat(status): list open records and named ones`.
+- [x] **Step 2: Run them.** `go test ./internal/cli/ ./internal/status/ -run 'Record'`: FAIL.
+- [x] **Step 3: Implement** `LoadRecords` (group the picked records by first source, one `scan.ReadFiles` and at most one `Commits` per source) and the routing in `cmd_status.go`: dated slugs go to `RecordQuery.Slugs`, undated ones to the change path as today; `records_total` is `len(records)` here.
+- [x] **Step 4: Run** `go test ./...`: PASS, existing status tests included.
+- [x] **Step 5: Commit** `feat(status): list open records and named ones`.
 
 ### Task 4: Merged records, their merge and tag, and the filters
 
@@ -206,7 +206,7 @@
   - `scan.RecordTags(g gitx.Git, tags []gitx.Ref) (map[string]string, []Unreadable)`: for each record slug some tag holds, the short name of the first tag in the given order whose tree holds `docket/records/<slug>.md`, read with `readTrees`; a tag whose tree or records folder cannot be read is `Unreadable` with `KindTag`.
   - `LoadRecords` fills merged records: with `Merged` or a named merged record; `Since` passed to `Additions`; `Limit` cuts merged records after sorting; `total` counts open and merged records before the cut; `Tags` and `RecordTags` run only when a merged record is listed. When `Tags` fails, one `Unreadable` with `KindTag`, `Name` `refs/tags` and git's reason, and every `tag` null.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `TestAdditionsFirstParent` (`gitx`): a branch adds `docket/records/a.md` and merges with `--no-ff` → one `Addition` for it whose `SHA` is the merge commit; with `since` the merge commit → none.
   - `TestAdditionsFastForward`: the branch merges by fast-forward → the `SHA` is the branch commit that added it.
   - `TestAdditionsNewestFirst`: `a.md` added, deleted, added again → two additions, the later first.
@@ -223,10 +223,10 @@
   - `TestNamedRecordListed`: `dkt status 2026-10-30-fix-a --json` → `merged`, its `merge` and `tag`, exit 0.
   - `TestUnreadableTag`: as in `TestRecordTags`, a tag whose root tree object is removed, `--merged` → that tag in `unreadable`, exit 3; without `--merged`, exit 0.
   - `TestTagListingFails`: a lightweight tag whose commit object is removed, `--merged` → one `unreadable` entry `refs/tags`, the merged records listed with `tag` null, exit 3.
-- [ ] **Step 2: Run them.** `go test ./internal/gitx/ ./internal/scan/ ./internal/status/ ./internal/cli/ -run 'Addition|Tag|Merged|Limit|Filter|NamedRecordListed'`: FAIL.
-- [ ] **Step 3: Implement** `Additions`, `Tags`, `RecordTags`, the merged part of `LoadRecords`, and the flags on `status`: `--merged` (bool), `--since` (string), `--limit` (through `flag.Func`, so an absent flag differs from `0`).
-- [ ] **Step 4: Run** `go test ./...` and `go vet ./...`: PASS.
-- [ ] **Step 5: Commit** `feat(status): merged records with their merge, tag and filters`.
+- [x] **Step 2: Run them.** `go test ./internal/gitx/ ./internal/scan/ ./internal/status/ ./internal/cli/ -run 'Addition|Tag|Merged|Limit|Filter|NamedRecordListed'`: FAIL.
+- [x] **Step 3: Implement** `Additions`, `Tags`, `RecordTags`, the merged part of `LoadRecords`, and the flags on `status`: `--merged` (bool), `--since` (string), `--limit` (through `flag.Func`, so an absent flag differs from `0`).
+- [x] **Step 4: Run** `go test ./...` and `go vet ./...`: PASS.
+- [x] **Step 5: Commit** `feat(status): merged records with their merge, tag and filters`.
 
 ### Task 5: `dkt lint` reads the branch once and checks `Record` trailers
 
@@ -252,7 +252,7 @@
   - Rule `record-trailer`, only when no name is given: for each commit and each distinct `Record` value `v` such that `record.SlugOf(v + ".md")` fails or `docket/records/<v>.md` is not a regular file in `Input.Repo`; message `commit <short> has trailer Record: <v>, which names no record under docket/records`.
   - `branchBase(c *Context) (string, error)` in `cmd_lint.go`: the merge base, `""` when HEAD has no commit; the errors `addedFiles` gives today. `addedFiles(c *Context, base string, dirs ...string) ([]string, error)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `TestRecordTrailerNamesNoRecord` (`lint`): `Commits` with `Record` `[fix-x]`, the repository holding `docket/records/2026-11-01-fix-x.md` → one `record-trailer` naming the short SHA and `fix-x`.
   - `TestRecordTrailerNamesARecord`: `Record` `[2026-11-01-fix-x]` → none.
   - `TestRecordTrailerPathValue`: values `../x`, `a/b` and `2026-11-01-x/../../y` → one finding each, even with `y.md` at the repository root and `docket/x.md` present.
@@ -260,10 +260,10 @@
   - Change `TestRoutingUnreadable` (`routing_test.go`) and `TestLintRecordsUnknown` (`record_test.go`) to the single source `added files`, with the one `AddedErr`.
   - `TestLintOneUnreadableEntry` (cli): `git branch -m main trunk` → `sources` of `unreadable` exactly `[added files]`, exit 3. Change `TestNoDefaultBranchForRouting` from `[routing records]` to `[added files]`.
   - `TestLintRecordTrailer` (cli): a branch commit carrying `Record: fix-x` beside the record `2026-11-01-fix-x` → `record-trailer`, exit 1.
-- [ ] **Step 2: Run them.** `go test ./internal/lint/ ./internal/cli/ -run 'RecordTrailer|Unreadable|DefaultBranch'`: FAIL.
-- [ ] **Step 3: Implement** `branchBase`, the reshaped `addedFiles`, `Commits` from `c.Git.Commits(base, "HEAD")` when `base` is not empty, the single unreadable entry, and `record-trailer` in `internal/lint/record.go`.
-- [ ] **Step 4: Run** `go test ./...`: PASS.
-- [ ] **Step 5: Commit** `feat(lint): one look at the branch, and Record trailers that name no record`.
+- [x] **Step 2: Run them.** `go test ./internal/lint/ ./internal/cli/ -run 'RecordTrailer|Unreadable|DefaultBranch'`: FAIL.
+- [x] **Step 3: Implement** `branchBase`, the reshaped `addedFiles`, `Commits` from `c.Git.Commits(base, "HEAD")` when `base` is not empty, the single unreadable entry, and `record-trailer` in `internal/lint/record.go`.
+- [x] **Step 4: Run** `go test ./...`: PASS.
+- [x] **Step 5: Commit** `feat(lint): one look at the branch, and Record trailers that name no record`.
 
 ### Task 6: Count the prolonged sound mark as half a word
 
@@ -278,11 +278,11 @@
 **Interfaces:**
 - Produces: `record.Words` counts U+30FC `ー` and U+FF70 `ｰ` as half a word that ends a run.
 
-- [ ] **Step 1: Write the failing test** `TestWordsProlongedSoundMark`: `Words("コーヒー")` 2; `Words("ｺｰﾋｰ")` 2; `Words("ー")` 0.5.
-- [ ] **Step 2: Run it.** `go test ./internal/record/ -run Words`: FAIL (3 for `コーヒー`).
-- [ ] **Step 3: Implement** in `Words`; update its comment.
-- [ ] **Step 4: Run** `go test ./internal/record/ ./internal/lint/`: PASS, the existing word-limit tests included.
-- [ ] **Step 5: Commit** `fix(record): count the prolonged sound mark as half a word`.
+- [x] **Step 1: Write the failing test** `TestWordsProlongedSoundMark`: `Words("コーヒー")` 2; `Words("ｺｰﾋｰ")` 2; `Words("ー")` 0.5.
+- [x] **Step 2: Run it.** `go test ./internal/record/ -run Words`: FAIL (3 for `コーヒー`).
+- [x] **Step 3: Implement** in `Words`; update its comment.
+- [x] **Step 4: Run** `go test ./internal/record/ ./internal/lint/`: PASS, the existing word-limit tests included.
+- [x] **Step 5: Commit** `fix(record): count the prolonged sound mark as half a word`.
 
 ### Task 7: The scan lists a worktree once
 
@@ -297,13 +297,13 @@
 **Interfaces:**
 - Produces: in `Scan`, a worktree's ancestry is settled before `noteRead` files its records error, so a worktree unreadable as a whole has one entry.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `TestWorktreeListedOnce`: the broken ancestry of `TestWorktreeWithFailedAncestryCheckIsUnreadable` plus that worktree's `docket/records` made unreadable as in `TestScanRecordsUnreadable` → exactly one `Unreadable` for the worktree, with `Path` `""`.
   - `TestRecordOnABranch`: branch `fix-x` commits `docket/records/2026-11-01-fix-x.md`, worktree B is on `fix-x` → `Records` holds the slug once with `Sources` `[worktree B, refs/heads/fix-x]`. (It may pass at once: it pins the `Records found` requirement.)
-- [ ] **Step 2: Run them.** `go test ./internal/scan/ -run 'ListedOnce|RecordOnABranch'`: `TestWorktreeListedOnce` FAILS with two entries.
-- [ ] **Step 3: Implement** the reordering in `Scan`.
-- [ ] **Step 4: Run** `go test ./internal/scan/`: PASS, `TestWorktreeOnUnmountedVolume` included.
-- [ ] **Step 5: Commit** `fix(scan): list a worktree unreadable as a whole once`.
+- [x] **Step 2: Run them.** `go test ./internal/scan/ -run 'ListedOnce|RecordOnABranch'`: `TestWorktreeListedOnce` FAILS with two entries.
+- [x] **Step 3: Implement** the reordering in `Scan`.
+- [x] **Step 4: Run** `go test ./internal/scan/`: PASS, `TestWorktreeOnUnmountedVolume` included.
+- [x] **Step 5: Commit** `fix(scan): list a worktree unreadable as a whole once`.
 
 ### Task 8: A failed record write leaves nothing
 
@@ -320,15 +320,15 @@
   - `record.Create` notes which folders on the way to `dir` it made; when the write fails it removes the file, then each folder it made, deepest first, with `os.Remove` (never `RemoveAll`); the error joins the write error and, for each path it could not remove, `<path> was left: <reason>`.
   - Package variables `writeRecord func(f *os.File, b []byte) error` and `removePath func(string) error`, for tests to inject failures, as `archive.writeTemp`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `TestCreateFailedWriteLeavesNothing`: a root without `docket`; `writeRecord` fails → `Create` returns that error; neither the record, `docket/records` nor `docket` exists.
   - `TestCreateFailedWriteKeepsExistingFolders`: `docket` exists, `docket/records` does not → `docket` remains, `docket/records` does not.
   - `TestCreateFailedWriteKeepsOtherRecords`: `writeRecord` writes another record into the folder before failing → that record and the folder remain, and the error names `docket/records` as left.
   - `TestCreateFailedCleanupNamesLeftover`: `removePath` fails for the record → the error contains the record's path and `was left`.
-- [ ] **Step 2: Run them.** `go test ./internal/record/ -run CreateFailed`: FAIL.
-- [ ] **Step 3: Implement** in `Create`.
-- [ ] **Step 4: Run** `go test ./internal/record/ ./internal/cli/`: PASS, `dkt record` tests included.
-- [ ] **Step 5: Commit** `fix(record): leave no folder after a failed write`.
+- [x] **Step 2: Run them.** `go test ./internal/record/ -run CreateFailed`: FAIL.
+- [x] **Step 3: Implement** in `Create`.
+- [x] **Step 4: Run** `go test ./internal/record/ ./internal/cli/`: PASS, `dkt record` tests included.
+- [x] **Step 5: Commit** `fix(record): leave no folder after a failed write`.
 
 ### Task 9: The skill syncs a record's tasks
 
@@ -343,9 +343,9 @@
 **Interfaces:**
 - Consumes: `dkt sync <record-slug>` (Task 2).
 
-- [ ] **Step 1: Edit step 4 of `## Light review`** in both copies to: `4. When the record lists tasks, run \`dkt sync <slug>\` and commit the record. Run \`dkt lint\` and fix what it reports. Then open the pull request and merge it with a merge commit.`
-- [ ] **Step 2: Check.** `diff .claude/skills/docket/SKILL.md .agents/skills/docket/SKILL.md` prints nothing; `go test . ./internal/setup/` PASS.
-- [ ] **Step 3: Commit** `docs(skill): sync a record's tasks before lint`.
+- [x] **Step 1: Edit step 4 of `## Light review`** in both copies to: `4. When the record lists tasks, run \`dkt sync <slug>\` and commit the record. Run \`dkt lint\` and fix what it reports. Then open the pull request and merge it with a merge commit.`
+- [x] **Step 2: Check.** `diff .claude/skills/docket/SKILL.md .agents/skills/docket/SKILL.md` prints nothing; `go test . ./internal/setup/` PASS.
+- [x] **Step 3: Commit** `docs(skill): sync a record's tasks before lint`.
 
 ### Task 10: The docs, after `install-schema-per-machine` merges
 
@@ -363,11 +363,11 @@
 **Interfaces:**
 - Consumes: every symbol above.
 
-- [ ] **Step 1: Wait and rebase.** Start only after `install-schema-per-machine` is on `main`; rebase this branch on it and run `go test ./...` and `go vet ./...`: PASS.
-- [ ] **Step 2: Edit**
+- [x] **Step 1: Wait and rebase.** Start only after `install-schema-per-machine` is on `main`; rebase this branch on it and run `go test ./...` and `go vet ./...`: PASS.
+- [x] **Step 2: Edit**
   - `README.md`: the Bookkeeping row says `sync` changes nothing but checkboxes in `plan.md` or a record; the command list shows `dkt status [<slug>|<record>...] [--merged [--since <rev>] [--limit <n>]] [--json]` and `dkt sync <slug>|<record> [--check]`; the light-review paragraph says `dkt status` lists open records and `dkt sync` ticks their tasks.
   - `docs/ARCHITECTURE.md`: `internal/status` also summarizes records; capability rows for `status.LoadRecords`, `change.MatchTasks`, `record.CommitsFor`, `gitx.Git.Additions`, `gitx.Git.Tags`, `scan.RecordTags`, `archive.SyncRecord`.
   - `docket/ideas/2026-10-29-records.md`: the Status section says the second change shipped, and the follow-ups are done.
   - `docket/order.md`: tick item 7.
-- [ ] **Step 3: Check.** `dkt lint` passes; every symbol named in `docs/ARCHITECTURE.md` exists (`rg -n "func (LoadRecords|MatchTasks|CommitsFor|RecordTags|SyncRecord)|func \(g Git\) (Additions|Tags)" internal/`).
-- [ ] **Step 4: Commit** `docs: records in status and sync`.
+- [x] **Step 3: Check.** `dkt lint` passes; every symbol named in `docs/ARCHITECTURE.md` exists (`rg -n "func (LoadRecords|MatchTasks|CommitsFor|RecordTags|SyncRecord)|func \(g Git\) (Additions|Tags)" internal/`).
+- [x] **Step 4: Commit** `docs: records in status and sync`.
