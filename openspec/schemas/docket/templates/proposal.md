@@ -14,7 +14,7 @@
 
 ## Builds On
 
-<!-- What already exists that this change builds on, extends, or must not duplicate, as path:symbol or capability. Read docs/ARCHITECTURE.md and the capability index first. If nothing relevant exists, say so and what you searched. -->
+<!-- What already exists that this change builds on, extends, or must not duplicate, as path:symbol or capability. Search the code and openspec/specs/ first, and read the project's own architecture notes if its instructions name any. If nothing relevant exists, say so and what you searched. -->
 
 ## Capabilities
 
