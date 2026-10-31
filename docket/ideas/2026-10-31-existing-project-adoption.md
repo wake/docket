@@ -47,6 +47,9 @@ OpenSpec folder kept out of git, and a change made with OpenSpec's
 
 ## Related
 
+- `2026-10-31-global-schema.md`: the shipped schema leaves the project and
+  is installed once per machine, so found item 1 then concerns the skills
+  and the Docket block only. This idea builds on it.
 - `2026-10-31-scan-tree-batch.md`: the speed of the scan in a large
   repository, from the same trial.
 - `2026-10-31-codebase-decomposition.md`: describing the code that already
