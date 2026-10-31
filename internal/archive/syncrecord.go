@@ -67,17 +67,6 @@ func SyncRecord(e Env, slug string, check bool) (SyncReport, error) {
 	if check || len(lines) == 0 {
 		return rep, nil
 	}
-	out, err := change.Tick(b, lines)
-	if err != nil {
-		return rep, err
-	}
-	f, err := writeOrRefuse(e.Root, rel, slug, out)
-	if err != nil {
-		return rep, err
-	}
-	if f != nil {
-		rep.Ticked = []TaskTicks{}
-		rep.Findings = append(rep.Findings, *f)
-	}
-	return rep, nil
+	err = tickAndWrite(&rep, e.Root, rel, slug, b, lines)
+	return rep, err
 }

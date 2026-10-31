@@ -102,19 +102,26 @@ func Sync(e Env, slug string, check bool) (SyncReport, error) {
 	if check || len(lines) == 0 {
 		return rep, nil
 	}
-	out, err := change.Tick(c.PlanBytes, lines)
+	err = tickAndWrite(&rep, e.Root, c.path("plan.md"), slug, c.PlanBytes, lines)
+	return rep, err
+}
+
+// tickAndWrite ticks lines in b and writes rel; a link refusal empties
+// rep.Ticked and records the finding instead.
+func tickAndWrite(rep *SyncReport, root, rel, slug string, b []byte, lines []int) error {
+	out, err := change.Tick(b, lines)
 	if err != nil {
-		return rep, err
+		return err
 	}
-	f, err := writeOrRefuse(e.Root, c.path("plan.md"), slug, out)
+	f, err := writeOrRefuse(root, rel, slug, out)
 	if err != nil {
-		return rep, err
+		return err
 	}
 	if f != nil {
 		rep.Ticked = []TaskTicks{}
 		rep.Findings = append(rep.Findings, *f)
 	}
-	return rep, nil
+	return nil
 }
 
 // writeOrRefuse writes like writeFile; a link on the path comes back as a
