@@ -78,15 +78,27 @@ and do it only after the user agrees; when they decline, go to the next.
   wording.
 - The installed files (`schema-missing`, `skill-missing`,
   `agents-block-missing`, `schema-differs`, `skill-differs`,
-  `agents-block-differs`): take them together, since one command fixes
-  them all. `dkt init` writes every missing file and leaves differing ones
+  `agents-block-differs`, `schema-project-copy`, `config-schema-default`):
+  take them together, since one command fixes them all. `dkt init` writes
+  every missing file, removes the project copy of the schema and sets
+  `schema: docket` in `openspec/config.yaml`, and leaves differing files
   alone; when there is no `openspec` directory it first runs
   `openspec init`. `dkt init --force` also replaces every differing file.
-  First show how each differing file differs from the shipped one: in a
-  new temporary directory, run `git init`, create an empty `openspec`
-  directory, run `dkt init` there, and compare the file at the same path.
-  Then name every file the command will write, and run it only after the
+  The schema's files are per-machine, named by absolute path. First show
+  how each differing file differs from the shipped one: in a new temporary
+  directory, run `git init`, create an empty `openspec` directory, and run
+  `dkt init` there with `XDG_DATA_HOME` set to a second new temporary
+  directory, so your machine's copy is not written; compare the file at the
+  same path, or per-machine files under the second directory. Then name
+  every file the command will write or remove, and run it only after the
   user agrees.
+- `schema-edited`: show how the project's `openspec/schemas/docket` differs
+  from the shipped schema. Say that OpenSpec uses it instead of the
+  per-machine one and that forks are not supported yet. Removing it loses
+  the edits: only after the user agrees, remove it and run `dkt init`.
+- `config-schema-other`: say that `openspec/config.yaml` names another
+  schema and `dkt new` uses `docket` either way. Propose setting
+  `schema: docket`; edit the file only after the user agrees.
 - `symlink-refused` or `agents-block-malformed`: explain what stops
   `dkt init` and propose how to fix it; do not change the link or the
   markers yourself.
