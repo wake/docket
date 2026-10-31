@@ -177,3 +177,6 @@ None.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-11-01 | Plan review (codex) | A failed tag listing becomes one unreadable entry `refs/tags`; the first-parent log passes `--root`; tests for an unreadable record file, `records_total` with open and merged records, and a record added in the root commit | Tasks 3 and 4 gained tests; no new task |
+| 2026-11-01 | Lead rulings during implementation | Task 5 also changes `dkt archive`'s one `addedFiles` call, once `install-schema-per-machine` had merged; Task 10 also updates `README.zh-TW.md` | No new task |
+| 2026-11-01 | Pre-merge review (codex and spec reviewer) | `merge.time` keeps the merge commit's own offset; `dkt record` treats as its own only the folders its `Mkdir` made, and cleans up when the candidate is a link; `dkt sync` checks a record slug before looking for the default branch | One fix wave on Tasks 2, 4 and 8; no schedule change |
