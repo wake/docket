@@ -50,6 +50,37 @@ parsing is deterministic, but the tool is aimed at AI coding assistants.
 - Language parsers and outside tools would tie Docket to them. Any use of
   one would be optional, at the user's request.
 
+## Trial, 2026-10-31
+
+A baseline of one package of the Purdex repository (`internal/redact`, 174
+lines and 5 tests), written unattended by Opus through the `docket` skill
+on dkt v0.9.1:
+
+- It took 34 turns, about 4 minutes and US$1.16, and wrote two
+  capabilities with 17 requirements and 50 scenarios, about 3,100 words.
+  `openspec validate --strict` and `dkt lint` pass. Where the tests were
+  silent it probed the code with a temporary test, removed afterwards, and
+  found inputs the tests do not cover.
+- Nothing in the skill or the schema says how a baseline is written: how
+  fine-grained, whether a known defect is specified as it is, the language
+  of the specs, capability names, where unanswered questions go, and how to
+  probe behavior without writing into the repository. The shipped schema
+  also sent it to `docs/ARCHITECTURE.md` and `dkt index`, which exist only
+  in Docket's own repository and in the plan.
+- About 18 words of proposal and spec per line of code. Purdex has about
+  390,000 lines (240,000 of Go, 150,000 of TypeScript) and about 34,000
+  test cases. At that rate a whole baseline is thousands of such runs and
+  more spec than anyone can review: a baseline has to be scoped, from a map
+  made without an agent.
+- The map of that package came from three commands: `go doc -short` (three
+  functions and a constant), `go test -list` (five tests) and `rg` for its
+  importers (nine packages). The agent spent its first steps gathering the
+  same facts.
+- Two questions for the baseline path: whether a known defect is specified
+  as it is (so that a later fix shows as a spec change) or left out; and
+  whether a baseline stops at the outside contract or also covers rule
+  details.
+
 ## Related
 
 - `2026-10-30-spec-domains.md`: domains for specs.
@@ -57,6 +88,7 @@ parsing is deterministic, but the tool is aimed at AI coding assistants.
 - `2026-10-29-records.md`: the `Record:` trailer.
 - `2026-10-31-refactoring.md`: restructuring planned from these facts.
 - `2026-10-31-ub-mode.md`: metrics that could pick what to baseline.
+- `2026-10-31-existing-project-adoption.md`: the rest of the same trial.
 
 ## Open questions
 
