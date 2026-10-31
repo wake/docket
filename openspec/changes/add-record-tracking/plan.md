@@ -98,15 +98,15 @@
   - `gitx.Commit.Record []string`: the `Record` trailer values, read like `Change`.
   - `record.CommitsFor(slug string, commits []gitx.Commit) []gitx.Commit`: the commits whose `Record` holds `slug`, in order.
 
-- [ ] **Step 1: Extract the exported `MatchTasks` (structural).** Run `go test ./internal/change/ ./internal/status/ ./internal/archive/` and `go vet ./...`: PASS with no test file changed. Commit `refactor(change): match Task trailers over commits already chosen`.
-- [ ] **Step 2: Write the failing tests**
-  - `TestMatchTasksTakesEveryCommit` (`change`): a commit with `Task: 1` and no `Change` trailer names Task 1. (It passes at once after Step 1: it pins `MatchTasks`.)
+- [ ] **Step 1: Pin `MatchTasks` first.** Write `TestMatchTasksTakesEveryCommit` (`change`): a commit with `Task: 1` and no `Change` trailer names Task 1. Run `go test ./internal/change/`: FAIL (`MatchTasks` undefined).
+- [ ] **Step 2: Extract the exported `MatchTasks` (structural).** Run `go test ./internal/change/ ./internal/status/ ./internal/archive/` and `go vet ./...`: PASS, with no existing test changed. Commit the test and the extraction as `refactor(change): match Task trailers over commits already chosen`.
+- [ ] **Step 3: Write the failing tests**
   - `TestCommitsRecordTrailer` (`gitx`): a commit with message `x\n\nRecord: 2026-11-01-fix-x\nTask: 2` has `Record` `[2026-11-01-fix-x]` and `Task` `[2]`; a commit with `record: a` has `Record` `[a]`; a commit with neither has `Record` nil.
   - `TestCommitsFor` (`record`): of three commits with `Record` `[a]`, `[b]`, `[a b]`, slug `a` gives the first and third.
-- [ ] **Step 3: Run them.** `go test ./internal/gitx/ ./internal/record/`: FAIL (`Record` and `CommitsFor` undefined).
-- [ ] **Step 4: Implement** the `Record` field, read with `%(trailers:key=Record,valueonly,unfold)` as a seventh NUL-separated field, and `CommitsFor`.
-- [ ] **Step 5: Run** `go test ./...` and `go vet ./...`: PASS.
-- [ ] **Step 6: Commit** `feat(gitx, record): read Record trailers`.
+- [ ] **Step 4: Run them.** `go test ./internal/gitx/ ./internal/record/`: FAIL (`Record` and `CommitsFor` undefined).
+- [ ] **Step 5: Implement** the `Record` field, read with `%(trailers:key=Record,valueonly,unfold)` as a seventh NUL-separated field, and `CommitsFor`.
+- [ ] **Step 6: Run** `go test ./...` and `go vet ./...`: PASS.
+- [ ] **Step 7: Commit** `feat(gitx, record): read Record trailers`.
 
 ### Task 2: `dkt sync` ticks a record's tasks
 
@@ -168,6 +168,7 @@
   - `TestMergedRecordsHidden`: `main` holds `2026-10-31-fix-a.md` only → `records` `[]`, `records_total` 0, exit 0.
   - `TestMergedRecordEditedOnBranchHidden`: as above, plus branch `edit` changes that file → still `[]`.
   - `TestRecordFrontMatterUnreadable`: an open record without front matter → listed with `title`, `kind`, `source` null, exit 0.
+  - `TestUnreadableRecordFile`: an uncommitted record in worktree B made unreadable with `chmod 0` → the file in `unreadable`, the record listed with `title`, `kind`, `source` null, exit 3.
   - `TestRecordTasksFromTrailers`: an open record on branch `fix-x` with two tasks; a commit there `work\n\nRecord: <slug>\nTask: 1` → Task 1 `started`, `commits` `[<sha>]`, `unsynced` true; Task 2 `pending`; `progress` `{0 2 0 2}` for one step each.
   - `TestNamedRecordMissing`: `dkt status 2026-11-01-fix-q` → `record-missing` with `change` `2026-11-01-fix-q`, exit 1.
   - `TestRecordInFocus`: `statusChange` for `add-x` and `add-y`, an open record → `dkt status add-y 2026-11-01-fix-x --json` gives `changes` `[add-y]`, `records` `[2026-11-01-fix-x]`, exit 0.
@@ -199,25 +200,29 @@
 - Consumes: `status.LoadRecords`, `status.RecordQuery`, `statusRecordLine` (Task 3).
 - Produces:
   - `type gitx.Addition struct { Path, SHA string; Time time.Time }`.
-  - `gitx.Git.Additions(tip, since, dir string) ([]Addition, error)`: newest first, one per commit and file, the files under `dir` that each commit on the first-parent history of `tip` (and not reachable from `since` when not empty) added against its first parent: `log --first-parent --diff-merges=first-parent --diff-filter=A --name-only`.
-  - `gitx.Git.Tags() ([]Ref, error)`: the tags whose object peels to a commit, by creation date then name; `Name` the full refname, `SHA` the commit.
+  - `gitx.Git.Additions(tip, since, dir string) ([]Addition, error)`: newest first, one per commit and file, the files under `dir` that each commit on the first-parent history of `tip` (and not reachable from `since` when not empty) added against its first parent, the root commit against nothing: `log --root --first-parent --diff-merges=first-parent --diff-filter=A --name-only` (`--root` because `log.showRoot` may be off).
+  - `gitx.Git.Tags() ([]Ref, error)`: the tags whose object peels to a commit, by creation date then name (`for-each-ref --sort=refname --sort=creatordate`); `Name` the full refname, `SHA` the commit. git fails the whole listing when any tag's object is missing, and so does `Tags`.
   - `scan.KindTag Kind = "tag"`.
   - `scan.RecordTags(g gitx.Git, tags []gitx.Ref) (map[string]string, []Unreadable)`: for each record slug some tag holds, the short name of the first tag in the given order whose tree holds `docket/records/<slug>.md`, read with `readTrees`; a tag whose tree or records folder cannot be read is `Unreadable` with `KindTag`.
-  - `LoadRecords` fills merged records: with `Merged` or a named merged record; `Since` passed to `Additions`; `Limit` cuts merged records after sorting; `total` counts before the cut; `RecordTags` runs only when a merged record is listed.
+  - `LoadRecords` fills merged records: with `Merged` or a named merged record; `Since` passed to `Additions`; `Limit` cuts merged records after sorting; `total` counts open and merged records before the cut; `Tags` and `RecordTags` run only when a merged record is listed. When `Tags` fails, one `Unreadable` with `KindTag`, `Name` `refs/tags` and git's reason, and every `tag` null.
 
 - [ ] **Step 1: Write the failing tests**
   - `TestAdditionsFirstParent` (`gitx`): a branch adds `docket/records/a.md` and merges with `--no-ff` → one `Addition` for it whose `SHA` is the merge commit; with `since` the merge commit → none.
   - `TestAdditionsFastForward`: the branch merges by fast-forward → the `SHA` is the branch commit that added it.
   - `TestAdditionsNewestFirst`: `a.md` added, deleted, added again → two additions, the later first.
+  - `TestAdditionsRootCommit`: the root commit adds `a.md`, with `log.showRoot=false` in the repository config → one `Addition` whose `SHA` is the root commit.
   - `TestTagsByCreationDate`: tags made with `GIT_COMMITTER_DATE` set: `v2` (lightweight, 2026-01-02), `v1` (annotated, 2026-01-01), `b` and `a` (both 2026-01-03), and `tree` pointing at a tree → `[v1 v2 a b]`, each `SHA` the peeled commit.
-  - `TestRecordTags` (`scan`): `v1` before the record exists, `v2` after → `{slug: "v2"}`; a tag whose commit object is removed → one `Unreadable` with kind `tag`.
+  - `TestTagsMissingObject`: a lightweight tag whose commit object is removed → an error.
+  - `TestRecordTags` (`scan`): `v1` before the record exists, `v2` after → `{slug: "v2"}`; a tag on a commit made only for it (with a file no other commit has), whose root tree object is removed → one `Unreadable` with kind `tag` naming that tag.
   - `TestMergedRecordsWithMergeAndTag` (cli): branch adds `2026-10-30-fix-a`, merges `--no-ff` into `main`, then tag `v0.9.1` → `--merged --json` lists it `merged` with `merge.commit` the merge commit, `merge.time` its committer time in RFC 3339, `tag` `v0.9.1`; the human line ends `merged <date>  v0.9.1  0/0 tasks`.
   - `TestMergedSince`: `fix-a` merged, tag `v0.9.1`, then `fix-b` merged → `--merged --since v0.9.1` lists only `fix-b`; `records_total` 1.
   - `TestLimitReportsTotal`: five records merged one per commit with distinct `GIT_COMMITTER_DATE` → `--merged --limit 2` lists the two newest, `records_total` 5, the human output ends `3 more merged records not listed; raise --limit`.
+  - `TestRecordsTotalOpenAndMerged`: one open record on a branch and three merged ones → `--merged --limit 1` lists the open record and the newest merged one, `records_total` 4.
   - `TestMergedSameCommitBySlug`: `fix-b` and `fix-a` added in one commit → listed `fix-a`, `fix-b`; `--limit 1` keeps `fix-a`.
   - `TestFilterFlagsNeedMerged`: exit 2 for `--limit 2`; `--since main`; `--merged 2026-10-30-fix-a`; `--merged --limit 0`; `--merged --limit x`; `--merged --since nosuch`.
   - `TestNamedRecordListed`: `dkt status 2026-10-30-fix-a --json` → `merged`, its `merge` and `tag`, exit 0.
-  - `TestUnreadableTag`: a tag whose commit object is removed, `--merged` → the tag in `unreadable`, exit 3; without `--merged`, exit 0.
+  - `TestUnreadableTag`: as in `TestRecordTags`, a tag whose root tree object is removed, `--merged` → that tag in `unreadable`, exit 3; without `--merged`, exit 0.
+  - `TestTagListingFails`: a lightweight tag whose commit object is removed, `--merged` → one `unreadable` entry `refs/tags`, the merged records listed with `tag` null, exit 3.
 - [ ] **Step 2: Run them.** `go test ./internal/gitx/ ./internal/scan/ ./internal/status/ ./internal/cli/ -run 'Addition|Tag|Merged|Limit|Filter|NamedRecordListed'`: FAIL.
 - [ ] **Step 3: Implement** `Additions`, `Tags`, `RecordTags`, the merged part of `LoadRecords`, and the flags on `status`: `--merged` (bool), `--since` (string), `--limit` (through `flag.Func`, so an absent flag differs from `0`).
 - [ ] **Step 4: Run** `go test ./...` and `go vet ./...`: PASS.

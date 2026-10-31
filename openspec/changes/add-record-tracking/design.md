@@ -76,9 +76,15 @@ Only when merged records are listed:
   scan's existing batched tree reads (`internal/scan/trees.go`), and a
   record's tag is the first tree that holds its file.
 
-A record the log does not show (a shallow clone) has `merge` null, sorts
-last, and is left out by `--since`. A tag whose tree cannot be read is
-listed as unreadable (exit 3), as any unreadable source is.
+The log passes `--root`, so a record added in the root commit is found
+even when `log.showRoot` is off. A record the log does not show (a shallow
+clone) has `merge` null, sorts last, and is left out by `--since`. A tag
+whose tree cannot be read is listed as unreadable (exit 3), as any
+unreadable source is. git refuses to list the tags at all, sorted by
+date, when one tag's object is missing; then `refs/tags` is listed as
+unreadable once, with git's reason naming the tag, and every `tag` is null
+(my call: listing and peeling each tag on its own would cost a process per
+tag for a damaged repository).
 
 - Alternative: `git log` and `git tag --contains` per record. Two
   history walks per record; thousands of processes in a large project.
