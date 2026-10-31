@@ -5,7 +5,9 @@ title: Install the shipped schema once per machine
 Recorded 2026-10-31, from the discussion of adopting Docket in an existing
 project. Decided: Docket follows OpenSpec's layout. The shipped schema is
 not copied into projects; a project names it, and a project that wants
-other rules forks it under a new name.
+other rules forks it under a new name. Also decided: nothing writes the
+per-machine copy unless the user runs a command for it or agrees to it;
+other commands only report it missing or out of date.
 
 ## Today
 
@@ -59,9 +61,12 @@ To settle in the change:
 
 1. `dkt` owns `$XDG_DATA_HOME/openspec/schemas/docket/` and keeps it equal
    to the schema it embeds.
-2. `dkt init`, `dkt new` and `dkt archive` write it when it is missing or
-   differs; `dkt inspect` only reports it. Nobody edits it in place:
-   other rules are a fork.
+2. Only a command the user runs to install it writes it (decided). `dkt
+   new`, `dkt archive` and `dkt inspect` report it when it is missing or
+   differs, and name that command. Writing it from `dkt new` whenever it
+   is out of date was considered and dropped: nothing may write without
+   the user's action or consent. Nobody edits it in place: other rules
+   are a fork.
 3. `dkt init` sets `schema: docket` in `openspec/config.yaml`. That also
    marks the project as one that uses Docket.
 4. A project with a fork names it in `config.yaml`, and `dkt new` uses the
