@@ -62,7 +62,11 @@ func archiveCommand() Command {
 				return Outcome{}, err
 			}
 			defer root.Close()
-			added, addedErr := addedFiles(c)
+			var added []string
+			base, addedErr := branchBase(c)
+			if addedErr == nil {
+				added, addedErr = addedFiles(c, base)
+			}
 			origin := ""
 			if c.Repo.Origin != nil {
 				origin = *c.Repo.Origin

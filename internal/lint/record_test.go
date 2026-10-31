@@ -7,7 +7,22 @@ import (
 	"testing/fstest"
 
 	"github.com/wake/docket"
+	"github.com/wake/docket/internal/gitx"
 )
+
+func trailerInput(files map[string]string, values ...string) Input {
+	in := recInput(files)
+	in.Commits = []gitx.Commit{{SHA: "0123456789abcdef", Record: values}}
+	return in
+}
+
+func TestRecordTrailerNamesNoRecord(t *testing.T) {
+	r := Run(trailerInput(map[string]string{recPath("2026-11-01-fix-x"): goodRecord()}, "fix-x"))
+	if len(r.Findings) != 1 || r.Findings[0].Rule != "record-trailer" || r.Findings[0].Change != "" || r.Findings[0].File != "" ||
+		r.Findings[0].Message != "commit 0123456 has trailer Record: fix-x, which names no record under docket/records" {
+		t.Fatalf("%+v", r.Findings)
+	}
+}
 
 const goodSlug = "2026-10-30-fix-b"
 
@@ -296,9 +311,9 @@ func TestLintMixedNames(t *testing.T) {
 
 func TestLintRecordsUnknown(t *testing.T) {
 	in := recInput(map[string]string{"README.md": "x"})
-	in.AddedRecordsErr = fmt.Errorf("no default branch")
+	in.AddedErr = fmt.Errorf("no default branch")
 	r := Run(in)
-	if len(r.Unreadable) != 1 || r.Unreadable[0].Source != "records" {
+	if len(r.Unreadable) != 1 || r.Unreadable[0].Source != "added files" {
 		t.Fatalf("%+v", r.Unreadable)
 	}
 }
@@ -312,5 +327,38 @@ func TestLintRecordsDirUnreadable(t *testing.T) {
 	}
 	if len(r.Records) != 0 || len(r.Findings) != 0 {
 		t.Fatalf("records = %v, findings = %+v", r.Records, r.Findings)
+	}
+}
+
+func TestRecordTrailerNamesARecord(t *testing.T) {
+	r := Run(trailerInput(map[string]string{recPath("2026-11-01-fix-x"): goodRecord()}, "2026-11-01-fix-x"))
+	for _, f := range r.Findings {
+		if f.Rule == "record-trailer" {
+			t.Fatalf("%+v", f)
+		}
+	}
+}
+
+func TestRecordTrailerPathValue(t *testing.T) {
+	files := map[string]string{"y.md": "x", "docket/x.md": "x", recPath("2026-11-01-x"): goodRecord()}
+	in := trailerInput(files, "../x", "a/b", "2026-11-01-x/../../y", "../x")
+	n := 0
+	for _, f := range Run(in).Findings {
+		if f.Rule == "record-trailer" {
+			n++
+		}
+	}
+	if n != 3 {
+		t.Fatalf("record-trailer findings = %d, want 3", n)
+	}
+}
+
+func TestRecordTrailerSkippedWithNames(t *testing.T) {
+	in := trailerInput(map[string]string{recPath("2026-11-01-fix-x"): goodRecord()}, "fix-x")
+	in.Slugs = []string{"2026-11-01-fix-x"}
+	for _, f := range Run(in).Findings {
+		if f.Rule == "record-trailer" {
+			t.Fatalf("%+v", f)
+		}
 	}
 }

@@ -11,7 +11,7 @@ var RoutedDirs = []string{"docs/superpowers/specs", "docs/superpowers/plans"}
 // per-change, so Run calls it once.
 func checkRouting(r *run) {
 	if r.in.AddedErr != nil {
-		r.unreadable("routing", r.in.AddedErr)
+		r.unreadable("added files", r.in.AddedErr)
 	}
 	for _, p := range r.in.Added {
 		for _, dir := range RoutedDirs {
