@@ -56,6 +56,7 @@ parsing is deterministic, but the tool is aimed at AI coding assistants.
 - `2026-10-24-add-index.md`: an index of the code's exported symbols.
 - `2026-10-29-records.md`: the `Record:` trailer.
 - `2026-10-31-refactoring.md`: restructuring planned from these facts.
+- `2026-10-31-ub-mode.md`: metrics that could pick what to baseline.
 
 ## Open questions
 
