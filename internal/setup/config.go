@@ -3,6 +3,8 @@ package setup
 import (
 	"errors"
 	"strings"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // ConfigSchema says what openspec/config.yaml names as the project's schema.
@@ -68,7 +70,33 @@ func schemaKey(b []byte) (value string, start, end, line int, err error) {
 	if line < 0 {
 		value = ""
 	}
+	if err := crossCheck(b, value, line >= 0); err != nil {
+		return "", 0, 0, 0, err
+	}
 	return value, start, end, line, nil
+}
+
+// crossCheck asks the YAML parser what the line reader found: any other
+// spelling of a top-level schema key (quoted, spaced, in a flow mapping)
+// would be missed by the reader, and NameDocket would add a second key.
+func crossCheck(b []byte, value string, found bool) error {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(b, &doc); err != nil {
+		return errors.New("the file is not valid YAML: " + err.Error())
+	}
+	if doc.Kind == 0 {
+		return nil // empty file or only comments
+	}
+	m := doc.Content[0]
+	if m.Kind != yaml.MappingNode {
+		return errors.New("the file is not a YAML mapping")
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == "schema" && (!found || m.Content[i+1].Value != value) {
+			return errors.New("the schema key is not one plain top-level line")
+		}
+	}
+	return nil
 }
 
 // SchemaKey returns the top-level schema key of a configuration file and its

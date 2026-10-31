@@ -21,7 +21,8 @@ func TestSchemaKey(t *testing.T) {
 			t.Errorf("%q = %q, %d, %v; want %q, %d", c.in, v, l, err, c.val, c.line)
 		}
 	}
-	for _, in := range []string{"schema:\n  docket\n", "schema: a\nschema: b\n", "schema: a b\n"} {
+	for _, in := range []string{"schema:\n  docket\n", "schema: a\nschema: b\n", "schema: a b\n",
+		"\"schema\": spec-driven\n", "'schema': x\n", "schema : spec-driven\n", "\ufeffschema: spec-driven\n", "{schema: x}\n", "schema: [\n"} {
 		if _, _, err := SchemaKey([]byte(in)); err == nil {
 			t.Errorf("%q: no error", in)
 		}

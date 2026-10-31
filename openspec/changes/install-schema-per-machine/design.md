@@ -122,7 +122,10 @@ reports nothing.
 
 ### The `schema` key of `config.yaml`
 
-`dkt` reads it line by line, without a YAML library. A top-level key is a
+`dkt` reads it line by line, and cross-checks the result with the YAML parser
+the module already has: a file that does not parse, is not a mapping, or has
+a top-level `schema` key the line reader did not find (quoted, spaced, in a
+flow mapping) is unreadable. A top-level key is a
 line starting `schema:` at column 0; lines inside a block scalar are
 indented, so none of them can be one. Its value must
 be on the same line: a bare word, or one in single or double quotes,
