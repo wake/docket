@@ -14,10 +14,10 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/scan` | Finds changes across worktrees and branches; resolves the default branch |
 | `internal/setup` | Installs the schema once per machine, the skills and the Docket block (`dkt init`), removes a project copy of a shipped schema, and decides what it would do without writing (`dkt inspect`) |
 | `internal/change` | Change-folder rules: slug validation, `docket.yaml` metadata, plan steps and ticking |
-| `internal/archive` | Closes changes: `dkt sync`, `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, the trailer check of `dkt inspect`, and `evidence.md` |
+| `internal/archive` | Closes changes: `dkt sync` (plans and records), `dkt archive`, `dkt rebase`, the base check, the cross-check of Docket's reading against OpenSpec's, the trailer check of `dkt inspect`, and `evidence.md` |
 | `internal/markdown` | Line, heading and table readers that skip code fences and comments |
 | `internal/delta` | Reads delta specs and main specs; makes scenario slugs |
-| `internal/status` | Summarizes each active change: phase, task states from commit trailers, progress, last activity |
+| `internal/status` | Summarizes each active change and each record: phase, task states from commit trailers, progress, last activity |
 | `internal/conflicts` | Finds requirements that more than one active change touches |
 | `internal/record` | Records: kinds, name and slug, the template rendering, creating a file under a free name, parsing and word counting |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
@@ -83,6 +83,12 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Pick a free slug | `change.Suffixed` with `scan.Inventory.Uses` or `RecordSources` |
 | Where a record slug is used | `scan.Inventory.RecordSources` |
 | Count a record section's words | `record.Words` |
+| Load records with their state, merge commit and tag | `status.LoadRecords` |
+| Match trailers to tasks for a change or a record | `change.MatchTasks` |
+| Commits on HEAD that carry a record's trailers | `record.CommitsFor` |
+| Files under a directory that each first-parent commit added | `Git.Additions` |
+| List tags; the first tag that holds each record | `Git.Tags`; `scan.RecordTags` |
+| Tick a record's tasks from commit trailers | `archive.SyncRecord` |
 | Check task headings in any file | `lint.checkTaskHeadings` |
 | Report a result | `cli.Outcome`; map to an exit code with `cli.ExitCode` |
 | Build a test repository | `testutil.NewRepo` |

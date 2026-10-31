@@ -30,7 +30,7 @@ Docket 讀 repo 裡的檔案和 git 紀錄，做四種工作：
 | 角色 | 指令 | 做什麼 |
 |---|---|---|
 | 檢查（唯讀，失敗時回傳非零結束碼） | `lint`、`conflicts`、`check` | 必填段落（紀錄：front matter、段落、字數上限）、殘留的佔位字、任務標題格式、複用表裡不存在的路徑、被多個進行中 change 修改的需求、沒有測試的 scenario |
-| 記帳 | `status`、`sync`、`log` | 從 commit trailer 算出進度、閒置天數、一條需求怎麼演變。`sync` 只改 `plan.md` 的勾選框，不動其他內容 |
+| 記帳 | `status`、`sync`、`log` | 從 commit trailer 算出進度、閒置天數、一條需求怎麼演變。`sync` 只改 `plan.md` 或紀錄的勾選框，不動其他內容 |
 | 組裝 | `brief`、`accept --export` | 把散在多個檔案的內容拼成給實作 agent 的 brief，或拼成給客戶確認的頁面 |
 | 流程包裝 | `init`、`new`、`archive`、`rebase` | 安裝 schema，依固定順序呼叫 OpenSpec CLI 和上面的檢查，並記下 base commit 與證據 |
 
@@ -55,7 +55,7 @@ Docket **不會**：
    - prompt 文字（agent 讀了會照做的文字，例如 `AGENTS.md`、`docket` skill、schema 裡的說明；路徑列在 `AGENTS.md`）、只改測試而且測的是已經規定或已經存在的行為，以及 CI 這類檢查設定：prompt 用機械方式檢查，測試用突變它所測的程式碼來檢查，檢查設定靠 PR 自己跑的 CI 來檢查，合併前讓整份 diff 審一次。完全不碰 OpenSpec。
    - 給人讀的文件、程式碼或測試檔裡只改註解或空白（這不算改程式碼或測試）、版本號、只改相依套件清單的升級：只跑自動檢查，不另外審查。改到程式碼或測試檔時，先讓一個只讀 diff 的新 agent 確認每一行改動都是註解或空白，而且沒有會改變建置或執行的註解。依改到的東西歸類：prompt 裡的錯字算 prompt，搬移程式碼算重構。完全不碰 OpenSpec。
 
-   第二、第三條路徑的工作不開 change，但會在 `docket/records/` 留一份紀錄，由 `dkt record` 寫出、`dkt lint` 檢查，它的 commit 帶 `Record: <slug>`。`dkt new` 和 `dkt record` 在 slug 已被用掉時，會改用空著的 `-2`（再來 `-3`，依此類推）後綴。
+   第二、第三條路徑的工作不開 change，但會在 `docket/records/` 留一份紀錄，由 `dkt record` 寫出、`dkt lint` 檢查，它的 commit 帶 `Record: <slug>`，trailer 指不到任何紀錄時 `dkt lint` 會回報。`dkt status` 列出未合併的紀錄，`dkt sync` 勾選它們的任務。`dkt new` 和 `dkt record` 在 slug 已被用掉時，會改用空著的 `-2`（再來 `-3`，依此類推）後綴。
 2. **開 change。**在 git worktree 裡執行 `dkt new <slug>`，它會呼叫 `openspec new change`。
 3. **寫提案與 delta。**
    - brainstorming 直接把 `proposal.md` 和 `specs/**/spec.md` 寫進 change 資料夾，需要時再加 `design.md`。
@@ -98,10 +98,10 @@ dkt new <slug> --kind feature|change-request|baseline --source "<出處>" --titl
 dkt record <name> --kind fix|refactor|test|prompt|checks --source "<出處>" --title "<標題>"   # 輕審工作的紀錄
 dkt lint [<slug>|<record>...]     # 文件規則
 dkt conflicts [<slug>]            # 被多個進行中 change 碰到的需求
-dkt sync <slug> [--check]         # 依 commit trailer 勾 plan.md
+dkt sync <slug>|<record> [--check]   # 依 commit trailer 勾 plan.md 或紀錄的任務
 dkt archive <slug>...             # 發版步驟，在從預設分支開出的分支上
 dkt rebase <slug>                 # 把較新的規格接受為 change 的 base
-dkt status [<slug>...] [--json]   # 階段、任務與其 commit、進度、最後活動、未提交的改動
+dkt status [<slug>|<record>...] [--merged [--since <rev>] [--limit <n>]] [--json]   # 階段、任務與其 commit、進度、最後活動、未提交的改動；未合併的紀錄，加 --merged 連已合併的一起列
 dkt workflow [template] [--json]  # 使用者的 workflow 檔，或範本
 dkt inspect [--json]              # 專案的 Docket 設定；不寫入任何檔案
 dkt brief <slug> --task N         # 給實作 agent 的 brief
