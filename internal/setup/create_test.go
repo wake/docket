@@ -14,10 +14,10 @@ func TestFailedCreateLeavesNothingAndRerunFinishes(t *testing.T) {
 	rename = func(string, string) error { return errors.New("rename refused") }
 	t.Cleanup(func() { rename = old })
 	root := t.TempDir()
-	if _, err := Init(root, assets, false, openspecDir(t, root)); err == nil {
+	if _, err := Init(root, mdir(root), assets, false, openspecDir(t, root)); err == nil {
 		t.Fatal("Init succeeded although rename failed")
 	}
-	first := filepath.Join(root, schemaDir, "schema.yaml")
+	first := filepath.Join(mdir(root), "schema.yaml")
 	if _, err := os.Lstat(first); err == nil {
 		t.Errorf("%s exists after a failed create", first)
 	}
@@ -28,11 +28,11 @@ func TestFailedCreateLeavesNothingAndRerunFinishes(t *testing.T) {
 		return nil
 	})
 	rename = old
-	r, err := Init(root, assets, false, nil)
+	r, err := Init(root, mdir(root), assets, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := statuses(r)[schemaDir+"/schema.yaml"]; got != Written {
+	if got := statuses(r)[filepath.Join(mdir(root), "schema.yaml")]; got != Written {
 		t.Errorf("schema.yaml = %q", got)
 	}
 }

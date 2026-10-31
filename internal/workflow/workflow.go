@@ -15,10 +15,11 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/wake/docket/internal/markdown"
+	"github.com/wake/docket/internal/userdirs"
 )
 
 // ErrNoHome means no absolute home directory could be found.
-var ErrNoHome = errors.New("cannot find the home directory: HOME is not an absolute path and the user lookup gave none")
+var ErrNoHome = userdirs.ErrNoHome
 
 // Status is the state of the workflow file.
 type Status string
@@ -41,36 +42,17 @@ type Report struct {
 	MissingSections []string
 }
 
-// lookup returns the last value of key in env, or "" and false.
-func lookup(env []string, key string) (string, bool) {
-	v, found := "", false
-	for _, e := range env {
-		if k, val, ok := strings.Cut(e, "="); ok && k == key {
-			v, found = val, true
-		}
-	}
-	return v, found
-}
-
 // Locate returns the path of the workflow file: under XDG_CONFIG_HOME when
 // that is an absolute path, else under the home's .config. The home is HOME
 // when absolute, else the result of userHome (which may be nil). It reads only
 // env; the last value of a repeated variable counts.
 func Locate(env []string, userHome func() (string, error)) (string, error) {
-	if x, _ := lookup(env, "XDG_CONFIG_HOME"); filepath.IsAbs(x) {
+	if x, _ := userdirs.Lookup(env, "XDG_CONFIG_HOME"); filepath.IsAbs(x) {
 		return filepath.Join(x, "docket", "workflow.md"), nil
 	}
-	home, _ := lookup(env, "HOME")
-	if !filepath.IsAbs(home) {
-		home = ""
-		if userHome != nil {
-			if h, err := userHome(); err == nil && filepath.IsAbs(h) {
-				home = h
-			}
-		}
-	}
-	if home == "" {
-		return "", ErrNoHome
+	home, err := userdirs.Home(env, userHome)
+	if err != nil {
+		return "", err
 	}
 	return filepath.Join(home, ".config", "docket", "workflow.md"), nil
 }

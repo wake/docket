@@ -41,17 +41,26 @@ func problemFindings(ps []setup.Problem) ([]Finding, []Unreadable) {
 	return findings, unreadable
 }
 
+// projectCopyPath is the project's copy of the schema, as findings name it.
+const projectCopyPath = "openspec/schemas/docket"
+
+const msgSchemaEdited = "differs from every schema Docket shipped, and is used instead of the per-machine one"
+
 func initCommand() Command {
 	var force bool
 	return Command{
 		Name:  "init",
 		Usage: "init [--force]",
 		Define: func(fs *flag.FlagSet) {
-			fs.BoolVar(&force, "force", false, "overwrite schema files that differ from the shipped ones")
+			fs.BoolVar(&force, "force", false, "overwrite installed files that differ from the shipped ones")
 		},
 		Run: func(c *Context, args []string) (Outcome, error) {
 			if len(args) > 0 {
 				return Outcome{}, UsageError{Msg: "init takes no arguments"}
+			}
+			schemaDir, err := setup.SchemaDir(c.Env, c.UserHome)
+			if err != nil {
+				return Outcome{}, EnvError{Msg: err.Error()}
 			}
 			// The runner is created only when openspec/ is missing, so a
 			// repository that already has it needs no OpenSpec CLI.
@@ -63,7 +72,7 @@ func initCommand() Command {
 				_, err = r.Run("init", "--tools", "none")
 				return err
 			}
-			res, err := setup.Init(c.Repo.Root, shippedAssets(), force, initOpenSpec)
+			res, err := setup.Init(c.Repo.Root, schemaDir, shippedAssets(), force, initOpenSpec)
 			var ref *setup.Refused
 			if errors.As(err, &ref) {
 				out := Outcome{Result: res}
@@ -83,6 +92,8 @@ func initCommand() Command {
 				if f.Status == setup.Differs {
 					rule, msg := "schema-differs", "differs from the shipped schema; use --force to overwrite"
 					switch f.Kind {
+					case setup.KindConfig:
+						rule, msg = "config-schema-other", "names another schema; dkt init leaves it, and dkt new still uses docket"
 					case setup.KindSkill:
 						rule, msg = "skill-differs", "differs from the shipped skill; use --force to overwrite"
 					case setup.KindBlock:
@@ -90,6 +101,16 @@ func initCommand() Command {
 					}
 					out.Findings = append(out.Findings, Finding{Rule: rule, Message: msg, File: f.Path})
 				}
+			}
+			removed := false
+			for _, f := range res.Files {
+				removed = removed || f.Status == setup.Removed
+			}
+			switch {
+			case res.ProjectCopy == setup.EditedCopy:
+				out.Findings = append(out.Findings, Finding{Rule: "schema-edited", Message: msgSchemaEdited, File: projectCopyPath})
+			case res.ProjectCopy == setup.ShippedCopy && !removed:
+				out.Findings = append(out.Findings, Finding{Rule: "schema-project-copy", Message: "a copy of a shipped schema, used instead of the per-machine one; dkt init removes it once the per-machine copy matches the shipped schema", File: projectCopyPath})
 			}
 			return out, nil
 		},

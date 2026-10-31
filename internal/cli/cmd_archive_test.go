@@ -24,13 +24,21 @@ const archivePlan = "# Plan\n\n## Reuse\n\n| Need | Existing (path:symbol) | Dec
 func runArchive(t *testing.T, r *testutil.Repo, env []string, args ...string) (int, string, string) {
 	t.Helper()
 	var so, se bytes.Buffer
+	env = append(append([]string{}, env...), "XDG_DATA_HOME="+dataHome(r.Dir))
 	code := Run(Options{Args: append([]string{"archive"}, args...), Dir: r.Dir, Env: env, Stdout: &so, Stderr: &se})
 	return code, so.String(), se.String()
 }
 
 func archiveFixture(t *testing.T) *testutil.Repo {
 	t.Helper()
-	r := cleanRepo(t)
+	return archiveFixtureWith(t, true)
+}
+
+// archiveFixtureWith is archiveFixture with or without a project copy of the
+// schema.
+func archiveFixtureWith(t *testing.T, projectCopy bool) *testutil.Repo {
+	t.Helper()
+	r := cleanRepoWith(t, projectCopy)
 	r.Git("remote", "add", "origin", archiveOrigin)
 	r.Commit("code", map[string]string{"internal/x.go": "package x\n", "openspec/config.yaml": "schema: docket\n"})
 	base := r.Git("rev-parse", "HEAD")
@@ -320,5 +328,84 @@ func TestArchiveWithOpenSpec(t *testing.T) {
 	}
 	if got := r.Git("rev-parse", "HEAD"); got != head {
 		t.Errorf("HEAD moved")
+	}
+}
+
+func TestArchiveSchemaNotInstalled(t *testing.T) {
+	r := archiveFixtureWith(t, false)
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
+	before := r.Git("status", "--porcelain")
+	code, so, se := runArchive(t, r, env, "add-x", "--json")
+	if code != 1 || !hasRule(t, so, "schema-missing") || !strings.Contains(so, "the docket schema is not installed; run dkt init") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := decode(t, so)["result"].(map[string]any)
+	if !reflect.DeepEqual(res["stopped"], map[string]any{"change": "", "step": "preconditions"}) || res["schema"] != nil {
+		t.Fatalf("result = %v", res)
+	}
+	if b, _ := os.ReadFile(log); len(b) != 0 {
+		t.Errorf("openspec was run: %q", b)
+	}
+	if after := r.Git("status", "--porcelain"); after != before {
+		t.Errorf("working tree changed: %q -> %q", before, after)
+	}
+}
+
+func TestArchiveSchemaDiffers(t *testing.T) {
+	r := archiveFixtureWith(t, false)
+	testutil.InstallDataSchema(t, dataHome(r.Dir))
+	editMachineSchema(t, r.Dir)
+	code, so, se := runArchive(t, r, archiveEnv(t, r), "add-x")
+	if code != 0 || !strings.Contains(so, "archived add-x as 2026-01-02-add-x") ||
+		!strings.Contains(so, "differs from the shipped one; dkt init --force overwrites it") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+}
+
+func TestArchiveSchemaInResult(t *testing.T) {
+	r := archiveFixtureWith(t, false)
+	testutil.InstallDataSchema(t, dataHome(r.Dir))
+	editMachineSchema(t, r.Dir)
+	code, so, se := runArchive(t, r, archiveEnv(t, r), "add-x", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	s := schemaOf(t, so)
+	samePath(t, s["path"].(string), filepath.Join(dataHome(r.Dir), "openspec/schemas/docket"))
+	if s["matches"] != false {
+		t.Errorf("schema = %v", s)
+	}
+}
+
+func TestArchiveRelativeDataHomeWithCopy(t *testing.T) {
+	r := archiveFixture(t)
+	env := append(archiveEnv(t, r), "XDG_DATA_HOME=data")
+	code, so, se := runArchive(t, r, env, "add-x", "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := decode(t, so)["result"].(map[string]any)
+	if a, _ := res["archived"].([]any); len(a) != 1 {
+		t.Fatalf("result %v", res)
+	}
+}
+
+func TestArchiveRelativeDataHome(t *testing.T) {
+	r := archiveFixtureWith(t, false)
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
+	before := r.Git("status", "--porcelain")
+	var so, se bytes.Buffer
+	env = append(env, "XDG_DATA_HOME=data")
+	code := Run(Options{Args: []string{"archive", "add-x"}, Dir: r.Dir, Env: env, Stdout: &so, Stderr: &se})
+	if code != 4 {
+		t.Fatalf("exit %d\n%s\n%s", code, so.String(), se.String())
+	}
+	if b, _ := os.ReadFile(log); len(b) != 0 {
+		t.Errorf("openspec was run: %q", b)
+	}
+	if after := r.Git("status", "--porcelain"); after != before {
+		t.Errorf("working tree changed: %q -> %q", before, after)
 	}
 }

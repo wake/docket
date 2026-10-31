@@ -21,7 +21,7 @@ func TestRewriteKeepsModeAndLeavesNoTemporaryFile(t *testing.T) {
 	if err := os.Chmod(p, 0o664); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Init(root, assets, true, openspecDir(t, root)); err != nil {
+	if _, err := Init(root, mdir(root), assets, true, openspecDir(t, root)); err != nil {
 		t.Fatal(err)
 	}
 	b, _ := os.ReadFile(p)
@@ -61,7 +61,7 @@ func TestFailedRewriteKeepsTheFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.Chmod(root, 0o755) })
-	if _, err := Init(root, assets, true, nil); err == nil {
+	if _, err := Init(root, mdir(root), assets, true, nil); err == nil {
 		t.Fatal("Init succeeded in a read-only directory")
 	}
 	if b, _ := os.ReadFile(p); string(b) != oldBlock {
@@ -89,7 +89,7 @@ func TestFailedRenameRemovesTheTemporaryFile(t *testing.T) {
 	if err := os.WriteFile(p, []byte(oldBlock), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Init(root, assets, true, openspecDir(t, root)); err == nil {
+	if _, err := Init(root, mdir(root), assets, true, openspecDir(t, root)); err == nil {
 		t.Fatal("Init succeeded although rename failed")
 	}
 	if b, _ := os.ReadFile(p); string(b) != oldBlock {

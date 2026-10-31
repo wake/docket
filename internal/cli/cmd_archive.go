@@ -17,6 +17,7 @@ type ArchiveResult struct {
 	Stopped  *archive.Stop      `json:"stopped"`
 	Drifts   []archive.Drift    `json:"drifts"`
 	Readings *archive.Readings  `json:"readings"`
+	Schema   *SchemaState       `json:"schema"`
 }
 
 func archiveCommand() Command {
@@ -33,6 +34,16 @@ func archiveCommand() Command {
 					return Outcome{}, UsageError{Msg: fmt.Sprintf("slug %q is given twice", s)}
 				}
 				seen[s] = true
+			}
+			schema, schemaLines, err := findSchema(c)
+			if err != nil {
+				return Outcome{}, err
+			}
+			if schema == nil {
+				return Outcome{
+					Result:   ArchiveResult{Archived: []archive.Archived{}, Stopped: &archive.Stop{Step: "preconditions"}, Drifts: []archive.Drift{}},
+					Findings: []Finding{{Rule: "schema-missing", Message: "the docket schema is not installed; run dkt init"}},
+				}, nil
 			}
 			r, err := openspec.New(c.Repo.Root, c.Env)
 			if err != nil {
@@ -68,6 +79,10 @@ func archiveCommand() Command {
 				Slugs:   args,
 			})
 			out := archiveOutcome(rep)
+			res := out.Result.(ArchiveResult)
+			res.Schema = schema
+			out.Result = res
+			out.Human = append(out.Human, schemaLines...)
 			if err != nil {
 				// Keep what was archived before the failure.
 				return out, envOrErr(err)

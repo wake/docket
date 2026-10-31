@@ -18,7 +18,7 @@ import (
 func runNew(t *testing.T, dir, openspec string, extraEnv []string, args ...string) (int, string, string) {
 	t.Helper()
 	var so, se bytes.Buffer
-	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+openspec)
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+openspec, "XDG_DATA_HOME="+dataHome(dir))
 	env = append(env, extraEnv...)
 	code := Run(Options{Args: append(append([]string{"new"}, args...), "--json"), Dir: dir, Env: env, Stdout: &so, Stderr: &se})
 	return code, so.String(), se.String()
@@ -41,12 +41,21 @@ func newRepo(t *testing.T) *testutil.Repo {
 // cleanRepo is like newRepo but with no archived change.
 func cleanRepo(t *testing.T) *testutil.Repo {
 	t.Helper()
+	return cleanRepoWith(t, true)
+}
+
+// cleanRepoWith is cleanRepo with or without a project copy of the schema.
+func cleanRepoWith(t *testing.T, projectCopy bool) *testutil.Repo {
+	t.Helper()
 	r := testutil.NewRepo(t)
 	r.Git("checkout", "-q", "-b", "main")
-	testutil.InstallSchema(t, r.Dir)
-	r.Commit("init", map[string]string{
-		"README.md": "x\n",
-	})
+	files := map[string]string{"README.md": "x\n"}
+	if projectCopy {
+		testutil.InstallSchema(t, r.Dir)
+	} else {
+		files["openspec/.gitkeep"] = "" // dkt init leaves openspec/ behind
+	}
+	r.Commit("init", files)
 	return r
 }
 
@@ -306,6 +315,9 @@ func TestChangeCreated(t *testing.T) {
 	if res["requested"] != "add-x" || !reflect.DeepEqual(res["used"], []any{}) {
 		t.Errorf("requested/used = %v / %#v", res["requested"], res["used"])
 	}
+	if schemaOf(t, so)["matches"] != true {
+		t.Errorf("schema = %v", res["schema"])
+	}
 }
 
 func TestNewWritesDocketYAML(t *testing.T) {
@@ -358,16 +370,6 @@ func TestNewBlankTitle(t *testing.T) {
 		}
 		noChange(t, r.Dir)
 	}
-}
-
-func TestSchemaNotInstalled(t *testing.T) {
-	r := committedRepo(t)
-	r.Git("branch", "-M", "main")
-	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
-	if code != 1 || !strings.Contains(so, "dkt init") {
-		t.Fatalf("exit %d\n%s\n%s", code, so, se)
-	}
-	noChange(t, r.Dir)
 }
 
 func TestUnsupportedVersion(t *testing.T) {
@@ -607,4 +609,175 @@ func TestNewVersionCommandFails(t *testing.T) {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
 	noChange(t, r.Dir)
+}
+
+// samePath compares two paths after resolving links, since temporary
+// directories can sit under a symlinked parent.
+func samePath(t *testing.T, got, want string) {
+	t.Helper()
+	g, err1 := filepath.EvalSymlinks(got)
+	w, err2 := filepath.EvalSymlinks(want)
+	if err1 != nil || err2 != nil || g != w {
+		t.Errorf("path = %q, want %q (%v %v)", got, want, err1, err2)
+	}
+}
+
+func schemaOf(t *testing.T, so string) map[string]any {
+	t.Helper()
+	s, ok := resultOf(t, so)["schema"].(map[string]any)
+	if !ok {
+		t.Fatalf("result.schema is not an object: %s", so)
+	}
+	return s
+}
+
+// editMachineSchema appends a line to the per-machine schema.yaml.
+func editMachineSchema(t *testing.T, dir string) {
+	t.Helper()
+	f, err := os.OpenFile(machineFile(dir, "schema.yaml"), os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString("# edited\n"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// runNewText runs dkt new without --json.
+func runNewText(t *testing.T, dir, slug string) (int, string, string) {
+	t.Helper()
+	var so, se bytes.Buffer
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+testutil.OpenSpecCmd(t), "XDG_DATA_HOME="+dataHome(dir))
+	code := Run(Options{Args: []string{"new", slug, "--kind", "feature", "--source", "x", "--title", "X"}, Dir: dir, Env: env, Stdout: &so, Stderr: &se})
+	return code, so.String(), se.String()
+}
+
+func TestSchemaNotInstalled(t *testing.T) {
+	r := cleanRepoWith(t, false)
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	code, so, se := runNew(t, r.Dir, cmd, nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 1 || !hasRule(t, so, "schema-missing") || !strings.Contains(so, "the docket schema is not installed; run dkt init") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if b, _ := os.ReadFile(log); len(b) != 0 {
+		t.Errorf("openspec was run: %q", b)
+	}
+	noChange(t, r.Dir)
+}
+
+func TestNewSchemaFromTheMachine(t *testing.T) {
+	r := cleanRepoWith(t, false)
+	testutil.InstallDataSchema(t, dataHome(r.Dir))
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	s := schemaOf(t, so)
+	samePath(t, s["path"].(string), filepath.Join(dataHome(r.Dir), "openspec/schemas/docket"))
+	if s["matches"] != true {
+		t.Errorf("schema = %v", s)
+	}
+}
+
+func TestNewProjectCopyFirst(t *testing.T) {
+	r := cleanRepo(t)
+	testutil.InstallDataSchema(t, dataHome(r.Dir))
+	code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-x", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	samePath(t, schemaOf(t, so)["path"].(string), filepath.Join(r.Dir, "openspec/schemas/docket"))
+}
+
+func TestNewSchemaDiffers(t *testing.T) {
+	r := cleanRepoWith(t, false)
+	testutil.InstallDataSchema(t, dataHome(r.Dir))
+	editMachineSchema(t, r.Dir)
+	code, out, se := runNewText(t, r.Dir, "add-x")
+	if code != 0 || !strings.Contains(out, "differs from the shipped one; dkt init --force overwrites it") {
+		t.Fatalf("exit %d\n%s\n%s", code, out, se)
+	}
+	code, js, se2 := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-y", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 0 || schemaOf(t, js)["matches"] != false {
+		t.Fatalf("exit %d\n%s\n%s", code, js, se2)
+	}
+}
+
+func TestNewOlderProjectCopy(t *testing.T) {
+	r := cleanRepoWith(t, false)
+	testutil.InstallOldSchema(t, r.Dir)
+	code, out, se := runNewText(t, r.Dir, "add-x")
+	if code != 0 || !strings.Contains(out, "openspec/schemas/docket is a copy of an older shipped schema and is used instead of the per-machine one; dkt init removes it") {
+		t.Fatalf("exit %d\n%s\n%s", code, out, se)
+	}
+	code, js, se2 := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-y", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 0 || schemaOf(t, js)["matches"] != false {
+		t.Fatalf("exit %d\n%s\n%s", code, js, se2)
+	}
+}
+
+func TestNewProjectCopyWithLink(t *testing.T) {
+	r := cleanRepoWith(t, false)
+	testutil.InstallSchema(t, r.Dir)
+	prop := filepath.Join(r.Dir, "openspec/schemas/docket/templates/proposal.md")
+	b, err := os.ReadFile(prop)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "proposal.md")
+	if err := os.WriteFile(outside, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(prop); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, prop); err != nil {
+		t.Fatal(err)
+	}
+	code, out, se := runNewText(t, r.Dir, "add-x")
+	if code != 0 || !strings.Contains(out, "openspec/schemas/docket differs from every shipped schema and is used instead of the per-machine one") {
+		t.Fatalf("exit %d\n%s\n%s", code, out, se)
+	}
+	code, js, se2 := runNew(t, r.Dir, testutil.OpenSpecCmd(t), nil, "add-y", "--kind", "feature", "--source", "x", "--title", "X")
+	if code != 0 || schemaOf(t, js)["matches"] != false {
+		t.Fatalf("exit %d\n%s\n%s", code, js, se2)
+	}
+}
+
+func TestNewRelativeDataHome(t *testing.T) {
+	r := cleanRepoWith(t, false)
+	rel := []string{"XDG_DATA_HOME=data"}
+	if code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), rel, "add-x", "--kind", "feature", "--source", "x", "--title", "X"); code != 4 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	noChange(t, r.Dir)
+	testutil.InstallSchema(t, r.Dir)
+	if code, so, se := runNew(t, r.Dir, testutil.OpenSpecCmd(t), rel, "add-x", "--kind", "feature", "--source", "x", "--title", "X"); code != 0 {
+		t.Fatalf("with a project copy: exit %d\n%s\n%s", code, so, se)
+	}
+}
+
+func TestNewWithMachineSchemaOpenSpec(t *testing.T) {
+	real := os.Getenv("DOCKET_TEST_OPENSPEC")
+	if real == "" {
+		t.Skip("DOCKET_TEST_OPENSPEC is not set")
+	}
+	r := cleanRepoWith(t, false)
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+real, "XDG_DATA_HOME="+dataHome(r.Dir))
+	var so, se bytes.Buffer
+	if code := Run(Options{Args: []string{"init"}, Dir: r.Dir, Env: env, Stdout: &so, Stderr: &se}); code != 0 {
+		t.Fatalf("init: exit %d\n%s\n%s", code, so.String(), se.String())
+	}
+	r.Commit("init docket", nil)
+	so.Reset()
+	se.Reset()
+	code := Run(Options{Args: []string{"new", "add-x", "--kind", "feature", "--source", "x", "--title", "X"}, Dir: r.Dir, Env: env, Stdout: &so, Stderr: &se})
+	if code != 0 {
+		t.Fatalf("new: exit %d\n%s\n%s", code, so.String(), se.String())
+	}
+	b, err := os.ReadFile(filepath.Join(r.Dir, "openspec/changes/add-x/.openspec.yaml"))
+	if err != nil || !strings.Contains(string(b), "schema: docket") {
+		t.Fatalf(".openspec.yaml = %q %v", b, err)
+	}
 }

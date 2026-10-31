@@ -12,14 +12,23 @@ import (
 
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/testutil"
+	"github.com/wake/docket/internal/userdirs"
 )
 
+// schemaDir is the schema folder under the data home.
 const schemaDir = "openspec/schemas/docket/"
+
+// dataHome is the XDG_DATA_HOME the runs on the repository at dir share, a
+// sibling of the repository so it never holds the real one.
+func dataHome(dir string) string { return dir + ".data" }
+
+// machineFile is the path of a schema file under the per-machine directory.
+func machineFile(dir, rel string) string { return filepath.Join(dataHome(dir), schemaDir, rel) }
 
 func runInit(t *testing.T, dir, openspec string, args ...string) (int, string, string) {
 	t.Helper()
 	var so, se bytes.Buffer
-	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+openspec)
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+openspec, "XDG_DATA_HOME="+dataHome(dir))
 	code := Run(Options{Args: append([]string{"init"}, args...), Dir: dir, Env: env, Stdout: &so, Stderr: &se})
 	return code, so.String(), se.String()
 }
@@ -40,7 +49,7 @@ func assertSchemaInstalled(t *testing.T, dir string) {
 		}
 		n++
 		want, _ := fs.ReadFile(docket.Schema(), p)
-		got, rerr := os.ReadFile(filepath.Join(dir, schemaDir, p))
+		got, rerr := os.ReadFile(machineFile(dir, p))
 		if rerr != nil || !bytes.Equal(got, want) {
 			t.Errorf("%s not identical (err %v)", p, rerr)
 		}
@@ -66,8 +75,11 @@ func TestFreshRepository(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
 	}
-	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/config.yaml")); err != nil {
-		t.Error(err)
+	if b, err := os.ReadFile(filepath.Join(r.Dir, "openspec/config.yaml")); err != nil || !strings.HasPrefix(string(b), "schema: docket\n") {
+		t.Errorf("config.yaml = %q (err %v)", b, err)
+	}
+	if _, err := os.Lstat(filepath.Join(r.Dir, "openspec/schemas/docket")); err == nil {
+		t.Error("the schema was installed in the repository")
 	}
 	assertSchemaInstalled(t, r.Dir)
 }
@@ -79,12 +91,26 @@ func TestJSONOnSuccess(t *testing.T) {
 	if code != 0 || m["ok"] != true || resultOf(t, so)["openspec_initialized"] != true {
 		t.Fatalf("exit %d: %s", code, so)
 	}
+	err := fs.WalkDir(docket.Schema(), ".", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if got := fileStatus(t, so, machineFile(r.Dir, p)); got != "written" {
+				t.Errorf("%s: %v", p, got)
+			}
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fileStatus(t, so, "openspec/config.yaml"); got != "written" {
+		t.Errorf("config.yaml: %v", got)
+	}
 }
 
 func TestExistingOpenSpecProject(t *testing.T) {
 	r := committedRepo(t)
 	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
-	r.Write("openspec/config.yaml", "schema: x\n")
+	r.Write("openspec/config.yaml", "schema: docket\n")
 	code, so, se := runInit(t, r.Dir, cmd)
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
@@ -104,8 +130,8 @@ func TestLocallyEditedTemplate(t *testing.T) {
 	if code, so, se := runInit(t, r.Dir, cmd); code != 0 {
 		t.Fatalf("%d %s %s", code, so, se)
 	}
-	rel := schemaDir + "templates/proposal.md"
-	p := filepath.Join(r.Dir, rel)
+	rel := machineFile(r.Dir, "templates/proposal.md")
+	p := rel
 	if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -130,24 +156,26 @@ func TestForceOverwrites(t *testing.T) {
 	r := committedRepo(t)
 	cmd := testutil.OpenSpecCmd(t)
 	runInit(t, r.Dir, cmd)
-	rel := schemaDir + "templates/proposal.md"
-	if err := os.WriteFile(filepath.Join(r.Dir, rel), []byte("mine\n"), 0o644); err != nil {
-		t.Fatal(err)
+	rel := machineFile(r.Dir, "templates/proposal.md")
+	skill := ".agents/skills/docket/SKILL.md"
+	for _, p := range []string{rel, filepath.Join(r.Dir, skill)} {
+		if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	code, so, _ := runInit(t, r.Dir, cmd, "--force", "--json")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s", code, so)
 	}
 	assertSchemaInstalled(t, r.Dir)
-	found := false
-	for _, f := range resultOf(t, so)["files"].([]any) {
-		m := f.(map[string]any)
-		if m["path"] == rel {
-			found = m["status"] == "overwritten"
-		}
+	want, _ := fs.ReadFile(docket.Skills()[0].Files, "SKILL.md")
+	if got := readFile(t, r.Dir, skill); got != string(want) {
+		t.Errorf("skill not restored: %q", got)
 	}
-	if !found {
-		t.Errorf("no overwritten status: %s", so)
+	for _, p := range []string{rel, skill} {
+		if got := fileStatus(t, so, p); got != "overwritten" {
+			t.Errorf("%s: %q", p, got)
+		}
 	}
 }
 
@@ -156,7 +184,7 @@ func TestRerunNoDifferences(t *testing.T) {
 	cmd := testutil.OpenSpecCmd(t)
 	runInit(t, r.Dir, cmd)
 	times := map[string]int64{}
-	err := filepath.WalkDir(filepath.Join(r.Dir, schemaDir), func(p string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(filepath.Join(dataHome(r.Dir), schemaDir), func(p string, d fs.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
 			i, ierr := d.Info()
 			if ierr != nil {
@@ -169,7 +197,7 @@ func TestRerunNoDifferences(t *testing.T) {
 	if err != nil || len(times) == 0 {
 		t.Fatalf("walk: %v", err)
 	}
-	for _, rel := range append(skillRels(t), "AGENTS.md", "CLAUDE.md") {
+	for _, rel := range append(skillRels(t), "AGENTS.md", "CLAUDE.md", "openspec/config.yaml") {
 		i, err := os.Stat(filepath.Join(r.Dir, rel))
 		if err != nil {
 			t.Fatal(err)
@@ -207,7 +235,7 @@ func TestCLIMissing(t *testing.T) {
 
 func TestExistingOpenSpecWithoutCLI(t *testing.T) {
 	r := committedRepo(t)
-	r.Write("openspec/config.yaml", "schema: x\n")
+	r.Write("openspec/config.yaml", "schema: docket\n")
 	code, so, se := runInit(t, r.Dir, "/nonexistent/openspec")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
@@ -323,15 +351,15 @@ func sameSnapshot(t *testing.T, before, after map[string]string) {
 func TestSymlinkedSchemaFileRefused(t *testing.T) {
 	r := committedRepo(t)
 	r.Write("AGENTS.md", "# agents\n")
-	r.Write("openspec/config.yaml", "schema: x\n")
-	rel := schemaDir + "templates/proposal.md"
-	if err := os.MkdirAll(filepath.Join(r.Dir, schemaDir, "templates"), 0o755); err != nil {
+	r.Write("openspec/config.yaml", "schema: docket\n")
+	rel := machineFile(r.Dir, "templates/proposal.md")
+	if err := os.MkdirAll(filepath.Dir(rel), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(filepath.Join(r.Dir, "AGENTS.md"), filepath.Join(r.Dir, rel)); err != nil {
+	if err := os.Symlink(filepath.Join(r.Dir, "AGENTS.md"), rel); err != nil {
 		t.Fatal(err)
 	}
-	before := snapshot(t, r.Dir)
+	before, machine := snapshot(t, r.Dir), snapshot(t, dataHome(r.Dir))
 	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--force", "--json")
 	if code != 1 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
@@ -345,13 +373,18 @@ func TestSymlinkedSchemaFileRefused(t *testing.T) {
 		t.Errorf("finding: %v", f)
 	}
 	sameSnapshot(t, before, snapshot(t, r.Dir))
+	sameSnapshot(t, machine, snapshot(t, dataHome(r.Dir)))
 }
 
 func TestSymlinkedSchemasDirectoryRefused(t *testing.T) {
 	r := committedRepo(t)
-	r.Write("openspec/config.yaml", "schema: x\n")
+	r.Write("openspec/config.yaml", "schema: docket\n")
 	outside := t.TempDir()
-	if err := os.Symlink(outside, filepath.Join(r.Dir, "openspec/schemas")); err != nil {
+	link := machineFile(r.Dir, "")
+	if err := os.MkdirAll(filepath.Dir(filepath.Clean(link)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Clean(link)); err != nil {
 		t.Fatal(err)
 	}
 	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--force", "--json")
@@ -383,7 +416,7 @@ func TestPartialFailureKeepsResult(t *testing.T) {
 		t.Skip("root ignores file modes")
 	}
 	r := committedRepo(t)
-	r.Write("openspec/config.yaml", "schema: x\n")
+	r.Write("openspec/config.yaml", "schema: docket\n")
 	// An empty, read-only skill directory passes the checks and fails its
 	// write; the files written before it must still be reported.
 	dir := filepath.Join(r.Dir, ".agents/skills/docket")
@@ -403,7 +436,7 @@ func TestPartialFailureKeepsResult(t *testing.T) {
 	for _, f := range files {
 		listed[f.(map[string]any)["path"].(string)] = true
 	}
-	if !listed[schemaDir+"schema.yaml"] || listed[".agents/skills/docket/SKILL.md"] {
+	if !listed[machineFile(r.Dir, "schema.yaml")] || listed[".agents/skills/docket/SKILL.md"] {
 		t.Errorf("wrong files on partial failure: %s", so)
 	}
 	if err := os.Chmod(dir, 0o755); err != nil {
@@ -609,9 +642,14 @@ func TestLinkAndUnreadableTogether(t *testing.T) {
 		t.Skip("root ignores file modes")
 	}
 	r := committedRepo(t)
-	r.Write("openspec/config.yaml", "schema: x\n")
-	r.Write(schemaDir+"schema.yaml", "x\n")
-	bad := filepath.Join(r.Dir, schemaDir, "schema.yaml")
+	r.Write("openspec/config.yaml", "schema: docket\n")
+	bad := machineFile(r.Dir, "schema.yaml")
+	if err := os.MkdirAll(filepath.Dir(bad), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(bad, []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(bad, 0o000); err != nil {
 		t.Fatal(err)
 	}
@@ -623,7 +661,7 @@ func TestLinkAndUnreadableTogether(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(r.Dir, ".claude/skills/docket")); err != nil {
 		t.Fatal(err)
 	}
-	before := snapshot(t, r.Dir)
+	before, machine := snapshot(t, r.Dir), snapshot(t, dataHome(r.Dir))
 	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
 	if code != 3 {
 		t.Fatalf("exit %d\n%s\n%s", code, so, se)
@@ -635,6 +673,7 @@ func TestLinkAndUnreadableTogether(t *testing.T) {
 		t.Errorf("envelope: %s", so)
 	}
 	sameSnapshot(t, before, snapshot(t, r.Dir))
+	sameSnapshot(t, machine, snapshot(t, dataHome(r.Dir)))
 	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
 		t.Errorf("outside written")
 	}
@@ -874,7 +913,7 @@ func TestOtherConfigurationUnchanged(t *testing.T) {
 	other := map[string]string{
 		".claude/settings.json":        "{}\n",
 		".claude/skills/mine/SKILL.md": "mine\n",
-		"openspec/config.yaml":         "schema: x\n",
+		"openspec/config.yaml":         "schema: docket\ncontext: |\n  x\n",
 	}
 	for p, c := range other {
 		r.Write(p, c)
@@ -894,5 +933,318 @@ func TestOtherConfigurationUnchanged(t *testing.T) {
 	_, so, _ = runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
 	if _, ok := resultOf(t, so)["agents_section"]; ok {
 		t.Errorf("agents_section present: %s", so)
+	}
+}
+
+// initWith runs init on a bare repository with exactly the given environment
+// variables added to a temporary HOME and no data home.
+func initWith(t *testing.T, r *testutil.Repo, extra ...string) (int, string, string) {
+	t.Helper()
+	var so, se bytes.Buffer
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+testutil.OpenSpecCmd(t))
+	code := Run(Options{Args: []string{"init", "--json"}, Dir: r.Dir, Env: append(env, extra...), Stdout: &so, Stderr: &se})
+	return code, so.String(), se.String()
+}
+
+func nothingWritten(t *testing.T, r *testutil.Repo) {
+	t.Helper()
+	for _, p := range []string{"openspec", ".claude", "AGENTS.md"} {
+		if _, err := os.Lstat(filepath.Join(r.Dir, p)); err == nil {
+			t.Errorf("%s was written", p)
+		}
+	}
+}
+
+func TestInitDataHomeFromXDG(t *testing.T) {
+	r := committedRepo(t)
+	d := filepath.Join(t.TempDir(), "d")
+	if code, so, se := initWith(t, r, "XDG_DATA_HOME="+d); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	want, _ := fs.ReadFile(docket.Schema(), "schema.yaml")
+	if got, _ := os.ReadFile(filepath.Join(d, "openspec/schemas/docket/schema.yaml")); !bytes.Equal(got, want) {
+		t.Errorf("schema.yaml = %q", got)
+	}
+}
+
+func TestInitDataHomeDefault(t *testing.T) {
+	r := committedRepo(t)
+	h := t.TempDir()
+	if code, so, se := initWith(t, r, "HOME="+h); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	want, _ := fs.ReadFile(docket.Schema(), "schema.yaml")
+	if got, _ := os.ReadFile(filepath.Join(h, ".local/share/openspec/schemas/docket/schema.yaml")); !bytes.Equal(got, want) {
+		t.Errorf("schema.yaml = %q", got)
+	}
+}
+
+func TestInitRelativeDataHome(t *testing.T) {
+	r := committedRepo(t)
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.3")
+	var so, se bytes.Buffer
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+cmd, "XDG_DATA_HOME=data")
+	code := Run(Options{Args: []string{"init"}, Dir: r.Dir, Env: env, Stdout: &so, Stderr: &se})
+	if code != 4 || !strings.Contains(se.String(), "XDG_DATA_HOME") {
+		t.Fatalf("exit %d\n%s\n%s", code, so.String(), se.String())
+	}
+	nothingWritten(t, r)
+	if b, _ := os.ReadFile(log); len(bytes.TrimSpace(b)) != 0 {
+		t.Errorf("openspec ran: %q", b)
+	}
+}
+
+// bareEnv is env without HOME and XDG_DATA_HOME.
+func bareEnv(env []string) []string {
+	var bare []string
+	for _, e := range env {
+		if !strings.HasPrefix(e, "HOME=") && !strings.HasPrefix(e, "XDG_DATA_HOME=") {
+			bare = append(bare, e)
+		}
+	}
+	return bare
+}
+
+func TestInitNoHome(t *testing.T) {
+	r := committedRepo(t)
+	var so, se bytes.Buffer
+	env := bareEnv(append(testutil.Env(t), "DOCKET_OPENSPEC="+testutil.OpenSpecCmd(t)))
+	code := Run(Options{Args: []string{"init"}, Dir: r.Dir, Env: env, UserHome: nil, Stdout: &so, Stderr: &se})
+	if code != 4 || !strings.Contains(se.String(), userdirs.ErrNoHome.Error()) {
+		t.Fatalf("exit %d\n%s\n%s", code, so.String(), se.String())
+	}
+	nothingWritten(t, r)
+}
+
+func TestInitLinkedDataDirectoryFollowed(t *testing.T) {
+	r := committedRepo(t)
+	tmp := t.TempDir()
+	if err := os.Mkdir(filepath.Join(tmp, "real"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(tmp, "real"), filepath.Join(tmp, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if code, so, se := initWith(t, r, "XDG_DATA_HOME="+filepath.Join(tmp, "link")); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	want, _ := fs.ReadFile(docket.Schema(), "schema.yaml")
+	if got, _ := os.ReadFile(filepath.Join(tmp, "real/openspec/schemas/docket/schema.yaml")); !bytes.Equal(got, want) {
+		t.Errorf("schema.yaml = %q", got)
+	}
+}
+
+func TestDefaultSchemaReplaced(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/config.yaml", "schema: spec-driven\n\n# Project context (optional)\n")
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := readFile(t, r.Dir, "openspec/config.yaml"); got != "schema: docket\n\n# Project context (optional)\n" {
+		t.Errorf("config.yaml = %q", got)
+	}
+	if got := fileStatus(t, so, "openspec/config.yaml"); got != "written" {
+		t.Errorf("status %s", got)
+	}
+}
+
+func TestConfigFileCreated(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/.keep", "")
+	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := readFile(t, r.Dir, "openspec/config.yaml"); got != "schema: docket\n" {
+		t.Errorf("config.yaml = %q", got)
+	}
+}
+
+func TestOtherSchemaLeft(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/config.yaml", "schema: team-flow\n")
+	code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--force", "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+	if got := readFile(t, r.Dir, "openspec/config.yaml"); got != "schema: team-flow\n" {
+		t.Errorf("config.yaml = %q", got)
+	}
+	fnds, _ := decode(t, so)["findings"].([]any)
+	if len(fnds) != 1 {
+		t.Fatalf("findings: %s", so)
+	}
+	if f := fnds[0].(map[string]any); f["rule"] != "config-schema-other" || f["file"] != "openspec/config.yaml" {
+		t.Errorf("finding: %v", f)
+	}
+}
+
+func TestUnreadableSchemaKey(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/config.yaml", "schema:\n  docket\n")
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 3 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	un, _ := decode(t, so)["unreadable"].([]any)
+	if len(un) != 1 || un[0].(map[string]any)["source"] != "openspec/config.yaml" {
+		t.Errorf("unreadable: %s", so)
+	}
+	if _, err := os.Lstat(dataHome(r.Dir)); err == nil {
+		t.Error("the per-machine directory exists")
+	}
+	if _, err := os.Lstat(filepath.Join(r.Dir, ".claude")); err == nil {
+		t.Error("a skill was written")
+	}
+}
+
+var oldCopyFiles = []string{"schema.yaml", "templates/design.md", "templates/plan.md", "templates/proposal.md", "templates/spec.md"}
+
+func TestShippedProjectCopyRemoved(t *testing.T) {
+	r := committedRepo(t)
+	testutil.InstallOldSchema(t, r.Dir)
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	assertSchemaInstalled(t, r.Dir)
+	for _, p := range oldCopyFiles {
+		if st := fileStatus(t, so, "openspec/schemas/docket/"+p); st != "removed" {
+			t.Errorf("%s: %s", p, st)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(r.Dir, "openspec/schemas/docket")); err == nil {
+		t.Error("the project copy remains")
+	}
+	if left, _ := filepath.Glob(filepath.Join(r.Dir, "openspec", ".docket-removed-*")); len(left) != 0 {
+		t.Errorf("left behind: %v", left)
+	}
+}
+
+// appendLine adds a line to the file at rel under dir.
+func appendLine(t *testing.T, dir, rel string) {
+	t.Helper()
+	f, err := os.OpenFile(filepath.Join(dir, rel), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString("edited\n"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// findingOf returns the finding with the rule, or nil.
+func findingOf(t *testing.T, so, rule string) map[string]any {
+	t.Helper()
+	fnds, _ := decode(t, so)["findings"].([]any)
+	for _, f := range fnds {
+		if m := f.(map[string]any); m["rule"] == rule {
+			return m
+		}
+	}
+	return nil
+}
+
+func TestEditedProjectCopyKept(t *testing.T) {
+	r := committedRepo(t)
+	testutil.InstallSchema(t, r.Dir)
+	appendLine(t, r.Dir, "openspec/schemas/docket/templates/proposal.md")
+	before := snapshot(t, filepath.Join(r.Dir, "openspec/schemas/docket"))
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--force", "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	sameSnapshot(t, before, snapshot(t, filepath.Join(r.Dir, "openspec/schemas/docket")))
+	f := findingOf(t, so, "schema-edited")
+	if f == nil || f["file"] != "openspec/schemas/docket" || f["message"] != "differs from every schema Docket shipped, and is used instead of the per-machine one" {
+		t.Errorf("finding: %v", f)
+	}
+}
+
+func TestProjectCopyWithExtraFileKept(t *testing.T) {
+	r := committedRepo(t)
+	testutil.InstallSchema(t, r.Dir)
+	r.Write("openspec/schemas/docket/templates/extra.md", "mine\n")
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 1 || findingOf(t, so, "schema-edited") == nil {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := readFile(t, r.Dir, "openspec/schemas/docket/templates/extra.md"); got != "mine\n" {
+		t.Errorf("extra.md = %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(r.Dir, "openspec/schemas/docket/schema.yaml")); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestRemovalWaitsForTheMachineCopy(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	testutil.InstallSchema(t, r.Dir)
+	edited := machineFile(r.Dir, "schema.yaml")
+	if err := os.WriteFile(edited, append(mustRead(t, edited), "# mine\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, filepath.Join(r.Dir, "openspec/schemas/docket"))
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	sameSnapshot(t, before, snapshot(t, filepath.Join(r.Dir, "openspec/schemas/docket")))
+	for _, rule := range []string{"schema-differs", "schema-project-copy"} {
+		if findingOf(t, so, rule) == nil {
+			t.Errorf("no %s finding: %s", rule, so)
+		}
+	}
+}
+
+func mustRead(t *testing.T, p string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+func TestSymlinkInProjectCopyRefused(t *testing.T) {
+	r := committedRepo(t)
+	testutil.InstallSchema(t, r.Dir)
+	r.Write("AGENTS.md", "# agents\n")
+	link := filepath.Join(r.Dir, "openspec/schemas/docket/templates/proposal.md")
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(r.Dir, "AGENTS.md"), link); err != nil {
+		t.Fatal(err)
+	}
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if f := findingOf(t, so, "symlink-refused"); f == nil || f["file"] != "openspec/schemas/docket/templates/proposal.md" {
+		t.Errorf("finding: %v", f)
+	}
+	if _, err := os.Lstat(dataHome(r.Dir)); err == nil {
+		t.Error("the per-machine directory was created")
+	}
+}
+
+func TestFolderWithoutSchemaLeft(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/schemas/docket/templates/proposal.md", "mine\n")
+	before := snapshot(t, filepath.Join(r.Dir, "openspec/schemas/docket"))
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t), "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	sameSnapshot(t, before, snapshot(t, filepath.Join(r.Dir, "openspec/schemas/docket")))
+	for _, f := range decode(t, so)["findings"].([]any) {
+		if f.(map[string]any)["file"] == "openspec/schemas/docket" {
+			t.Errorf("finding names the folder: %v", f)
+		}
 	}
 }
