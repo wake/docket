@@ -103,3 +103,133 @@ func TestSyncSymlinkedPlanRefused(t *testing.T) {
 		t.Fatal("link target written")
 	}
 }
+
+const recSlug = "2026-11-01-fix-x"
+const recFile = "docket/records/" + recSlug + ".md"
+const recBody = "# Fix x\n\n## Tasks\n\n### Task 1: A\n\n- [ ] **Step 1: a**\n\n### Task 2: B\n\n- [ ] **Step 1: b**\n- [ ] **Step 2: c**\n"
+
+// recordRepo has the record committed on main, then a branch fix-x.
+func recordRepo(t *testing.T) *testutil.Repo {
+	t.Helper()
+	r := cleanRepo(t)
+	r.Commit("add record", map[string]string{recFile: recBody})
+	r.Git("checkout", "-q", "-b", "fix-x")
+	return r
+}
+
+func recordText(t *testing.T, r *testutil.Repo) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(r.Dir, recFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestRecordTasksTicked(t *testing.T) {
+	r := recordRepo(t)
+	r.Commit("work\n\nRecord: "+recSlug+"\nTask: 2", map[string]string{"a.txt": "a\n"})
+	code, so, se := runSync(t, r, nil, recSlug, "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := decode(t, so)["result"].(map[string]any)
+	if res["record"] != recSlug || res["change"] != nil {
+		t.Fatalf("result %v", res)
+	}
+	want := strings.Replace(strings.Replace(recBody, "- [ ] **Step 1: b", "- [x] **Step 1: b", 1), "- [ ] **Step 2: c", "- [x] **Step 2: c", 1)
+	if got := recordText(t, r); got != want {
+		t.Fatalf("record:\n%s", got)
+	}
+	if st := r.Git("status", "--porcelain"); !strings.Contains(st, recFile) || strings.Count(st, "\n") != 0 {
+		t.Fatalf("status %q", st)
+	}
+}
+
+func TestRecordSyncIgnoresMergedCommits(t *testing.T) {
+	r := cleanRepo(t)
+	r.Commit("add record", map[string]string{recFile: recBody})
+	r.Commit("old\n\nRecord: "+recSlug+"\nTask: 1", map[string]string{"m.txt": "m\n"})
+	r.Git("checkout", "-q", "-b", "fix-x")
+	if code, so, se := runSync(t, r, nil, recSlug); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if recordText(t, r) != recBody {
+		t.Fatal("record changed")
+	}
+}
+
+func TestRecordSyncCheck(t *testing.T) {
+	r := recordRepo(t)
+	r.Commit("work\n\nRecord: "+recSlug+"\nTask: 2", map[string]string{"a.txt": "a\n"})
+	code, so, _ := runSync(t, r, nil, recSlug, "--check", "--json")
+	if code != 1 || !hasRule(t, so, "plan-unsynced") || !strings.Contains(so, "Task 2 has commits and 2 unticked steps") {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+	if recordText(t, r) != recBody {
+		t.Fatal("record written")
+	}
+}
+
+func TestRecordSyncUnknownTask(t *testing.T) {
+	r := recordRepo(t)
+	sha := r.Commit("bad\n\nRecord: "+recSlug+"\nTask: 9", map[string]string{"a.txt": "a\n"})
+	r.Commit("work\n\nRecord: "+recSlug+"\nTask: 2", map[string]string{"b.txt": "b\n"})
+	code, so, _ := runSync(t, r, nil, recSlug, "--json")
+	if code != 1 || !hasRule(t, so, "task-unknown") || !strings.Contains(so, sha[:7]) {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+	if !strings.Contains(recordText(t, r), "- [x] **Step 2: c") {
+		t.Fatal("Task 2 not ticked")
+	}
+}
+
+func TestRecordSyncNeedsDefaultBranch(t *testing.T) {
+	r := recordRepo(t)
+	r.Git("branch", "-m", "main", "trunk")
+	if code, so, se := runSync(t, r, nil, recSlug); code != 4 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if recordText(t, r) != recBody {
+		t.Fatal("record changed")
+	}
+}
+
+func TestRecordSyncThroughLink(t *testing.T) {
+	r := cleanRepo(t)
+	out := t.TempDir()
+	if err := os.WriteFile(filepath.Join(out, recSlug+".md"), []byte(recBody), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(r.Dir, "docket"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(out, filepath.Join(r.Dir, "docket/records")); err != nil {
+		t.Fatal(err)
+	}
+	r.Git("checkout", "-q", "-b", "fix-x")
+	r.Commit("work\n\nRecord: "+recSlug+"\nTask: 2", map[string]string{"a.txt": "a\n"})
+	code, so, _ := runSync(t, r, nil, recSlug, "--json")
+	if code != 1 || !hasRule(t, so, "symlink-refused") || !strings.Contains(so, "docket/records") {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+	if b, _ := os.ReadFile(filepath.Join(out, recSlug+".md")); string(b) != recBody {
+		t.Fatal("outside file written")
+	}
+}
+
+func TestRecordSyncMissing(t *testing.T) {
+	r := cleanRepo(t)
+	code, so, _ := runSync(t, r, nil, recSlug, "--json")
+	if code != 1 || !hasRule(t, so, "record-missing") {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+}
+
+func TestRecordSyncBadSlug(t *testing.T) {
+	r := cleanRepo(t)
+	code, so, _ := runSync(t, r, nil, "2026-11-01-", "--json")
+	if code != 1 || !hasRule(t, so, "slug-invalid") {
+		t.Fatalf("exit %d\n%s", code, so)
+	}
+}
