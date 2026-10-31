@@ -23,6 +23,7 @@ const (
 	Unchanged   FileStatus = "unchanged"
 	Differs     FileStatus = "differs"
 	Overwritten FileStatus = "overwritten"
+	Removed     FileStatus = "removed"
 )
 
 // FileKind says which part of the installation a file belongs to.
@@ -32,10 +33,12 @@ const (
 	KindSchema FileKind = "schema"
 	KindSkill  FileKind = "skill"
 	KindBlock  FileKind = "block"
+	KindConfig FileKind = "config"
 )
 
-// File is one installed file; Path is relative to the repository root. Kind
-// is for callers and is not part of the JSON output.
+// File is one installed file; Path is relative to the repository root, or
+// absolute for a file in the per-machine schema directory. Kind is for
+// callers and is not part of the JSON output.
 type File struct {
 	Path   string     `json:"path"`
 	Status FileStatus `json:"status"`
@@ -89,8 +92,9 @@ func (r *Refused) Error() string {
 	return msg
 }
 
-// schemaDir is where the schema lives, relative to the repository root.
-const schemaDir = "openspec/schemas/docket"
+// schemaName is the folder of the schema under the per-machine schemas
+// directory.
+const schemaName = "docket"
 
 // agentsFile and claudeFile are the files that carry the Docket block.
 const (
@@ -107,6 +111,18 @@ type target struct {
 	rel  string
 	want []byte
 	kind FileKind
+	// base is the directory rel is under; empty means the repository root.
+	// The per-machine schema files have base <schemas dir> and rel
+	// docket/<file>.
+	base string
+}
+
+// shown is the path File reports: rel, or the absolute path under base.
+func (t target) shown() string {
+	if t.base == "" {
+		return t.rel
+	}
+	return filepath.Join(t.base, filepath.FromSlash(t.rel))
 }
 
 // decided is a target with what the check phase settled: the status, the
@@ -119,38 +135,48 @@ type decided struct {
 	// viaAgents marks a CLAUDE.md that already leads to AGENTS.md (an import
 	// or a link); Inspect leaves it out and Init ignores it.
 	viaAgents bool
+	// config is what a config.yaml target found.
+	config ConfigSchema
 }
 
-// Init installs the schema and the skills under root. It first decides the
+// Init installs the schema into schemaDir (the per-machine directory) and the
+// skills under root. It first decides the
 // status of every file and checks every path; only when all checks pass does
 // it call initOpenSpec (when <root>/openspec is missing) and write. A refused
 // run writes nothing and returns *Refused. A differing file is left alone
 // (Differs) unless force is set (Overwritten).
-func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result, error) {
+func Init(root, schemaDir string, a Assets, force bool, initOpenSpec func() error) (Result, error) {
 	res := Result{Files: []File{}}
 	if err := safepath.Check(root, "openspec"); err != nil {
 		return res, &Refused{Problems: []Problem{problemFor("openspec", err)}}
 	}
-	plan, problems, err := decideAll(root, a, force)
+	_, statErr := os.Lstat(filepath.Join(root, "openspec"))
+	plan, problems, err := decideAll(root, schemaDir, a, force, statErr == nil)
 	if err != nil {
 		return res, err
 	}
 	if len(problems) > 0 {
 		return res, &Refused{Problems: problems}
 	}
-	if _, err := os.Lstat(filepath.Join(root, "openspec")); errors.Is(err, fs.ErrNotExist) {
+	if errors.Is(statErr, fs.ErrNotExist) {
 		if err := initOpenSpec(); err != nil {
 			return res, err
 		}
 		res.OpenSpecInitialized = true
-	} else if err != nil {
-		return res, err
+		// OpenSpec may have written config.yaml; decide it now.
+		d, p := decide(root, target{rel: configFile, kind: KindConfig}, a.Block, force)
+		if p != nil {
+			return res, &Refused{Problems: []Problem{*p}}
+		}
+		plan = append(plan, d)
+	} else if statErr != nil {
+		return res, statErr
 	}
 	for _, d := range plan {
 		if err := write(root, d); err != nil {
 			return res, err
 		}
-		res.Files = append(res.Files, File{Path: d.rel, Status: d.status, Kind: d.kind})
+		res.Files = append(res.Files, File{Path: d.shown(), Status: d.status, Kind: d.kind})
 	}
 	return res, nil
 }
@@ -159,8 +185,8 @@ func Init(root string, a Assets, force bool, initOpenSpec func() error) (Result,
 // the problems that would make Init refuse. It does not check the openspec
 // directory itself: Init does that first, and Inspect adds it to the problems
 // it reports. It changes nothing.
-func decideAll(root string, a Assets, force bool) ([]decided, []Problem, error) {
-	targets, err := targetsOf(a)
+func decideAll(root, schemaDir string, a Assets, force, withConfig bool) ([]decided, []Problem, error) {
+	targets, err := targetsOf(a, schemaDir, withConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -177,35 +203,49 @@ func decideAll(root string, a Assets, force bool) ([]decided, []Problem, error) 
 	return plan, problems, nil
 }
 
+// Report is what Inspect finds.
+type Report struct {
+	Files    []File
+	Problems []Problem
+	// Config is what openspec/config.yaml names; empty when it could not be
+	// read.
+	Config ConfigSchema
+}
+
 // Inspect reports what Init without force would do under root, writing and
 // starting nothing: the files it would install or keep with Init's statuses,
 // and the problems that would make it refuse. Unlike Init it still returns
 // the files that passed. A CLAUDE.md that imports AGENTS.md, or links to it,
 // is left out. An unsafe openspec path is one of the problems, and the other
-// files are still decided. The error is for failing to read the assets.
-func Inspect(root string, a Assets) ([]File, []Problem, error) {
-	plan, problems, err := decideAll(root, a, false)
+// files are still decided. An empty schemaDir leaves the per-machine files
+// out. The error is for failing to read the assets.
+func Inspect(root, schemaDir string, a Assets) (Report, error) {
+	plan, problems, err := decideAll(root, schemaDir, a, false, true)
 	if err != nil {
-		return nil, nil, err
+		return Report{}, err
 	}
 	if err := safepath.Check(root, "openspec"); err != nil {
 		problems = append([]Problem{problemFor("openspec", err)}, problems...)
 	}
-	files := make([]File, 0, len(plan))
+	rep := Report{Files: make([]File, 0, len(plan)), Problems: problems}
 	for _, d := range plan {
+		if d.kind == KindConfig {
+			rep.Config = d.config
+		}
 		if d.viaAgents {
 			continue
 		}
-		files = append(files, File{Path: d.rel, Status: d.status, Kind: d.kind})
+		rep.Files = append(rep.Files, File{Path: d.shown(), Status: d.status, Kind: d.kind})
 	}
-	return files, problems, nil
+	return rep, nil
 }
 
-// targetsOf lists every file to install: the schema, the skills in each of
+// targetsOf lists every file to install: the schema in schemaDir (none when
+// it is empty), config.yaml when withConfig is set, the skills in each of
 // skillRoots, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
-func targetsOf(a Assets) ([]target, error) {
+func targetsOf(a Assets, schemaDir string, withConfig bool) ([]target, error) {
 	var out []target
-	add := func(src fs.FS, dir string, kind FileKind) error {
+	add := func(src fs.FS, dir string, kind FileKind, base string) error {
 		return fs.WalkDir(src, ".", func(p string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return err
@@ -214,16 +254,21 @@ func targetsOf(a Assets) ([]target, error) {
 			if err != nil {
 				return err
 			}
-			out = append(out, target{rel: path.Join(dir, p), want: want, kind: kind})
+			out = append(out, target{rel: path.Join(dir, p), want: want, kind: kind, base: base})
 			return nil
 		})
 	}
-	if err := add(a.Schema, schemaDir, KindSchema); err != nil {
-		return nil, err
+	if schemaDir != "" {
+		if err := add(a.Schema, schemaName, KindSchema, filepath.Dir(schemaDir)); err != nil {
+			return nil, err
+		}
+	}
+	if withConfig {
+		out = append(out, target{rel: configFile, kind: KindConfig})
 	}
 	for _, root := range skillRoots {
 		for _, sk := range a.Skills {
-			if err := add(sk.Files, path.Join(root, sk.Name), KindSkill); err != nil {
+			if err := add(sk.Files, path.Join(root, sk.Name), KindSkill, ""); err != nil {
 				return nil, err
 			}
 		}
@@ -241,10 +286,23 @@ func problemFor(rel string, err error) Problem {
 	return Problem{Path: rel, Kind: ProblemUnreadable, Err: err}
 }
 
+// problemForTarget is problemFor for a target under its own base: the paths
+// it reports are the ones File reports.
+func problemForTarget(t target, err error) Problem {
+	var sl *safepath.SymlinkError
+	if t.base != "" && errors.As(err, &sl) {
+		err = &safepath.SymlinkError{Path: filepath.Join(t.base, filepath.FromSlash(sl.Path))}
+	}
+	return problemFor(t.shown(), err)
+}
+
 // decide checks t's path and reads the file there to say what a write would
 // do. It changes nothing.
 func decide(root string, t target, block string, force bool) (decided, *Problem) {
 	d := decided{target: t}
+	if t.base != "" {
+		root = t.base
+	}
 	abs := filepath.Join(root, filepath.FromSlash(t.rel))
 	if t.rel == claudeFile {
 		if tgt, err := os.Readlink(abs); err == nil && filepath.Clean(tgt) == agentsFile {
@@ -253,14 +311,17 @@ func decide(root string, t target, block string, force bool) (decided, *Problem)
 		}
 	}
 	if err := safepath.Check(root, t.rel); err != nil {
-		p := problemFor(t.rel, err)
+		p := problemForTarget(t, err)
 		return d, &p
 	}
 	got, err := readNoFollow(abs)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return d, &Problem{Path: t.rel, Kind: ProblemUnreadable, Err: err}
+		return d, &Problem{Path: t.shown(), Kind: ProblemUnreadable, Err: err}
 	}
 	d.existed = err == nil
+	if t.kind == KindConfig {
+		return decideConfig(d, got)
+	}
 	if t.kind == KindBlock {
 		return decideBlock(d, got, block, force)
 	}
@@ -306,21 +367,25 @@ func write(root string, d decided) error {
 	if d.status == Unchanged || d.status == Differs {
 		return nil
 	}
+	if d.base != "" {
+		root = d.base
+	}
 	dst := filepath.Join(root, filepath.FromSlash(d.rel))
+	shown := d.shown()
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return fmt.Errorf("write %s: %w", d.rel, err)
+		return fmt.Errorf("write %s: %w", shown, err)
 	}
 	if d.existed {
 		info, err := os.Lstat(dst)
 		if err != nil {
-			return fmt.Errorf("write %s: %w", d.rel, err)
+			return fmt.Errorf("write %s: %w", shown, err)
 		}
 		if !info.Mode().IsRegular() {
-			return fmt.Errorf("write %s: not a regular file", d.rel)
+			return fmt.Errorf("write %s: not a regular file", shown)
 		}
-		return install(dst, d.data, info.Mode().Perm(), true, d.rel)
+		return install(dst, d.data, info.Mode().Perm(), true, shown)
 	}
-	return install(dst, d.data, 0o644, false, d.rel)
+	return install(dst, d.data, 0o644, false, shown)
 }
 
 // rename is os.Rename; tests replace it to make the last step fail.

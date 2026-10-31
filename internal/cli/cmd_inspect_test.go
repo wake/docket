@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
+	"github.com/wake/docket/internal/userdirs"
 	"github.com/wake/docket/internal/workflow"
 )
 
@@ -19,6 +21,7 @@ import (
 func runInspect(t *testing.T, dir string, env []string, args ...string) (int, string, string) {
 	t.Helper()
 	var so, se bytes.Buffer
+	env = append(append([]string{}, env...), "XDG_DATA_HOME="+dataHome(dir))
 	code := Run(Options{Args: append([]string{"inspect"}, args...), Dir: dir, Env: env, Stdout: &so, Stderr: &se})
 	return code, so.String(), se.String()
 }
@@ -73,10 +76,26 @@ func TestInspectBeforeInit(t *testing.T) {
 	for _, x := range inspectRules(t, so) {
 		rules[x] = true
 	}
-	for _, want := range []string{"schema-missing", "skill-missing", "agents-block-missing"} {
+	for _, want := range []string{"schema-missing", "skill-missing", "agents-block-missing", "config-schema-default"} {
 		if !rules[want] {
 			t.Errorf("no %s finding: %s", want, so)
 		}
+	}
+	for _, f := range decode(t, so)["findings"].([]any) {
+		m := f.(map[string]any)
+		switch m["rule"] {
+		case "schema-missing":
+			if !strings.HasPrefix(m["file"].(string), dataHome(r.Dir)+"/openspec/schemas/docket/") {
+				t.Errorf("schema-missing file: %v", m["file"])
+			}
+		case "config-schema-default":
+			if m["file"] != "openspec/config.yaml" {
+				t.Errorf("config finding file: %v", m["file"])
+			}
+		}
+	}
+	if f := inspectFiles(t, so)["openspec/config.yaml"]; f["status"] != "missing" || f["kind"] != "config" {
+		t.Errorf("config entry: %v", f)
 	}
 	kinds := map[any]bool{}
 	for p, f := range inspectFiles(t, so) {
@@ -85,7 +104,7 @@ func TestInspectBeforeInit(t *testing.T) {
 		}
 		kinds[f["kind"]] = true
 	}
-	for _, k := range []string{"schema", "skill", "block"} {
+	for _, k := range []string{"schema", "skill", "block", "config"} {
 		if !kinds[k] {
 			t.Errorf("no file of kind %s", k)
 		}
@@ -182,7 +201,7 @@ func TestInspectSymlinkedSkillDirectory(t *testing.T) {
 	if f := fs[0].(map[string]any); f["rule"] != "symlink-refused" || f["file"] != ".claude/skills/docket" {
 		t.Errorf("finding: %v", f)
 	}
-	if f := inspectFiles(t, so)["openspec/schemas/docket/schema.yaml"]; f["status"] != "same" {
+	if f := inspectFiles(t, so)[machineFile(r.Dir, "schema.yaml")]; f["status"] != "same" {
 		t.Errorf("schema entry: %v", f)
 	}
 }
@@ -259,7 +278,7 @@ func TestInspectUnreadableFile(t *testing.T) {
 	if !found {
 		t.Errorf("unreadable does not name %s: %s", rel, so)
 	}
-	if f := inspectFiles(t, so)["openspec/schemas/docket/schema.yaml"]; f["status"] != "same" {
+	if f := inspectFiles(t, so)[machineFile(r.Dir, "schema.yaml")]; f["status"] != "same" {
 		t.Errorf("schema entry: %v", f)
 	}
 	res := resultOf(t, so)
@@ -286,6 +305,11 @@ func TestInspectCleanSetup(t *testing.T) {
 	}
 	if fs := decode(t, so)["findings"].([]any); len(fs) != 0 {
 		t.Errorf("findings: %v", fs)
+	}
+	for p := range inspectFiles(t, so) {
+		if strings.HasPrefix(p, "openspec/schemas/") {
+			t.Errorf("file in the repository: %s", p)
+		}
 	}
 	res := resultOf(t, so)
 	if got := res["openspec"]; !reflect.DeepEqual(got, map[string]any{"version": "1.14.3", "supported": true}) {
@@ -618,8 +642,8 @@ func TestInspectNothingWritten(t *testing.T) {
 	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
 		t.Fatalf("init: %d %s", code, so)
 	}
-	for _, root := range []string{"openspec/schemas/docket", ".claude/skills", ".agents/skills"} {
-		err := filepath.WalkDir(filepath.Join(r.Dir, root), func(p string, d fs.DirEntry, err error) error {
+	for _, root := range []string{machineFile(r.Dir, ""), filepath.Join(r.Dir, ".claude/skills"), filepath.Join(r.Dir, ".agents/skills")} {
+		err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 			if err == nil && d.Type().IsRegular() {
 				err = os.WriteFile(p, []byte("mine\n"), 0o644)
 			}
@@ -714,5 +738,105 @@ func TestInspectDefaultBranchFlag(t *testing.T) {
 		if f.(map[string]any)["change"] == "add-x" {
 			t.Errorf("finding names add-x: %s", so)
 		}
+	}
+}
+
+func TestInspectMachineCopyDiffers(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	p := machineFile(r.Dir, "schema.yaml")
+	b, _ := os.ReadFile(p)
+	if err := os.WriteFile(p, append(b, "# mine\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if f := inspectFiles(t, so)[p]; f["status"] != "differs" || f["kind"] != "schema" {
+		t.Errorf("entry: %v", f)
+	}
+	fs := decode(t, so)["findings"].([]any)
+	if len(fs) != 1 {
+		t.Fatalf("findings: %v", fs)
+	}
+	f := fs[0].(map[string]any)
+	if f["rule"] != "schema-differs" || f["file"] != p || !strings.Contains(f["message"].(string), "dkt init --force overwrites it") {
+		t.Errorf("finding: %v", f)
+	}
+}
+
+func TestInspectNoHomeForSchema(t *testing.T) {
+	r := committedRepo(t)
+	env, _ := inspectEnv(t)
+	var so, se bytes.Buffer
+	code := Run(Options{Args: []string{"inspect", "--json"}, Dir: r.Dir, Env: bareEnv(env), UserHome: nil, Stdout: &so, Stderr: &se})
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so.String())
+	}
+	found := false
+	for _, f := range decode(t, so.String())["findings"].([]any) {
+		m := f.(map[string]any)
+		if m["rule"] == "schema-missing" && m["message"] == userdirs.ErrNoHome.Error() {
+			found = true
+			if _, has := m["file"]; has {
+				t.Errorf("finding has a file: %v", m)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("no schema-missing finding: %s", so.String())
+	}
+}
+
+func TestInspectRelativeDataHome(t *testing.T) {
+	r := committedRepo(t)
+	env, _ := inspectEnv(t)
+	var so, se bytes.Buffer
+	code := Run(Options{Args: []string{"inspect", "--json"}, Dir: r.Dir, Env: append(env, "XDG_DATA_HOME=data"), Stdout: &so, Stderr: &se})
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so.String())
+	}
+	found := false
+	for _, f := range decode(t, so.String())["findings"].([]any) {
+		m := f.(map[string]any)
+		if m["rule"] == "schema-missing" && strings.Contains(m["message"].(string), "XDG_DATA_HOME") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no schema-missing finding: %s", so.String())
+	}
+}
+
+func TestInspectDefaultSchemaKey(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/config.yaml", "schema: spec-driven\n")
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if f := inspectFiles(t, so)["openspec/config.yaml"]; f["status"] != "differs" || f["kind"] != "config" {
+		t.Errorf("entry: %v", f)
+	}
+	if !slices.Contains(inspectRules(t, so), "config-schema-default") {
+		t.Errorf("no config-schema-default: %s", so)
+	}
+}
+
+func TestInspectOtherSchemaKey(t *testing.T) {
+	r := committedRepo(t)
+	r.Write("openspec/config.yaml", "schema: team-flow\n")
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	if !slices.Contains(inspectRules(t, so), "config-schema-other") {
+		t.Errorf("no config-schema-other: %s", so)
 	}
 }

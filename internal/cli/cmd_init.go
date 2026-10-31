@@ -47,11 +47,15 @@ func initCommand() Command {
 		Name:  "init",
 		Usage: "init [--force]",
 		Define: func(fs *flag.FlagSet) {
-			fs.BoolVar(&force, "force", false, "overwrite schema files that differ from the shipped ones")
+			fs.BoolVar(&force, "force", false, "overwrite installed files that differ from the shipped ones")
 		},
 		Run: func(c *Context, args []string) (Outcome, error) {
 			if len(args) > 0 {
 				return Outcome{}, UsageError{Msg: "init takes no arguments"}
+			}
+			schemaDir, err := setup.SchemaDir(c.Env, c.UserHome)
+			if err != nil {
+				return Outcome{}, EnvError{Msg: err.Error()}
 			}
 			// The runner is created only when openspec/ is missing, so a
 			// repository that already has it needs no OpenSpec CLI.
@@ -63,7 +67,7 @@ func initCommand() Command {
 				_, err = r.Run("init", "--tools", "none")
 				return err
 			}
-			res, err := setup.Init(c.Repo.Root, shippedAssets(), force, initOpenSpec)
+			res, err := setup.Init(c.Repo.Root, schemaDir, shippedAssets(), force, initOpenSpec)
 			var ref *setup.Refused
 			if errors.As(err, &ref) {
 				out := Outcome{Result: res}
@@ -83,6 +87,8 @@ func initCommand() Command {
 				if f.Status == setup.Differs {
 					rule, msg := "schema-differs", "differs from the shipped schema; use --force to overwrite"
 					switch f.Kind {
+					case setup.KindConfig:
+						rule, msg = "config-schema-other", "names another schema; dkt init leaves it, and dkt new still uses docket"
 					case setup.KindSkill:
 						rule, msg = "skill-differs", "differs from the shipped skill; use --force to overwrite"
 					case setup.KindBlock:

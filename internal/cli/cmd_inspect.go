@@ -54,12 +54,17 @@ func inspectCommand() Command {
 			}
 			res := InspectResult{Files: []InspectFile{}, Changes: []archive.TrailerCheck{}}
 			var out Outcome
-			files, problems, err := setup.Inspect(c.Repo.Root, shippedAssets())
+			schemaDir, err := setup.SchemaDir(c.Env, c.UserHome)
+			if err != nil {
+				out.Findings = append(out.Findings, Finding{Rule: "schema-missing", Message: err.Error()})
+			}
+			rep, err := setup.Inspect(c.Repo.Root, schemaDir, shippedAssets())
 			if err != nil {
 				return Outcome{Result: res}, envOrErr(err)
 			}
+			files, problems := rep.Files, rep.Problems
 			for _, f := range files {
-				status, rule, msg := inspectStatus(f)
+				status, rule, msg := inspectStatus(f, rep.Config)
 				res.Files = append(res.Files, InspectFile{Path: f.Path, Kind: f.Kind, Status: status})
 				if status == "same" {
 					continue
@@ -113,9 +118,19 @@ func inspectCommand() Command {
 
 // inspectStatus maps init's status for f to the inspect status, and for a
 // file that is not in place, the finding's rule and message.
-func inspectStatus(f setup.File) (status, rule, msg string) {
+func inspectStatus(f setup.File, cfg setup.ConfigSchema) (status, rule, msg string) {
 	if f.Status == setup.Unchanged {
 		return "same", "", ""
+	}
+	if f.Kind == setup.KindConfig {
+		if cfg == setup.ConfigOther {
+			return "differs", "config-schema-other", "names another schema; dkt init leaves it, and dkt new still uses docket"
+		}
+		status = "differs"
+		if cfg == setup.ConfigNoFile {
+			status = "missing"
+		}
+		return status, "config-schema-default", "does not name the docket schema; dkt init sets schema: docket"
 	}
 	name, what := "schema", "the shipped schema"
 	switch f.Kind {
