@@ -24,9 +24,10 @@ unticked line is the next piece of work.
 - Go module at the repository root; `go vet ./...` and `go test ./...`.
 - OpenSpec CLI pinned to 1.14.x. To use a pinned copy without installing it:
   `DOCKET_OPENSPEC="npx -y @fission-ai/openspec@1.14.3"`.
-- `schema/docket/` is the schema Docket ships (embedded with
-  `go:embed`); `dkt init` installs it once per machine, not into each project. Edits to it follow the same triage as any other file; its
-  instructions and templates are prompts shipped to other projects.
+- `schema/docket/` is the schema Docket ships (embedded with `go:embed`);
+  `dkt init` installs it once per machine, not into each project. Edits to
+  it follow the same triage as any other file; its instructions and
+  templates are prompts shipped to other projects.
 - Prompt paths, the text agents act on: `AGENTS.md`, `CLAUDE.md`, `context`
   in `openspec/config.yaml`, `schema/docket/`,
   `.claude/skills/docket/`, `.claude/skills/docket-setup/`,

@@ -129,6 +129,8 @@ go install github.com/wake/docket/cmd/dkt@latest
 
 `dkt init` 和 `dkt new` 需要 OpenSpec CLI 1.14.x 在 `PATH` 上，或用 `DOCKET_OPENSPEC` 指定要執行的指令。
 
+`dkt init` 會把 `docket` schema 寫到這台機器的 `$XDG_DATA_HOME/openspec/schemas/docket/`（預設是 `~/.local/share/openspec/schemas/docket/`），每台機器只需要寫一次，OpenSpec 會到那裡找它。`dkt init` 也會把 `openspec/config.yaml` 設成 `schema: docket`。如果用包裝指令替 OpenSpec 換了 `XDG_DATA_HOME` 或 `HOME`，執行 `dkt` 時也要帶相同的值。在 CI 裡對 change 執行 `openspec` 之前，要先跑 `dkt init`。
+
 ### 升級
 
 舊版 dkt 建立的 change 仍可使用：它們的 kind、source、base 會從 `.openspec.yaml` 的 `x-kind`、`x-source`、`x-base` 讀取。`dkt lint` 會要求為每一個補上帶 title 的 `docket.yaml`，每份主 spec 也各需要一個帶 title 的 `docket.yaml`。
@@ -136,6 +138,8 @@ go install github.com/wake/docket/cmd/dkt@latest
 舊版 dkt 設定過的專案，請再跑一次 `dkt init`：它會加上 `docket` skill 和 Docket 區塊。把先前版本貼進 `AGENTS.md` 的「Change workflow」章節刪掉，並提交 `.claude/skills/docket/`、`.agents/skills/docket/`、`AGENTS.md` 與 `CLAUDE.md`。
 
 dkt v0.6.0 設定過的專案，請執行 `dkt init --force` 換上新的 Docket 區塊與 skill（在那之前 `dkt init` 會回報 `agents-block-differs`），然後提交。之後第一件開發工作開始時，agent 會和你一起設定 workflow 檔。
+
+dkt v0.9.2 以前設定過的專案，schema 是放在 `openspec/schemas/docket/` 的一份副本。請執行 `dkt init`，確認它刪掉了 `openspec/schemas/docket/`、並在 `openspec/config.yaml` 設好 `schema: docket`，然後把兩者一起提交。專案裡每個人都要升級 dkt，並在各自的機器上執行一次 `dkt init`。改過的副本會原樣保留，`dkt init` 會回報 `schema-edited`。
 
 ## 需求（規劃中）
 

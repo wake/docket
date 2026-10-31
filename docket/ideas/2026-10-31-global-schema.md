@@ -106,4 +106,8 @@ Accepted costs:
 
 ## Status
 
-Done by the change `install-schema-per-machine`: `dkt init` installs the schema once per machine and removes a project copy of a shipped schema. Forks are in `2026-10-31-schema-fork.md`.
+Done by the change `install-schema-per-machine`: `dkt init` installs the
+schema once per machine and removes a project copy of a shipped schema.
+The open question was settled there: a `config.yaml` that is missing, has
+no `schema` key or names `spec-driven` gets `schema: docket`; another name
+is left and reported. Forks are in `2026-10-31-schema-fork.md`.
