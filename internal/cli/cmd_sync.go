@@ -5,11 +5,15 @@ import (
 	"fmt"
 
 	"github.com/wake/docket/internal/archive"
+	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/record"
+	"github.com/wake/docket/internal/scan"
 )
 
 // SyncResult is the result object of dkt sync.
 type SyncResult struct {
-	Change string              `json:"change"`
+	Change *string             `json:"change"`
+	Record *string             `json:"record"`
 	Check  bool                `json:"check"`
 	Ticked []archive.TaskTicks `json:"ticked"`
 }
@@ -30,16 +34,35 @@ func syncCommand() Command {
 				return Outcome{}, UsageError{Msg: "sync takes one slug"}
 			}
 			slug := args[0]
-			unlock, err := lockOpenSpec(c.Repo.Root)
-			if err != nil {
-				return Outcome{}, err
+			var rep archive.SyncReport
+			res := SyncResult{Check: check}
+			if change.StartsWithDate(slug) {
+				// No lock: ticks come from commits, so two runs write the same bytes.
+				// SyncRecord reports an invalid slug before it reads Default.
+				var db scan.DefaultBranch
+				var err error
+				if _, ok := record.SlugOf(slug + ".md"); ok {
+					if db, err = resolveDefaultBranch(c); err != nil {
+						return Outcome{}, err
+					}
+				}
+				if rep, err = archive.SyncRecord(archive.Env{Git: c.Git, Root: c.Repo.Root, Default: db}, slug, check); err != nil {
+					return Outcome{}, err
+				}
+				res.Record = &slug
+			} else {
+				unlock, err := lockOpenSpec(c.Repo.Root)
+				if err != nil {
+					return Outcome{}, err
+				}
+				defer unlock()
+				if rep, err = archive.Sync(archive.Env{Git: c.Git, Root: c.Repo.Root}, slug, check); err != nil {
+					return Outcome{}, err
+				}
+				res.Change = &slug
 			}
-			defer unlock()
-			rep, err := archive.Sync(archive.Env{Git: c.Git, Root: c.Repo.Root}, slug, check)
-			if err != nil {
-				return Outcome{}, err
-			}
-			out := Outcome{Result: SyncResult{Change: slug, Check: check, Ticked: append([]archive.TaskTicks{}, rep.Ticked...)}}
+			res.Ticked = append([]archive.TaskTicks{}, rep.Ticked...)
+			out := Outcome{Result: res}
 			addArchiveReport(&out, rep.Findings, rep.Unreadable)
 			if !check {
 				for _, t := range rep.Ticked {

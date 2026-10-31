@@ -30,7 +30,7 @@ Docket reads the files in the repository and the git history. It does four kinds
 | Role | Commands | What it does |
 |---|---|---|
 | Check (read-only; exits non-zero on failure) | `lint`, `conflicts`, `check` | Required sections (records: front matter, sections, word limits), leftover placeholders, task heading format, reuse-table paths that do not exist, requirements touched by more than one active change, scenarios without tests |
-| Bookkeeping | `status`, `sync`, `log` | Progress from commit trailers, idle days, and how a requirement changed over time. `sync` changes nothing but checkboxes in `plan.md` |
+| Bookkeeping | `status`, `sync`, `log` | Progress from commit trailers, idle days, and how a requirement changed over time. `sync` changes nothing but checkboxes in `plan.md` or a record |
 | Assemble | `brief`, `accept --export` | Gathers pieces from several files into a brief for an implementing agent, or into a page a client can review |
 | Wrap | `init`, `new`, `archive`, `rebase` | Installs the schema, runs the OpenSpec CLI and the checks above in a fixed order, and records the base commit and the evidence |
 
@@ -55,7 +55,7 @@ superpowers starts the work. OpenSpec never starts a step on its own; it is call
    - Prompt text (the text agents act on, such as `AGENTS.md`, the `docket` skill and the schema's instructions; list the paths in `AGENTS.md`), tests that check behavior already specified or already shown, and check settings such as CI configuration: check prompts mechanically, tests by mutating the code they cover, and check settings by the pull request's own CI run, and have the diff reviewed once before merging. OpenSpec is not involved.
    - Docs for people, edits that only change comments or whitespace in code or test files (these are not edits to code or tests), version bumps, and dependency upgrades that touch only the dependency manifests: no review beyond the automated checks. When such an edit touches a code or test file, a fresh agent that reads only the diff first confirms that every changed line is a comment or whitespace and that no comment changes how the code builds or runs. Sort by what is touched: a typo in a prompt is prompt text, and moving code is a restructuring. OpenSpec is not involved.
 
-   Work on the second and third paths above opens no change but keeps a record in `docket/records/`, written by `dkt record` and checked by `dkt lint`; its commits carry `Record: <slug>`. `dkt new` and `dkt record` take a free `-2` suffix (then `-3`, and so on) when the slug is used.
+   Work on the second and third paths above opens no change but keeps a record in `docket/records/`, written by `dkt record` and checked by `dkt lint`; its commits carry `Record: <slug>`, and `dkt lint` reports a trailer that names no record. `dkt status` lists the open records and `dkt sync` ticks their tasks. `dkt new` and `dkt record` take a free `-2` suffix (then `-3`, and so on) when the slug is used.
 2. **Open a change** in a git worktree with `dkt new <slug>`, which wraps `openspec new change`.
 3. **Write the proposal and the delta.**
    - brainstorming writes `proposal.md` and `specs/**/spec.md` straight into the change folder, plus `design.md` when needed.
@@ -98,10 +98,10 @@ dkt new <slug> --kind feature|change-request|baseline --source "<origin>" --titl
 dkt record <name> --kind fix|refactor|test|prompt|checks --source "<origin>" --title "<title>"   # a record for light-review work
 dkt lint [<slug>|<record>...]     # document rules
 dkt conflicts [<slug>]            # requirements touched by more than one active change
-dkt sync <slug> [--check]         # tick plan.md from commit trailers
+dkt sync <slug>|<record> [--check]   # tick plan.md or a record's tasks from commit trailers
 dkt archive <slug>...             # release step, on a branch made from the default branch
 dkt rebase <slug>                 # accept the newer specs as the change's base
-dkt status [<slug>...] [--json]   # phase, tasks and their commits, progress, last activity, uncommitted work
+dkt status [<slug>|<record>...] [--merged [--since <rev>] [--limit <n>]] [--json]   # phase, tasks and their commits, progress, last activity, uncommitted work; open records, and merged ones with --merged
 dkt workflow [template] [--json]  # the user's workflow file, or the template
 dkt inspect [--json]              # the project's Docket setup; writes nothing
 dkt brief <slug> --task N         # brief for an implementing agent

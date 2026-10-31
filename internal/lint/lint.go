@@ -12,6 +12,7 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/delta"
+	"github.com/wake/docket/internal/gitx"
 )
 
 // Finding is one problem found in a change. Change and File are empty and
@@ -41,18 +42,19 @@ type Report struct {
 
 // Input says what to lint. Repo is the worktree root and Templates is the
 // shipped schema (docket.Schema()). Added and AddedErr feed the routing
-// rule: the files the branch adds, or why they are unknown. AddedRecords and
-// AddedRecordsErr say the same for docket/records, and RecordTemplate is the
-// template of a new record (docket.RecordTemplate()).
+// rule: the files the branch adds, or why they are unknown; AddedErr covers
+// the routed folders, the records and the commits. AddedRecords are the files
+// added under docket/records, Commits the commits from the merge base to HEAD,
+// and RecordTemplate the template of a new record (docket.RecordTemplate()).
 type Input struct {
-	Repo            fs.FS
-	Templates       fs.FS
-	Slugs           []string
-	Added           []string
-	AddedErr        error
-	AddedRecords    []string
-	AddedRecordsErr error
-	RecordTemplate  string
+	Repo           fs.FS
+	Templates      fs.FS
+	Slugs          []string
+	Added          []string
+	AddedErr       error
+	AddedRecords   []string
+	Commits        []gitx.Commit
+	RecordTemplate string
 }
 
 const changesDir = "openspec/changes"

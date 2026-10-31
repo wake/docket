@@ -16,9 +16,7 @@ import (
 func (r *run) lintRecords(named []string) {
 	var slugs []string
 	if len(r.in.Slugs) == 0 {
-		if r.in.AddedRecordsErr != nil {
-			r.unreadable("records", r.in.AddedRecordsErr)
-		}
+		r.checkTrailers()
 		seen := map[string]bool{}
 		for _, p := range r.in.AddedRecords {
 			name, ok := strings.CutPrefix(p, record.Dir+"/")
@@ -172,4 +170,33 @@ func indexOf(list []string, s string) int {
 		}
 	}
 	return -1
+}
+
+// checkTrailers reports each distinct Record trailer value of a branch commit
+// that names no regular file under docket/records. fs.Stat rejects a value
+// with ".." in a path element or a leading slash; SlugOf rejects the rest.
+func (r *run) checkTrailers() {
+	type key struct{ sha, v string }
+	seen := map[key]bool{}
+	for _, c := range r.in.Commits {
+		for _, v := range c.Record {
+			if seen[key{c.SHA, v}] {
+				continue
+			}
+			seen[key{c.SHA, v}] = true
+			if _, ok := record.SlugOf(v + ".md"); ok && !strings.Contains(v, "/") {
+				if fi, err := fs.Stat(r.in.Repo, record.Dir+"/"+v+".md"); err == nil && fi.Mode().IsRegular() {
+					continue
+				}
+			}
+			short := c.SHA
+			if len(short) > 7 {
+				short = short[:7]
+			}
+			r.rep.Findings = append(r.rep.Findings, Finding{
+				Rule:    "record-trailer",
+				Message: fmt.Sprintf("commit %s has trailer Record: %s, which names no record under %s", short, v, record.Dir),
+			})
+		}
+	}
 }

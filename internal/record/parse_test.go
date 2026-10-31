@@ -58,3 +58,11 @@ func TestParseNoFrontMatter(t *testing.T) {
 		t.Fatalf("sections = %+v", f.Sections)
 	}
 }
+
+func TestWordsProlongedSoundMark(t *testing.T) {
+	for in, want := range map[string]float64{"コーヒー": 2, "ｺｰﾋｰ": 2, "ー": 0.5} {
+		if got := Words(in); got != want {
+			t.Errorf("Words(%q) = %v, want %v", in, got, want)
+		}
+	}
+}

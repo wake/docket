@@ -130,19 +130,17 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			continue
 		}
 		active, archived, records, recErr, err := readDisk(w.Path)
-		if !inv.noteRead(src, recErr, err) {
-			continue
-		}
 		rank := rankContainedWorktree
-		if !unbornHead(w.Head) {
-			contained, err := g.IsAncestor(w.Head, db.Commit)
-			if err != nil {
-				inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
-				continue
-			}
-			if !contained {
+		// Settle ancestry before noteRead, so a worktree unreadable as a whole
+		// is listed once, not also for its records folder.
+		if err == nil && !unbornHead(w.Head) {
+			var contained bool
+			if contained, err = g.IsAncestor(w.Head, db.Commit); err == nil && !contained {
 				rank = rankUnmergedWorktree
 			}
+		}
+		if !inv.noteRead(src, recErr, err) {
+			continue
 		}
 		f.add(src, rank, active, archived, records)
 	}

@@ -129,8 +129,9 @@ did. In a git worktree:
    last paragraph, with any other trailers such as `Co-Authored-By` and
    no blank line between them: git reads trailers from the last
    paragraph only.
-4. Run `dkt lint` and fix what it reports. Then open the pull request
-   and merge it with a merge commit.
+4. When the record lists tasks, run `dkt sync <slug>` and commit the
+   record. Run `dkt lint` and fix what it reports. Then open the pull
+   request and merge it with a merge commit.
 
 ## Check
 

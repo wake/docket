@@ -17,13 +17,14 @@ const WordLimit = 60
 
 // Words counts words as the word limit does: a run of letters or digits is
 // one word; each character of the Han, Hiragana, Katakana or Hangul scripts
-// is half a word and ends a run.
+// is half a word and ends a run, as is the prolonged sound mark (U+30FC,
+// U+FF70), which belongs to the Common script.
 func Words(text string) float64 {
 	var n float64
 	in := false
 	for _, r := range text {
 		switch {
-		case unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul):
+		case r == 'ー' || r == 'ｰ' || unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul):
 			n += 0.5
 			in = false
 		case unicode.IsLetter(r) || unicode.IsDigit(r) || (in && unicode.IsMark(r)):

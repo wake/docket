@@ -506,6 +506,55 @@ func TestScanRecordsUnreadable(t *testing.T) {
 	}
 }
 
+func TestWorktreeListedOnce(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("mode 000 does not stop root")
+	}
+	a := baseRepo(t)
+	bPath := filepath.Join(t.TempDir(), "b")
+	b := a.AddWorktree(bPath, "w")
+	sha := b.Commit("extra", map[string]string{"docket/records/2026-11-01-fix-x.md": "x\n"})
+	obj := filepath.Join(a.Dir, ".git", "objects", sha[:2], sha[2:])
+	if err := os.Chmod(obj, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(obj); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(bPath, "docket/records")
+	if err := os.Chmod(dir, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, 0o755) })
+	inv, _ := scanOf(t, a)
+	var got []scan.Unreadable
+	for _, u := range inv.Unreadable {
+		if u.Source.Kind == scan.KindWorktree && realPath(t, u.Source.Name) == realPath(t, bPath) {
+			got = append(got, u)
+		}
+	}
+	if len(got) != 1 || got[0].Path != "" {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+}
+
+func TestRecordOnABranch(t *testing.T) {
+	a := baseRepo(t)
+	a.Git("checkout", "-q", "-b", "fix-x")
+	a.Commit("rec", map[string]string{"docket/records/2026-11-01-fix-x.md": "x\n"})
+	a.Git("checkout", "-q", "main")
+	bPath := filepath.Join(t.TempDir(), "b")
+	a.Git("worktree", "add", "-q", bPath, "fix-x")
+	inv, _ := scanOf(t, a)
+	if len(inv.Records) != 1 || inv.Records[0].Slug != "2026-11-01-fix-x" {
+		t.Fatalf("records = %+v", inv.Records)
+	}
+	s := inv.Records[0].Sources
+	if len(s) != 2 || s[0].Kind != scan.KindWorktree || realPath(t, s[0].Name) != realPath(t, bPath) || s[1].Name != "refs/heads/fix-x" {
+		t.Fatalf("sources = %+v", s)
+	}
+}
+
 func TestScanRecordsNotAFolder(t *testing.T) {
 	r := baseRepo(t)
 	r.Git("checkout", "-q", "-b", "b")

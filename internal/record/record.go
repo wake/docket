@@ -8,12 +8,25 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/gitx"
 )
+
+// CommitsFor returns the commits whose Record trailers hold slug, in order.
+func CommitsFor(slug string, commits []gitx.Commit) []gitx.Commit {
+	var out []gitx.Commit
+	for _, c := range commits {
+		if slices.Contains(c.Record, slug) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
 
 // Kinds are the values --kind accepts for a record.
 var Kinds = []string{"fix", "refactor", "test", "prompt", "checks"}
@@ -84,6 +97,14 @@ func (e *LinkError) Error() string {
 	return e.Name + " is a symbolic link; Docket does not write through links"
 }
 
+// writeRecord and removePath are replaced by tests to inject failures.
+var (
+	writeRecord = func(f *os.File, b []byte) error { _, err := f.Write(b); return err }
+	removePath  = os.Remove
+	makeDir     = os.Mkdir
+	openFile    = os.OpenFile
+)
+
 // Create writes content to the first free record file in dir, creating dir
 // when it first needs to open a file (so nothing is created when it returns
 // ErrTooLong without trying one): slug, then
@@ -91,8 +112,26 @@ func (e *LinkError) Error() string {
 // when its file exists; the file is created exclusively, so concurrent runs
 // never take the same one. It returns the slug written. A symbolic link in
 // the way stops it with a *LinkError; a candidate past change.MaxSlug stops it
-// with an error wrapping ErrTooLong. When the write fails the file is removed.
+// with an error wrapping ErrTooLong. When the write fails the file is removed,
+// then each folder this call made, deepest first; whatever it cannot remove is
+// named in the error.
 func Create(dir, slug string, used func(slug string) bool, content []byte) (string, error) {
+	var made []string // folders on the way to dir that do not exist yet, deepest first
+	planned := false
+	// fail removes the file (when path is not empty), then every folder this call made.
+	fail := func(path string, err error) (string, error) {
+		errs := []error{err}
+		rm := made
+		if path != "" {
+			rm = append([]string{path}, made...)
+		}
+		for _, p := range rm {
+			if rerr := removePath(p); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+				errs = append(errs, fmt.Errorf("%s was left: %w", p, rerr))
+			}
+		}
+		return "", errors.Join(errs...)
+	}
 	for n := 1; ; n++ {
 		cand := change.Suffixed(slug, n)
 		if len(cand) > change.MaxSlug {
@@ -102,26 +141,45 @@ func Create(dir, slug string, used func(slug string) bool, content []byte) (stri
 			continue
 		}
 		path := filepath.Join(dir, cand+".md")
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return "", err
+		if !planned {
+			planned = true
+			var missing []string // outermost last
+			for p := dir; ; p = filepath.Dir(p) {
+				if _, err := os.Lstat(p); err == nil || filepath.Dir(p) == p {
+					break
+				}
+				missing = append(missing, p)
+			}
+			// Only a folder this call's Mkdir made is ours to remove; ErrExist
+			// means another run made it between the walk and here.
+			for i := len(missing) - 1; i >= 0; i-- {
+				err := makeDir(missing[i], 0o755)
+				if errors.Is(err, fs.ErrExist) {
+					continue
+				}
+				if err != nil {
+					return fail("", err)
+				}
+				made = append([]string{missing[i]}, made...)
+			}
 		}
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+		f, err := openFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
 		if errors.Is(err, fs.ErrExist) {
 			fi, lerr := os.Lstat(path)
 			if lerr == nil && fi.Mode()&fs.ModeSymlink != 0 {
-				return "", &LinkError{Name: cand + ".md"}
+				return fail("", &LinkError{Name: cand + ".md"})
 			}
 			continue
 		}
 		if err != nil {
-			return "", err
+			return fail("", err)
 		}
-		_, werr := f.Write(content)
+		werr := writeRecord(f, content)
 		if cerr := f.Close(); werr == nil {
 			werr = cerr
 		}
 		if werr != nil {
-			return "", errors.Join(werr, os.Remove(path))
+			return fail(path, werr)
 		}
 		return cand, nil
 	}

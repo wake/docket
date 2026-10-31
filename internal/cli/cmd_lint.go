@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/lint"
@@ -29,18 +30,26 @@ func lintCommand() Command {
 			}
 			defer root.Close()
 
-			added, addedErr := addedFiles(c, lint.RoutedDirs...)
-			records, recordsErr := addedFiles(c, record.Dir)
-			rep := lint.Run(lint.Input{
-				Repo:            root.FS(),
-				Templates:       docket.Schema(),
-				Slugs:           args,
-				Added:           added,
-				AddedErr:        addedErr,
-				AddedRecords:    records,
-				AddedRecordsErr: recordsErr,
-				RecordTemplate:  docket.RecordTemplate(),
-			})
+			// One look at the branch: any failure is one unreadable entry.
+			in := lint.Input{Repo: root.FS(), Templates: docket.Schema(), Slugs: args, RecordTemplate: docket.RecordTemplate()}
+			base, err := branchBase(c)
+			if err == nil {
+				var all []string
+				if all, err = addedFiles(c, base, append(append([]string{}, lint.RoutedDirs...), record.Dir)...); err == nil {
+					for _, f := range all {
+						if strings.HasPrefix(f, record.Dir+"/") {
+							in.AddedRecords = append(in.AddedRecords, f)
+						} else {
+							in.Added = append(in.Added, f)
+						}
+					}
+					if base != "" {
+						in.Commits, err = c.Git.Commits(base, "HEAD")
+					}
+				}
+			}
+			in.AddedErr = err
+			rep := lint.Run(in)
 
 			out := Outcome{Result: LintResult{Changes: append([]string{}, rep.Changes...), Records: append([]string{}, rep.Records...)}}
 			for _, f := range rep.Findings {
@@ -54,26 +63,34 @@ func lintCommand() Command {
 	}
 }
 
+// branchBase returns the merge base of HEAD and the default branch, or ""
+// when HEAD has no commit. The error says why it could not be found.
+func branchBase(c *Context) (string, error) {
+	if c.Repo.Head == nil {
+		return "", nil
+	}
+	db, err := scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)
+	if err != nil {
+		if errors.Is(err, scan.ErrNoDefaultBranch) {
+			return "", fmt.Errorf("%w; pass --default-branch to say which branch to compare with", err)
+		}
+		return "", err
+	}
+	base, ok, err := c.Git.MergeBase(*c.Repo.Head, db.Commit)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", fmt.Errorf("HEAD and %s share no history; pass --default-branch to name another branch", db.Name)
+	}
+	return base, nil
+}
+
 // addedFiles returns the files the branch adds under the given folders:
-// committed since the merge base with the default branch, plus uncommitted
-// ones. The error says why they could not be known.
-func addedFiles(c *Context, dirs ...string) ([]string, error) {
+// committed since base (when not empty), plus uncommitted ones.
+func addedFiles(c *Context, base string, dirs ...string) ([]string, error) {
 	set := map[string]bool{}
-	if c.Repo.Head != nil {
-		db, err := scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)
-		if err != nil {
-			if errors.Is(err, scan.ErrNoDefaultBranch) {
-				return nil, fmt.Errorf("%w; pass --default-branch to say which branch to compare with", err)
-			}
-			return nil, err
-		}
-		base, ok, err := c.Git.MergeBase(*c.Repo.Head, db.Commit)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, fmt.Errorf("HEAD and %s share no history; pass --default-branch to name another branch", db.Name)
-		}
+	if base != "" {
 		files, err := c.Git.AddedFiles(base, dirs...)
 		if err != nil {
 			return nil, err

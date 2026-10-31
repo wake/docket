@@ -120,11 +120,11 @@ func TestNoDefaultBranchForRouting(t *testing.T) {
 	if !hasRule(t, so, "proposal-section") {
 		t.Fatalf("other rules did not run:\n%s", so)
 	}
-	if got := sourcesOf(t, so); !reflect.DeepEqual(got, []string{"routing", "records"}) {
+	if got := sourcesOf(t, so); !reflect.DeepEqual(got, []string{"added files"}) {
 		t.Fatalf("unreadable = %v\n%s", got, so)
 	}
-	if strings.Count(so, "--default-branch") < 2 {
-		t.Fatalf("each source needs the hint:\n%s", so)
+	if !strings.Contains(so, "--default-branch") {
+		t.Fatalf("the source needs the hint:\n%s", so)
 	}
 }
 
@@ -266,4 +266,29 @@ func TestLintRecordTemplateTextLeft(t *testing.T) {
 		}
 	}
 	t.Fatalf("no placeholder finding:\n%s", so)
+}
+
+func TestLintOneUnreadableEntry(t *testing.T) {
+	r := lintFixture(t)
+	r.Git("branch", "-m", "main", "trunk")
+	code, so, se := runLint(t, r.Dir, r.Env, "--json")
+	if code != 3 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := sourcesOf(t, so); !reflect.DeepEqual(got, []string{"added files"}) {
+		t.Fatalf("unreadable = %v\n%s", got, so)
+	}
+}
+
+func TestLintRecordTrailer(t *testing.T) {
+	r := cleanRepo(t)
+	r.Git("checkout", "-q", "-b", "topic")
+	r.Commit("record\n\nRecord: fix-x", map[string]string{"docket/records/2026-11-01-fix-x.md": lintRecord})
+	code, so, se := runLint(t, r.Dir, r.Env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if !hasRule(t, so, "record-trailer") {
+		t.Fatalf("no record-trailer:\n%s", so)
+	}
 }

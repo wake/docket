@@ -2,6 +2,7 @@ package record
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +10,16 @@ import (
 	"time"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/gitx"
 )
+
+func TestCommitsFor(t *testing.T) {
+	cs := []gitx.Commit{{SHA: "1", Record: []string{"a"}}, {SHA: "2", Record: []string{"b"}}, {SHA: "3", Record: []string{"a", "b"}}}
+	got := CommitsFor("a", cs)
+	if len(got) != 2 || got[0].SHA != "1" || got[1].SHA != "3" {
+		t.Fatalf("got %+v", got)
+	}
+}
 
 func TestSlugOf(t *testing.T) {
 	if got, ok := SlugOf("2026-10-30-fix-x.md"); !ok || got != "2026-10-30-fix-x" {
@@ -158,6 +168,188 @@ func TestCreateMakesTheFolder(t *testing.T) {
 	}
 	if b, err := os.ReadFile(filepath.Join(dir, "x.md")); err != nil || string(b) != "hello\n" {
 		t.Errorf("%q, %v", b, err)
+	}
+}
+
+func failWrite(t *testing.T, before func()) {
+	t.Helper()
+	old := writeRecord
+	writeRecord = func(f *os.File, b []byte) error {
+		if before != nil {
+			before()
+		}
+		return errors.New("disk full")
+	}
+	t.Cleanup(func() { writeRecord = old })
+}
+
+func exists(p string) bool { _, err := os.Lstat(p); return err == nil }
+
+func TestCreateFailedWriteLeavesNothing(t *testing.T) {
+	root := t.TempDir()
+	failWrite(t, nil)
+	_, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), "disk full") {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket was left")
+	}
+}
+
+func TestCreateFailedWriteKeepsExistingFolders(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "docket"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	failWrite(t, nil)
+	if _, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x")); err == nil {
+		t.Fatal("no error")
+	}
+	if !exists(filepath.Join(root, "docket")) || exists(filepath.Join(root, "docket", "records")) {
+		t.Error("want docket kept and docket/records removed")
+	}
+}
+
+func TestCreateFailedWriteKeepsOtherRecords(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "docket", "records")
+	other := filepath.Join(dir, "other.md")
+	failWrite(t, func() {
+		if err := os.WriteFile(other, []byte("o"), 0o644); err != nil {
+			t.Error(err)
+		}
+	})
+	_, err := Create(dir, "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), dir+" was left") {
+		t.Fatalf("err = %v", err)
+	}
+	if !exists(other) || exists(filepath.Join(dir, "x.md")) {
+		t.Error("want the other record kept and ours removed")
+	}
+	if !exists(filepath.Join(root, "docket")) {
+		t.Error("docket removed")
+	}
+}
+
+func TestCreateFailedCleanupNamesLeftover(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "docket", "records")
+	failWrite(t, nil)
+	old := removePath
+	removePath = func(p string) error {
+		if strings.HasSuffix(p, "x.md") {
+			return errors.New("busy")
+		}
+		return old(p)
+	}
+	t.Cleanup(func() { removePath = old })
+	_, err := Create(dir, "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), filepath.Join(dir, "x.md")+" was left: busy") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestCreateMkdirFailsLeavesNothing(t *testing.T) {
+	root := t.TempDir()
+	old := makeDir
+	makeDir = func(p string, m os.FileMode) error {
+		if strings.HasSuffix(p, "records") {
+			return errors.New("no permission")
+		}
+		return old(p, m)
+	}
+	t.Cleanup(func() { makeDir = old })
+	_, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), "no permission") {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket was left")
+	}
+}
+
+func TestCreateOpenFailsLeavesNothing(t *testing.T) {
+	root := t.TempDir()
+	old := openFile
+	openFile = func(string, int, os.FileMode) (*os.File, error) { return nil, errors.New("too many open files") }
+	t.Cleanup(func() { openFile = old })
+	_, err := Create(filepath.Join(root, "docket", "records"), "x", never, []byte("x"))
+	if err == nil || !strings.Contains(err.Error(), "too many open files") {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket was left")
+	}
+}
+
+func TestCreateLaterCandidateKeepsTheBookkeeping(t *testing.T) {
+	root := t.TempDir()
+	failWrite(t, nil)
+	dir := filepath.Join(root, "docket", "records")
+	old := openFile
+	openFile = func(p string, fl int, m os.FileMode) (*os.File, error) {
+		if strings.HasSuffix(p, "x.md") {
+			return nil, fs.ErrExist
+		}
+		return old(p, fl, m)
+	}
+	t.Cleanup(func() { openFile = old })
+	if _, err := Create(dir, "x", never, []byte("x")); err == nil {
+		t.Fatal("no error")
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket was left")
+	}
+}
+
+func TestCreateDoesNotOwnAFolderAnotherRunMade(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "docket", "records")
+	old := makeDir
+	makeDir = func(p string, m os.FileMode) error {
+		if p == dir { // another run makes it first
+			if err := os.Mkdir(p, m); err != nil {
+				t.Error(err)
+			}
+		}
+		return old(p, m)
+	}
+	t.Cleanup(func() { makeDir = old })
+	failWrite(t, nil)
+	if _, err := Create(dir, "x", never, []byte("x")); err == nil {
+		t.Fatal("no error")
+	}
+	if !exists(dir) {
+		t.Error("docket/records, made by another run, was removed")
+	}
+}
+
+func TestCreateLinkCandidateCleansUp(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "docket", "records")
+	old := openFile
+	openFile = func(p string, fl int, m os.FileMode) (*os.File, error) {
+		if err := os.Symlink(filepath.Join(root, "nowhere"), p); err != nil {
+			t.Error(err)
+		}
+		return nil, fs.ErrExist
+	}
+	t.Cleanup(func() { openFile = old })
+	// The link is not ours to delete; take it away as its owner would, so the
+	// folders can go.
+	oldRm := removePath
+	removePath = func(p string) error {
+		_ = os.Remove(filepath.Join(dir, "x.md"))
+		return oldRm(p)
+	}
+	t.Cleanup(func() { removePath = oldRm })
+	_, err := Create(dir, "x", never, []byte("x"))
+	var le *LinkError
+	if !errors.As(err, &le) {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Errorf("folders were left: %v", err)
 	}
 }
 
