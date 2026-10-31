@@ -2,6 +2,7 @@ package scan
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/record"
@@ -22,6 +23,21 @@ type treeWalk struct {
 	changes, records, archive string
 	res                       treeRead
 	fallback                  bool
+}
+
+// malformed reports whether a tree has an entry name holding a slash, or two
+// entries with one name. git never writes such a tree, but ls-tree reads full
+// paths and keeps only direct children, so readTree treats them in ways the
+// raw names here would not; the walk leaves a commit holding one to readTree.
+func malformed(es []gitx.TreeObject) bool {
+	names := make(map[string]bool, len(es))
+	for _, e := range es {
+		if strings.Contains(e.Name, "/") || names[e.Name] {
+			return true
+		}
+		names[e.Name] = true
+	}
+	return false
 }
 
 // readTrees reads the trees of the commits level by level, one ReadTrees call
@@ -73,7 +89,7 @@ func readTrees(g gitx.Git, commits []string) map[string]treeRead {
 			}
 			complete := true
 			for _, n := range oid(w) {
-				if _, ok := trees[n]; !ok {
+				if es, ok := trees[n]; !ok || malformed(es) {
 					complete = false
 				}
 			}

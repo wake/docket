@@ -1,10 +1,14 @@
 package scan
 
 import (
+	"bytes"
+	"encoding/hex"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/gitx"
@@ -154,4 +158,93 @@ func TestReadTreesUnknownCommitAndBatchFailure(t *testing.T) {
 	// commit is left to readTree, whose error is the same.
 	bad := gitx.Git{Dir: t.TempDir(), Env: r.Env}
 	sameAsReadTree(t, bad, commit)
+}
+
+// rawEntry is one entry of a tree written byte by byte, so it can hold what
+// git's own checks refuse: a slash in a name, or two entries with one name.
+type rawEntry struct{ mode, name, oid string }
+
+// rawTree writes a tree object holding the entries as given and returns its id.
+func rawTree(t *testing.T, r *testutil.Repo, es ...rawEntry) string {
+	t.Helper()
+	var buf bytes.Buffer
+	for _, e := range es {
+		raw, err := hex.DecodeString(e.oid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		buf.WriteString(e.mode + " " + e.name + "\x00")
+		buf.Write(raw)
+	}
+	cmd := exec.Command("git", "hash-object", "-t", "tree", "--literally", "-w", "--stdin")
+	cmd.Dir, cmd.Env, cmd.Stdin = r.Dir, r.Env, &buf
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("hash-object: %v", err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// commitOf commits the tree on its own branch and returns the commit.
+func commitOf(t *testing.T, r *testutil.Repo, tree string) string {
+	t.Helper()
+	c := r.Git("commit-tree", tree, "-m", "raw")
+	r.Git("update-ref", "refs/heads/raw", c)
+	return c
+}
+
+// TestReadTreesMalformedTreesEqualReadTree: trees git never writes, but a
+// damaged repository can hold. Every case must come out as readTree has it.
+func TestReadTreesMalformedTreesEqualReadTree(t *testing.T) {
+	cases := map[string]func(t *testing.T, r *testutil.Repo) string{
+		"changes holds an entry named add/x": func(t *testing.T, r *testutil.Repo) string {
+			sub := rawTree(t, r, rawEntry{"100644", "a.md", blob(t, r, "a\n")})
+			changes := rawTree(t, r, rawEntry{"40000", "add-y", sub}, rawEntry{"40000", "add/x", sub})
+			return commitOf(t, r, rawTree(t, r, rawEntry{"40000", "openspec", rawTree(t, r, rawEntry{"40000", "changes", changes})}))
+		},
+		"archive holds an entry named 2026-01-01-add-x/y": func(t *testing.T, r *testutil.Repo) string {
+			sub := rawTree(t, r, rawEntry{"100644", "a.md", blob(t, r, "a\n")})
+			archive := rawTree(t, r, rawEntry{"40000", "2026-01-01-add-z", sub}, rawEntry{"40000", "2026-01-01-add-x/y", sub})
+			changes := rawTree(t, r, rawEntry{"40000", "archive", archive}, rawEntry{"40000", "add-y", sub})
+			return commitOf(t, r, rawTree(t, r, rawEntry{"40000", "openspec", rawTree(t, r, rawEntry{"40000", "changes", changes})}))
+		},
+		"records hold a blob named 2026-10-30-x/y.md": func(t *testing.T, r *testutil.Repo) string {
+			b := blob(t, r, "x\n")
+			records := rawTree(t, r, rawEntry{"100644", "2026-10-30-fix-a.md", b}, rawEntry{"100644", "2026-10-30-x/y.md", b})
+			return commitOf(t, r, rawTree(t, r, rawEntry{"40000", "docket", rawTree(t, r, rawEntry{"40000", "records", records})}))
+		},
+		"root holds two openspec entries": func(t *testing.T, r *testutil.Repo) string {
+			sub := rawTree(t, r, rawEntry{"100644", "a.md", blob(t, r, "a\n")})
+			changes := rawTree(t, r, rawEntry{"40000", "add-y", sub})
+			os := rawTree(t, r, rawEntry{"40000", "changes", changes})
+			return commitOf(t, r, rawTree(t, r, rawEntry{"100644", "openspec", blob(t, r, "f\n")}, rawEntry{"40000", "openspec", os}))
+		},
+		"openspec holds two changes entries": func(t *testing.T, r *testutil.Repo) string {
+			sub := rawTree(t, r, rawEntry{"100644", "a.md", blob(t, r, "a\n")})
+			c1 := rawTree(t, r, rawEntry{"40000", "add-one", sub})
+			c2 := rawTree(t, r, rawEntry{"40000", "add-two", sub})
+			os := rawTree(t, r, rawEntry{"40000", "changes", c1}, rawEntry{"40000", "changes", c2})
+			return commitOf(t, r, rawTree(t, r, rawEntry{"40000", "openspec", os}))
+		},
+	}
+	for name, build := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := testutil.NewRepo(t)
+			r.Commit("init", map[string]string{"README.md": "x\n"})
+			c := build(t, r)
+			got := sameAsReadTree(t, gitx.Git{Dir: r.Dir, Env: r.Env}, c)
+			t.Logf("readTree: %+v", got)
+		})
+	}
+}
+
+func blob(t *testing.T, r *testutil.Repo, content string) string {
+	t.Helper()
+	cmd := exec.Command("git", "hash-object", "-w", "--stdin")
+	cmd.Dir, cmd.Env, cmd.Stdin = r.Dir, r.Env, strings.NewReader(content)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(out))
 }
