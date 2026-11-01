@@ -318,7 +318,7 @@ func TestInspectCleanSetup(t *testing.T) {
 	if wf, _ := res["workflow"].(map[string]any); wf["status"] != "ok" {
 		t.Errorf("workflow: %v", res["workflow"])
 	}
-	if got, want := wfKeys(res), []string{"changes", "files", "openspec", "workflow"}; !reflect.DeepEqual(got, want) {
+	if got, want := wfKeys(res), []string{"changes", "default_branch", "files", "openspec", "workflow"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("keys %v, want %v", got, want)
 	}
 	if got := res["changes"]; !reflect.DeepEqual(got, []any{}) {
@@ -715,8 +715,53 @@ func TestInspectNoDefaultBranch(t *testing.T) {
 	r.Git("checkout", "-q", "-b", "work")
 	r.Commit("init", map[string]string{"README.md": "x\n"})
 	env, _ := inspectEnv(t)
-	if code, so, _ := runInspect(t, r.Dir, env, "--json"); code != 4 {
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
 		t.Fatalf("exit %d: %s", code, so)
+	}
+	assertNoBranchResult(t, so)
+	for _, f := range decode(t, so)["findings"].([]any) {
+		if f.(map[string]any)["rule"] == "environment" {
+			t.Errorf("environment finding: %s", so)
+		}
+	}
+	_, text, _ := runInspect(t, r.Dir, env)
+	if !strings.Contains(text, "skipped  trailers: no default branch found\n") {
+		t.Errorf("text output: %s", text)
+	}
+}
+
+func assertNoBranchResult(t *testing.T, so string) {
+	t.Helper()
+	res := resultOf(t, so)
+	if got, ok := res["default_branch"]; !ok || got != nil {
+		t.Errorf("default_branch: %v (present %v)", got, ok)
+	}
+	if got := res["changes"]; !reflect.DeepEqual(got, []any{}) {
+		t.Errorf("changes: %v", got)
+	}
+}
+
+func TestInspectRepositoryWithoutCommits(t *testing.T) {
+	r := testutil.NewRepo(t)
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code == 4 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	assertNoBranchResult(t, so)
+	res := resultOf(t, so)
+	if res["openspec"] == nil || res["files"] == nil {
+		t.Errorf("result: %v", res)
+	}
+}
+
+func TestInspectDefaultBranchFound(t *testing.T) {
+	r := committedRepo(t)
+	env, _ := inspectEnv(t)
+	_, so, _ := runInspect(t, r.Dir, env, "--json")
+	if got := resultOf(t, so)["default_branch"]; got != "main" {
+		t.Errorf("default_branch: %v", got)
 	}
 }
 
@@ -733,6 +778,14 @@ func TestInspectDefaultBranchFlag(t *testing.T) {
 	if !hasChangeFinding(t, so, "no-task-commits", "add-x") {
 		t.Errorf("no no-task-commits finding: %s", so)
 	}
+	if got := resultOf(t, so)["default_branch"]; got != "trunk" {
+		t.Errorf("default_branch: %v", got)
+	}
+	code, so, _ = runInspect(t, r.Dir, env, "--json", "--default-branch", "nope")
+	if code == 4 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	assertNoBranchResult(t, so)
 	_, so, _ = runInspect(t, r.Dir, env, "--json")
 	for _, f := range decode(t, so)["findings"].([]any) {
 		if f.(map[string]any)["change"] == "add-x" {

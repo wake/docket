@@ -8,6 +8,7 @@ import (
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/archive"
 	"github.com/wake/docket/internal/openspec"
+	"github.com/wake/docket/internal/scan"
 	"github.com/wake/docket/internal/setup"
 	"github.com/wake/docket/internal/workflow"
 )
@@ -21,6 +22,10 @@ type InspectResult struct {
 	// Changes lists the changes on the default branch whose trailers were
 	// checked or skipped.
 	Changes []archive.TrailerCheck `json:"changes"`
+
+	// DefaultBranch is the branch the trailers were checked against; nil when
+	// none was found.
+	DefaultBranch *string `json:"default_branch"`
 }
 
 // OpenSpecState is the OpenSpec CLI dkt found. Version is nil only when no CLI
@@ -48,9 +53,10 @@ func inspectCommand() Command {
 			if len(args) > 0 {
 				return Outcome{}, UsageError{Msg: "inspect takes no arguments"}
 			}
-			db, err := resolveDefaultBranch(c)
-			if err != nil {
-				return Outcome{}, err
+			db, dbErr := scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)
+			noBranch := errors.Is(dbErr, scan.ErrNoDefaultBranch)
+			if dbErr != nil && !noBranch {
+				return Outcome{}, dbErr
 			}
 			res := InspectResult{Files: []InspectFile{}, Changes: []archive.TrailerCheck{}}
 			var out Outcome
@@ -104,15 +110,20 @@ func inspectCommand() Command {
 				out.Human = append(out.Human, line)
 			}
 
-			checks, tFinds, err := archive.Trailers(archive.Env{Git: c.Git, Root: c.Repo.Root, Default: db})
-			if err != nil {
-				return Outcome{Result: res}, err
-			}
-			res.Changes = append(res.Changes, checks...)
-			addArchiveReport(&out, tFinds, nil)
-			for _, ch := range checks {
-				if ch.Skipped != nil {
-					out.Human = append(out.Human, fmt.Sprintf("skipped  %s: %s", ch.Slug, *ch.Skipped))
+			if noBranch {
+				out.Human = append(out.Human, "skipped  trailers: no default branch found")
+			} else {
+				res.DefaultBranch = &db.Name
+				checks, tFinds, err := archive.Trailers(archive.Env{Git: c.Git, Root: c.Repo.Root, Default: db})
+				if err != nil {
+					return Outcome{Result: res}, err
+				}
+				res.Changes = append(res.Changes, checks...)
+				addArchiveReport(&out, tFinds, nil)
+				for _, ch := range checks {
+					if ch.Skipped != nil {
+						out.Human = append(out.Human, fmt.Sprintf("skipped  %s: %s", ch.Slug, *ch.Skipped))
+					}
 				}
 			}
 
