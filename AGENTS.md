@@ -5,10 +5,19 @@ this file through CLAUDE.md.
 
 ## Project
 
-Docket (`dkt`) is a small Go CLI that checks and keeps the books for OpenSpec
-change folders in projects that plan and execute with superpowers. See
-README.md. It is a public repository: write everything in English, and never
+Docket is a development process: superpowers and OpenSpec used together for
+spec-driven development. `dkt` is its Go CLI, which checks and keeps the books
+for OpenSpec change folders. See README.md. It is a public repository: never
 commit hostnames, customer names, personal paths or secrets.
+
+Documents are written first in Traditional Chinese under `zh-TW/`; once the
+maintainer agrees, they are translated into English at their own path, and both
+go in the same pull request. For a file a `dkt` command creates, run the
+command first, then write its Chinese copy; when `dkt archive` runs, merge the
+deltas into the Chinese main specs and delete the Chinese change. The details
+are in `zh-TW/README.md`. Everything
+outside `zh-TW/` and `README.zh-TW.md` is in English, as are code, commits and
+pull requests.
 
 Status: milestone 1 is complete. `dkt init`, `dkt new`, `dkt record`, `dkt issue`, `dkt lint`,
 `dkt conflicts`, `dkt sync`, `dkt archive`, `dkt rebase`, `dkt status`, `dkt workflow` and `dkt inspect` exist; build them

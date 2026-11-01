@@ -1,0 +1,265 @@
+name: docket
+version: 1
+description: "Docket 流程：proposal → specs → design（選用）→ plan；plan.md 是唯一的 task 清單"
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: 說明此 change 的初始 proposal 文件
+    template: proposal.md
+    instruction: |
+      撰寫 proposal 文件，說明為什麼需要這個 change（WHY）。
+
+      各段落：
+      - **Why**：用 1-2 句話說明問題或機會。這解決什麼問題？為什麼是現在？
+      - **What Changes**：變更的項目清單。具體寫出新 capability、修改或移除。破壞性變更標上 **BREAKING**。
+      - **Non-Goals**：這個 change 刻意不做的事，每項一個項目。不可為空：如果沒有排除任何東西，表示範圍還沒想清楚。
+      - **Builds On**：這個 change 所建立在、延伸或不可重複造的既有東西，以 `path:symbol` 或 capability 名稱指出。寫之前，先搜尋程式碼與 `openspec/specs/`，若專案的指示有指名架構筆記，也要讀。如果沒有相關的既有東西，就說明沒有，並說明搜尋了什麼。不可為空。
+      - **Capabilities**：指出哪些 spec 會被建立或修改：
+        - **New Capabilities**：列出新引入的 capability。每一個都會成為新的 `specs/<capability-path>/spec.md`。以持久的系統行為來命名每個 capability（例如 `user-auth`），不要以這個 change 的工作命名（例如 `add-login-endpoint`）。選擇有內聚性的邊界，讓系統演進時它能擁有相關的需求；避免過於廣泛的萬用 capability。你新引入的路徑片段用 kebab-case（例如 `user-auth` 或 `identity/user-auth`），並遵循專案既有的 spec 組織方式。
+        - **Modified Capabilities**：列出需求（REQUIREMENTS）有變更的既有 capability。只在 spec 層級的行為改變時才列入（只是實作細節不算）。每一個都需要一個 delta spec 檔案。使用 `openspec/specs/` 底下確切的既有路徑。沒有需求變更時留空。
+      - **Impact**：受影響的程式碼、API、依賴或系統。
+      - **Implementation Contract**：實作者所要遵守的內容，分四個子段落，每個都不可為空。
+        寫出行為與介面；只有檔案路徑或行號不是契約。
+        - **Observable Behavior**：使用者或呼叫端看得到的東西。
+        - **Interfaces**：指令、旗標、API、事件、檔案格式、資料欄位。
+        - **Failure Modes**：出錯時會發生什麼。
+        - **Acceptance Criteria**：每一項都點出它對應的 delta 情境。
+      - **Change Log**：一個表格 `| Date | Source | Change | Impact |`。change 是新的時候，
+        只留表頭。此 change 之後的每次修訂都加一列：ISO 日期（YYYY-MM-DD）、誰透過哪個管道提出、
+        改了什麼，以及對 task 與時程的影響。
+
+      重要：Capabilities 一節至關重要。它建立 proposal 與 specs 階段之間的契約。
+      填寫之前先查既有的 spec：
+      執行 `openspec list --specs` 取得專案的 capability 清單，
+      再對看起來相關的執行 `openspec show "<spec-id>" --type spec --json --no-scenarios`，
+      它會回傳 capability 的目的與需求文字，而不會把整份 spec 檔拉進 context。
+      只有對已註冊的獨立 store，才在兩個指令都加上 `--store "<id>"`，並保留 `--type
+      spec`：否則 change 與 spec 同名會造成歧義錯誤。
+      不帶 `--specs` 的 `openspec list` 列的是進行中的 change，不是 spec，
+      它絕不會顯示專案已經涵蓋什麼。重用既有 capability 的確切路徑，不要引入近似重複的名稱。
+      過濾後的讀取只是概覽。在決定什麼已涵蓋或什麼該改之前，用
+      `openspec show "<spec-id>" --type spec`（`--store` 規則相同）完整讀過每份相關的 spec，包含情境。
+      這裡列出的每個 capability 都需要一個對應的 spec 檔案。
+
+      每個 change 必須宣告至少一個 capability（新增或修改），或明確放棄 spec：
+      除非 change 的 `.openspec.yaml` 設定 `skip_specs: true`，
+      否則 `openspec validate` 會拒絕零 delta 的 change。
+      只在沒有 spec 層級的行為改變時（純重構、工具、文件）才使用 `skip_specs: true`，
+      因為 spec 描述行為，行為沒變，spec 也不該變。
+      不要為了通過驗證而編造需求。
+
+      保持精簡（1-2 頁）。聚焦在「為什麼」而不是「怎麼做」，
+      實作細節屬於 design.md。
+
+      這是基礎：specs、design 與 plan 都建立在它之上。
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: 此 change 的詳細 spec
+    template: spec.md
+    instruction: |
+      撰寫 spec 檔案，定義系統應該做什麼（WHAT）。
+
+      spec 是行為契約，不是實作計畫。
+
+      好的 spec 內容：
+      - 使用者或下游系統所依賴的可觀察行為
+      - 輸入、輸出與錯誤情況
+      - 外部限制（安全、隱私、可靠性、相容性）
+      - 可測試或可明確驗證的情境
+
+      spec 中要避免：
+      - 內部的 class／function 名稱
+      - 函式庫或框架的選擇
+      - 逐步的實作細節
+      - 詳細的執行計畫（那些屬於 design.md 或 plan.md）
+
+      快速檢驗：如果實作可以改變而不改變對外可見的行為，它大概不屬於 spec。
+
+      為 proposal 的 Capabilities 一節列出的每個 capability 建立一個 spec 檔案。
+      `<capability-path>` 是相對於 `specs/` 的 spec 目錄（例如
+      `user-auth` 或 `identity/user-auth`）。保留完整路徑：
+      - 新 capability：使用 proposal 中的確切路徑，檔案在 `specs/<capability-path>/spec.md`。proposal 中新引入的任何路徑片段都必須是 kebab-case。遵循專案既有的組織方式；專案使用扁平結構時，不要新增領域層級。
+      - 修改既有 capability：建立 delta 於 `specs/<capability-path>/spec.md` 時，使用 `openspec/specs/<capability-path>/` 底下確切的既有路徑。寫 delta 之前，先執行 `openspec list --specs` 確認該路徑，只對已註冊的獨立 store 才加上 `--store "<id>"`；打錯或編造的路徑會指向不存在的 capability，而不是你原本的意思。不要搬移或重新命名 capability。
+
+      一次寫一個 spec 檔案，讓使用者看到進度，也讓中斷的執行保留已寫好的檔案：
+      - 寫任何東西之前，先比對 proposal 列出的 capability 與已存在的
+        `specs/<capability-path>/spec.md` 檔案，從第一個還沒有檔案的 capability 開始。
+        除非使用者要求，不要重寫既有的檔案。
+      - 每個檔案之前，用一行說明你正在寫哪個 capability。
+      - 草擬好一個檔案就立刻寫出。不要在寫第一個檔案之前先規劃好所有檔案。
+      - proposal 列出的每個 capability 都有了檔案就停下。
+
+      除非 change 的 `.openspec.yaml` 設定 `skip_specs: true`（沒有 spec 層級的行為改變），
+      否則至少要有一個 spec 檔案，`openspec validate` 會拒絕沒有該標記的零 delta change。
+      如果 proposal 沒有列出任何 capability 而且沒設定 `skip_specs`，先回頭修正 proposal。
+
+      Delta 操作（用 ## 標題）：
+      - **ADDED Requirements**：新的 capability
+      - **MODIFIED Requirements**：改變的行為，MUST 包含完整的更新內容
+      - **REMOVED Requirements**：廢止的功能，MUST 包含 **Reason** 與 **Migration**
+      - **RENAMED Requirements**：只改名稱，使用 FROM:/TO: 格式
+
+      需求的格式：
+      - 每個需求：`### Requirement: <name>`，後面接描述
+      - 規範性需求使用 SHALL/MUST（避免 should/may）
+      - 每個情境：`#### Scenario: <name>`，用 WHEN/THEN 格式
+      - **重要**：情境 MUST 剛好使用 4 個井字號（`####`）。使用 3 個井字號或項目符號會無聲地失敗。
+      - 每個需求 MUST 至少有一個情境。
+      - 每個需求的描述（`### Requirement:` 與第一個情境之間的文字）保持在 500 字元以內。`openspec validate` 會對 ADDED 需求與主 spec 中較長的描述標出警告。這是警告：一般驗證仍會通過，但 `openspec validate --strict` 會因它而失敗。寫新需求時，一個需求只陳述一個行為：把範例與邊界情況移到情境中，並把涵蓋多個行為的需求拆成各自獨立的 `### Requirement:` 區塊，各有各的情境。在 MODIFIED 之下，保持既有需求區塊完整；絕不要只為了符合長度而拆分、刪減或改寫既有文字。只在使用者要求、且是為此目的而開的 change 中，才拆分既有的長需求：在 MODIFIED 之下，保留它的標題與每個情境，並把描述縮減為一個行為而不改變其意義，然後把你移出的每個行為各自加成一個 ADDED 需求，附上自己的情境。
+
+      只有新 capability：delta spec 的第一個段落是 `## Purpose`，
+      一兩句話（至少 50 字元，否則 `openspec validate --strict` 會回報太簡短），說明這個 capability 的用途。
+      封存時會把它複製到所建立的主 spec；沒有它的話，新的主 spec 會留下
+      `TBD ... Update Purpose after archive` 佔位文字，要手動補上。
+      不要在既有 capability 的 delta 加 `## Purpose`：
+      那份 spec 已有 Purpose，delta 的會被忽略。要改既有 capability 的 Purpose，包括遺留的 `TBD` 佔位文字，
+      直接編輯 `<planningHome.root>/openspec/specs/<capability-path>/spec.md`。
+      `planningHome.root` 來自 `openspec instructions ...
+      --json` 的回應。一律使用它，不要用相對於 repo 的路徑：
+      change 位於 store 時（不論來自 `--store`、專案的 `store:` 指標或全域預設 store），
+      它會解析到 store，否則解析到目前的 repository。不要自己去判斷是哪種情況，這個欄位已經判斷好了。
+
+      MODIFIED 需求的流程：
+      1. 在 `<planningHome.root>/openspec/specs/<capability-path>/spec.md`（與上面相同的 store-aware 根目錄）找到既有的需求
+      2. 複製整個需求區塊（從 `### Requirement:` 到所有情境）
+      3. 貼到 `## MODIFIED Requirements` 之下，並編輯以反映新的行為
+      4. 確保標題文字完全相符（不分空白）
+
+      常見的陷阱：MODIFIED 只放部分內容，會在封存時遺失細節。
+      如果是加入新的關注點而不改變既有行為，改用 ADDED。
+
+      範例（新的 capability，所以第一個段落是 `## Purpose`）：
+      ```
+      # Spec Delta
+
+      ## Purpose
+
+      Lets users take their data out of the product in a portable format.
+
+      ## ADDED Requirements
+
+      ### Requirement: User can export data
+      The system SHALL allow users to export their data in CSV format.
+
+      #### Scenario: Successful export
+      - **WHEN** user clicks "Export" button
+      - **THEN** system downloads a CSV file with all user data
+
+      ## REMOVED Requirements
+
+      ### Requirement: Legacy export
+      **Reason**: Replaced by new export system
+      **Migration**: Use new export endpoint at /api/v2/export
+      ```
+
+      spec 應該可測試：每個情境都是一個潛在的測試案例。
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: 含實作細節的技術 design 文件
+    template: design.md
+    instruction: |
+      撰寫 design 文件，說明如何實作（HOW）這個 change。
+
+      何時要有 design.md（符合任一項才建立）：
+      - 橫跨多個服務／模組的變更，或新的架構模式
+      - 新的外部依賴，或重大的資料模型變更
+      - 安全、效能或遷移的複雜度
+      - 在寫程式碼之前先做技術決定會有幫助的模糊之處
+
+      各段落：
+      - **Context**：只寫說明做法所需的現況與限制。動機參照 proposal，不要重述（例如「見 proposal.md - Why」）。
+      - **Goals / Non-Goals**：這個 design 達成什麼、明確排除什麼。不要重述 proposal 的範圍，只加上 design 層級的邊界。
+      - **Decisions**：關鍵的技術選擇與理由（為什麼選 X 而不是 Y？）。每個決定都附上考慮過的替代方案。
+      - **Risks / Trade-offs**：已知的限制、可能出錯的地方。格式：[風險] → 緩解方式
+      - **Migration Plan**：部署的步驟、回滾策略（如適用）
+      - **Open Questions**：可以安全地稍後再回答、而不會改變 spec、做法或 task 拆分的未知事項。沒有就省略。
+
+      Open question 是給真正可延後的未知事項，不是你跳過的決定。
+      如果某個問題會改變 spec、所選的做法或 task 拆分，現在就解決它：去問使用者，不要猜。
+
+      聚焦在架構與做法，不是逐行的實作。
+      proposal 談為什麼與做什麼；design 談怎麼做。動機參照 proposal，
+      需求則在寫好之後參照 spec；如果某個段落只是在重述它們，就指向它們。
+
+      好的 design 文件會說明技術決定背後的「為什麼」。
+    requires:
+      - proposal
+
+  - id: plan
+    generates: plan.md
+    description: 用 superpowers:writing-plans 撰寫的實作 plan；唯一的 task 清單
+    template: plan.md
+    instruction: |
+      用 superpowers:writing-plans 撰寫 plan，存到這個 change 的
+      plan.md，而不是該 skill 的預設位置。沒有 tasks.md：
+      plan.md 是唯一的 task 清單，OpenSpec 追蹤它的核取方塊。
+
+      保留 writing-plans 的標頭與 task 結構，只有標題改為 `# Implementation Plan`，
+      因為 change 的 title 已經命名了這項工作。另外加上：
+      - 標頭之後緊接一個 `## Reuse` 表格：
+        `| Need | Existing (path:symbol) | Decision | Reason | Evidence |`，
+        plan 需要的每個 capability 一列。Decision 是 `reuse`、
+        `extend` 或 `new`。`reuse` 或 `extend` 列要指出 repository 中存在的路徑，
+        或來自外部的依賴，寫成 `external: <name>`（CLI、函式庫）。`new` 列要在 Reason 說明
+        為什麼現有的東西都不合用。Evidence 是決定背後的搜尋，
+        例如 `rg -n "func Run" internal/`。這是此 change
+        主要的重用決定：在這裡做，不要等到實作時。
+      - 每個 task 標題都剛好是 `### Task N: <name>`。task 編號從 1 開始，
+        不重複，也絕不重用。plan 中沒有其他東西以 task 為標題。
+      - 每個 task 都有一行 `**Scenarios:**`，列出它實作或測試的 delta 情境，
+        格式為 `<capability-path>#<scenario-slug>`，例如 `booking#join-when-full`。
+        slug 是情境名稱轉小寫，每一段不是字母或數字的字元都換成單一個 `-`，
+        且前後都沒有 `-`。
+        此 change 的 ADDED 與 MODIFIED 需求之下的每個情境，至少要被一個 task 認領。
+        不實作任何情境的 task，例如搭鷹架，寫 `**Scenarios:** none`。
+      - task 是能單獨驗收的切片。耦合緊的 task 合為一個 task；
+        只在審查者可能拒絕其中一部分、接受另一部分的地方才拆分 task。
+      - 每個 task 在 `**Scenarios:**` 那行之後都有一行 `**Review:**`：
+        task 需要審查者判斷時（錯誤路徑、依環境而定的行為、公開介面或輸出格式）寫 `judgment`，
+        否則寫 `checks`。只有 `judgment` 的 task 有自己的審查者。
+      - 每個 task 的 `**Files:**` 區塊列出該 task 建立或修改的每個檔案，
+        讓平行的 change 在開始之前就能比對。
+      - 步驟是 `- [ ]` 核取方塊。`dkt sync` 依 `Change:` 與 `Task:` commit trailer 勾選 task 的步驟；
+        只有在沒有任何 commit 就完成的 task 才手動勾選。
+
+      寫任何程式碼之前，讓 plan 連同 proposal、delta spec 與 design.md 一起被審查一次，
+      最好由與撰寫者不同的模型審查，並修正審查發現的問題。
+
+      plan 核准之後需求有變時：
+      - 已完成的 task 保持原樣並維持勾選。
+      - 完成前就取消的 task，從 task 清單移到 `## Cancelled Tasks` 一節，
+        寫成項目 `- Task N: <name> - <reason>`。它不再是 `### Task` 標題，
+        它的編號也不重用。
+      - 新需求推翻已完成的 task 時，新增一個 task，帶一行 `**Compensates:** Task N`；
+        它會改變或移除 Task N 所建的東西。
+      - 在 task 清單上方加一個 `## Revision N (YYYY-MM-DD): <what changed>` 段落，
+        並在 proposal.md 的 Change Log 加一列。
+    requires:
+      - specs
+
+apply:
+  requires: [ plan ]
+  tracks: plan.md
+  instruction: |
+    plan 經過審查之後才開始（見 plan 的指示）。
+    用 superpowers:subagent-driven-development 執行 plan.md，但有一個例外：
+    只有 `**Review:**` 那行寫 `judgment` 的 task 有自己的審查者。
+    每個改程式碼的 task 改為接受機械檢查：
+    它新增的測試在程式碼之前會失敗、之後會通過，
+    而對它改動的行做突變會讓某個測試失敗。
+    不改程式碼的 task，例如只編輯文件的，由它自己的驗證步驟檢查。
+    把與該 task 有關的 Reuse 列交給每位實作者。每位實作者的報告列出它新增的
+    每個匯出符號，並對每一個說明為什麼沒有任何既有的符合需求。
+    為某個 task 做的每個 commit 都帶 trailer
+    `Change: <change-name>` 與 `Task: <N>`；結構調整與行為改變分開 commit。
+
+    合併之前，整個 change 審查一次，由兩位審查者平行進行：
+    一位用不同的模型，受命攻擊（錯誤結果、邊界情況、部分失敗、程式碼其他地方的同一個缺陷），
+    另一位在新的 context 中，對照 proposal 與 delta 檢查程式碼。
+    修正之後，只有大的修正才再審一次。change 是一個 PR。
+    開 PR 之前執行 `dkt sync <change-name>`，讓 plan.md 把每個有 commit 的 task 顯示為完成。
