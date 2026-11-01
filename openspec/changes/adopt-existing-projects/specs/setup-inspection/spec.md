@@ -39,3 +39,24 @@ The doctor SHALL take each `install-ignored`, `title-missing` and `other-schema`
 #### Scenario: Started change left
 - **WHEN** the doctor reaches `other-schema` for `add-x` with 2 of 4 steps ticked
 - **THEN** it proposes no conversion, says to finish `add-x` with its own files and archive it with `dkt archive`, and lists any capability `add-x` adds that has no title
+
+## MODIFIED Requirements
+
+### Requirement: Trailers on the default branch
+For each active change whose folder is in the default branch's tree and whose plan there has a task, `dkt inspect` SHALL report `no-task-commits` when no commit reachable from the default branch's tip and not from the change's recorded base carries both `Change: <slug>` and a `Task:` trailer. A change whose base is missing or not an ancestor of the tip, or that is a change of another schema, SHALL be skipped. `result.changes` SHALL list each such change, with the reason when skipped.
+
+#### Scenario: Squashed change
+- **WHEN** `add-x` is in the default branch's tree with a plan of two tasks, and the only commit since its base on the default branch carries no `Change: add-x` trailer
+- **THEN** the findings hold `no-task-commits` for `add-x`
+
+#### Scenario: Merged with a merge commit
+- **WHEN** `add-x` reached the default branch through a merge commit whose second parent's history has commits with `Change: add-x` and `Task: 1`
+- **THEN** no finding names `add-x`
+
+#### Scenario: Base not an ancestor
+- **WHEN** `add-x` is in the default branch's tree and its recorded base is not an ancestor of the default branch's tip
+- **THEN** no finding names `add-x`, and `result.changes` lists `add-x` as skipped with the reason
+
+#### Scenario: Change of another schema skipped
+- **WHEN** `add-x` is in the default branch's tree with `schema: spec-driven` and a `plan.md` with a task, and no commit carries `Change: add-x`
+- **THEN** no finding names `add-x`, and `result.changes` lists `add-x` as skipped, saying it was made with the `spec-driven` schema

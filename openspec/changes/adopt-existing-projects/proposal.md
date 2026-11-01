@@ -139,10 +139,13 @@ None.
 
 ### Failure Modes
 
-- git cannot answer whether a path is ignored: the paths are listed as
-  unreadable, and nothing else changes.
-- A `.openspec.yaml` whose `schema` is not a string: the change is listed as
-  unreadable by the command reading it.
+- git cannot answer whether a path is ignored: each path asked about is
+  listed as unreadable, and nothing else changes.
+- A `.openspec.yaml` that is not a YAML mapping, or whose `schema` is not a
+  string: `dkt lint` reports `metadata-invalid` on it and lints the change
+  as one of the `docket` schema; `dkt archive`, `dkt sync` and `dkt rebase`
+  refuse it with `metadata-invalid`; `dkt status` shows it as of the
+  `docket` schema, as it shows a change with unusable metadata.
 - A change of another schema that adds a capability without a title beside
   its delta: `dkt lint` reports `title-missing`, and `dkt archive` stops at
   its lint step, so no main spec is left without a title.
@@ -155,6 +158,7 @@ None.
 - `setup-inspection#ignored-file-inspected`,
   `setup-inspection#main-spec-title-inspected`,
   `setup-inspection#change-of-another-schema-inspected`,
+  `setup-inspection#change-of-another-schema-skipped`,
   `setup-inspection#ignore-rule-changed-with-consent`,
   `setup-inspection#titles-written-with-consent`,
   `setup-inspection#unstarted-change-converted`,
@@ -173,3 +177,4 @@ None.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-11-01 | codex plan review | A `schema` that is not a string is `metadata-invalid`, not unreadable; a failed ignore check lists each path; `dkt inspect`'s trailer check skips a change of another schema | Tasks 1, 2, 3, 5 and 6 tests; no new task |

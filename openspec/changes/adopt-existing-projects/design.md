@@ -78,9 +78,9 @@ See proposal.md for why. The relevant state today:
    is skipped. Alternative: check those titles only in `dkt archive`,
    rejected because the problem would appear only at release.
 
-7. **Status counts `tasks.md` checkboxes with the plan's step reader.** The
-   checkboxes are counted the way plan steps are (code fences and comments
-   skipped), and the phase follows the same thresholds as for a plan, with
+7. **Status counts `tasks.md` checkboxes with the plan's step pattern.** The
+   checkboxes are lines the plan's step pattern matches, outside code fences
+   and HTML comments, and the phase follows the same thresholds as for a plan, with
    steps in place of tasks. No tasks are listed: `tasks.md` has no task
    structure Docket reads.
 
@@ -126,30 +126,42 @@ See proposal.md for why. The relevant state today:
     JSON field: the doctor reads messages, as it does for the other
     findings. (My call.)
 
-13. **Failures go through each command's existing unreadable list.** A
-    `schema` that is not a string, or git failing to answer the ignore
-    check, is listed in `unreadable` (exit 3), as other read failures of
-    the same command are. (My call.)
+13. **A bad schema is invalid metadata; a failed git call is unreadable.** A
+    `.openspec.yaml` that does not parse, or whose `schema` is not a YAML
+    string (null, a number, a list), is treated as other broken metadata
+    is: `metadata-invalid` from lint and the archive loader, nothing from
+    status. Only an absent key means `docket`. Git failing to answer the
+    ignore check lists each path asked about in `unreadable` (exit 3).
+    (Revised after the plan review.)
 
-14. **`convert.md` ships with the skill folder.** Skills are embedded as
+14. **Commands that read only what they need for another schema.** lint
+    reads `.openspec.yaml` before walking the change folder and, for another
+    schema, reads only `.openspec.yaml` and the files under `specs/`, so an
+    unreadable file Docket does not check cannot fail it. The archive loader
+    reads the schema first; for another schema it reads no `docket.yaml`, no
+    base and no plan, and `dkt sync` and `dkt rebase` refuse before reading
+    anything else. `dkt inspect`'s trailer check skips such a change with
+    the reason. (From the plan review.)
+
+15. **`convert.md` ships with the skill folder.** Skills are embedded as
     whole folders, so a new file in `.agents/skills/docket-doctor/` is
     installed by `dkt init` and compared for `skill-differs` without code
     changes; the `.claude/skills/` copy must match, as the existing test
     checks. The folder is already a listed prompt path.
 
-15. **The title rule kept for another schema includes a broken delta
+16. **The title rule kept for another schema includes a broken delta
     `docket.yaml`.** `metadata-invalid` on a `docket.yaml` beside a delta is
     part of the same check, and a broken one would fail the spec title step
     of `dkt archive`. (My call.)
 
-16. **`dkt sync` and `dkt rebase` refuse a change of another schema.** Their
+17. **`dkt sync` and `dkt rebase` refuse a change of another schema.** Their
     loader requires a base today, so such a change would get
     `metadata-invalid ... has no x-base`, which points at the wrong cause.
     They check the schema first and report `other-schema`. `dkt archive`'s
     loader stops requiring a base for such a change, since it skips the
     base check. (My call, from the builder check.)
 
-17. **The `docket` skill names the rule for other schemas.** One line: a
+18. **The `docket` skill names the rule for other schemas.** One line: a
     change whose `.openspec.yaml` names another schema follows that
     schema's files, gets no `plan.md` unless converted, and is archived with
     `dkt archive`.
