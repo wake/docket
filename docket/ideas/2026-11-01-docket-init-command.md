@@ -38,6 +38,29 @@ asks the agent to run it.
 - After it, the project is ready to start development, or to start a
   refactoring (`2026-10-31-refactoring.md`).
 
+## The steps, agreed 2026-11-01
+
+1. Check the environment, writing nothing: OpenSpec 1.14.x (`dkt` already
+   checks it; `dkt inspect` would report it too), superpowers (only the
+   agent can see which skills it has, and `dkt` does not read the user's
+   agent configuration, so the command checks it), and a git repository.
+   When something is missing, stop and say how to install it; installing
+   writes outside the project, so the command does not do it.
+2. `dkt init`: the project's files and the per-machine schema.
+3. `docket-setup` when the workflow file is missing.
+4. In an existing project, survey it: the interface list
+   (`2026-10-31-codebase-decomposition.md`, `2026-10-24-add-index.md`),
+   the adoption checks (`2026-10-31-existing-project-adoption.md`), and a
+   draft of capabilities for the user to confirm, as the start of a
+   baseline.
+5. Check the setup as `docket-doctor` does.
+6. Report what to commit, and that development or a refactoring can
+   start.
+
+Split: this idea is the command itself, steps 1, 2, 3, 5 and 6, mostly
+joining what exists. Step 4 comes from the three ideas it names, each
+done as its own piece of work; the command takes each part up as it ships.
+
 ## Found, 2026-11-01
 
 From the documentation of Claude Code 2.1.316 and Codex 0.153.4; nothing
