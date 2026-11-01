@@ -178,3 +178,4 @@ None.
 | Date | Source | Change | Impact |
 |---|---|---|---|
 | 2026-11-01 | codex plan review | A `schema` that is not a string is `metadata-invalid`, not unreadable; a failed ignore check lists each path; `dkt inspect`'s trailer check skips a change of another schema | Tasks 1, 2, 3, 5 and 6 tests; no new task |
+| 2026-11-01 | pre-merge spec review | `dkt inspect` reads nothing under a linked `openspec` for the main-spec title and other-schema checks | Task 4 code (9cf4fb7); its test strengthened in the pre-merge fixes; no new task |

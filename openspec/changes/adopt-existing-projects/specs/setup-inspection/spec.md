@@ -8,14 +8,14 @@
 - **THEN** the findings hold `install-ignored` naming `openspec/config.yaml` with `.git/info/exclude`, line 7 and `openspec/`, and `.git/info/exclude` is byte-for-byte unchanged
 
 ### Requirement: Main spec titles inspected
-`dkt inspect` SHALL report `title-missing` for each main spec under the worktree's `openspec/specs/` that has no title, as `dkt lint` does when no change is named.
+`dkt inspect` SHALL report `title-missing` for each main spec under the worktree's `openspec/specs/` that has no title, as `dkt lint` does when no change is named. When `openspec` itself is a symbolic link (`symlink-refused`), it SHALL read nothing under it for this check.
 
 #### Scenario: Main spec title inspected
 - **WHEN** `openspec/specs/booking/spec.md` exists without a `docket.yaml` beside it
 - **THEN** `dkt inspect` reports `title-missing` naming `openspec/specs/booking/docket.yaml` and exits with 1
 
 ### Requirement: Changes of another schema inspected
-`dkt inspect` SHALL report `other-schema` for each active change in the worktree's `openspec/changes/` that is a change of another schema, naming its `.openspec.yaml`, its schema, and how many checkboxes of its `tasks.md` are ticked out of how many.
+`dkt inspect` SHALL report `other-schema` for each active change in the worktree's `openspec/changes/` that is a change of another schema, naming its `.openspec.yaml`, its schema, and how many checkboxes of its `tasks.md` are ticked out of how many. When `openspec` itself is a symbolic link (`symlink-refused`), it SHALL read nothing under it for this check.
 
 #### Scenario: Change of another schema inspected
 - **WHEN** `openspec/changes/add-x/.openspec.yaml` holds `schema: spec-driven` and its `tasks.md` has four checkboxes, none ticked
