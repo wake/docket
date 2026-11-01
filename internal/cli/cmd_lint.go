@@ -19,6 +19,14 @@ type LintResult struct {
 	Changes []string `json:"changes"`
 	Records []string `json:"records"`
 	Issues  []string `json:"issues"`
+
+	OtherSchema []OtherSchemaEntry `json:"other_schema"`
+}
+
+// OtherSchemaEntry is a linted change made with a schema other than docket.
+type OtherSchemaEntry struct {
+	Slug   string `json:"slug"`
+	Schema string `json:"schema"`
 }
 
 func lintCommand() Command {
@@ -57,6 +65,13 @@ func lintCommand() Command {
 			rep := lint.Run(in)
 
 			out := Outcome{Result: LintResult{Changes: append([]string{}, rep.Changes...), Records: append([]string{}, rep.Records...), Issues: append([]string{}, rep.Issues...)}}
+			res := out.Result.(LintResult)
+			res.OtherSchema = []OtherSchemaEntry{}
+			for _, o := range rep.OtherSchema {
+				res.OtherSchema = append(res.OtherSchema, OtherSchemaEntry{Slug: o.Slug, Schema: o.Schema})
+				out.Human = append(out.Human, fmt.Sprintf("other schema  %s: %s", o.Slug, o.Schema))
+			}
+			out.Result = res
 			for _, f := range rep.Findings {
 				out.Findings = append(out.Findings, Finding{Rule: f.Rule, Message: f.Message, Change: f.Change, File: f.File, Line: f.Line})
 			}
