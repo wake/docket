@@ -18,6 +18,11 @@ func TestDecodeMapping(t *testing.T) {
 	if err := DecodeMapping([]byte("- a\n"), &v); err == nil {
 		t.Error("a list decoded")
 	}
+	for _, in := range []string{"", "x\n"} {
+		if err := DecodeMapping([]byte(in), &v); err == nil {
+			t.Errorf("%q decoded", in)
+		}
+	}
 	// yaml.v3 reads yes as a bool, so use a word that is not one.
 	if err := DecodeMapping([]byte("dropped: maybe\n"), &v); err == nil {
 		t.Error("maybe decoded into *bool")
