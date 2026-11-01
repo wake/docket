@@ -15,10 +15,13 @@ import (
 
 // StatusResult is the result object of dkt status.
 type StatusResult struct {
-	Changes      []status.Change `json:"changes"`
-	Records      []status.Record `json:"records"`
-	RecordsTotal int             `json:"records_total"`
-	Issues       []status.Issue  `json:"issues"`
+	Changes      []status.Change    `json:"changes"`
+	Records      []status.Record    `json:"records"`
+	RecordsTotal int                `json:"records_total"`
+	Issues       []status.Issue     `json:"issues"`
+	Order        []status.OrderLine `json:"order"`
+	Next         *int               `json:"next"`
+	Ideas        []status.Idea      `json:"ideas"`
 }
 
 func statusCommand() Command {
@@ -125,12 +128,14 @@ func statusCommand() Command {
 				return Outcome{}, err
 			}
 			unread = append(unread, recUnread...)
-			issues := []status.Issue{}
+			issues, order, ideas := []status.Issue{}, []status.OrderLine{}, []status.Idea{}
+			var next *int
 			if len(args) == 0 {
-				var issUnread []scan.Unreadable
-				if issues, issUnread, err = status.LoadIssues(c.Git, inv); err != nil {
+				backlog, issUnread, err := status.LoadBacklog(c.Git, inv)
+				if err != nil {
 					return Outcome{}, err
 				}
+				issues, order, next, ideas = backlog.Issues, backlog.Order, backlog.Next, backlog.Ideas
 				unread = append(unread, issUnread...)
 			}
 			out.Unreadable = append(scanUnreadable(inv.Unreadable), scanUnreadable(unread)...)
@@ -149,10 +154,25 @@ func statusCommand() Command {
 			for _, is := range issues {
 				out.Human = append(out.Human, statusIssueLine(is))
 			}
+			for _, l := range order {
+				if l.State != status.Done {
+					out.Human = append(out.Human, fmt.Sprintf("order %d %s %s", l.Number, l.State, l.Path)+titleAndHandlers(l.Title, l.Handlers))
+				}
+			}
+			for _, id := range ideas {
+				if id.State == status.InProgress {
+					out.Human = append(out.Human, fmt.Sprintf("idea %s %s", id.Path, id.State)+titleAndHandlers(id.Title, id.Handlers))
+				}
+			}
+			for _, l := range order {
+				if next != nil && *next == l.Number {
+					out.Human = append(out.Human, fmt.Sprintf("next %d %s", l.Number, l.Path))
+				}
+			}
 			if cut := total - len(records); cut > 0 {
 				out.Human = append(out.Human, fmt.Sprintf("%d more merged records not listed; raise --limit", cut))
 			}
-			out.Result = StatusResult{Changes: changes, Records: records, RecordsTotal: total, Issues: issues}
+			out.Result = StatusResult{Changes: changes, Records: records, RecordsTotal: total, Issues: issues, Order: order, Next: next, Ideas: ideas}
 			return out, nil
 		},
 	}
@@ -201,20 +221,30 @@ func statusRecordLine(r status.Record) string {
 }
 
 func statusIssueLine(is status.Issue) string {
-	line := fmt.Sprintf("issue %s %s", is.Slug, is.State)
-	if is.Title != nil {
-		line += fmt.Sprintf(" %q", *is.Title)
+	return fmt.Sprintf("issue %s %s", is.Slug, is.State) + titleAndHandlers(is.Title, is.Handlers)
+}
+
+// titleAndHandlers is the end of an issue, order or idea line.
+func titleAndHandlers(title *string, hs []status.Handler) string {
+	line := ""
+	if title != nil {
+		line = fmt.Sprintf(" %q", *title)
 	}
-	var hs []string
-	for _, h := range is.Handlers {
+	return line + handlerList(hs)
+}
+
+// handlerList is " (record a, change b merged)", or "" without handlers.
+func handlerList(hs []status.Handler) string {
+	var parts []string
+	for _, h := range hs {
 		s := h.Kind + " " + h.Slug
 		if h.Merged {
 			s += " merged"
 		}
-		hs = append(hs, s)
+		parts = append(parts, s)
 	}
-	if len(hs) > 0 {
-		line += " (" + strings.Join(hs, ", ") + ")"
+	if len(parts) == 0 {
+		return ""
 	}
-	return line
+	return " (" + strings.Join(parts, ", ") + ")"
 }

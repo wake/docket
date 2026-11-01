@@ -32,11 +32,11 @@ func loadIssues(t *testing.T, r *testutil.Repo) ([]Issue, []scan.Unreadable) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	issues, unread, err := LoadIssues(g, inv)
+	b, unread, err := LoadBacklog(g, inv)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return issues, unread
+	return b.Issues, unread
 }
 
 // only checks that exactly one issue is listed, in the state and with the handlers.
@@ -210,4 +210,14 @@ func TestChangeActiveAndArchivedIsOneHandler(t *testing.T) {
 	w2.Commit("both", map[string]string{"openspec/changes/add-x/docket.yaml": meta, "openspec/changes/archive/2026-11-01-add-x/docket.yaml": meta})
 	is, _ := loadIssues(t, r2)
 	only(t, is, InProgress, Handler{Kind: "change", Slug: "add-x"})
+}
+
+func TestHandlerWithANote(t *testing.T) {
+	r, _ := baseRepo(t)
+	r.Commit("issue", map[string]string{issAF: issText,
+		"docket/records/2026-11-02-fix-a.md": recordNaming("\"" + issAF + ", found while fixing y\""),
+	})
+	if is, _ := loadIssues(t, r); len(is) != 0 {
+		t.Fatalf("source with a note should hand the issue over: %+v", is)
+	}
 }

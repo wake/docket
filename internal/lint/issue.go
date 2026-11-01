@@ -5,6 +5,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/idea"
 	"github.com/wake/docket/internal/issue"
 )
 
@@ -78,11 +80,22 @@ func (r *run) isFile(p, prefix string) bool {
 	return false
 }
 
-// checkIssueSource reports a source that starts with the issues folder but
-// names no regular file there. file is the file that holds the source.
-func checkIssueSource(r *run, c *loaded, file, source string) {
+// sourceFolders are the folders a source can name a file of, with the rule
+// that reports it and what the folder holds.
+var sourceFolders = []struct{ dir, rule, noun string }{
+	{issue.Dir, "issue-source", "issue"},
+	{idea.Dir, "idea-source", "idea"},
+}
+
+// checkSources reports a source that starts with the issues or the ideas
+// folder but names no regular file there. file is the file that holds the
+// source.
+func checkSources(r *run, c *loaded, file, source string) {
 	s := strings.TrimSpace(source)
-	if strings.HasPrefix(s, issue.Dir+"/") && !r.isFile(s, issue.Dir+"/") {
-		r.add(c, "issue-source", file, 1, "source %q names no issue file", s)
+	p := change.SourcePath(s)
+	for _, f := range sourceFolders {
+		if strings.HasPrefix(p, f.dir+"/") && !r.isFile(p, f.dir+"/") {
+			r.add(c, f.rule, file, 1, "source %q names no %s file", s, f.noun)
+		}
 	}
 }

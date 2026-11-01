@@ -103,6 +103,16 @@ func ReadMetadata(files map[string][]byte) (Metadata, error) {
 	return m, nil
 }
 
+// SourcePath returns the path a source names: its first whitespace-separated
+// field, minus one trailing comma. A source with no field names nothing.
+func SourcePath(source string) string {
+	f := strings.Fields(source)
+	if len(f) == 0 {
+		return ""
+	}
+	return strings.TrimSuffix(f[0], ",")
+}
+
 // SetKey replaces the value of the one top-level `key:` line and keeps every
 // other byte, including the line ending. With no such line it appends one,
 // adding a line ending first when b lacks one (CRLF when b uses CRLF). The

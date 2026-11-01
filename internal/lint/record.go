@@ -100,7 +100,7 @@ func checkRecord(r *run, c *loaded, name string, f record.File) {
 	checkRecordTasks(r, c, name, f)
 	checkPlaceholderFile(r, c, name, c.Files[name])
 	if f.FrontMatterErr == nil {
-		checkIssueSource(r, c, name, f.FrontMatter.Source)
+		checkSources(r, c, name, f.FrontMatter.Source)
 	}
 }
 

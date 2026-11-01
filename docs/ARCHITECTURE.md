@@ -21,6 +21,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/status` | Summarizes each active change and each record: phase, task states from commit trailers, progress, last activity |
 | `internal/conflicts` | Finds requirements that more than one active change touches |
 | `internal/record` | Records: kinds, name and slug, the template rendering, creating a file under a free name, parsing and word counting |
+| `internal/idea` | Ideas and the order: the front matter, idea paths, the order file's lines and their problems |
 | `internal/issue` | Issues: name and slug, the template rendering, parsing the front matter that hides an issue |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
 | `internal/userdirs` | Finds the home, the data directory (`XDG_DATA_HOME`) and the Claude Code config directory (`CLAUDE_CONFIG_DIR`) from values `cmd/dkt` passes in |
@@ -93,7 +94,11 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Pick a free slug | `change.Suffixed` with `scan.Inventory.Uses` or `RecordSources` |
 | Where a record slug is used | `scan.Inventory.RecordSources` |
 | Count a record section's words | `record.Words` |
-| Issue states from the records and changes that name them | `status.LoadIssues` |
+| Issue and idea states, the order and the next work, from the records and changes that name them | `status.LoadBacklog` |
+| Records and changes that name any set of paths, in one pass | `status.findHandlers` |
+| The path a source names (its first field) | `change.SourcePath` |
+| Read an idea's front matter; tell an idea path; read the order file | `idea.Parse`; `idea.IsIdeaPath`; `idea.ParseOrder` |
+| The default branch as a source | `scan.DefaultBranch.Source` |
 | Where an issue slug is used, and its handlers' sources | `scan.Inventory.Issues` |
 | Render a file issue from the template; read its front matter | `issue.Render`; `issue.ParseFrontMatter` |
 | Load records with their state, merge commit and tag | `status.LoadRecords` |
