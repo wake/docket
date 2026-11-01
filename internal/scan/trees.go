@@ -2,6 +2,7 @@ package scan
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/wake/docket/internal/gitx"
@@ -10,19 +11,22 @@ import (
 
 // treeRead is what readTree returns for one commit.
 type treeRead struct {
-	active, archived, records []string
-	recErr, err               error
+	active, archived []string
+	dated            map[string][]string // slugs by dated folder
+	datedErr         map[string]error
+	err              error
 }
 
 // treeWalk follows one commit down to the folders the scan reads. A field
 // holds the object id of the tree to read at the next level, empty when
 // there is none.
 type treeWalk struct {
-	commit                    string
-	openspec, docket          string
-	changes, records, archive string
-	res                       treeRead
-	fallback                  bool
+	commit           string
+	openspec, docket string
+	changes, archive string
+	datedTree        map[string]string // object id of each dated folder
+	res              treeRead
+	fallback         bool
 }
 
 // malformed reports whether a tree has an entry name holding a slash, or two
@@ -42,7 +46,7 @@ func malformed(es []gitx.TreeObject) bool {
 
 // readTrees reads the trees of the commits level by level, one ReadTrees call
 // per level: the root tree, then the openspec and docket trees, then
-// openspec/changes and docket/records, then the archive. Each distinct commit
+// openspec/changes and the dated folders, then the archive. Each distinct commit
 // and each distinct tree is read once. Every commit gets what readTree gives
 // it; a commit that has an object the batch does not return, and every
 // commit not yet read when a batch fails, goes to readTree itself, so it gets
@@ -53,7 +57,7 @@ func readTrees(g gitx.Git, commits []string) map[string]treeRead {
 	for _, c := range commits {
 		if !seen[c] {
 			seen[c] = true
-			walks = append(walks, &treeWalk{commit: c})
+			walks = append(walks, &treeWalk{commit: c, datedTree: map[string]string{}, res: treeRead{dated: map[string][]string{}, datedErr: map[string]error{}}})
 		}
 	}
 
@@ -133,13 +137,21 @@ func readTrees(g gitx.Git, commits []string) map[string]treeRead {
 			}
 			if w.docket != "" {
 				es := trees[w.docket]
-				w.records = folder(es, "records")
-				if e, ok := entry(es, "records"); ok && e.Type != "tree" {
-					w.res.recErr = fmt.Errorf("%s is not a folder at %s", record.Dir, w.commit)
+				for _, dir := range datedDirs {
+					w.datedTree[dir] = folder(es, path.Base(dir))
+					if e, ok := entry(es, path.Base(dir)); ok && e.Type != "tree" {
+						w.res.datedErr[dir] = fmt.Errorf("%s is not a folder at %s", dir, w.commit)
+					}
 				}
 			}
 		})
-	level(func(w *treeWalk) []string { return append(list(w.changes), list(w.records)...) },
+	level(func(w *treeWalk) []string {
+		o := list(w.changes)
+		for _, dir := range datedDirs {
+			o = append(o, list(w.datedTree[dir])...)
+		}
+		return o
+	},
 		func(w *treeWalk, trees map[string][]gitx.TreeObject) {
 			if w.changes != "" {
 				es := trees[w.changes]
@@ -151,11 +163,11 @@ func readTrees(g gitx.Git, commits []string) map[string]treeRead {
 					}
 				}
 			}
-			if w.records != "" {
-				for _, e := range trees[w.records] {
+			for _, dir := range datedDirs {
+				for _, e := range trees[w.datedTree[dir]] {
 					if e.Type == "blob" && (e.Mode == "100644" || e.Mode == "100755") {
 						if slug, ok := record.SlugOf(e.Name); ok {
-							w.res.records = append(w.res.records, slug)
+							w.res.dated[dir] = append(w.res.dated[dir], slug)
 						}
 					}
 				}
@@ -173,9 +185,7 @@ func readTrees(g gitx.Git, commits []string) map[string]treeRead {
 	out := make(map[string]treeRead, len(walks))
 	for _, w := range walks {
 		if w.fallback {
-			var r treeRead
-			r.active, r.archived, r.records, r.recErr, r.err = readTree(g, w.commit)
-			out[w.commit] = r
+			out[w.commit] = readTree(g, w.commit)
 			continue
 		}
 		out[w.commit] = w.res

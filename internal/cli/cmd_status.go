@@ -18,6 +18,7 @@ type StatusResult struct {
 	Changes      []status.Change `json:"changes"`
 	Records      []status.Record `json:"records"`
 	RecordsTotal int             `json:"records_total"`
+	Issues       []status.Issue  `json:"issues"`
 }
 
 func statusCommand() Command {
@@ -124,6 +125,14 @@ func statusCommand() Command {
 				return Outcome{}, err
 			}
 			unread = append(unread, recUnread...)
+			issues := []status.Issue{}
+			if len(args) == 0 {
+				var issUnread []scan.Unreadable
+				if issues, issUnread, err = status.LoadIssues(c.Git, inv); err != nil {
+					return Outcome{}, err
+				}
+				unread = append(unread, issUnread...)
+			}
 			out.Unreadable = append(scanUnreadable(inv.Unreadable), scanUnreadable(unread)...)
 			for _, ch := range changes {
 				out.Human = append(out.Human, statusLine(ch))
@@ -137,10 +146,13 @@ func statusCommand() Command {
 					out.Human = append(out.Human, "  "+s.Name+"@"+shortCommit(s.Commit))
 				}
 			}
+			for _, is := range issues {
+				out.Human = append(out.Human, statusIssueLine(is))
+			}
 			if cut := total - len(records); cut > 0 {
 				out.Human = append(out.Human, fmt.Sprintf("%d more merged records not listed; raise --limit", cut))
 			}
-			out.Result = StatusResult{Changes: changes, Records: records, RecordsTotal: total}
+			out.Result = StatusResult{Changes: changes, Records: records, RecordsTotal: total, Issues: issues}
 			return out, nil
 		},
 	}
@@ -183,4 +195,23 @@ func statusRecordLine(r status.Record) string {
 		line += "  merged " + when + "  " + tag
 	}
 	return fmt.Sprintf("%s  %d/%d tasks", line, r.Progress.TasksDone, r.Progress.TasksTotal)
+}
+
+func statusIssueLine(is status.Issue) string {
+	line := fmt.Sprintf("issue %s %s", is.Slug, is.State)
+	if is.Title != nil {
+		line += fmt.Sprintf(" %q", *is.Title)
+	}
+	var hs []string
+	for _, h := range is.Handlers {
+		s := h.Kind + " " + h.Slug
+		if h.Merged {
+			s += " merged"
+		}
+		hs = append(hs, s)
+	}
+	if len(hs) > 0 {
+		line += " (" + strings.Join(hs, ", ") + ")"
+	}
+	return line
 }

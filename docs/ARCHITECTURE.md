@@ -9,6 +9,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `schema.go` | Root package `docket`: embeds the OpenSpec schema (`schema/docket`), the `docket`, `docket-setup` and `docket-doctor` skills, the Docket block of `AGENTS.md`, the workflow template (`workflow/template.md`) and the record template (`record/template.md`) |
 | `cmd/dkt` | Entry point; the only place that reads the process environment and working directory |
 | `internal/cli` | Command table, argument handling, text and JSON output, exit codes |
+| `internal/cli/dated.go` | `writeDated`, the shared flow of `dkt record` and `dkt issue`: pick a free slug and create the file |
 | `internal/gitx` | Every git call: refs, worktrees, merge-base, file contents at a revision |
 | `internal/openspec` | Locates, version-checks and runs the OpenSpec CLI |
 | `internal/scan` | Finds changes across worktrees and branches; resolves the default branch |
@@ -20,6 +21,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/status` | Summarizes each active change and each record: phase, task states from commit trailers, progress, last activity |
 | `internal/conflicts` | Finds requirements that more than one active change touches |
 | `internal/record` | Records: kinds, name and slug, the template rendering, creating a file under a free name, parsing and word counting |
+| `internal/issue` | Issues: name and slug, the template rendering, parsing the front matter that hides an issue |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
 | `internal/userdirs` | Finds the home and the data directory (`XDG_DATA_HOME`) from values `cmd/dkt` passes in |
 | `internal/safepath` | Refuses a write path that passes through a symbolic link |
@@ -83,6 +85,9 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Pick a free slug | `change.Suffixed` with `scan.Inventory.Uses` or `RecordSources` |
 | Where a record slug is used | `scan.Inventory.RecordSources` |
 | Count a record section's words | `record.Words` |
+| Issue states from the records and changes that name them | `status.LoadIssues` |
+| Where an issue slug is used, and its handlers' sources | `scan.Inventory.Issues` |
+| Render a file issue from the template; read its front matter | `issue.Render`; `issue.ParseFrontMatter` |
 | Load records with their state, merge commit and tag | `status.LoadRecords` |
 | Match trailers to tasks for a change or a record | `change.MatchTasks` |
 | Commits on HEAD that carry a record's trailers | `record.CommitsFor` |

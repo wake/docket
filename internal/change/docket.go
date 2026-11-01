@@ -28,18 +28,24 @@ func ValidTitle(s string) bool {
 	return strings.TrimSpace(s) != "" && !strings.ContainsAny(s, "\r\n")
 }
 
+// DecodeMapping decodes b into v. It fails when b is not one YAML mapping or
+// a key does not decode to the type of its field.
+func DecodeMapping(b []byte, v any) error {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(b, &doc); err != nil {
+		return err
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("not a YAML mapping")
+	}
+	return doc.Content[0].Decode(v)
+}
+
 // ParseDocket reads docket.yaml. It fails when b is not a YAML mapping or a
 // key does not decode as a string. An invalid title reads as "".
 func ParseDocket(b []byte) (Docket, error) {
-	var doc yaml.Node
-	if err := yaml.Unmarshal(b, &doc); err != nil {
-		return Docket{}, err
-	}
-	if doc.Kind != yaml.DocumentNode || len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
-		return Docket{}, fmt.Errorf("not a YAML mapping")
-	}
 	var d Docket
-	if err := doc.Content[0].Decode(&d); err != nil {
+	if err := DecodeMapping(b, &d); err != nil {
 		return Docket{}, err
 	}
 	if !ValidTitle(d.Title) {

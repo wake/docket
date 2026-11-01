@@ -39,6 +39,21 @@ func fullBranch(t *testing.T) *testutil.Repo {
 	return r
 }
 
+// A broken records folder sends the commit through the one-folder-at-a-time
+// fallback; its issues are still found.
+func TestBranchIssuesThroughFallback(t *testing.T) {
+	r := baseRepo(t)
+	onBranch(t, r, func() {
+		r.Write("docket/records/2026-10-30-fix-x.md", "x\n")
+		r.Write("docket/issues/2026-11-02-x.md", "x\n")
+	})
+	dropObject(t, r, "b:docket/records")
+	inv, _ := scanOf(t, r)
+	if len(inv.Unreadable) != 1 || inv.Unreadable[0].Path != "docket/records" || joined(issueSlugs(inv)) != "2026-11-02-x" {
+		t.Fatalf("inv = %+v", inv)
+	}
+}
+
 func joined(s []string) string { return strings.Join(s, ",") }
 
 func archivedFolders(inv scan.Inventory) []string {
@@ -71,6 +86,13 @@ func TestBranchWithOneMissingObject(t *testing.T) {
 			commit := r.Git("rev-parse", "b")
 			dropObject(t, r, c.rev)
 			inv, _ := scanOf(t, r)
+			// A missing docket tree costs both dated folders, each reported.
+			if c.rev == "b:docket" {
+				if len(inv.Unreadable) != 2 || inv.Unreadable[1].Path != "docket/issues" {
+					t.Fatalf("unreadable = %+v", inv.Unreadable)
+				}
+				inv.Unreadable = inv.Unreadable[:1]
+			}
 			if len(inv.Unreadable) != 1 {
 				t.Fatalf("unreadable = %+v", inv.Unreadable)
 			}

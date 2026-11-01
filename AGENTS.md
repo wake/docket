@@ -10,7 +10,7 @@ change folders in projects that plan and execute with superpowers. See
 README.md. It is a public repository: write everything in English, and never
 commit hostnames, customer names, personal paths or secrets.
 
-Status: milestone 1 is complete. `dkt init`, `dkt new`, `dkt record`, `dkt lint`,
+Status: milestone 1 is complete. `dkt init`, `dkt new`, `dkt record`, `dkt issue`, `dkt lint`,
 `dkt conflicts`, `dkt sync`, `dkt archive`, `dkt rebase`, `dkt status`, `dkt workflow` and `dkt inspect` exist; build them
 with `go install ./cmd/dkt`. Upcoming work is ordered in `docket/order.md`.
 
@@ -32,7 +32,7 @@ unticked line is the next piece of work.
   in `openspec/config.yaml`, `schema/docket/`,
   `.claude/skills/docket/`, `.claude/skills/docket-setup/`,
   `.claude/skills/docket-doctor/`, the same three under `.agents/skills/`,
-  `workflow/template.md` and `record/template.md`. `dkt init` ships `schema/docket/`, the
+  `workflow/template.md`, `record/template.md` and `issue/template.md`. `dkt init` ships `schema/docket/`, the
   `docket`, `docket-setup` and `docket-doctor` skills and the Docket block of `AGENTS.md` to other projects, and
   `dkt workflow template` prints `workflow/template.md`.
 

@@ -30,14 +30,22 @@ func sorted(s []string) []string { s = slices.Clone(s); slices.Sort(s); return s
 // gives, the error text included.
 func sameAsReadTree(t *testing.T, g gitx.Git, commit string) treeRead {
 	t.Helper()
-	var want treeRead
-	want.active, want.archived, want.records, want.recErr, want.err = readTree(g, commit)
+	want := readTree(g, commit)
 	got := readTrees(g, []string{commit, commit})[commit]
 	if !reflect.DeepEqual(sorted(got.active), sorted(want.active)) || !reflect.DeepEqual(sorted(got.archived), sorted(want.archived)) ||
-		!reflect.DeepEqual(sorted(got.records), sorted(want.records)) || errText(got.recErr) != errText(want.recErr) || errText(got.err) != errText(want.err) {
+		!sameDated(got, want) || errText(got.err) != errText(want.err) {
 		t.Fatalf("readTrees = %+v\nreadTree  = %+v", got, want)
 	}
 	return got
+}
+
+func sameDated(a, b treeRead) bool {
+	for _, d := range datedDirs {
+		if !reflect.DeepEqual(sorted(a.dated[d]), sorted(b.dated[d])) || errText(a.datedErr[d]) != errText(b.datedErr[d]) {
+			return false
+		}
+	}
+	return true
 }
 
 func link(t *testing.T, r *testutil.Repo, target, rel string) {
@@ -61,11 +69,16 @@ func TestReadTreesEqualsReadTree(t *testing.T) {
 	yaml := "openspec/changes/add-x/.openspec.yaml"
 	arch := "openspec/changes/archive/2026-10-24-add-y/proposal.md"
 	cases := map[string]func(t *testing.T, r *testutil.Repo){
-		"empty":             func(t *testing.T, r *testutil.Repo) {},
-		"everything":        func(t *testing.T, r *testutil.Repo) { r.Write(yaml, "a\n"); r.Write(arch, "p\n"); r.Write(rec, "x\n") },
-		"only changes":      func(t *testing.T, r *testutil.Repo) { r.Write(yaml, "a\n") },
-		"only archive":      func(t *testing.T, r *testutil.Repo) { r.Write(arch, "p\n") },
-		"only records":      func(t *testing.T, r *testutil.Repo) { r.Write(rec, "x\n") },
+		"empty":        func(t *testing.T, r *testutil.Repo) {},
+		"everything":   func(t *testing.T, r *testutil.Repo) { r.Write(yaml, "a\n"); r.Write(arch, "p\n"); r.Write(rec, "x\n") },
+		"only changes": func(t *testing.T, r *testutil.Repo) { r.Write(yaml, "a\n") },
+		"only archive": func(t *testing.T, r *testutil.Repo) { r.Write(arch, "p\n") },
+		"only records": func(t *testing.T, r *testutil.Repo) { r.Write(rec, "x\n") },
+		"records and issues": func(t *testing.T, r *testutil.Repo) {
+			r.Write(rec, "x\n")
+			r.Write("docket/issues/2026-11-02-x.md", "x\n")
+		},
+		"issues is a file":  func(t *testing.T, r *testutil.Repo) { r.Write(rec, "x\n"); r.Write("docket/issues", "f\n") },
 		"archive is a file": func(t *testing.T, r *testutil.Repo) { r.Write(yaml, "a\n"); r.Write("openspec/changes/archive", "f\n") },
 		"archive is a link": func(t *testing.T, r *testutil.Repo) {
 			r.Write(yaml, "a\n")
@@ -247,4 +260,13 @@ func blob(t *testing.T, r *testutil.Repo, content string) string {
 		t.Fatal(err)
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func TestReadTreesFindsIssues(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{"docket/issues/2026-11-02-x.md": "x\n", "docket/records/2026-10-30-fix-x.md": "x\n"})
+	got := sameAsReadTree(t, gitx.Git{Dir: r.Dir, Env: r.Env}, "HEAD")
+	if len(got.dated["docket/issues"]) != 1 || got.dated["docket/issues"][0] != "2026-11-02-x" {
+		t.Fatalf("dated = %+v", got.dated)
+	}
 }

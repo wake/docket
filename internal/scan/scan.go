@@ -9,10 +9,12 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/record"
 )
 
@@ -56,6 +58,12 @@ type Record struct {
 	Sources []Source // Sources[0] is ranked as for changes
 }
 
+// Issue is a file issue, reported once however many sources hold it.
+type Issue struct {
+	Slug    string
+	Sources []Source // Sources[0] is ranked as for changes
+}
+
 // Archived is an archived use of a slug.
 type Archived struct {
 	Slug, Folder string
@@ -75,6 +83,7 @@ type Inventory struct {
 	Changes       []Change
 	Archived      []Archived
 	Records       []Record
+	Issues        []Issue
 	Unreadable    []Unreadable
 }
 
@@ -87,12 +96,16 @@ var archiveName = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(.+)$`)
 
 type found struct {
 	active   map[string][]Source
-	archived map[string][]Source // keyed by archive folder
-	records  map[string][]Source
+	archived map[string][]Source            // keyed by archive folder
+	dated    map[string]map[string][]Source // dated folder, then slug
 	rank     map[Source]int
 }
 
-func (f *found) add(src Source, rank int, active, archived, records []string) {
+// datedDirs are the folders of dated files, each file named <date>-<name>.md.
+// Their parent is docket/, which the batched tree walk relies on.
+var datedDirs = []string{record.Dir, issue.Dir}
+
+func (f *found) add(src Source, rank int, active, archived []string, dated map[string][]string) {
 	f.rank[src] = rank
 	for _, s := range active {
 		if s != "archive" {
@@ -104,8 +117,10 @@ func (f *found) add(src Source, rank int, active, archived, records []string) {
 			f.archived[a] = append(f.archived[a], src)
 		}
 	}
-	for _, r := range records {
-		f.records[r] = append(f.records[r], src)
+	for dir, slugs := range dated {
+		for _, s := range slugs {
+			f.dated[dir][s] = append(f.dated[dir][s], src)
+		}
 	}
 }
 
@@ -113,8 +128,11 @@ func (f *found) add(src Source, rank int, active, archived, records []string) {
 // and the default branch tip. It contacts no remote. Only failures not tied to
 // one source are returned; a source that cannot be read goes into Unreadable.
 func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
-	inv := Inventory{DefaultBranch: db, Changes: []Change{}, Archived: []Archived{}, Records: []Record{}, Unreadable: []Unreadable{}}
-	f := &found{active: map[string][]Source{}, archived: map[string][]Source{}, records: map[string][]Source{}, rank: map[Source]int{}}
+	inv := Inventory{DefaultBranch: db, Changes: []Change{}, Archived: []Archived{}, Records: []Record{}, Issues: []Issue{}, Unreadable: []Unreadable{}}
+	f := &found{active: map[string][]Source{}, archived: map[string][]Source{}, dated: map[string]map[string][]Source{}, rank: map[Source]int{}}
+	for _, d := range datedDirs {
+		f.dated[d] = map[string][]Source{}
+	}
 
 	wts, err := g.Worktrees()
 	if err != nil {
@@ -129,7 +147,8 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: "worktree is prunable: its directory is gone"})
 			continue
 		}
-		active, archived, records, recErr, err := readDisk(w.Path)
+		r := readDisk(w.Path)
+		err := r.err
 		rank := rankContainedWorktree
 		// Settle ancestry before noteRead, so a worktree unreadable as a whole
 		// is listed once, not also for its records folder.
@@ -139,10 +158,10 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 				rank = rankUnmergedWorktree
 			}
 		}
-		if !inv.noteRead(src, recErr, err) {
+		if !inv.noteRead(src, r.datedErr, err) {
 			continue
 		}
-		f.add(src, rank, active, archived, records)
+		f.add(src, rank, r.active, r.archived, r.dated)
 	}
 
 	unmerged, err := unmergedRefs(g, db)
@@ -170,15 +189,15 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 			continue
 		}
 		t := trees[r.SHA]
-		if !inv.noteRead(src, t.recErr, t.err) {
+		if !inv.noteRead(src, t.datedErr, t.err) {
 			continue
 		}
-		f.add(src, rank, t.active, t.archived, t.records)
+		f.add(src, rank, t.active, t.archived, t.dated)
 	}
 
 	dbSrc := Source{Kind: KindDefaultBranch, Name: db.Ref, Commit: db.Commit}
-	if t := trees[db.Commit]; inv.noteRead(dbSrc, t.recErr, t.err) {
-		f.add(dbSrc, rankDefaultBranch, t.active, t.archived, t.records)
+	if t := trees[db.Commit]; inv.noteRead(dbSrc, t.datedErr, t.err) {
+		f.add(dbSrc, rankDefaultBranch, t.active, t.archived, t.dated)
 	}
 
 	for slug, srcs := range f.active {
@@ -196,23 +215,29 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		}
 		return a.Folder < b.Folder
 	})
-	for slug, srcs := range f.records {
+	for slug, srcs := range f.dated[record.Dir] {
 		inv.Records = append(inv.Records, Record{Slug: slug, Sources: f.sortSources(srcs)})
 	}
 	sort.Slice(inv.Records, func(i, j int) bool { return inv.Records[i].Slug < inv.Records[j].Slug })
+	for slug, srcs := range f.dated[issue.Dir] {
+		inv.Issues = append(inv.Issues, Issue{Slug: slug, Sources: f.sortSources(srcs)})
+	}
+	sort.Slice(inv.Issues, func(i, j int) bool { return inv.Issues[i].Slug < inv.Issues[j].Slug })
 	return inv, nil
 }
 
 // noteRead files what reading a source failed on: err makes the whole source
-// unreadable, recErr only its records folder. It reports whether the
+// unreadable, datedErr only the dated folder it is keyed by. It reports whether the
 // source's changes were read.
-func (inv *Inventory) noteRead(src Source, recErr, err error) bool {
+func (inv *Inventory) noteRead(src Source, datedErr map[string]error, err error) bool {
 	if err != nil {
 		inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Reason: err.Error()})
 		return false
 	}
-	if recErr != nil {
-		inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Path: record.Dir, Reason: recErr.Error()})
+	for _, d := range datedDirs {
+		if e := datedErr[d]; e != nil {
+			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: src, Path: d, Reason: e.Error()})
+		}
 	}
 	return true
 }
@@ -290,28 +315,32 @@ func (f *found) sortSources(s []Source) []Source {
 	return s
 }
 
-// readDisk reads a worktree. recErr is a failure to list the records alone;
-// the changes are still returned.
-func readDisk(root string) (active, archived, records []string, recErr, err error) {
+// readDisk reads a worktree. datedErr holds a failure to list a dated
+// folder alone; the changes are still returned.
+func readDisk(root string) (r treeRead) {
 	if _, err := os.Stat(root); err != nil {
-		return nil, nil, nil, nil, err
+		return treeRead{err: err}
 	}
-	if active, err = diskDirs(filepath.Join(root, changesDir)); err != nil {
-		return nil, nil, nil, nil, err
+	var err error
+	if r.active, err = diskDirs(filepath.Join(root, changesDir)); err != nil {
+		return treeRead{err: err}
 	}
-	if archived, err = diskDirs(filepath.Join(root, archiveDir)); err != nil {
-		return nil, nil, nil, nil, err
+	if r.archived, err = diskDirs(filepath.Join(root, archiveDir)); err != nil {
+		return treeRead{err: err}
 	}
-	entries, recErr := os.ReadDir(filepath.Join(root, record.Dir))
-	if errors.Is(recErr, fs.ErrNotExist) {
-		recErr = nil
-	}
-	for _, e := range entries {
-		if slug, ok := record.SlugOf(e.Name()); ok && e.Type().IsRegular() {
-			records = append(records, slug)
+	r.dated, r.datedErr = map[string][]string{}, map[string]error{}
+	for _, dir := range datedDirs {
+		entries, err := os.ReadDir(filepath.Join(root, dir))
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			r.datedErr[dir] = err
+		}
+		for _, e := range entries {
+			if slug, ok := record.SlugOf(e.Name()); ok && e.Type().IsRegular() {
+				r.dated[dir] = append(r.dated[dir], slug)
+			}
 		}
 	}
-	return active, archived, records, recErr, nil
+	return r
 }
 
 // diskDirs lists subdirectory names; a missing directory is empty.
@@ -332,49 +361,62 @@ func diskDirs(dir string) ([]string, error) {
 	return names, nil
 }
 
-// readTree reads a commit with one ls-tree. recErr is a failure to list the
-// records alone.
-func readTree(g gitx.Git, rev string) (active, archived, records []string, recErr, err error) {
-	entries, err := g.ListTree(rev, changesDir+"/", archiveDir+"/", record.Dir, record.Dir+"/")
+// readTree reads a commit with one ls-tree. datedErr holds a failure to list
+// a dated folder alone.
+func readTree(g gitx.Git, rev string) treeRead {
+	args := []string{changesDir + "/", archiveDir + "/"}
+	for _, d := range datedDirs {
+		args = append(args, d, d+"/")
+	}
+	entries, err := g.ListTree(rev, args...)
 	if err != nil {
-		// One unreadable folder may be the records alone: ask for each in turn.
+		// One unreadable folder may be a dated one alone: ask for each in turn.
 		return readTreeEach(g, rev)
 	}
+	r := treeRead{dated: map[string][]string{}, datedErr: map[string]error{}}
 	for _, e := range entries {
 		dir, name := path.Split(e.Path)
 		switch {
-		case e.Path == record.Dir:
-			recErr = fmt.Errorf("%s is not a folder at %s", record.Dir, rev)
+		case slices.Contains(datedDirs, e.Path):
+			r.datedErr[e.Path] = fmt.Errorf("%s is not a folder at %s", e.Path, rev)
 		case dir == changesDir+"/" && e.Type == "tree":
-			active = append(active, name)
+			r.active = append(r.active, name)
 		case dir == archiveDir+"/" && e.Type == "tree":
-			archived = append(archived, name)
-		case dir == record.Dir+"/" && e.Type == "blob" && (e.Mode == "100644" || e.Mode == "100755"):
+			r.archived = append(r.archived, name)
+		case slices.Contains(datedDirs, strings.TrimSuffix(dir, "/")) && e.Type == "blob" && (e.Mode == "100644" || e.Mode == "100755"):
 			if slug, ok := record.SlugOf(name); ok {
-				records = append(records, slug)
+				d := strings.TrimSuffix(dir, "/")
+				r.dated[d] = append(r.dated[d], slug)
 			}
 		}
 	}
-	return active, archived, records, recErr, nil
+	return r
 }
 
 // readTreeEach is readTree with one git call per folder, which tells a
-// failure of the records folder from a failure of the changes.
-func readTreeEach(g gitx.Git, rev string) (active, archived, records []string, recErr, err error) {
-	if active, err = g.ListDirs(rev, changesDir); err != nil {
-		return nil, nil, nil, nil, err
+// failure of a dated folder from a failure of the changes.
+func readTreeEach(g gitx.Git, rev string) (r treeRead) {
+	var err error
+	if r.active, err = g.ListDirs(rev, changesDir); err != nil {
+		return treeRead{err: err}
 	}
-	if archived, err = g.ListDirs(rev, archiveDir); err != nil {
-		return nil, nil, nil, nil, err
+	if r.archived, err = g.ListDirs(rev, archiveDir); err != nil {
+		return treeRead{err: err}
 	}
-	paths, recErr := g.ListFiles(rev, record.Dir)
-	for _, p := range paths {
-		name := strings.TrimPrefix(p, record.Dir+"/")
-		if slug, ok := record.SlugOf(name); ok && !strings.Contains(name, "/") {
-			records = append(records, slug)
+	r.dated, r.datedErr = map[string][]string{}, map[string]error{}
+	for _, dir := range datedDirs {
+		paths, err := g.ListFiles(rev, dir)
+		if err != nil {
+			r.datedErr[dir] = err
+		}
+		for _, p := range paths {
+			name := strings.TrimPrefix(p, dir+"/")
+			if slug, ok := record.SlugOf(name); ok && !strings.Contains(name, "/") {
+				r.dated[dir] = append(r.dated[dir], slug)
+			}
 		}
 	}
-	return active, archived, records, recErr, nil
+	return r
 }
 
 // Uses reports how a slug is used: the active change, if any, and every
@@ -398,6 +440,16 @@ func (inv Inventory) RecordSources(slug string) []Source {
 	for _, r := range inv.Records {
 		if r.Slug == slug {
 			return r.Sources
+		}
+	}
+	return nil
+}
+
+// IssueSources returns the sources holding the issue, nil when none.
+func (inv Inventory) IssueSources(slug string) []Source {
+	for _, i := range inv.Issues {
+		if i.Slug == slug {
+			return i.Sources
 		}
 	}
 	return nil
