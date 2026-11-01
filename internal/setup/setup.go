@@ -257,7 +257,8 @@ type Report struct {
 // the files that passed. A CLAUDE.md that imports AGENTS.md, or links to it,
 // is left out. An unsafe openspec path is one of the problems, and the other
 // files are still decided. An empty Dirs.Schema leaves the per-machine files
-// out, and an empty Dirs.UserSkills leaves the user-level skills out. The error is for failing to read the assets.
+// out, and an empty Dirs.UserSkills leaves the user-level skills out. The error is for failing to
+// read the assets.
 func Inspect(root string, dirs Dirs, a Assets) (Report, error) {
 	plan, problems, err := decideAll(root, dirs, a, false, true)
 	if err != nil {
