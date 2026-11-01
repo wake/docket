@@ -114,3 +114,12 @@ was tried.
 - `2026-10-31-existing-project-adoption.md`: how an existing project starts
   using Docket.
 - `2026-10-31-global-schema.md`: the per-machine install it builds on.
+
+## Status
+
+Done by the change `add-docket-init`: the `docket-init` command (steps 1,
+2, 3, 5 and 6), installed once per machine by `dkt init` under
+`~/.claude/skills/` (or `CLAUDE_CONFIG_DIR`) and `~/.agents/skills/`,
+reported by `dkt inspect` as `user-skill-*`, and `dkt inspect` running in a
+repository without a default branch. Step 4, the survey of an existing
+project, is left to the ideas it names.
