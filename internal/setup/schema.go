@@ -117,3 +117,22 @@ func FindSchema(root, machineDir string) (dir string, found bool, err error) {
 	}
 	return "", false, nil
 }
+
+// UserSkillDirs returns the directories that receive the user-level skills:
+// <claude config>/skills, then <home>/.agents/skills, the second left out
+// when it is the same path as the first.
+func UserSkillDirs(env []string, userHome func() (string, error)) ([]string, error) {
+	claude, err := userdirs.ClaudeConfig(env, userHome)
+	if err != nil {
+		return nil, err
+	}
+	home, err := userdirs.Home(env, userHome)
+	if err != nil {
+		return nil, err
+	}
+	dirs := []string{filepath.Join(claude, "skills")}
+	if agents := filepath.Join(home, ".agents", "skills"); agents != dirs[0] {
+		dirs = append(dirs, agents)
+	}
+	return dirs, nil
+}

@@ -14,7 +14,7 @@ func TestFailedCreateLeavesNothingAndRerunFinishes(t *testing.T) {
 	rename = func(string, string) error { return errors.New("rename refused") }
 	t.Cleanup(func() { rename = old })
 	root := t.TempDir()
-	if _, err := Init(root, mdir(root), assets, false, openspecDir(t, root)); err == nil {
+	if _, err := Init(root, dirs(root), assets, false, openspecDir(t, root)); err == nil {
 		t.Fatal("Init succeeded although rename failed")
 	}
 	first := filepath.Join(mdir(root), "schema.yaml")
@@ -28,7 +28,7 @@ func TestFailedCreateLeavesNothingAndRerunFinishes(t *testing.T) {
 		return nil
 	})
 	rename = old
-	r, err := Init(root, mdir(root), assets, false, nil)
+	r, err := Init(root, dirs(root), assets, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

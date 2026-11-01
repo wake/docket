@@ -30,10 +30,11 @@ const (
 type FileKind string
 
 const (
-	KindSchema FileKind = "schema"
-	KindSkill  FileKind = "skill"
-	KindBlock  FileKind = "block"
-	KindConfig FileKind = "config"
+	KindSchema    FileKind = "schema"
+	KindSkill     FileKind = "skill"
+	KindBlock     FileKind = "block"
+	KindUserSkill FileKind = "user-skill"
+	KindConfig    FileKind = "config"
 )
 
 // File is one installed file; Path is relative to the repository root, or
@@ -60,11 +61,20 @@ type Skill struct {
 	Files fs.FS
 }
 
+// Dirs are the per-machine destinations. An empty Schema leaves the schema
+// out; an empty UserSkills leaves the user-level skills out.
+type Dirs struct {
+	Schema     string
+	UserSkills []string
+}
+
 // Assets are the files Init installs.
 type Assets struct {
-	Schema fs.FS   // installed under schemaDir
+	Schema fs.FS   // installed under Dirs.Schema
 	Skills []Skill // each installed under <root>/<name> for each of skillRoots
-	Block  string  // the Docket block kept in AGENTS.md and CLAUDE.md
+	// UserSkills are installed under <dir>/<name> for each of Dirs.UserSkills.
+	UserSkills []Skill
+	Block      string // the Docket block kept in AGENTS.md and CLAUDE.md
 }
 
 // ProblemKind says why a path stopped Init.
@@ -141,20 +151,20 @@ type decided struct {
 	config ConfigSchema
 }
 
-// Init installs the schema into schemaDir (the per-machine directory) and the
+// Init installs the schema into dirs.Schema (the per-machine directory) and the
 // skills under root. It first decides the status of every file and checks
 // every path; only when all checks pass does it call initOpenSpec (when
 // <root>/openspec is missing) and write. A refused run writes nothing and
 // returns *Refused. A differing file is left alone (Differs) unless force is
 // set (Overwritten). As its last step it removes the project's copy of a
 // shipped schema, once the per-machine copy matches.
-func Init(root, schemaDir string, a Assets, force bool, initOpenSpec func() error) (Result, error) {
+func Init(root string, dirs Dirs, a Assets, force bool, initOpenSpec func() error) (Result, error) {
 	res := Result{Files: []File{}}
 	if err := safepath.Check(root, "openspec"); err != nil {
 		return res, &Refused{Problems: []Problem{problemFor("openspec", err)}}
 	}
 	_, statErr := os.Lstat(filepath.Join(root, "openspec"))
-	plan, problems, err := decideAll(root, schemaDir, a, force, statErr == nil)
+	plan, problems, err := decideAll(root, dirs, a, force, statErr == nil)
 	if err != nil {
 		return res, err
 	}
@@ -187,7 +197,7 @@ func Init(root, schemaDir string, a Assets, force bool, initOpenSpec func() erro
 		res.Files = append(res.Files, File{Path: d.shown(), Status: d.status, Kind: d.kind})
 	}
 	if cp == ShippedCopy && machineMatches(plan) {
-		removed, state, err := removeProjectCopy(root, schemaDir, a)
+		removed, state, err := removeProjectCopy(root, dirs.Schema, a)
 		res.ProjectCopy = state
 		res.Files = append(res.Files, removed...)
 		if err != nil {
@@ -212,8 +222,8 @@ func machineMatches(plan []decided) bool {
 // the problems that would make Init refuse. It does not check the openspec
 // directory itself: Init does that first, and Inspect adds it to the problems
 // it reports. It changes nothing.
-func decideAll(root, schemaDir string, a Assets, force, withConfig bool) ([]decided, []Problem, error) {
-	targets, err := targetsOf(a, schemaDir, withConfig)
+func decideAll(root string, dirs Dirs, a Assets, force, withConfig bool) ([]decided, []Problem, error) {
+	targets, err := targetsOf(a, dirs, withConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -246,10 +256,11 @@ type Report struct {
 // and the problems that would make it refuse. Unlike Init it still returns
 // the files that passed. A CLAUDE.md that imports AGENTS.md, or links to it,
 // is left out. An unsafe openspec path is one of the problems, and the other
-// files are still decided. An empty schemaDir leaves the per-machine files
-// out. The error is for failing to read the assets.
-func Inspect(root, schemaDir string, a Assets) (Report, error) {
-	plan, problems, err := decideAll(root, schemaDir, a, false, true)
+// files are still decided. An empty Dirs.Schema leaves the per-machine files
+// out, and an empty Dirs.UserSkills leaves the user-level skills out. The
+// error is for failing to read the assets.
+func Inspect(root string, dirs Dirs, a Assets) (Report, error) {
+	plan, problems, err := decideAll(root, dirs, a, false, true)
 	if err != nil {
 		return Report{}, err
 	}
@@ -273,10 +284,11 @@ func Inspect(root, schemaDir string, a Assets) (Report, error) {
 	return rep, nil
 }
 
-// targetsOf lists every file to install: the schema in schemaDir (none when
+// targetsOf lists every file to install: the schema in dirs.Schema (none when
 // it is empty), config.yaml when withConfig is set, the skills in each of
-// skillRoots, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
-func targetsOf(a Assets, schemaDir string, withConfig bool) ([]target, error) {
+// skillRoots, AGENTS.md and CLAUDE.md (whose bytes are decided later), then
+// the user-level skills in each of dirs.UserSkills.
+func targetsOf(a Assets, dirs Dirs, withConfig bool) ([]target, error) {
 	var out []target
 	add := func(src fs.FS, dir string, kind FileKind, base string) error {
 		return fs.WalkDir(src, ".", func(p string, d fs.DirEntry, err error) error {
@@ -291,8 +303,8 @@ func targetsOf(a Assets, schemaDir string, withConfig bool) ([]target, error) {
 			return nil
 		})
 	}
-	if schemaDir != "" {
-		if err := add(a.Schema, schemaName, KindSchema, filepath.Dir(schemaDir)); err != nil {
+	if dirs.Schema != "" {
+		if err := add(a.Schema, schemaName, KindSchema, filepath.Dir(dirs.Schema)); err != nil {
 			return nil, err
 		}
 	}
@@ -307,6 +319,13 @@ func targetsOf(a Assets, schemaDir string, withConfig bool) ([]target, error) {
 		}
 	}
 	out = append(out, target{rel: agentsFile, kind: KindBlock}, target{rel: claudeFile, kind: KindBlock})
+	for _, dir := range dirs.UserSkills {
+		for _, sk := range a.UserSkills {
+			if err := add(sk.Files, sk.Name, KindUserSkill, dir); err != nil {
+				return nil, err
+			}
+		}
+	}
 	return out, nil
 }
 

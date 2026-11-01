@@ -64,6 +64,19 @@ func Skills() []setup.Skill {
 	return out
 }
 
+//go:embed user-skills/docket-init
+var userSkillFS embed.FS
+
+// UserSkills returns the skills dkt init installs for the user, outside the
+// project, each with paths relative to its folder.
+func UserSkills() []setup.Skill {
+	sub, err := fs.Sub(userSkillFS, "user-skills/docket-init")
+	if err != nil {
+		panic(err)
+	}
+	return []setup.Skill{{Name: "docket-init", Files: sub}}
+}
+
 // Block returns the Docket block of AGENTS.md: from the start of the line
 // holding the start marker through the end of the end marker, without the
 // newline after it. It panics unless AGENTS.md holds exactly one block.

@@ -23,6 +23,9 @@ Run `dkt inspect --json` before anything else. It writes nothing. Its
 - `openspec`: the OpenSpec CLI's `version` (null when none could be
   started) and whether it is `supported`;
 - `workflow`: the user's workflow file, as `dkt workflow` reports it;
+- `default_branch`: the branch whose trailers were checked; null when none
+  was found, as in a repository with no commit, and `changes` is then
+  empty;
 - `changes`: the active changes on the default branch whose commit
   trailers were checked, and those skipped, with the reason.
 
@@ -78,19 +81,21 @@ and do it only after the user agrees; when they decline, go to the next.
   wording.
 - The installed files (`schema-missing`, `skill-missing`,
   `agents-block-missing`, `schema-differs`, `skill-differs`,
-  `agents-block-differs`, `schema-project-copy`, `config-schema-default`):
+  `agents-block-differs`, `user-skill-missing`, `user-skill-differs`,
+  `schema-project-copy`, `config-schema-default`):
   take them together, since one command fixes them all. `dkt init` writes
   every missing file, removes a project copy of a shipped schema once the
   per-machine copy matches the shipped one, sets
   `schema: docket` in `openspec/config.yaml`, and leaves differing files
   alone; when there is no `openspec` directory it first runs
   `openspec init`. `dkt init --force` also replaces every differing file.
-  The schema's files are per-machine, named by absolute path. First show
-  how each differing file differs from the shipped one: in a new temporary
-  directory, run `git init`, create an empty `openspec` directory, and run
-  `dkt init` there with `XDG_DATA_HOME` set to a second new temporary
-  directory, so your machine's copy is not written; compare the file at the
-  same path, or per-machine files under the second directory. Then name
+  The schema's files and the `docket-init` copies are per-machine, named
+  by absolute path. First show how each differing file differs from the
+  shipped one: in a new temporary directory, run `git init`, create an
+  empty `openspec` directory, and run `dkt init` there with `HOME`,
+  `XDG_DATA_HOME` and `CLAUDE_CONFIG_DIR` set to new temporary directories,
+  so nothing on your machine is written; compare the file at the same
+  path, or per-machine files under those directories. Then name
   every file the command will write or remove, and run it only after the
   user agrees.
 - `schema-edited`: show how the project's `openspec/schemas/docket` differs

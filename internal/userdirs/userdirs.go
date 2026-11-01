@@ -63,3 +63,20 @@ func DataHome(env []string, userHome func() (string, error)) (string, error) {
 	}
 	return filepath.Join(home, ".local", "share"), nil
 }
+
+// ClaudeConfig returns the Claude Code configuration directory:
+// CLAUDE_CONFIG_DIR when it is not empty (a *RelativeError when it is
+// relative), else <home>/.claude.
+func ClaudeConfig(env []string, userHome func() (string, error)) (string, error) {
+	if c, _ := Lookup(env, "CLAUDE_CONFIG_DIR"); c != "" {
+		if !filepath.IsAbs(c) {
+			return "", &RelativeError{"CLAUDE_CONFIG_DIR", c}
+		}
+		return c, nil
+	}
+	home, err := Home(env, userHome)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".claude"), nil
+}

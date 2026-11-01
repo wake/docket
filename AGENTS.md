@@ -32,8 +32,8 @@ unticked line is the next piece of work.
   in `openspec/config.yaml`, `schema/docket/`,
   `.claude/skills/docket/`, `.claude/skills/docket-setup/`,
   `.claude/skills/docket-doctor/`, the same three under `.agents/skills/`,
-  `workflow/template.md`, `record/template.md` and `issue/template.md`. `dkt init` ships `schema/docket/`, the
-  `docket`, `docket-setup` and `docket-doctor` skills and the Docket block of `AGENTS.md` to other projects, and
+  `user-skills/docket-init/`, `workflow/template.md`, `record/template.md` and `issue/template.md`. `dkt init` ships `schema/docket/`, the
+  `docket`, `docket-setup` and `docket-doctor` skills and the Docket block of `AGENTS.md` to other projects (and installs `docket-init` at user level), and
   `dkt workflow template` prints `workflow/template.md`.
 
 <!-- docket:start -->
