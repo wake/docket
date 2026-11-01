@@ -19,7 +19,7 @@ itself, so this is defense in depth.
 Open the repository once with `os.Root` and do every write through it, so
 no path can leave the repository. `Root.MkdirAll` and `Root.WriteFile` need
 Go 1.25; `go.mod` says 1.24 (see
-`docket/ideas/2026-10-24-ci-triggers-and-go-floor.md`).
+`docket/issues/2026-11-01-ci-once-and-go-floor.md`).
 
 ## Open questions
 
