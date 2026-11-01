@@ -70,7 +70,7 @@ type Dirs struct {
 
 // Assets are the files Init installs.
 type Assets struct {
-	Schema fs.FS   // installed under schemaDir
+	Schema fs.FS   // installed under Dirs.Schema
 	Skills []Skill // each installed under <root>/<name> for each of skillRoots
 	// UserSkills are installed under <dir>/<name> for each of Dirs.UserSkills.
 	UserSkills []Skill
@@ -256,8 +256,8 @@ type Report struct {
 // and the problems that would make it refuse. Unlike Init it still returns
 // the files that passed. A CLAUDE.md that imports AGENTS.md, or links to it,
 // is left out. An unsafe openspec path is one of the problems, and the other
-// files are still decided. An empty schemaDir leaves the per-machine files
-// out. The error is for failing to read the assets.
+// files are still decided. An empty Dirs.Schema leaves the per-machine files
+// out, and an empty Dirs.UserSkills leaves the user-level skills out. The error is for failing to read the assets.
 func Inspect(root string, dirs Dirs, a Assets) (Report, error) {
 	plan, problems, err := decideAll(root, dirs, a, false, true)
 	if err != nil {
@@ -283,7 +283,7 @@ func Inspect(root string, dirs Dirs, a Assets) (Report, error) {
 	return rep, nil
 }
 
-// targetsOf lists every file to install: the schema in schemaDir (none when
+// targetsOf lists every file to install: the schema in dirs.Schema (none when
 // it is empty), config.yaml when withConfig is set, the skills in each of
 // skillRoots, AGENTS.md and CLAUDE.md (whose bytes are decided later), then
 // the user-level skills in each of dirs.UserSkills.
