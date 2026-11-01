@@ -72,7 +72,7 @@ func initCommand() Command {
 				_, err = r.Run("init", "--tools", "none")
 				return err
 			}
-			res, err := setup.Init(c.Repo.Root, schemaDir, shippedAssets(), force, initOpenSpec)
+			res, err := setup.Init(c.Repo.Root, setup.Dirs{Schema: schemaDir}, shippedAssets(), force, initOpenSpec)
 			var ref *setup.Refused
 			if errors.As(err, &ref) {
 				out := Outcome{Result: res}

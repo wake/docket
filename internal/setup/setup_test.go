@@ -29,6 +29,9 @@ var assets = Assets{Schema: schema, Skills: skills, Block: "<!-- docket:start --
 // root: beside it, so each test has its own and never the real one.
 func mdir(root string) string { return filepath.Join(root+".data", "openspec", "schemas", "docket") }
 
+// dirs are the destinations a test uses for the repository at root.
+func dirs(root string) Dirs { return Dirs{Schema: mdir(root)} }
+
 func statuses(r Result) map[string]FileStatus {
 	m := map[string]FileStatus{}
 	for _, f := range r.Files {
@@ -48,7 +51,7 @@ func inspectPaths(fs []File) map[string]File {
 func TestInspect(t *testing.T) {
 	t.Run("empty root", func(t *testing.T) {
 		root := t.TempDir()
-		rep, err := Inspect(root, mdir(root), assets)
+		rep, err := Inspect(root, dirs(root), assets)
 		files, problems := rep.Files, rep.Problems
 		if err != nil || len(problems) != 0 {
 			t.Fatalf("err %v problems %v", err, problems)
@@ -73,10 +76,10 @@ func TestInspect(t *testing.T) {
 
 func TestInspectAfterInit(t *testing.T) {
 	root := t.TempDir()
-	if _, err := Init(root, mdir(root), assets, false, func() error { return nil }); err != nil {
+	if _, err := Init(root, dirs(root), assets, false, func() error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	rep, err := Inspect(root, mdir(root), assets)
+	rep, err := Inspect(root, dirs(root), assets)
 	files, problems := rep.Files, rep.Problems
 	if err != nil || len(problems) != 0 {
 		t.Fatalf("err %v problems %v", err, problems)
@@ -97,7 +100,7 @@ func TestInspectAfterInit(t *testing.T) {
 func initedRoot(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	if _, err := Init(root, mdir(root), assets, false, func() error { return nil }); err != nil {
+	if _, err := Init(root, dirs(root), assets, false, func() error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	return root
@@ -109,7 +112,7 @@ func TestInspectEditedSkill(t *testing.T) {
 	if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	rep, err := Inspect(root, mdir(root), assets)
+	rep, err := Inspect(root, dirs(root), assets)
 	files, problems := rep.Files, rep.Problems
 	if err != nil || len(problems) != 0 {
 		t.Fatalf("err %v problems %v", err, problems)
@@ -132,7 +135,7 @@ func TestInspectClaudeMDLinkedToAgents(t *testing.T) {
 	if err := os.Symlink("AGENTS.md", p); err != nil {
 		t.Fatal(err)
 	}
-	rep, err := Inspect(root, mdir(root), assets)
+	rep, err := Inspect(root, dirs(root), assets)
 	files, problems := rep.Files, rep.Problems
 	if err != nil || len(problems) != 0 {
 		t.Fatalf("err %v problems %v", err, problems)
@@ -152,7 +155,7 @@ func TestInspectSymlinkedSkillDirectory(t *testing.T) {
 	if err := os.Symlink(other, link); err != nil {
 		t.Fatal(err)
 	}
-	rep, err := Inspect(root, mdir(root), assets)
+	rep, err := Inspect(root, dirs(root), assets)
 	files, problems := rep.Files, rep.Problems
 	if err != nil {
 		t.Fatal(err)
@@ -190,7 +193,7 @@ func TestInspectSymlinkedOpenSpec(t *testing.T) {
 	if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	rep, err := Inspect(root, mdir(root), assets)
+	rep, err := Inspect(root, dirs(root), assets)
 	files, problems := rep.Files, rep.Problems
 	if err != nil {
 		t.Fatal(err)
@@ -219,11 +222,11 @@ func TestInitCallsOpenSpecOnlyWhenMissing(t *testing.T) {
 	root := t.TempDir()
 	calls := 0
 	initOS := func() error { calls++; return os.MkdirAll(filepath.Join(root, "openspec"), 0o755) }
-	r, err := Init(root, mdir(root), assets, false, initOS)
+	r, err := Init(root, dirs(root), assets, false, initOS)
 	if err != nil || calls != 1 || !r.OpenSpecInitialized {
 		t.Fatalf("first: %v calls=%d %+v", err, calls, r)
 	}
-	r, err = Init(root, mdir(root), assets, false, initOS)
+	r, err = Init(root, dirs(root), assets, false, initOS)
 	if err != nil || calls != 1 || r.OpenSpecInitialized {
 		t.Fatalf("second: %v calls=%d %+v", err, calls, r)
 	}
@@ -239,7 +242,7 @@ func TestInitStatuses(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(root, "openspec"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	r, err := Init(root, mdir(root), assets, false, nil)
+	r, err := Init(root, dirs(root), assets, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +254,7 @@ func TestInitStatuses(t *testing.T) {
 	if err := os.WriteFile(p, []byte("edited\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r, err = Init(root, mdir(root), assets, false, nil)
+	r, err = Init(root, dirs(root), assets, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +264,7 @@ func TestInitStatuses(t *testing.T) {
 	if b, _ := os.ReadFile(p); string(b) != "edited\n" {
 		t.Fatalf("file changed: %q", b)
 	}
-	r, err = Init(root, mdir(root), assets, true, nil)
+	r, err = Init(root, dirs(root), assets, true, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +278,7 @@ func TestInitStatuses(t *testing.T) {
 
 func TestInitPropagatesOpenSpecError(t *testing.T) {
 	boom := errors.New("boom")
-	_, err := Init(t.TempDir(), t.TempDir(), assets, false, func() error { return boom })
+	_, err := Init(t.TempDir(), Dirs{Schema: t.TempDir()}, assets, false, func() error { return boom })
 	if !errors.Is(err, boom) {
 		t.Fatalf("err = %v", err)
 	}
@@ -287,13 +290,13 @@ func TestInitReadOnlyUnchangedFile(t *testing.T) {
 	}
 	root := t.TempDir()
 	initOS := func() error { return os.MkdirAll(filepath.Join(root, "openspec"), 0o755) }
-	if _, err := Init(root, mdir(root), assets, false, initOS); err != nil {
+	if _, err := Init(root, dirs(root), assets, false, initOS); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(filepath.Join(mdir(root), "schema.yaml"), 0o444); err != nil {
 		t.Fatal(err)
 	}
-	r, err := Init(root, mdir(root), assets, false, initOS)
+	r, err := Init(root, dirs(root), assets, false, initOS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +312,7 @@ func openspecDir(t *testing.T, root string) func() error {
 
 func TestInitInstallsSkill(t *testing.T) {
 	root := t.TempDir()
-	r, err := Init(root, mdir(root), assets, false, openspecDir(t, root))
+	r, err := Init(root, dirs(root), assets, false, openspecDir(t, root))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +338,7 @@ func TestInitInstallsSkill(t *testing.T) {
 			}
 		}
 	}
-	r, err = Init(root, mdir(root), assets, false, nil)
+	r, err = Init(root, dirs(root), assets, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -355,7 +358,7 @@ func TestInitLeavesUserSkillFiles(t *testing.T) {
 	if err := os.WriteFile(notes, []byte("mine\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r, err := Init(root, mdir(root), assets, true, openspecDir(t, root))
+	r, err := Init(root, dirs(root), assets, true, openspecDir(t, root))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,7 +390,7 @@ func TestInitRefusesBeforeWriting(t *testing.T) {
 		t.Fatal(err)
 	}
 	called := false
-	r, err := Init(root, mdir(root), assets, true, func() error { called = true; return nil })
+	r, err := Init(root, dirs(root), assets, true, func() error { called = true; return nil })
 	var ref *Refused
 	if !errors.As(err, &ref) {
 		t.Fatalf("err = %v", err)
@@ -423,7 +426,7 @@ func TestInitWriteFailureThenRerun(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.Chmod(dir, 0o755) })
-	r, err := Init(root, mdir(root), assets, false, openspecDir(t, root))
+	r, err := Init(root, dirs(root), assets, false, openspecDir(t, root))
 	if err == nil || !strings.Contains(err.Error(), ".agents/skills/docket/SKILL.md") {
 		t.Fatalf("err = %v", err)
 	}
@@ -434,7 +437,7 @@ func TestInitWriteFailureThenRerun(t *testing.T) {
 	if err := os.Chmod(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	r, err = Init(root, mdir(root), assets, false, nil)
+	r, err = Init(root, dirs(root), assets, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -465,7 +468,7 @@ func TestRemovalRenameFails(t *testing.T) {
 		}
 		return orig(from, to)
 	}
-	if _, err := Init(root, mdir(root), assets, false, nil); err == nil || !strings.Contains(err.Error(), "no rename") {
+	if _, err := Init(root, dirs(root), assets, false, nil); err == nil || !strings.Contains(err.Error(), "no rename") {
 		t.Fatalf("err = %v", err)
 	}
 	for _, p := range []string{"schema.yaml", "templates/design.md", "templates/plan.md", "templates/proposal.md", "templates/spec.md"} {
@@ -484,7 +487,7 @@ func TestRemovalCleanupFails(t *testing.T) {
 	orig := removeAll
 	t.Cleanup(func() { removeAll = orig })
 	removeAll = func(string) error { return errors.New("no delete") }
-	_, err := Init(root, mdir(root), assets, false, nil)
+	_, err := Init(root, dirs(root), assets, false, nil)
 	want := filepath.Join("openspec", ".docket-removed-"+strconv.Itoa(os.Getpid()))
 	if err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("err = %v, want it to name %s", err, want)
@@ -533,7 +536,7 @@ func TestRemovalRechecksTheCopy(t *testing.T) {
 	root := oldCopyRoot(t)
 	proposal := filepath.Join(root, "openspec/schemas/docket/templates/proposal.md")
 	interfereOnRemoval(t, proposal)
-	r, err := Init(root, mdir(root), assets, false, nil)
+	r, err := Init(root, dirs(root), assets, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -550,7 +553,7 @@ func TestRemovalRechecksTheCopy(t *testing.T) {
 func TestRemovalRechecksTheMachineCopy(t *testing.T) {
 	root := oldCopyRoot(t)
 	interfereOnRemoval(t, filepath.Join(mdir(root), "schema.yaml"))
-	r, err := Init(root, mdir(root), assets, false, nil)
+	r, err := Init(root, dirs(root), assets, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

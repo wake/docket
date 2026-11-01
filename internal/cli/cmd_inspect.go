@@ -58,7 +58,7 @@ func inspectCommand() Command {
 			if err != nil {
 				out.Findings = append(out.Findings, Finding{Rule: "schema-missing", Message: err.Error()})
 			}
-			rep, err := setup.Inspect(c.Repo.Root, schemaDir, shippedAssets())
+			rep, err := setup.Inspect(c.Repo.Root, setup.Dirs{Schema: schemaDir}, shippedAssets())
 			if err != nil {
 				return Outcome{Result: res}, envOrErr(err)
 			}
