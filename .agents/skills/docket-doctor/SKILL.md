@@ -29,7 +29,10 @@ Run `dkt inspect --json` before anything else. It writes nothing. Its
 - `changes`: the active changes on the default branch whose commit
   trailers were checked, and those skipped, with the reason.
 
-Its `findings` and `unreadable` are the mechanical problems. When it exits
+Its `findings` and `unreadable` are the mechanical problems. They include
+`install-ignored` (a path `dkt init` installs that git ignores),
+`title-missing` (a main spec without a title) and `other-schema` (an active
+change made with a schema other than `docket`). When it exits
 with 2 or 4 it checked nothing: tell the user what it said and stop.
 
 ## 2. Check what needs judgment
@@ -111,6 +114,27 @@ and do it only after the user agrees; when they decline, go to the next.
 - `openspec-missing` or `openspec-unsupported`: say which versions Docket
   supports (the finding names them) and that `DOCKET_OPENSPEC` can name
   the command that runs one. Install nothing.
+- `install-ignored`: group the findings by rule (the pattern in the
+  message). Before proposing, list the files the fix would let git see,
+  including files under that directory that are ignored today
+  (`git ls-files --others --ignored --exclude-standard -- <dir>`). Propose
+  the narrowest rule that frees the installed paths (for `.claude/`:
+  `.claude/*` and `!.claude/skills/`). Say whether the ignore file is
+  shared (`.gitignore`) or only on this machine (`.git/info/exclude`,
+  `core.excludesFile`). Edit it only after the user agrees. When
+  `openspec/` is kept out of git on purpose, do not edit anything: point
+  to the README's adoption steps.
+- `title-missing`: read each spec's Purpose and draft a title, one line of
+  text that is not empty (the form `dkt lint` checks). List all the drafts,
+  write every `openspec/specs/<capability>/docket.yaml` (`title: <text>`)
+  only after the user agrees, then run `dkt lint`.
+- `other-schema`: when the finding says 0 steps ticked, propose converting
+  the change by `convert.md` in this skill's folder. Otherwise propose no
+  conversion: say it is finished with its own files and archived with
+  `dkt archive`, and list the capabilities it adds that have no
+  `docket.yaml` title beside their delta
+  (`openspec/changes/<slug>/specs/<capability>/docket.yaml`); offer to
+  draft them as for `title-missing`.
 - A conflict with the framework: propose the wording for the user's
   instructions; never edit their files.
 - `no-task-commits`: explain that the change's commits on the default

@@ -97,6 +97,9 @@ Right after triage, before any other step of the work, run
    them in the message's last paragraph, with any other trailers such as
    `Co-Authored-By` and no blank line between them: git reads trailers
    from the last paragraph only.
+   A change whose `.openspec.yaml` names another schema follows that
+   schema's files, gets no `plan.md` unless converted (see `docket-doctor`),
+   and is still archived with `dkt archive`.
 6. Before opening the pull request, run `dkt sync <slug>` and
    `dkt lint <slug>`, and commit plan.md.
 7. A change is one pull request unless the workflow file says to split
