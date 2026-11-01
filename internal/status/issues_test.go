@@ -176,3 +176,20 @@ func TestIssueWithoutFrontMatterAndUnreadable(t *testing.T) {
 		t.Fatalf("issues = %+v, unread = %+v", is, unread)
 	}
 }
+
+func TestChangeActiveAndArchivedIsOneHandler(t *testing.T) {
+	meta := "title: X\nsource: " + issAF + "\n"
+	r, _ := baseRepo(t)
+	r.Commit("issue and archived", map[string]string{issAF: issText, "openspec/changes/archive/2026-11-01-add-x/docket.yaml": meta})
+	w := r.AddWorktree(filepath.Join(t.TempDir(), "wt"), "again")
+	w.Commit("active", map[string]string{"openspec/changes/add-x/docket.yaml": meta})
+	if is, _ := loadIssues(t, r); len(is) != 0 {
+		t.Fatalf("handled issue listed: %+v", is)
+	}
+	r2, _ := baseRepo(t)
+	r2.Commit("issue", map[string]string{issAF: issText})
+	w2 := r2.AddWorktree(filepath.Join(t.TempDir(), "wt"), "both")
+	w2.Commit("both", map[string]string{"openspec/changes/add-x/docket.yaml": meta, "openspec/changes/archive/2026-11-01-add-x/docket.yaml": meta})
+	is, _ := loadIssues(t, r2)
+	only(t, is, InProgress, Handler{Kind: "change", Slug: "add-x"})
+}

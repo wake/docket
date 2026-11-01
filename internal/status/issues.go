@@ -1,6 +1,7 @@
 package status
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -39,7 +40,7 @@ func LoadIssues(g gitx.Git, inv scan.Inventory) ([]Issue, []scan.Unreadable, err
 	issues := []Issue{}
 	groups, unread, err := readGroups(g, issue.Dir, len(inv.Issues),
 		func(i int) scan.Source { return inv.Issues[i].Sources[0] },
-		func(i int) string { return inv.Issues[i].Slug + ".md" })
+		func(i int) []string { return []string{inv.Issues[i].Slug + ".md"} })
 	if err != nil {
 		return nil, nil, err
 	}
@@ -61,10 +62,13 @@ func LoadIssues(g gitx.Git, inv scan.Inventory) ([]Issue, []scan.Unreadable, err
 	for i := range issues {
 		named[issue.Dir+"/"+issues[i].Slug+".md"] = &issues[i]
 	}
-	add := func(kind, slug, source string, srcs []scan.Source) {
-		if is, ok := named[strings.TrimSpace(source)]; ok {
-			is.Handlers = append(is.Handlers, Handler{Kind: kind, Slug: slug, Merged: tipSource(srcs) != nil})
+	// One handler per kind and slug.
+	add := func(kind, slug, source string, merged bool) {
+		is, ok := named[strings.TrimSpace(source)]
+		if !ok || slices.ContainsFunc(is.Handlers, func(h Handler) bool { return h.Kind == kind && h.Slug == slug }) {
+			return
 		}
+		is.Handlers = append(is.Handlers, Handler{Kind: kind, Slug: slug, Merged: merged})
 	}
 	// A record or change the tip holds is read from the tip, any other from its first source.
 	readFrom := func(srcs []scan.Source) scan.Source {
@@ -75,7 +79,7 @@ func LoadIssues(g gitx.Git, inv scan.Inventory) ([]Issue, []scan.Unreadable, err
 	}
 	recGroups, bad, err := readGroups(g, record.Dir, len(inv.Records),
 		func(i int) scan.Source { return readFrom(inv.Records[i].Sources) },
-		func(i int) string { return inv.Records[i].Slug + ".md" })
+		func(i int) []string { return []string{inv.Records[i].Slug + ".md"} })
 	if err != nil {
 		return nil, nil, err
 	}
@@ -83,29 +87,45 @@ func LoadIssues(g gitx.Git, inv scan.Inventory) ([]Issue, []scan.Unreadable, err
 	for _, grp := range recGroups {
 		for _, i := range grp.Idx {
 			r := inv.Records[i]
-			add("record", r.Slug, record.Parse(grp.Files[r.Slug+".md"]).FrontMatter.Source, r.Sources)
+			add("record", r.Slug, record.Parse(grp.Files[r.Slug+".md"]).FrontMatter.Source, tipSource(r.Sources) != nil)
 		}
 	}
-	readChange := func(slug, dir string, srcs []scan.Source) error {
-		keep := func(rel string) bool { return rel == change.DocketFile || rel == change.OpenSpecFile }
-		files, bad, err := scan.ReadFiles(g, readFrom(srcs), dir, keep)
-		if err != nil {
-			return err
-		}
-		unread = append(unread, bad...)
-		if m, err := change.ReadMetadata(files); err == nil {
-			add("change", slug, m.Source, srcs)
-		}
-		return nil
+	// Active and archived copies of a change, read once per source from openspec/changes.
+	type copyOf struct {
+		slug, rel string
+		srcs      []scan.Source
 	}
+	var copies []copyOf
+	tipHeld := map[string]bool{}
 	for _, c := range inv.Changes {
-		if err := readChange(c.Slug, "openspec/changes/"+c.Slug, c.Sources); err != nil {
-			return nil, nil, err
-		}
+		copies = append(copies, copyOf{c.Slug, c.Slug, c.Sources})
+		tipHeld[c.Slug] = tipHeld[c.Slug] || tipSource(c.Sources) != nil
 	}
 	for _, a := range inv.Archived {
-		if err := readChange(a.Slug, "openspec/changes/archive/"+a.Folder, a.Sources); err != nil {
-			return nil, nil, err
+		copies = append(copies, copyOf{a.Slug, "archive/" + a.Folder, a.Sources})
+		tipHeld[a.Slug] = tipHeld[a.Slug] || tipSource(a.Sources) != nil
+	}
+	chGroups, bad, err := readGroups(g, "openspec/changes", len(copies),
+		func(i int) scan.Source { return readFrom(copies[i].srcs) },
+		func(i int) []string {
+			return []string{copies[i].rel + "/" + change.DocketFile, copies[i].rel + "/" + change.OpenSpecFile}
+		})
+	if err != nil {
+		return nil, nil, err
+	}
+	unread = append(unread, bad...)
+	for _, grp := range chGroups {
+		for _, i := range grp.Idx {
+			c := copies[i]
+			files := map[string][]byte{}
+			for _, name := range []string{change.DocketFile, change.OpenSpecFile} {
+				if b, ok := grp.Files[c.rel+"/"+name]; ok {
+					files[name] = b
+				}
+			}
+			if m, err := change.ReadMetadata(files); err == nil {
+				add("change", c.slug, m.Source, tipHeld[c.slug])
+			}
 		}
 	}
 	out := issues[:0]

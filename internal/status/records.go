@@ -100,7 +100,7 @@ func LoadRecords(g gitx.Git, inv scan.Inventory, q RecordQuery) (records []Recor
 	// One read per first source; commits are read once per source commit.
 	groups, bad, err := readGroups(g, record.Dir, len(picked),
 		func(i int) scan.Source { return picked[i].Sources[0] },
-		func(i int) string { return picked[i].Slug + ".md" })
+		func(i int) []string { return []string{picked[i].Slug + ".md"} })
 	if err != nil {
 		return nil, 0, nil, err
 	}
@@ -193,8 +193,8 @@ type sourceGroup struct {
 }
 
 // readGroups reads dir once per distinct source of the n items, keeping the
-// file nameOf names for each. Groups come in order of first appearance.
-func readGroups(g gitx.Git, dir string, n int, srcOf func(int) scan.Source, nameOf func(int) string) ([]sourceGroup, []scan.Unreadable, error) {
+// files namesOf names for each. Groups come in order of first appearance.
+func readGroups(g gitx.Git, dir string, n int, srcOf func(int) scan.Source, namesOf func(int) []string) ([]sourceGroup, []scan.Unreadable, error) {
 	var groups []sourceGroup
 	at := map[scan.Source]int{}
 	want := map[scan.Source]map[string]bool{}
@@ -208,7 +208,9 @@ func readGroups(g gitx.Git, dir string, n int, srcOf func(int) scan.Source, name
 			want[src] = map[string]bool{}
 		}
 		groups[k].Idx = append(groups[k].Idx, i)
-		want[src][nameOf(i)] = true
+		for _, name := range namesOf(i) {
+			want[src][name] = true
+		}
 	}
 	var unread []scan.Unreadable
 	for k := range groups {
