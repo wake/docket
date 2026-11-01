@@ -241,7 +241,20 @@ func TestInspectSymlinkedOpenSpec(t *testing.T) {
 	if err := os.RemoveAll(link); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(t.TempDir(), link); err != nil {
+	target := t.TempDir()
+	for name, body := range map[string]string{
+		"specs/booking/spec.md":        "# Booking\n",
+		"changes/add-x/.openspec.yaml": "schema: spec-driven\n",
+		"changes/add-x/tasks.md":       "- [ ] 1.1 a\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(target, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(target, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
 	const rel = ".claude/skills/docket/SKILL.md"
@@ -262,6 +275,8 @@ func TestInspectSymlinkedOpenSpec(t *testing.T) {
 			if m["file"] != "openspec" {
 				t.Errorf("symlink finding: %v", m)
 			}
+		case "title-missing", "other-schema":
+			t.Errorf("read through the linked openspec: %v", m)
 		case "skill-differs":
 			if m["file"] == rel {
 				differs = true
