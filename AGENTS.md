@@ -12,7 +12,10 @@ commit hostnames, customer names, personal paths or secrets.
 
 Documents are written first in Traditional Chinese under `zh-TW/`; once the
 maintainer agrees, they are translated into English at their own path, and both
-go in the same pull request. The rules are in `zh-TW/README.md`. Everything
+go in the same pull request. For a file a `dkt` command creates, run the
+command first, then write its Chinese copy; when `dkt archive` runs, merge the
+deltas into the Chinese main specs and delete the Chinese change. The details
+are in `zh-TW/README.md`. Everything
 outside `zh-TW/` and `README.zh-TW.md` is in English, as are code, commits and
 pull requests.
 

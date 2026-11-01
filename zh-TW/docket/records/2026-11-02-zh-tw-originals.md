@@ -17,3 +17,5 @@ AGENTS.md 的 Project 段：Docket 定位為併用 superpowers 與 OpenSpec 的�
 機械檢查：無簡體字；spec 的 Requirement／Scenario 標題、WHEN 數、front matter 鍵、固定標題與英文版一致；YAML 可解析；`go test ./...`。
 
 ## Review
+
+codex（gpt-5.6-sol）攻擊一次，兩點都修：`dkt` 建立的檔先跑指令再寫繁中檔；封存時把 delta 併進繁中主 spec 並刪掉繁中 change。未再審。

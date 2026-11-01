@@ -5,7 +5,7 @@
 ## 對應
 
 路徑鏡射原檔：`zh-TW/<路徑>` ↔ `<路徑>`。例如 `zh-TW/openspec/specs/ideas/spec.md` ↔ `openspec/specs/ideas/spec.md`。
-README 例外，繁中版是根目錄的 `README.zh-TW.md`。封存的 change（`openspec/changes/archive/`）不翻。
+兩個例外：根目錄 README 的繁中版是 `README.zh-TW.md`；本檔只有中文，沒有英文對應。封存的 change（`openspec/changes/archive/`）不翻。
 
 ## 流程
 
@@ -13,6 +13,10 @@ README 例外，繁中版是根目錄的 `README.zh-TW.md`。封存的 change（
 2. 維護者確認。
 3. 翻成英文，寫回 `<路徑>`。
 4. 兩邊放在同一個 PR。
+
+由 `dkt` 建立的檔（`dkt new` 的 change、`dkt record` 的 record、`dkt issue` 的 issue）：先跑指令，用它回報的路徑在 `zh-TW/` 建繁中檔、寫內容，再照 2–4 走。
+
+封存時（`dkt archive`）：同一個 commit 裡，把 change 的 delta 併進 `zh-TW/openspec/specs/` 的繁中主 spec，並刪掉 `zh-TW/openspec/changes/<slug>/`。
 
 程式只讀英文檔；這個目錄不被 `dkt` 或 OpenSpec 讀取。
 

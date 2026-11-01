@@ -6,7 +6,7 @@
 
 Docket 是一套開發管理流程：併用 superpowers 與 OpenSpec 做 spec 驅動開發（SDD）。`dkt` 是它的 Go CLI，為 OpenSpec change 資料夾做檢查與記帳。見 README.md。這是公開的 repository：絕不 commit 主機名稱、客戶名稱、個人路徑或秘密。
 
-文件先在 `zh-TW/` 用繁體中文寫原稿，維護者確認後翻成英文寫回原路徑，兩邊放同一個 PR；規則見 `zh-TW/README.md`。`zh-TW/` 與 `README.zh-TW.md` 以外的一切都用英文，程式碼、commit 與 PR 也是。
+文件先在 `zh-TW/` 用繁體中文寫原稿，維護者確認後翻成英文寫回原路徑，兩邊放同一個 PR。`dkt` 建立的檔先跑指令，再寫它的繁中檔；`dkt archive` 時把 delta 併進繁中主 spec，並刪掉繁中的 change。細節見 `zh-TW/README.md`。`zh-TW/` 與 `README.zh-TW.md` 以外的一切都用英文，程式碼、commit 與 PR 也是。
 
 狀態：里程碑 1 已完成。`dkt init`、`dkt new`、`dkt record`、`dkt issue`、`dkt lint`、`dkt conflicts`、`dkt sync`、`dkt archive`、`dkt rebase`、`dkt status`、`dkt workflow` 與 `dkt inspect` 都已存在；用 `go install ./cmd/dkt` 建置。接下來的工作排在 `docket/order.md`。
 

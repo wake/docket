@@ -18,4 +18,4 @@ Mechanical checks: no Simplified characters; spec Requirement and Scenario headi
 
 ## Review
 
-<!-- filled after the review -->
+Codex (gpt-5.6-sol) attacked once; both findings fixed: for a file a `dkt` command creates, the command runs first and the Chinese copy follows; at archive, the deltas go into the Chinese main specs and the Chinese change is deleted. Not reviewed again.
