@@ -128,7 +128,7 @@ and do it only after the user agrees; when they decline, go to the next.
   text that is not empty (the form `dkt lint` checks). List all the drafts,
   write every `openspec/specs/<capability>/docket.yaml` (`title: <text>`)
   only after the user agrees, then run `dkt lint`.
-- `other-schema`: when the finding says 0 steps ticked, propose converting
+- `other-schema`: when the finding says `0 of <total> steps ticked`, propose converting
   the change by `convert.md` in this skill's folder. Otherwise propose no
   conversion: say it is finished with its own files and archived with
   `dkt archive`, and list the capabilities it adds that have no
