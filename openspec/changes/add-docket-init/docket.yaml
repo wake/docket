@@ -1,0 +1,4 @@
+title: A user-level docket-init command that sets a project up for Docket
+kind: feature
+source: docket/ideas/2026-11-01-docket-init-command.md
+base: 124ec08a66da9233d7947df00653ec10efa92d95
