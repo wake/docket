@@ -37,10 +37,10 @@ var Sections = []string{"What", "Why", "Verification", "Review"}
 // datePrefixLen is the length of "2006-01-02-", the date and its hyphen.
 const datePrefixLen = len("2006-01-02-")
 
-// ValidateName checks the name given to dkt record, before the date is added.
-func ValidateName(name string) error {
+// ValidateName checks the name given to dkt <command>, before the date is added.
+func ValidateName(command, name string) error {
 	if change.StartsWithDate(name) {
-		return fmt.Errorf("name %q must not start with a date: dkt record adds the date", name)
+		return fmt.Errorf("name %q must not start with a date: dkt %s adds the date", name, command)
 	}
 	if err := change.ValidateSlug(name); err != nil {
 		return err
@@ -64,12 +64,17 @@ func Render(title, kind, source, template string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	return Wrap(front, template), nil
+}
+
+// Wrap is a file of front matter, a blank line and the template.
+func Wrap(front []byte, template string) []byte {
 	var b bytes.Buffer
 	b.WriteString("---\n")
 	b.Write(front)
 	b.WriteString("---\n\n")
 	b.WriteString(template)
-	return b.Bytes(), nil
+	return b.Bytes()
 }
 
 // Result is what `dkt record` reports on success.

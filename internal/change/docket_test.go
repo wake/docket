@@ -11,6 +11,22 @@ import (
 
 const sha = "0123456789abcdef0123456789abcdef01234567"
 
+func TestDecodeMapping(t *testing.T) {
+	var v struct {
+		Dropped *bool `yaml:"dropped"`
+	}
+	if err := DecodeMapping([]byte("- a\n"), &v); err == nil {
+		t.Error("a list decoded")
+	}
+	// yaml.v3 reads yes as a bool, so use a word that is not one.
+	if err := DecodeMapping([]byte("dropped: maybe\n"), &v); err == nil {
+		t.Error("maybe decoded into *bool")
+	}
+	if err := DecodeMapping([]byte("dropped: true\n"), &v); err != nil || v.Dropped == nil || !*v.Dropped {
+		t.Errorf("err = %v, v = %+v", err, v)
+	}
+}
+
 func TestReadMetadataFromDocket(t *testing.T) {
 	files := map[string][]byte{
 		"docket.yaml":    []byte("title: Booking waitlist\nkind: feature\nsource: issue 12\nbase: " + sha + "\n"),

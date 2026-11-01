@@ -56,11 +56,25 @@ type File struct {
 	Plan           change.Plan
 }
 
-// Parse reads a record. The front matter and the HTML comments are blanked
-// before headings and tasks are read, so line numbers stay and neither holds
-// a section or a task.
+// Parse reads a record: Split, then the front matter as a Docket.
 func Parse(b []byte) File {
 	var f File
+	front, secs, plan, err := Split(b)
+	f.Sections, f.Plan = secs, plan
+	if err != nil {
+		f.FrontMatterErr = err
+	} else {
+		f.FrontMatter, f.FrontMatterErr = change.ParseDocket(front)
+	}
+	return f
+}
+
+// Split cuts a file into its front matter (the lines between the two `---`
+// lines), its level-two sections and its tasks. The front matter lines are
+// blanked, then the HTML comments, and fenced code is masked, before
+// headings and tasks are read, so line numbers stay and none holds a section
+// or a task. err is the missing-front-matter error.
+func Split(b []byte) (front []byte, sections []Section, plan change.Plan, err error) {
 	lines := markdown.Lines(b)
 	end := -1
 	if len(lines) > 0 && isRule(lines[0]) {
@@ -72,9 +86,9 @@ func Parse(b []byte) File {
 		}
 	}
 	if end < 0 {
-		f.FrontMatterErr = errors.New("front matter is missing: the file must start with a `---` line and close it with another")
+		err = errors.New("front matter is missing: the file must start with a `---` line and close it with another")
 	} else {
-		f.FrontMatter, f.FrontMatterErr = change.ParseDocket([]byte(strings.Join(lines[1:end], "\n")))
+		front = []byte(strings.Join(lines[1:end], "\n"))
 		for i := 0; i <= end; i++ {
 			lines[i] = ""
 		}
@@ -86,10 +100,10 @@ func Parse(b []byte) File {
 			continue
 		}
 		from, to := markdown.Body(lines, mask, h)
-		f.Sections = append(f.Sections, Section{Name: h.Text, Line: h.Index + 1, Text: strings.Join(lines[from:to], "\n")})
+		sections = append(sections, Section{Name: h.Text, Line: h.Index + 1, Text: strings.Join(lines[from:to], "\n")})
 	}
-	f.Plan = change.ParsePlan([]byte(strings.Join(lines, "\n")))
-	return f
+	plan = change.ParsePlan([]byte(strings.Join(lines, "\n")))
+	return front, sections, plan, err
 }
 
 func isRule(line string) bool { return strings.TrimRight(line, " \t") == "---" }

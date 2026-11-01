@@ -33,19 +33,19 @@ func TestSlugOf(t *testing.T) {
 }
 
 func TestValidateName(t *testing.T) {
-	if err := ValidateName("fix-x"); err != nil {
+	if err := ValidateName("record", "fix-x"); err != nil {
 		t.Errorf("fix-x: %v", err)
 	}
-	if err := ValidateName("2026-10-30-fix-x"); err == nil || !strings.Contains(err.Error(), "dkt record adds the date") {
+	if err := ValidateName("record", "2026-10-30-fix-x"); err == nil || !strings.Contains(err.Error(), "dkt record adds the date") {
 		t.Errorf("dated name: %v", err)
 	}
-	if err := ValidateName("Fix_X"); err == nil {
+	if err := ValidateName("record", "Fix_X"); err == nil {
 		t.Error("Fix_X passed")
 	}
-	if err := ValidateName(strings.Repeat("a", 189)); err != nil {
+	if err := ValidateName("record", strings.Repeat("a", 189)); err != nil {
 		t.Errorf("189 characters: %v", err)
 	}
-	if err := ValidateName(strings.Repeat("a", 190)); err == nil || !strings.Contains(err.Error(), "200") {
+	if err := ValidateName("record", strings.Repeat("a", 190)); err == nil || !strings.Contains(err.Error(), "200") {
 		t.Errorf("190 characters: %v", err)
 	}
 }

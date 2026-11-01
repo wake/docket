@@ -73,9 +73,6 @@ func (r *run) lintRecords(named []string) {
 	}
 }
 
-// sectionOrder is the order of the level-two sections of a record.
-var sectionOrder = append(append([]string{}, record.Sections...), record.TasksSection)
-
 // checkRecord applies the record rules to the record in file name of c.
 func checkRecord(r *run, c *loaded, name string, f record.File) {
 	checkRecordFrontMatter(r, c, name, f)
@@ -106,34 +103,59 @@ func checkRecordFrontMatter(r *run, c *loaded, name string, f record.File) {
 }
 
 func checkRecordSections(r *run, c *loaded, name string, f record.File) {
+	checkSections(r, c, name, f.Sections, sectionRules{"record", record.Sections, record.TasksSection})
+}
+
+// sectionRules are the sections of a kind of file: the findings are named
+// <Prefix>-section and <Prefix>-too-long. Sections are required, in order;
+// Optional, when not empty, may follow them.
+type sectionRules struct {
+	Prefix   string
+	Sections []string
+	Optional string
+}
+
+// order is Sections followed by Optional.
+func (s sectionRules) order() []string {
+	out := append([]string{}, s.Sections...)
+	if s.Optional != "" {
+		out = append(out, s.Optional)
+	}
+	return out
+}
+
+// checkSections reports the sections of file name that are unknown, repeated,
+// out of order, missing, empty or too long.
+func checkSections(r *run, c *loaded, name string, secs []record.Section, rules sectionRules) {
+	order := rules.order()
 	first := map[string]record.Section{}
 	last := -1
-	for _, s := range f.Sections {
-		idx := indexOf(sectionOrder, s.Name)
+	for _, s := range secs {
+		idx := indexOf(order, s.Name)
 		switch {
 		case idx < 0:
-			r.add(c, "record-section", name, s.Line, "`## %s` is not a record section; the sections are %s", s.Name, headingList())
+			r.add(c, rules.Prefix+"-section", name, s.Line, "`## %s` is not a %s section; the sections are %s", s.Name, rules.Prefix, headingList(rules))
 			continue
 		case first[s.Name].Line != 0:
-			r.add(c, "record-section", name, s.Line, "`## %s` appears more than once (first on line %d)", s.Name, first[s.Name].Line)
+			r.add(c, rules.Prefix+"-section", name, s.Line, "`## %s` appears more than once (first on line %d)", s.Name, first[s.Name].Line)
 			continue
 		case idx < last:
-			r.add(c, "record-section", name, s.Line, "`## %s` is out of order; the sections are %s", s.Name, headingList())
+			r.add(c, rules.Prefix+"-section", name, s.Line, "`## %s` is out of order; the sections are %s", s.Name, headingList(rules))
 		}
 		first[s.Name] = s
 		last = max(last, idx)
 	}
-	for _, n := range record.Sections {
+	for _, n := range rules.Sections {
 		s, ok := first[n]
 		if !ok {
-			r.add(c, "record-section", name, 0, "the record has no `## %s` section", n)
+			r.add(c, rules.Prefix+"-section", name, 0, "the %s has no `## %s` section", rules.Prefix, n)
 			continue
 		}
 		if strings.TrimSpace(s.Text) == "" {
-			r.add(c, "record-section", name, s.Line, "`## %s` is empty", n)
+			r.add(c, rules.Prefix+"-section", name, s.Line, "`## %s` is empty", n)
 		}
 		if w := record.Words(s.Text); w > record.WordLimit {
-			r.add(c, "record-too-long", name, s.Line, "`## %s` has %s words; the limit is %d",
+			r.add(c, rules.Prefix+"-too-long", name, s.Line, "`## %s` has %s words; the limit is %d",
 				n, strconv.FormatFloat(w, 'f', -1, 64), record.WordLimit)
 		}
 	}
@@ -155,12 +177,17 @@ func checkRecordTasks(r *run, c *loaded, name string, f record.File) {
 	}
 }
 
-func headingList() string {
-	parts := make([]string, len(sectionOrder))
-	for i, n := range sectionOrder {
+func headingList(rules sectionRules) string {
+	order := rules.order()
+	parts := make([]string, len(order))
+	for i, n := range order {
 		parts[i] = "`## " + n + "`"
 	}
-	return strings.Join(parts, ", ") + " (Tasks optional), in that order"
+	list := strings.Join(parts, ", ")
+	if rules.Optional != "" {
+		list += " (" + rules.Optional + " optional)"
+	}
+	return list + ", in that order"
 }
 
 func indexOf(list []string, s string) int {

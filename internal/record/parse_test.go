@@ -6,6 +6,23 @@ import (
 	"testing"
 )
 
+func TestSplit(t *testing.T) {
+	src := "---\ntitle: X\n---\n\n## One\nbody\n\n<!--\n## Fake\n-->\n```\n## Fenced\n```\n## Two\nmore\n"
+	front, secs, _, err := Split([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(front) != "title: X" {
+		t.Errorf("front = %q", front)
+	}
+	if len(secs) != 2 || secs[0].Name != "One" || secs[0].Line != 5 || secs[1].Name != "Two" || secs[1].Line != 14 {
+		t.Errorf("sections = %+v", secs)
+	}
+	if _, _, _, err := Split([]byte("## One\n")); err == nil {
+		t.Error("no error for missing front matter")
+	}
+}
+
 func TestWords(t *testing.T) {
 	for _, c := range []struct {
 		in   string
