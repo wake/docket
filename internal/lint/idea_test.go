@@ -192,3 +192,42 @@ func TestNoOrderNoIdeas(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 }
+
+func TestLinkedIdeasFolder(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "notes"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "docket"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "notes", "b.md"), []byte("no front matter\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, order), []byte("# Order\n\n1. `"+ideaB+"`\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../notes", filepath.Join(root, "docket", "ideas")); err != nil {
+		t.Skipf("symbolic links unavailable: %v", err)
+	}
+	r := Run(Input{Repo: os.DirFS(root), Templates: docket.Schema()})
+	if len(r.Unreadable) != 1 || r.Unreadable[0].Source != "docket/ideas" {
+		t.Fatalf("%+v", r.Unreadable)
+	}
+	wantAt(t, r, "order-idea", order, 3)
+	if len(findingsOf(r, "idea-front-matter")) != 0 {
+		t.Fatalf("%+v", r.Findings)
+	}
+}
+
+func TestOrderLintedWhenIdeasUnreadable(t *testing.T) {
+	r := ideaRun(map[string]string{"docket/ideas": "a file", order: "# Order\n\n1. `" + ideaA + "`\n3. `" + ideaB + "`\n"})
+	if len(r.Unreadable) != 1 {
+		t.Fatalf("%+v", r.Unreadable)
+	}
+	wantAt(t, r, "order-format", order, 4)
+}
+
+func TestEmptyOrderFile(t *testing.T) {
+	wantAt(t, ideaRun(map[string]string{order: ""}), "order-format", order, 1)
+}

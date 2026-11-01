@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"errors"
 	"io/fs"
 	"sort"
 	"strings"
@@ -11,10 +12,30 @@ import (
 // lintIdeas checks every idea and the order. A link, a folder or a file that
 // is not .md under docket/ideas is not an idea.
 func (r *run) lintIdeas() {
-	regular, ok := r.regularNames(idea.Dir)
-	if !ok {
-		return
+	dropped := map[string]bool{}
+	if r.ideasLinked() {
+		// Lint would read through the link; status reads the committed tree, where it is no folder.
+		r.unreadable(idea.Dir, errors.New("is a symbolic link and is not read"))
+	} else if regular, ok := r.regularNames(idea.Dir); ok {
+		r.lintIdeaFiles(regular, dropped)
 	}
+	r.lintOrder(dropped)
+}
+
+// ideasLinked reports whether docket/ideas is a symbolic link.
+func (r *run) ideasLinked() bool {
+	entries, _ := fs.ReadDir(r.in.Repo, "docket")
+	for _, e := range entries {
+		if e.Name() == "ideas" {
+			return e.Type()&fs.ModeSymlink != 0
+		}
+	}
+	return false
+}
+
+// lintIdeaFiles checks the ideas among the entries of docket/ideas and records
+// in dropped which of them are dropped.
+func (r *run) lintIdeaFiles(regular map[string]bool, dropped map[string]bool) {
 	var names []string
 	for name, isRegular := range regular {
 		if isRegular && strings.HasSuffix(name, ".md") {
@@ -22,7 +43,6 @@ func (r *run) lintIdeas() {
 		}
 	}
 	sort.Strings(names)
-	dropped := map[string]bool{}
 	for _, name := range names {
 		p := idea.Dir + "/" + name
 		b, err := fs.ReadFile(r.in.Repo, p)
@@ -49,12 +69,12 @@ func (r *run) lintIdeas() {
 			}
 		}
 	}
-	r.lintOrder(dropped)
 }
 
 // lintOrder checks docket/order.md; dropped says, by path, which ideas are
 // dropped.
 func (r *run) lintOrder(dropped map[string]bool) {
+	linked := r.ideasLinked()
 	c := &loaded{Dir: "docket"}
 	regular, ok := r.regularNames(c.Dir)
 	if !ok {
@@ -80,7 +100,7 @@ func (r *run) lintOrder(dropped map[string]bool) {
 	seen := map[string]bool{}
 	for _, l := range lines {
 		switch {
-		case !idea.IsIdeaPath(l.Path) || !r.isFile(l.Path, idea.Dir+"/"):
+		case linked || !idea.IsIdeaPath(l.Path) || !r.isFile(l.Path, idea.Dir+"/"):
 			r.add(c, "order-idea", "order.md", l.At, "%q names no idea file", l.Path)
 		case seen[l.Path]:
 			r.add(c, "order-idea", "order.md", l.At, "%q is already in the order", l.Path)

@@ -65,7 +65,10 @@ type Problem struct {
 	Message string
 }
 
-var orderLine = regexp.MustCompile("^([0-9]+)\\. `([^`]+)`$")
+var orderLine = regexp.MustCompile("^([1-9][0-9]*)\\. `([^`]+)`$")
+
+// numbered matches the start of a line that tries to be an order line.
+var numbered = regexp.MustCompile("^([0-9]+)\\.")
 
 // ParseOrder reads the order. Lines of the form are returned even after a
 // problem.
@@ -73,6 +76,7 @@ func ParseOrder(b []byte) ([]Line, []Problem) {
 	var lines []Line
 	var problems []Problem
 	headed := false
+	prev := 0 // the number the last numbered line carried
 	for i, raw := range markdown.Lines(b) {
 		s := markdown.Trim(raw)
 		if s == "" {
@@ -92,17 +96,20 @@ func ParseOrder(b []byte) ([]Line, []Problem) {
 		}
 		if m == nil {
 			problems = append(problems, Problem{at, "a line of the order must read `<n>. `docket/ideas/<name>.md``"})
+			if d := numbered.FindStringSubmatch(s); d != nil {
+				prev, _ = strconv.Atoi(d[1])
+			}
 			continue
 		}
 		n, _ := strconv.Atoi(m[1])
-		want := 1
-		if len(lines) > 0 {
-			want = lines[len(lines)-1].Number + 1
-		}
-		if n != want {
+		if n != prev+1 {
 			problems = append(problems, Problem{at, "the numbers of the order must run 1, 2, 3 without a gap"})
 		}
+		prev = n
 		lines = append(lines, Line{n, m[2], at})
+	}
+	if !headed {
+		problems = append(problems, Problem{1, "the order must start with `# Order`"})
 	}
 	return lines, problems
 }

@@ -21,6 +21,14 @@ func TestParseOrder(t *testing.T) {
 			[]Line{{1, a, 3}, {2, b, 4}, {4, "docket/ideas/c.md", 5}, {5, "docket/ideas/d.md", 6}}, []int{5}},
 		{"first not 1", head + "2. `" + a + "`\n", []Line{{2, a, 3}}, []int{3}},
 		{"no heading", "\n1. `" + a + "`\n", []Line{{1, a, 2}}, []int{2}},
+		{"empty", "", nil, []int{1}},
+		{"newlines", "\n\n", nil, []int{1}},
+		{"crlf only", "\r\n", nil, []int{1}},
+		{"bom only", "\xef\xbb\xbf", nil, []int{1}},
+		{"leading zero", head + "01. `" + a + "`\n", nil, []int{3}},
+		{"form problem sets the number", head + "1. `" + a + "`\n2. `" + b + "`\n3. [ ] `docket/ideas/c.md`\n4. `docket/ideas/d.md`\n",
+			[]Line{{1, a, 3}, {2, b, 4}, {4, "docket/ideas/d.md", 6}}, []int{5}},
+		{"non-numbered line keeps the number", head + "1. `" + a + "`\n- later\n2. `" + b + "`\n", []Line{{1, a, 3}, {2, b, 5}}, []int{4}},
 		{"stray line", head + "1. `" + a + "`\n- later\n2. `" + b + "`\n", []Line{{1, a, 3}, {2, b, 5}}, []int{4}},
 	}
 	for _, c := range cases {
