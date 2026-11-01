@@ -817,3 +817,49 @@ func TestBranchFileInArchiveIsNotArchived(t *testing.T) {
 		t.Fatalf("inv = %+v", inv)
 	}
 }
+
+func issueSlugs(inv scan.Inventory) []string {
+	slugs := []string{}
+	for _, i := range inv.Issues {
+		slugs = append(slugs, i.Slug)
+	}
+	return slugs
+}
+
+func TestIssueOnABranch(t *testing.T) {
+	a := baseRepo(t)
+	a.Git("checkout", "-q", "-b", "x")
+	a.Commit("issue", map[string]string{"docket/issues/2026-11-02-x.md": "x\n"})
+	a.Git("checkout", "-q", "main")
+	bPath := filepath.Join(t.TempDir(), "b")
+	a.Git("worktree", "add", "-q", bPath, "x")
+	inv, _ := scanOf(t, a)
+	if joined(issueSlugs(inv)) != "2026-11-02-x" {
+		t.Fatalf("issues = %+v", inv.Issues)
+	}
+	s := inv.IssueSources("2026-11-02-x")
+	if len(s) != 2 || s[0].Kind != scan.KindWorktree || realPath(t, s[0].Name) != realPath(t, bPath) || s[1].Name != "refs/heads/x" {
+		t.Fatalf("sources = %+v", s)
+	}
+	if len(inv.Records) != 0 || inv.IssueSources("nope") != nil {
+		t.Fatalf("inv = %+v", inv)
+	}
+}
+
+func TestNoIssuesFolder(t *testing.T) {
+	inv, _ := scanOf(t, baseRepo(t))
+	if inv.Issues == nil || len(inv.Issues) != 0 || len(inv.Unreadable) != 0 {
+		t.Fatalf("inv = %+v", inv)
+	}
+}
+
+func TestIssuesFolderUnreadable(t *testing.T) {
+	r := baseRepo(t)
+	r.Git("checkout", "-q", "-b", "b")
+	r.Commit("file", map[string]string{"docket/issues": "not a folder\n"})
+	r.Git("checkout", "-q", "main")
+	inv, _ := scanOf(t, r)
+	if len(inv.Unreadable) != 1 || inv.Unreadable[0].Source.Name != "refs/heads/b" || inv.Unreadable[0].Path != "docket/issues" {
+		t.Fatalf("unreadable = %+v", inv.Unreadable)
+	}
+}

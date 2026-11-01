@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/record"
 )
 
@@ -57,6 +58,12 @@ type Record struct {
 	Sources []Source // Sources[0] is ranked as for changes
 }
 
+// Issue is a file issue, reported once however many sources hold it.
+type Issue struct {
+	Slug    string
+	Sources []Source // Sources[0] is ranked as for changes
+}
+
 // Archived is an archived use of a slug.
 type Archived struct {
 	Slug, Folder string
@@ -76,6 +83,7 @@ type Inventory struct {
 	Changes       []Change
 	Archived      []Archived
 	Records       []Record
+	Issues        []Issue
 	Unreadable    []Unreadable
 }
 
@@ -95,7 +103,7 @@ type found struct {
 
 // datedDirs are the folders of dated files, each file named <date>-<name>.md.
 // Their parent is docket/, which the batched tree walk relies on.
-var datedDirs = []string{record.Dir}
+var datedDirs = []string{record.Dir, issue.Dir}
 
 func (f *found) add(src Source, rank int, active, archived []string, dated map[string][]string) {
 	f.rank[src] = rank
@@ -120,7 +128,7 @@ func (f *found) add(src Source, rank int, active, archived []string, dated map[s
 // and the default branch tip. It contacts no remote. Only failures not tied to
 // one source are returned; a source that cannot be read goes into Unreadable.
 func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
-	inv := Inventory{DefaultBranch: db, Changes: []Change{}, Archived: []Archived{}, Records: []Record{}, Unreadable: []Unreadable{}}
+	inv := Inventory{DefaultBranch: db, Changes: []Change{}, Archived: []Archived{}, Records: []Record{}, Issues: []Issue{}, Unreadable: []Unreadable{}}
 	f := &found{active: map[string][]Source{}, archived: map[string][]Source{}, dated: map[string]map[string][]Source{}, rank: map[Source]int{}}
 	for _, d := range datedDirs {
 		f.dated[d] = map[string][]Source{}
@@ -211,6 +219,10 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		inv.Records = append(inv.Records, Record{Slug: slug, Sources: f.sortSources(srcs)})
 	}
 	sort.Slice(inv.Records, func(i, j int) bool { return inv.Records[i].Slug < inv.Records[j].Slug })
+	for slug, srcs := range f.dated[issue.Dir] {
+		inv.Issues = append(inv.Issues, Issue{Slug: slug, Sources: f.sortSources(srcs)})
+	}
+	sort.Slice(inv.Issues, func(i, j int) bool { return inv.Issues[i].Slug < inv.Issues[j].Slug })
 	return inv, nil
 }
 
@@ -428,6 +440,16 @@ func (inv Inventory) RecordSources(slug string) []Source {
 	for _, r := range inv.Records {
 		if r.Slug == slug {
 			return r.Sources
+		}
+	}
+	return nil
+}
+
+// IssueSources returns the sources holding the issue, nil when none.
+func (inv Inventory) IssueSources(slug string) []Source {
+	for _, i := range inv.Issues {
+		if i.Slug == slug {
+			return i.Sources
 		}
 	}
 	return nil
