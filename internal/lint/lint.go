@@ -166,6 +166,7 @@ func Run(in Input) Report {
 	r.lintRecords(recordNames)
 	if len(in.Slugs) == 0 {
 		r.lintIssues()
+		r.lintIdeas()
 	}
 	if len(in.Slugs) == 0 {
 		checkSpecTitles(r)

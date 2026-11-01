@@ -48,7 +48,7 @@ func TestGoodIssue(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 	r = runIssue("---\ntitle: B\nsource: s\ndropped: yes\nidea: docket/ideas/x.md\n---\n\n"+issueBody(),
-		map[string]string{"docket/ideas/x.md": "idea\n"})
+		map[string]string{"docket/ideas/x.md": ideaFile("title: X\n")})
 	if len(r.Findings) != 0 {
 		t.Fatalf("%+v", r.Findings)
 	}
@@ -114,7 +114,7 @@ func TestRecordSourceNamesAnIssue(t *testing.T) {
 }
 
 func TestIssueIdeaLinkOrDotDot(t *testing.T) {
-	repo := repoWith(map[string]string{issuePath: "", "README.md": "x", "docket/ideas/real.md": "idea\n"})
+	repo := repoWith(map[string]string{issuePath: "", "README.md": "x", "docket/ideas/real.md": ideaFile("title: R\n")})
 	repo["docket/ideas/link.md"] = &fstest.MapFile{Data: []byte("real.md"), Mode: fs.ModeSymlink}
 	for _, idea := range []string{"docket/ideas/link.md", "docket/ideas/../README.md"} {
 		repo[issuePath] = &fstest.MapFile{Data: []byte("---\ntitle: B\nsource: s\nidea: " + idea + "\n---\n\n" + issueBody())}
