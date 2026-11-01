@@ -21,8 +21,10 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           # Docs that nothing builds, embeds or tests. Any other path, or a diff that fails, runs everything.
-          docs='^(docket/ideas/|docket/order\.md$|docs/|README(\.zh-TW)?\.md$)'
-          if files=$(git diff --no-renames --name-only "$BASE" HEAD) &&
+          docs='^((docket/ideas|docs)/.+\.md|docket/order\.md|README(\.zh-TW)?\.md)$'
+          # Only the root package can embed these paths; once it does, they are code.
+          if ! grep -hE '^//go:embed' ./*.go | grep -qE '[[:space:]]["`]?(docs|docket|README|\*)' &&
+             files=$(git diff --no-renames --name-only "$BASE" HEAD) &&
              ! printf '%s\n' "$files" | grep -qvE "$docs"; then
             echo code=false >> "$GITHUB_OUTPUT"
           else

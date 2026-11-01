@@ -21,12 +21,13 @@ reads, and CI ran it again for every docs-only pull request.
 ## Verification
 
 The template prints through `dkt workflow template`; the READMEs match it.
-The CI decision, run from `ci.yml` against ten git diffs, gives docs-only
-for ideas, the order and the READMEs, and everything for code, an embedded
-template, code moved into `docs/`, lookalike paths, an empty diff and a
-missing base. Dropping `--no-renames` makes one case fail.
+The CI decision, run from `ci.yml` against sixteen git diffs, skips only
+for Markdown docs; code, embedded files, files moved into `docs/`, Go
+files there, docs a `go:embed` reads, an empty diff and a missing base run
+everything. Undoing each of its three rules fails a case.
 
 ## Review
 
-<!-- Who reviewed the diff (a model, or a person), what the review found,
-and how each finding was handled. -->
+A reviewer on another model found that a new Go file under `docs/` would
+skip the tests. Fixed: only Markdown counts as docs, and docs that the
+root package embeds count as code. Not reviewed again.
