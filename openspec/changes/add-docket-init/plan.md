@@ -72,13 +72,13 @@
 **Interfaces:**
 - Produces: `docket.UserSkills() []setup.Skill`, returning exactly one `setup.Skill{Name: "docket-init", Files: <user-skills/docket-init>}`.
 
-- [ ] **Step 1: Write the failing tests** in `schema_test.go`:
+- [x] **Step 1: Write the failing tests** in `schema_test.go`:
   - `TestUserSkillNames`: the names of `UserSkills()` equal `[]string{"docket-init"}`.
   - `TestSkillFrontmatter` also runs `checkSkillFrontmatter` for each of `UserSkills()`; `checkSkillFrontmatter` requires `disable-model-invocation: true` for `docket-doctor` and `docket-init`, and its absence for the others.
   - `TestDoctorHiddenFromCodex` (renamed `TestInvokedOnlyHiddenFromCodex`) covers `Skills()` and `UserSkills()`: `docket-doctor` and `docket-init` have `agents/openai.yaml` with `policy.allow_implicit_invocation: false`; no other skill has the file.
-- [ ] **Step 2: Run** `go test -run 'TestUserSkillNames|TestSkillFrontmatter|TestInvokedOnlyHiddenFromCodex' .` — expect FAIL (`UserSkills` undefined).
-- [ ] **Step 3: Implement `UserSkills()`** in `schema.go` with its own `//go:embed user-skills/docket-init` variable, and write `agents/openai.yaml` as docket-doctor's (`policy:` / `  allow_implicit_invocation: false`).
-- [ ] **Step 4: Write `user-skills/docket-init/SKILL.md`** in the style of `.agents/skills/docket-doctor/SKILL.md` (numbered `##` steps, short imperative sentences). Frontmatter:
+- [x] **Step 2: Run** `go test -run 'TestUserSkillNames|TestSkillFrontmatter|TestInvokedOnlyHiddenFromCodex' .` — expect FAIL (`UserSkills` undefined).
+- [x] **Step 3: Implement `UserSkills()`** in `schema.go` with its own `//go:embed user-skills/docket-init` variable, and write `agents/openai.yaml` as docket-doctor's (`policy:` / `  allow_implicit_invocation: false`).
+- [x] **Step 4: Write `user-skills/docket-init/SKILL.md`** in the style of `.agents/skills/docket-doctor/SKILL.md` (numbered `##` steps, short imperative sentences). Frontmatter:
 
   ```yaml
   name: docket-init
@@ -102,8 +102,8 @@
   5. *Report.* List what `git status --short` shows as created or changed by the setup, for the user to commit (`openspec/`, `.claude/skills/`, `.agents/skills/`, `AGENTS.md`, `CLAUDE.md`); say that the workflow file, the per-machine schema and the `docket-init` copies are outside the repository. Do not commit. In a repository with no commit, say that the first commit gives it the default branch `dkt new` needs. In Claude Code, when `.claude/skills/` did not exist before this run, say to type `/reload-skills`; in Codex, to restart when `$docket` does not show. End by saying development or a refactoring can start: the user describes the work, and the `docket` skill triages it.
 
   The intro says the command writes only through `dkt init`, `docket-setup` and `docket-doctor`, each with the consent it asks for, and never installs or commits.
-- [ ] **Step 5: Run** `go test .` — expect PASS.
-- [ ] **Step 6: Commit** `schema.go`, `schema_test.go`, `user-skills/docket-init/` with the trailers (`Task: 1`).
+- [x] **Step 5: Run** `go test .` — expect PASS.
+- [x] **Step 6: Commit** `schema.go`, `schema_test.go`, `user-skills/docket-init/` with the trailers (`Task: 1`).
 
 ### Task 2: setup installs the user-level skills
 
@@ -124,8 +124,8 @@
 - Produces: `Assets.UserSkills []Skill` (each installed under `<dir>/<name>` for each of `Dirs.UserSkills`); `KindUserSkill FileKind = "user-skill"`.
 - Produces: `func userdirs.ClaudeConfig(env []string, userHome func() (string, error)) (string, error)`; `func setup.UserSkillDirs(env []string, userHome func() (string, error)) ([]string, error)` returning `<claude>/skills` then `<home>/.agents/skills`, with a duplicate (after `filepath.Clean`) dropped.
 
-- [ ] **Step 1: Restructure (no behavior change).** Replace `schemaDir string` in `Init` and `Inspect` with `dirs Dirs` holding only `Schema`; update every call: the tests use a helper `dirs(root) Dirs { return Dirs{Schema: mdir(root)} }`, `cmd_init.go` and `cmd_inspect.go` pass `setup.Dirs{Schema: schemaDir}`. Run `go test ./...` — expect PASS. Commit (`Task: 2`, message `refactor(setup): pass destinations as Dirs`).
-- [ ] **Step 2: Write the failing tests.**
+- [x] **Step 1: Restructure (no behavior change).** Replace `schemaDir string` in `Init` and `Inspect` with `dirs Dirs` holding only `Schema`; update every call: the tests use a helper `dirs(root) Dirs { return Dirs{Schema: mdir(root)} }`, `cmd_init.go` and `cmd_inspect.go` pass `setup.Dirs{Schema: schemaDir}`. Run `go test ./...` — expect PASS. Commit (`Task: 2`, message `refactor(setup): pass destinations as Dirs`).
+- [x] **Step 2: Write the failing tests.**
   - `internal/userdirs`: `TestClaudeConfig` table: `HOME=/h` → `/h/.claude`; `HOME=/h` `CLAUDE_CONFIG_DIR=/c` → `/c`; `CLAUDE_CONFIG_DIR=` → `/h/.claude`; `CLAUDE_CONFIG_DIR=c` → `&RelativeError{"CLAUDE_CONFIG_DIR", "c"}`; only `CLAUDE_CONFIG_DIR=/c` → `/c`; empty env → `ErrNoHome`.
   - `internal/setup`: `TestUserSkillDirs`: `HOME=/h` → `[/h/.claude/skills /h/.agents/skills]`; with `CLAUDE_CONFIG_DIR=/c` → `[/c/skills /h/.agents/skills]`; with `CLAUDE_CONFIG_DIR=/h/.agents` → `[/h/.agents/skills]`; only `CLAUDE_CONFIG_DIR=/c` → `ErrNoHome`.
   - `internal/setup`: add `UserSkills: []Skill{{"docket-init", MapFS{"SKILL.md": "# init\n", "agents/openai.yaml": "policy: {}\n"}}}` to the test `assets`, and a helper `udirs(root) []string` returning `root+".claude/skills"` and `root+".agents/skills"`. Tests, each with `Dirs{Schema: mdir(root), UserSkills: udirs(root)}`:
@@ -138,10 +138,10 @@
     - `TestInitUserSkillFolderIsFile`: `<udirs[0]>/docket-init` is a regular file; Init returns `*Refused` and writes nothing.
     - `TestInspectUserSkills`: before Init, `Inspect` lists the four files with kind `KindUserSkill` and status `Written`, and creates neither directory.
     - `TestInitNoUserSkillDirs`: with `Dirs{Schema: mdir(root)}`, no result file has kind `KindUserSkill`.
-- [ ] **Step 3: Run** `go test ./internal/setup ./internal/userdirs` — expect FAIL (`ClaudeConfig`, `UserSkillDirs`, `Dirs.UserSkills`, `KindUserSkill` undefined).
-- [ ] **Step 4: Implement.** `ClaudeConfig` mirrors `DataHome`. `UserSkillDirs` goes in `internal/setup/schema.go` beside `SchemaDir`. In `targetsOf`, after the schema, add for each directory in `dirs.UserSkills` and each skill in `a.UserSkills` the skill's files with `rel` `path.Join(sk.Name, p)`, kind `KindUserSkill`, `base` the directory. Nothing else in `decide`, `write` or `problemForTarget` should need to change; if it does, say why in the report.
-- [ ] **Step 5: Run** `go test ./...` — expect PASS.
-- [ ] **Step 6: Commit** (`Task: 2`, message `feat(setup): install the user-level docket-init skill`).
+- [x] **Step 3: Run** `go test ./internal/setup ./internal/userdirs` — expect FAIL (`ClaudeConfig`, `UserSkillDirs`, `Dirs.UserSkills`, `KindUserSkill` undefined).
+- [x] **Step 4: Implement.** `ClaudeConfig` mirrors `DataHome`. `UserSkillDirs` goes in `internal/setup/schema.go` beside `SchemaDir`. In `targetsOf`, after the schema, add for each directory in `dirs.UserSkills` and each skill in `a.UserSkills` the skill's files with `rel` `path.Join(sk.Name, p)`, kind `KindUserSkill`, `base` the directory. Nothing else in `decide`, `write` or `problemForTarget` should need to change; if it does, say why in the report.
+- [x] **Step 5: Run** `go test ./...` — expect PASS.
+- [x] **Step 6: Commit** (`Task: 2`, message `feat(setup): install the user-level docket-init skill`).
 
 ### Task 3: dkt inspect without a default branch
 
@@ -156,16 +156,16 @@
 **Interfaces:**
 - Produces: `InspectResult.DefaultBranch *string` with JSON key `default_branch`.
 
-- [ ] **Step 1: Write the failing tests** in `cmd_inspect_test.go`:
+- [x] **Step 1: Write the failing tests** in `cmd_inspect_test.go`:
   - `TestInspectNoDefaultBranch` (replaces the test of that name that expects exit 4; the branch `work` repository stays): exit is 1, `result.default_branch` is nil, `result.changes` is `[]`, no finding has rule `environment`, and the text output (`runInspect` without `--json`) has the line `skipped  trailers: no default branch found`.
   - `TestInspectRepositoryWithoutCommits`: `testutil.NewRepo` with no commit; exit is not 4; `default_branch` nil; `changes` `[]`; `result.openspec` and `result.files` present.
   - `TestInspectDefaultBranchFound`: `committedRepo` → `default_branch` is `"main"`.
   - `TestInspectDefaultBranchFlag` also asserts `default_branch` is `"trunk"`, and that `--default-branch nope` gives `default_branch` nil and an exit other than 4.
   - `TestInspectCleanSetup`'s expected keys become `changes default_branch files openspec workflow`.
-- [ ] **Step 2: Run** `go test ./internal/cli -run 'TestInspect'` — expect FAIL.
-- [ ] **Step 3: Implement.** In `inspectCommand`, call `scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)`; on `scan.ErrNoDefaultBranch`, skip `archive.Trailers` and add the human line; otherwise set `res.DefaultBranch` to `db.Name`. Other errors still return.
-- [ ] **Step 4: Run** `go test ./internal/cli` — expect PASS.
-- [ ] **Step 5: Commit** (`Task: 3`, message `feat(inspect): run without a default branch`).
+- [x] **Step 2: Run** `go test ./internal/cli -run 'TestInspect'` — expect FAIL.
+- [x] **Step 3: Implement.** In `inspectCommand`, call `scan.ResolveDefaultBranch(c.Git, c.DefaultBranch)`; on `scan.ErrNoDefaultBranch`, skip `archive.Trailers` and add the human line; otherwise set `res.DefaultBranch` to `db.Name`. Other errors still return.
+- [x] **Step 4: Run** `go test ./internal/cli` — expect PASS.
+- [x] **Step 5: Commit** (`Task: 3`, message `feat(inspect): run without a default branch`).
 
 ### Task 4: dkt init and dkt inspect report the command
 
@@ -180,8 +180,8 @@
 **Interfaces:**
 - Consumes: `setup.UserSkillDirs`, `setup.Dirs`, `setup.KindUserSkill`, `docket.UserSkills()` (Tasks 1, 2).
 
-- [ ] **Step 1: Give init and inspect one home in tests.** Add `func userHome(dir string) string { return dir + ".home" }` beside `dataHome`, and have `runInit` and `runInspect` append `HOME=`+`userHome(dir)`. Run `go test ./internal/cli` — expect PASS (nothing writes there yet).
-- [ ] **Step 2: Write the failing tests.**
+- [x] **Step 1: Give init and inspect one home in tests.** Add `func userHome(dir string) string { return dir + ".home" }` beside `dataHome`, and have `runInit` and `runInspect` append `HOME=`+`userHome(dir)`. Run `go test ./internal/cli` — expect PASS (nothing writes there yet).
+- [x] **Step 2: Write the failing tests.**
   - `TestInitUserSkill`: fresh run; the text output has `written` lines for `userHome/.claude/skills/docket-init/SKILL.md`, `.../agents/openai.yaml` and the same under `userHome/.agents/skills/docket-init/`; `--json` lists them with those absolute paths; exit 0.
   - `TestInitClaudeConfigDir`: `CLAUDE_CONFIG_DIR=<temp>/claude`; the copy is under `<temp>/claude/skills/docket-init/`, `userHome/.claude` does not exist, the Codex copy is under `userHome/.agents/skills/docket-init/`.
   - `TestInitRelativeClaudeConfigDir`: `CLAUDE_CONFIG_DIR=claude` → exit 4, the message contains `CLAUDE_CONFIG_DIR is not an absolute path`, and nothing was written: no `AGENTS.md` in the repository, no per-machine schema directory, no `userHome/.agents`.
@@ -194,10 +194,10 @@
   - `TestInspectNoHomeForSchema` also expects `user-skill-missing` with the `ErrNoHome` text and no `file`.
   - `TestInspectNothingWritten`: after init, remove both user-level `docket-init` folders; snapshot `userHome(r.Dir)` before and after inspect as the other directories are; `user-skill-missing` is among the rules.
   - `TestInspectCleanSetup` still reports no finding.
-- [ ] **Step 3: Run** `go test ./internal/cli` — expect FAIL.
-- [ ] **Step 4: Implement.** `shippedAssets` adds `UserSkills: docket.UserSkills()`. `dkt init` resolves `setup.UserSkillDirs` after `SchemaDir`, an error being an `EnvError` as there, and maps a differing `KindUserSkill` file to `user-skill-differs`. `dkt inspect` adds a `user-skill-missing` finding with the error's text when `UserSkillDirs` fails, and `inspectStatus` names kind `KindUserSkill` `user-skill` with "the shipped skill". Update expected file lists in existing tests that now include the four files.
-- [ ] **Step 5: Run** `go vet ./... && go test ./...` — expect PASS.
-- [ ] **Step 6: Commit** (`Task: 4`, message `feat(init): install and inspect the docket-init command`).
+- [x] **Step 3: Run** `go test ./internal/cli` — expect FAIL.
+- [x] **Step 4: Implement.** `shippedAssets` adds `UserSkills: docket.UserSkills()`. `dkt init` resolves `setup.UserSkillDirs` after `SchemaDir`, an error being an `EnvError` as there, and maps a differing `KindUserSkill` file to `user-skill-differs`. `dkt inspect` adds a `user-skill-missing` finding with the error's text when `UserSkillDirs` fails, and `inspectStatus` names kind `KindUserSkill` `user-skill` with "the shipped skill". Update expected file lists in existing tests that now include the four files.
+- [x] **Step 5: Run** `go vet ./... && go test ./...` — expect PASS.
+- [x] **Step 6: Commit** (`Task: 4`, message `feat(init): install and inspect the docket-init command`).
 
 ### Task 5: The doctor, docs and prompt paths
 
@@ -211,8 +211,8 @@
 - Modify: `AGENTS.md` (Development section only, outside the Docket block)
 - Modify: `docs/ARCHITECTURE.md`
 
-- [ ] **Step 1: Doctor** (both copies, identical): step 1 lists `default_branch` (the branch whose trailers were checked; null when none was found, as in a repository with no commit, and `changes` is then empty); step 4's installed-file problems add `user-skill-missing` and `user-skill-differs`, and say the `docket-init` copies, like the schema's files, are per-machine and named by absolute path; the comparison run sets `HOME`, `XDG_DATA_HOME` and `CLAUDE_CONFIG_DIR` to new temporary directories, so nothing on the machine is written, and compares per-machine files under them.
-- [ ] **Step 2: README (both languages):** the paragraph on skills says that in any project the user can type `/docket-init` (`$docket-init` in Codex) to check the environment and set the project up; the files-written sentence adds the `docket-init` command; the per-machine paragraph says `dkt init` also writes `~/.claude/skills/docket-init/` (under `CLAUDE_CONFIG_DIR` when set) and `~/.agents/skills/docket-init/`.
-- [ ] **Step 3: AGENTS.md:** the prompt paths add `user-skills/docket-init/`, and the sentence on what `dkt init` ships adds that it installs `docket-init` at user level.
-- [ ] **Step 4: ARCHITECTURE.md:** the `schema.go`, `internal/setup` and `internal/userdirs` rows mention the command and `CLAUDE_CONFIG_DIR`; the capability table adds `setup.UserSkillDirs` and `userdirs.ClaudeConfig`.
-- [ ] **Step 5: Verify.** `diff .agents/skills/docket-doctor/SKILL.md .claude/skills/docket-doctor/SKILL.md` prints nothing; `go test .` passes (`TestInstalledSkillMatchesShipped`); `rg -n "user-skill-missing|CLAUDE_CONFIG_DIR" .agents/skills/docket-doctor/SKILL.md` finds both; each edited file reads through. Commit (`Task: 5`, message `docs: the docket-init command`).
+- [x] **Step 1: Doctor** (both copies, identical): step 1 lists `default_branch` (the branch whose trailers were checked; null when none was found, as in a repository with no commit, and `changes` is then empty); step 4's installed-file problems add `user-skill-missing` and `user-skill-differs`, and say the `docket-init` copies, like the schema's files, are per-machine and named by absolute path; the comparison run sets `HOME`, `XDG_DATA_HOME` and `CLAUDE_CONFIG_DIR` to new temporary directories, so nothing on the machine is written, and compares per-machine files under them.
+- [x] **Step 2: README (both languages):** the paragraph on skills says that in any project the user can type `/docket-init` (`$docket-init` in Codex) to check the environment and set the project up; the files-written sentence adds the `docket-init` command; the per-machine paragraph says `dkt init` also writes `~/.claude/skills/docket-init/` (under `CLAUDE_CONFIG_DIR` when set) and `~/.agents/skills/docket-init/`.
+- [x] **Step 3: AGENTS.md:** the prompt paths add `user-skills/docket-init/`, and the sentence on what `dkt init` ships adds that it installs `docket-init` at user level.
+- [x] **Step 4: ARCHITECTURE.md:** the `schema.go`, `internal/setup` and `internal/userdirs` rows mention the command and `CLAUDE_CONFIG_DIR`; the capability table adds `setup.UserSkillDirs` and `userdirs.ClaudeConfig`.
+- [x] **Step 5: Verify.** `diff .agents/skills/docket-doctor/SKILL.md .claude/skills/docket-doctor/SKILL.md` prints nothing; `go test .` passes (`TestInstalledSkillMatchesShipped`); `rg -n "user-skill-missing|CLAUDE_CONFIG_DIR" .agents/skills/docket-doctor/SKILL.md` finds both; each edited file reads through. Commit (`Task: 5`, message `docs: the docket-init command`).
