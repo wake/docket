@@ -45,12 +45,20 @@ An idea SHALL be a regular file `docket/ideas/<name>.md`: YAML front matter with
 - **WHEN** a line of `docket/order.md` names an idea whose front matter has `dropped: true`
 - **THEN** `dkt lint` reports `order-idea` on that line
 
+#### Scenario: Empty order file
+- **WHEN** `docket/order.md` is empty or holds only blank lines
+- **THEN** `dkt lint` reports `order-format` on line 1 and exits with 1
+
 #### Scenario: Linked order file
 - **WHEN** `docket/order.md` is a symbolic link to a file outside the repository
 - **THEN** `dkt lint` reports `order-format` naming the link and does not read through it
 
 ### Requirement: Idea front matter checked
-`dkt lint` SHALL report `idea-front-matter` for an idea whose front matter is missing or is not a YAML mapping, lacks a valid `title`, has `dropped` with a value other than `true`, or has a `needs` that is not a list of paths each naming another regular idea file in the worktree. A file under `docket/ideas/` that is not a regular file SHALL be skipped.
+`dkt lint` SHALL report `idea-front-matter` for an idea whose front matter is missing or is not a YAML mapping, lacks a valid `title`, has `dropped` with a value other than `true`, or has a `needs` that is not a list of paths each naming another regular idea file in the worktree. A file under `docket/ideas/` that is not a regular file SHALL be skipped. When `docket/ideas` is itself a symbolic link, lint SHALL list it as unreadable and read no idea through it.
+
+#### Scenario: Linked ideas folder
+- **WHEN** `docket/ideas` is a symbolic link to a folder inside the repository that holds `b.md`, and a line of `docket/order.md` names `docket/ideas/b.md`
+- **THEN** `dkt lint` lists `docket/ideas` as unreadable, reports `order-idea` on that line, and exits with 3
 
 #### Scenario: Idea without a title
 - **WHEN** `docket/ideas/2026-11-02-x.md` has front matter without `title`

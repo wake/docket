@@ -138,8 +138,9 @@ parallel do not meet in `docket/order.md`.
 - `ideas#idea-file-read`, `ideas#order-file-read`: the two formats.
 - `ideas#order-line-with-a-checkbox`, `ideas#gap-in-the-order`,
   `ideas#order-names-a-missing-idea`, `ideas#same-idea-twice`,
-  `ideas#dropped-idea-in-the-order`, `ideas#linked-order-file`: lint checks
-  the order.
+  `ideas#dropped-idea-in-the-order`, `ideas#linked-order-file`,
+  `ideas#empty-order-file`, `ideas#linked-ideas-folder`: lint checks the
+  order.
 - `ideas#idea-without-a-title`, `ideas#need-names-no-idea`: lint checks idea
   front matter.
 - `ideas#source-names-no-idea`: lint checks idea sources.
@@ -165,3 +166,4 @@ parallel do not meet in `docket/order.md`.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-11-02 | pre-merge review (codex adversarial) | a symbolic link `docket/ideas` is listed as unreadable and no idea is read through it; an empty `docket/order.md` is `order-format` | Task 2 code (c750879); two scenarios added to Task 2; no new task |
