@@ -34,7 +34,7 @@ Docket 讀 repo 裡的檔案和 git 紀錄，做四種工作：
 | 組裝 | `brief`、`accept --export` | 把散在多個檔案的內容拼成給實作 agent 的 brief，或拼成給客戶確認的頁面 |
 | 流程包裝 | `init`、`new`、`archive`、`rebase` | 安裝 schema，依固定順序呼叫 OpenSpec CLI 和上面的檢查，並記下 base commit 與證據 |
 
-會寫檔的指令有：`init`（schema、skill 與 Docket 區塊）、`new`（change 資料夾）、`record`（`docket/records/` 底下的紀錄）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 spec 標題與 `evidence.md`）、`rebase`（`docket.yaml` 的 base 那一行；舊版 dkt 建立的 change 則是 `.openspec.yaml` 的那一行）。它們都不會 commit。
+會寫檔的指令有：`init`（schema、skill、`docket-init` 指令與 Docket 區塊）、`new`（change 資料夾）、`record`（`docket/records/` 底下的紀錄）、`sync`（勾選框）、`archive`（經由 OpenSpec，外加 spec 標題與 `evidence.md`）、`rebase`（`docket.yaml` 的 base 那一行；舊版 dkt 建立的 change 則是 `.openspec.yaml` 的那一行）。它們都不會 commit。
 
 ## Docket 不是什麼
 
