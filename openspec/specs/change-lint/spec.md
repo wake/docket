@@ -134,7 +134,7 @@ Every bullet under `## Cancelled Tasks` SHALL have the form `- Task N: <name> - 
 - **THEN** lint reports a `compensates` finding on that line
 
 ### Requirement: Routing
-lint SHALL report every file under `docs/superpowers/specs/` or `docs/superpowers/plans/` that the current branch adds after its merge base with the default branch tip, whether committed or present uncommitted in the worktree, because designs and plans belong in the change folder. When no default branch can be found, lint SHALL list the routing check as unreadable and still run its other rules.
+lint SHALL report every file under `docs/superpowers/specs/` or `docs/superpowers/plans/` that the current branch adds after its merge base with the default branch tip, whether committed or present uncommitted in the worktree, because designs and plans belong in the change folder. When no default branch or merge base can be found, lint SHALL list the branch's added files as unreadable once, for routing, records and `Record` trailers alike, and still run its other rules.
 
 #### Scenario: Design written to the superpowers folder
 - **WHEN** the worktree has a new untracked file `docs/superpowers/specs/2026-10-25-x-design.md`
@@ -142,7 +142,11 @@ lint SHALL report every file under `docs/superpowers/specs/` or `docs/superpower
 
 #### Scenario: No default branch for routing
 - **WHEN** the repository has no default branch Docket can find and a change has a `proposal-section` problem
-- **THEN** lint reports the `proposal-section` finding, lists the routing check as unreadable, and exits with 3
+- **THEN** lint reports the `proposal-section` finding, lists the branch's added files as unreadable, and exits with 3
+
+#### Scenario: One unreadable entry
+- **WHEN** the repository has no default branch Docket can find and a user runs `dkt lint`
+- **THEN** lint lists exactly one unreadable entry
 
 ### Requirement: Unparseable structure
 lint SHALL report as `unparseable`, never skip, delta content OpenSpec 1.14 would not apply: a requirement header outside the ADDED, MODIFIED, REMOVED and RENAMED sections, a level-two section other than those four and Purpose, and a RENAMED FROM or TO line that does not form a pair. Headers inside fenced code blocks SHALL be ignored, as OpenSpec ignores them.
