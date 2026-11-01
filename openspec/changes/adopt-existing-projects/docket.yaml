@@ -1,0 +1,4 @@
+title: Adopt Docket in a project that already has its own files and OpenSpec changes
+kind: feature
+source: docket/ideas/2026-10-31-existing-project-adoption.md
+base: cd949431b7149a4cea8a9601c07df55ed42d669f
