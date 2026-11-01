@@ -118,6 +118,9 @@ func initCommand() Command {
 			case res.ProjectCopy == setup.ShippedCopy && !removed:
 				out.Findings = append(out.Findings, Finding{Rule: "schema-project-copy", Message: "a copy of a shipped schema, used instead of the per-machine one; dkt init removes it once the per-machine copy matches the shipped schema", File: projectCopyPath})
 			}
+			igF, igU := ignoredFindings(c, res.Files)
+			out.Findings = append(out.Findings, igF...)
+			out.Unreadable = append(out.Unreadable, igU...)
 			return out, nil
 		},
 	}

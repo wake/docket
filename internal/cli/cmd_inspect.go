@@ -91,6 +91,9 @@ func inspectCommand() Command {
 			pf, pu := problemFindings(problems)
 			out.Findings = append(out.Findings, pf...)
 			out.Unreadable = append(out.Unreadable, pu...)
+			igF, igU := ignoredFindings(c, files)
+			out.Findings = append(out.Findings, igF...)
+			out.Unreadable = append(out.Unreadable, igU...)
 			state, osFinds, err := openSpecState(c)
 			if err != nil {
 				return Outcome{Result: res}, err
