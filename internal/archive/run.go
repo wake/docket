@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/lint"
 	"github.com/wake/docket/internal/openspec"
@@ -161,13 +162,17 @@ func (r *archiveRun) change(slug string) (stopped bool, err error) {
 	if c == nil {
 		return r.stop(slug, "plan", finds, unread), nil
 	}
-	commits, err := e.Git.Commits(c.Meta.Base, r.head)
-	if err != nil {
-		return false, err
-	}
-	res := computeSync(c, commits)
-	if r.stop(slug, "plan", planFindings(c, res), nil) {
-		return true, nil
+	docket := c.Schema == change.DocketSchema
+	var res syncResult
+	if docket {
+		commits, err := e.Git.Commits(c.Meta.Base, r.head)
+		if err != nil {
+			return false, err
+		}
+		res = computeSync(c, commits)
+		if r.stop(slug, "plan", planFindings(c, res), nil) {
+			return true, nil
+		}
 	}
 
 	lr := r.in.Lint(slug)
@@ -181,10 +186,14 @@ func (r *archiveRun) change(slug string) (stopped bool, err error) {
 		return true, nil
 	}
 
-	drifts, finds, unread, checked := checkBase(e, c)
-	r.rep.Drifts = append(r.rep.Drifts, drifts...)
-	if r.stop(slug, "base", finds, unread) {
-		return true, nil
+	var checked int
+	if docket {
+		var drifts []Drift
+		drifts, finds, unread, checked = checkBase(e, c)
+		r.rep.Drifts = append(r.rep.Drifts, drifts...)
+		if r.stop(slug, "base", finds, unread) {
+			return true, nil
+		}
 	}
 
 	out, err := r.in.OpenSpec.Run("validate", slug, "--strict")
@@ -222,7 +231,7 @@ func (r *archiveRun) change(slug string) (stopped bool, err error) {
 	a := Archived{Change: slug, Folder: folder}
 	evPath := path.Join(folder, "evidence.md")
 	ev := evidence{Slug: slug, Date: as[:10], Docket: r.in.Version, OpenSpec: r.version, Origin: r.in.Origin, Head: r.head,
-		Meta: c.Meta, Tasks: c.Plan.Tasks, Commits: map[int][]gitx.Commit{}, Validate: validated, Checked: checked}
+		Schema: c.Schema, Meta: c.Meta, Tasks: c.Plan.Tasks, Commits: map[int][]gitx.Commit{}, Validate: validated, Checked: checked}
 	for _, w := range res.Tasks {
 		ev.Commits[w.Task.Number] = w.Commits
 	}

@@ -31,6 +31,18 @@ func Trailers(e Env) ([]TrailerCheck, []Finding, error) {
 			continue
 		}
 		dir := "openspec/changes/" + name
+		ob, hasOS, err := e.Git.ShowIfExists(e.Default.Commit, dir+"/"+change.OpenSpecFile)
+		if err != nil {
+			return nil, nil, err
+		}
+		if hasOS {
+			schema, serr := change.ReadSchema(map[string][]byte{change.OpenSpecFile: ob})
+			if serr == nil && schema != change.DocketSchema {
+				reason := "made with the " + schema + " schema"
+				checks = append(checks, TrailerCheck{Slug: name, Skipped: &reason})
+				continue
+			}
+		}
 		pb, ok, err := e.Git.ShowIfExists(e.Default.Commit, dir+"/plan.md")
 		if err != nil {
 			return nil, nil, err
