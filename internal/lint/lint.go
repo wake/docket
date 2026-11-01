@@ -150,7 +150,7 @@ func Run(in Input) Report {
 		checkProposal(r, c)
 		checkPlaceholders(r, c)
 		if m, err := change.ReadMetadata(c.Files); err == nil {
-			checkIssueSource(r, c, m.File, m.Source)
+			checkSources(r, c, m.File, m.Source)
 		}
 		if c.Has(planFile) {
 			checkPlan(r, c)

@@ -79,9 +79,9 @@ func (r *run) isFile(p, prefix string) bool {
 	return false
 }
 
-// checkIssueSource reports a source that starts with the issues folder but
+// checkSources reports a source that starts with the issues folder but
 // names no regular file there. file is the file that holds the source.
-func checkIssueSource(r *run, c *loaded, file, source string) {
+func checkSources(r *run, c *loaded, file, source string) {
 	s := strings.TrimSpace(source)
 	if p := change.SourcePath(s); strings.HasPrefix(p, issue.Dir+"/") && !r.isFile(p, issue.Dir+"/") {
 		r.add(c, "issue-source", file, 1, "source %q names no issue file", s)
