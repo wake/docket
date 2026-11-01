@@ -33,6 +33,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Job | Use |
 |---|---|
 | Run git | `gitx.Git.Run` (and its typed helpers, e.g. `Git.Show`, `Git.Worktrees`) |
+| Tell which paths the ignore rules cover | `gitx.Git.Ignored` |
 | Find changes everywhere | `scan.Scan`, then `Inventory.Uses` |
 | Resolve the default branch | `scan.ResolveDefaultBranch` |
 | Read a file from a scanned source | `scan.ReadFile` |
@@ -56,9 +57,13 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Make a scenario slug | `delta.Slug` |
 | Read proposal.md or plan.md | `change.ParseProposal`, `change.ParsePlan` |
 | Lint change folders | `lint.Run` |
+| Find main specs without a title | `lint.SpecTitles` |
+| Find changes of another schema | `lint.OtherSchemas` |
 | Read change metadata (`docket.yaml`, or `.openspec.yaml` of an older change) | `change.ReadMetadata`, `change.ParseDocket` |
 | Set one recorded key, such as the base | `change.SetKey` |
 | Tick plan steps | `change.Tick` |
+| Read the schema of a change | `change.ReadSchema` |
+| Count ticked and total checkboxes in a file | `change.Checkboxes` |
 | List commits between two revisions | `Git.Commits` |
 | List uncommitted paths | `Git.Uncommitted` |
 | Read a file at a revision if it exists | `Git.ShowIfExists` |
@@ -75,6 +80,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Keep the overlaps that involve one change | `conflicts.Involving` |
 | Load every active change's status | `status.Load` |
 | Work out a change's phase, tasks and progress | `status.Summarize` |
+| Phase and progress of a change of another schema from its `tasks.md` | `status.SummarizeChecklist` |
 | Match commits to plan tasks by trailer | `change.NamedTasks` |
 | List uncommitted paths under given paths | `Git.UncommittedUnder` |
 | List commits with their times, limited to paths | `Git.Commits` (`Commit.Time`, `paths`) |

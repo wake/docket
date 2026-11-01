@@ -144,6 +144,15 @@ dkt v0.6.0 設定過的專案，請執行 `dkt init --force` 換上新的 Docket
 
 dkt v0.9.2 以前設定過的專案，schema 是放在 `openspec/schemas/docket/` 的一份副本。請執行 `dkt init`，確認它刪掉了 `openspec/schemas/docket/`、並在 `openspec/config.yaml` 設好 `schema: docket`，然後把兩者一起提交。專案裡每個人都要升級 dkt，並在各自的機器上執行一次 `dkt init`。改過的副本會原樣保留，`dkt init` 會回報 `schema-edited`。
 
+### 在既有專案採用 Docket
+
+執行 `/docket-init`，或先跑 `dkt init` 再用 `docket-doctor` skill。doctor 會讀 `dkt inspect`，逐項提出修正，經你同意後才會動手編輯。
+
+- `dkt init` 要安裝、但被忽略規則擋在外面的檔案（`install-ignored`）：加上最窄的規則讓它們能被納入，`.claude/` 的做法是 `.claude/*` 加 `!.claude/skills/`，然後提交。`dkt init` 與 `dkt inspect` 都不會編輯忽略檔。
+- 沒有 title 的主 spec（`title-missing`）：doctor 會為每一份擬好 title，經你同意後寫入。
+- 用其他 OpenSpec schema 建立的 change（`.openspec.yaml` 的 `schema:`，例如 `spec-driven`）保留自己的檔案。`dkt lint` 只檢查它新增的 capability 的 title。`dkt status` 會顯示它的 schema 與 `tasks.md` 進度。`dkt archive` 封存它時不做 plan 與 base 檢查。`dkt sync` 與 `dkt rebase` 會拒絕它。一個步驟都還沒勾選的 change，可在你同意後由 agent 依 `docket-doctor/convert.md` 轉成 `docket` schema。
+- 專案刻意不納入版本控制的 OpenSpec 內容，要先由專案自己提交、改寫或捨棄，才能倚賴它。doctor 不會編輯那裡的任何東西。
+
 ## 需求（規劃中）
 
 - git
