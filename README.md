@@ -4,7 +4,7 @@ English | [繁體中文](README.zh-TW.md)
 
 Docket is a small command-line tool that checks [OpenSpec](https://github.com/Fission-AI/OpenSpec) change folders and keeps their books. It is meant for projects that plan and execute work with [superpowers](https://github.com/obra/superpowers). Docket keeps no state of its own, and the command is `dkt`.
 
-> **Status: early.** `init`, `new`, `lint`, `conflicts`, `sync`, `archive`, `rebase`, `status`, `record` and `workflow` work; the first seven of them completed the first milestone. The other commands below are a draft and will change. Docket is built with the workflow this README describes.
+> **Status: early.** `init`, `new`, `lint`, `conflicts`, `sync`, `archive`, `rebase`, `status`, `record`, `issue` and `workflow` work; the first seven of them completed the first milestone. The other commands below are a draft and will change. Docket is built with the workflow this README describes.
 
 ## Why
 
@@ -56,6 +56,8 @@ superpowers starts the work. OpenSpec never starts a step on its own; it is call
    - Docs for people, edits that only change comments or whitespace in code or test files (these are not edits to code or tests), version bumps, and dependency upgrades that touch only the dependency manifests: no review, and only the checks that read what changed (none for docs that nothing builds, embeds or tests). When such an edit touches a code or test file, a fresh agent that reads only the diff first confirms that every changed line is a comment or whitespace and that no comment changes how the code builds or runs. Sort by what is touched: a typo in a prompt is prompt text, and moving code is a restructuring. OpenSpec is not involved.
 
    Work on the second and third paths above opens no change but keeps a record in `docket/records/`, written by `dkt record` and checked by `dkt lint`; its commits carry `Record: <slug>`, and `dkt lint` reports a trailer that names no record. `dkt status` lists the open records and `dkt sync` ticks their tasks. `dkt new` and `dkt record` take a free `-2` suffix (then `-3`, and so on) when the slug is used.
+
+   Work whose expected behavior is already settled and that is not done now is an issue, not an idea. An issue has four sections (`## Current`, `## Expected`, `## Unchanged`, `## Found`; `dkt issue template` prints them). A project that keeps issues in an outside tool names it in a `## Issues` section of its `AGENTS.md`, and the agent files the issue there once the user agrees; otherwise `dkt issue` writes `docket/issues/<date>-<name>.md`. A record or change whose source is the issue's path handles it, and `dkt status` lists file issues that are pending or in progress from those records and changes. `dkt` never calls an outside tool.
 2. **Open a change** in a git worktree with `dkt new <slug>`, which wraps `openspec new change`.
 3. **Write the proposal and the delta.**
    - brainstorming writes `proposal.md` and `specs/**/spec.md` straight into the change folder, plus `design.md` when needed.
@@ -96,6 +98,7 @@ We found no public project that uses a single list this way; most keep both file
 dkt init [--force]                # install the docket schema, the skills and the Docket block
 dkt new <slug> --kind feature|change-request|baseline --source "<origin>" --title "<title>"
 dkt record <name> --kind fix|refactor|test|prompt|checks --source "<origin>" --title "<title>"   # a record for light-review work
+dkt issue <name> --title "<title>" --source "<origin>"   # a file issue for settled work that is not done now; `dkt issue template` prints the sections
 dkt lint [<slug>|<record>...]     # document rules
 dkt conflicts [<slug>]            # requirements touched by more than one active change
 dkt sync <slug>|<record> [--check]   # tick plan.md or a record's tasks from commit trailers

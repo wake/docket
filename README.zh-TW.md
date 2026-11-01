@@ -4,7 +4,7 @@
 
 Docket 是一個小型命令列工具，負責檢查 [OpenSpec](https://github.com/Fission-AI/OpenSpec) 的 change 資料夾，並幫它們記帳。適用於用 [superpowers](https://github.com/obra/superpowers) 規劃與執行工作的專案。Docket 自己不存任何狀態，指令名稱是 `dkt`。
 
-> **狀態：早期。**`init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`、`status`、`record`、`workflow` 已經能用，前面七個指令完成了第一個里程碑。下面其餘的指令還是草案，之後會調整。Docket 本身就是照這份 README 描述的流程開發的。
+> **狀態：早期。**`init`、`new`、`lint`、`conflicts`、`sync`、`archive`、`rebase`、`status`、`record`、`issue`、`workflow` 已經能用，前面七個指令完成了第一個里程碑。下面其餘的指令還是草案，之後會調整。Docket 本身就是照這份 README 描述的流程開發的。
 
 ## 為什麼要有它
 
@@ -56,6 +56,8 @@ Docket **不會**：
    - 給人讀的文件、程式碼或測試檔裡只改註解或空白（這不算改程式碼或測試）、版本號、只改相依套件清單的升級：不審查，只跑會讀到這次改動的檢查（只改沒有建置、嵌入或測試會讀的文件時，一項都不跑）。改到程式碼或測試檔時，先讓一個只讀 diff 的新 agent 確認每一行改動都是註解或空白，而且沒有會改變建置或執行的註解。依改到的東西歸類：prompt 裡的錯字算 prompt，搬移程式碼算重構。完全不碰 OpenSpec。
 
    第二、第三條路徑的工作不開 change，但會在 `docket/records/` 留一份紀錄，由 `dkt record` 寫出、`dkt lint` 檢查，它的 commit 帶 `Record: <slug>`，trailer 指不到任何紀錄時 `dkt lint` 會回報。`dkt status` 列出未合併的紀錄，`dkt sync` 勾選它們的任務。`dkt new` 和 `dkt record` 在 slug 已被用掉時，會改用空著的 `-2`（再來 `-3`，依此類推）後綴。
+
+   預期行為已經確定、現在不做的工作是 issue，不是 idea。issue 有四節（`## Current`、`## Expected`、`## Unchanged`、`## Found`，`dkt issue template` 會印出）。專案若把 issue 放在外部工具，就在 `AGENTS.md` 的 `## Issues` 一節寫明，agent 經使用者同意後把 issue 開在那裡；否則 `dkt issue` 寫出 `docket/issues/<日期>-<name>.md`。來源是該 issue 路徑的紀錄或 change 就是處理它的工作，`dkt status` 依這些紀錄與 change 列出待處理或進行中的檔案 issue。`dkt` 不會呼叫外部工具。
 2. **開 change。**在 git worktree 裡執行 `dkt new <slug>`，它會呼叫 `openspec new change`。
 3. **寫提案與 delta。**
    - brainstorming 直接把 `proposal.md` 和 `specs/**/spec.md` 寫進 change 資料夾，需要時再加 `design.md`。
@@ -96,6 +98,7 @@ Docket **不會**：
 dkt init [--force]                # 安裝 docket schema、各 skill 與 Docket 區塊
 dkt new <slug> --kind feature|change-request|baseline --source "<出處>" --title "<標題>"
 dkt record <name> --kind fix|refactor|test|prompt|checks --source "<出處>" --title "<標題>"   # 輕審工作的紀錄
+dkt issue <name> --title "<標題>" --source "<出處>"   # 預期行為已定、現在不做的工作，寫成檔案 issue；`dkt issue template` 印出各節
 dkt lint [<slug>|<record>...]     # 文件規則
 dkt conflicts [<slug>]            # 被多個進行中 change 碰到的需求
 dkt sync <slug>|<record> [--check]   # 依 commit trailer 勾 plan.md 或紀錄的任務

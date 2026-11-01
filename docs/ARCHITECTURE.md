@@ -20,6 +20,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | `internal/status` | Summarizes each active change and each record: phase, task states from commit trailers, progress, last activity |
 | `internal/conflicts` | Finds requirements that more than one active change touches |
 | `internal/record` | Records: kinds, name and slug, the template rendering, creating a file under a free name, parsing and word counting |
+| `internal/issue` | Issues: name and slug, the template rendering, parsing the front matter that hides an issue |
 | `internal/lint` | Runs the lint rules over change folders through an `fs.FS` |
 | `internal/userdirs` | Finds the home and the data directory (`XDG_DATA_HOME`) from values `cmd/dkt` passes in |
 | `internal/safepath` | Refuses a write path that passes through a symbolic link |
@@ -83,6 +84,7 @@ Docket (`dkt`) is a Go CLI. Read this before writing a proposal or a plan.
 | Pick a free slug | `change.Suffixed` with `scan.Inventory.Uses` or `RecordSources` |
 | Where a record slug is used | `scan.Inventory.RecordSources` |
 | Count a record section's words | `record.Words` |
+| Render a file issue from the template; read its front matter | `issue.Render`; `issue.ParseFrontMatter` |
 | Load records with their state, merge commit and tag | `status.LoadRecords` |
 | Match trailers to tasks for a change or a record | `change.MatchTasks` |
 | Commits on HEAD that carry a record's trailers | `record.CommitsFor` |
