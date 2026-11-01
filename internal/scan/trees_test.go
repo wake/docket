@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/testutil"
 )
 
@@ -30,11 +31,10 @@ func sorted(s []string) []string { s = slices.Clone(s); slices.Sort(s); return s
 // gives, the error text included.
 func sameAsReadTree(t *testing.T, g gitx.Git, commit string) treeRead {
 	t.Helper()
-	var want treeRead
-	want.active, want.archived, want.records, want.recErr, want.err = readTree(g, commit)
+	want := readTree(g, commit)
 	got := readTrees(g, []string{commit, commit})[commit]
 	if !reflect.DeepEqual(sorted(got.active), sorted(want.active)) || !reflect.DeepEqual(sorted(got.archived), sorted(want.archived)) ||
-		!reflect.DeepEqual(sorted(got.records), sorted(want.records)) || errText(got.recErr) != errText(want.recErr) || errText(got.err) != errText(want.err) {
+		!reflect.DeepEqual(sorted(got.dated[record.Dir]), sorted(want.dated[record.Dir])) || errText(got.datedErr[record.Dir]) != errText(want.datedErr[record.Dir]) || errText(got.err) != errText(want.err) {
 		t.Fatalf("readTrees = %+v\nreadTree  = %+v", got, want)
 	}
 	return got

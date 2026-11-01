@@ -28,12 +28,12 @@ func RecordTags(g gitx.Git, tags []gitx.Ref) (map[string]string, []Unreadable) {
 		case tr.err != nil:
 			bad = append(bad, Unreadable{Source: src, Reason: tr.err.Error()})
 			continue
-		case tr.recErr != nil:
-			bad = append(bad, Unreadable{Source: src, Path: record.Dir, Reason: tr.recErr.Error()})
+		case tr.datedErr[record.Dir] != nil:
+			bad = append(bad, Unreadable{Source: src, Path: record.Dir, Reason: tr.datedErr[record.Dir].Error()})
 			continue
 		}
 		short := strings.TrimPrefix(t.Name, "refs/tags/")
-		for _, slug := range tr.records {
+		for _, slug := range tr.dated[record.Dir] {
 			if _, ok := found[slug]; !ok {
 				found[slug] = short
 			}
