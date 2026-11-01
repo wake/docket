@@ -97,7 +97,7 @@ func TestSchemaHasTemplates(t *testing.T) {
 }
 
 func TestSkillFrontmatter(t *testing.T) {
-	for _, sk := range Skills() {
+	for _, sk := range append(Skills(), UserSkills()...) {
 		t.Run(sk.Name, func(t *testing.T) { checkSkillFrontmatter(t, sk) })
 	}
 }
@@ -130,7 +130,7 @@ func checkSkillFrontmatter(t *testing.T, sk setup.Skill) {
 	if fm.Description == "" || len(fm.Description) > 1024 {
 		t.Errorf("description length %d", len(fm.Description))
 	}
-	if sk.Name == "docket-doctor" {
+	if sk.Name == "docket-doctor" || sk.Name == "docket-init" {
 		if fm.DisableModelInvocation == nil || !*fm.DisableModelInvocation {
 			t.Error("disable-model-invocation must be true")
 		}
@@ -149,10 +149,20 @@ func TestSkillNames(t *testing.T) {
 	}
 }
 
-func TestDoctorHiddenFromCodex(t *testing.T) {
-	for _, sk := range Skills() {
+func TestUserSkillNames(t *testing.T) {
+	var got []string
+	for _, sk := range UserSkills() {
+		got = append(got, sk.Name)
+	}
+	if want := []string{"docket-init"}; !slices.Equal(got, want) {
+		t.Errorf("names = %v, want %v", got, want)
+	}
+}
+
+func TestInvokedOnlyHiddenFromCodex(t *testing.T) {
+	for _, sk := range append(Skills(), UserSkills()...) {
 		b, err := fs.ReadFile(sk.Files, "agents/openai.yaml")
-		if sk.Name != "docket-doctor" {
+		if sk.Name != "docket-doctor" && sk.Name != "docket-init" {
 			if err == nil {
 				t.Errorf("%s has agents/openai.yaml", sk.Name)
 			}
