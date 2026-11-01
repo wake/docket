@@ -154,3 +154,4 @@ files when it names none.
 
 | Date | Source | Change | Impact |
 |---|---|---|---|
+| 2026-11-01 | plan review (codex) | A handler the default branch tip holds is read from the tip; two state scenarios added; the command flow, the YAML decoder and the front-matter framing shared with records | Tasks 1 and 5 grow; no new task |

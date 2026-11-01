@@ -95,7 +95,7 @@ Each of the four sections of a file issue SHALL hold at most 60 words outside HT
 - **THEN** `dkt lint` reports no `issue-source`
 
 ### Requirement: Issue state
-A file issue's handlers SHALL be the records and changes, active or archived, whose source is the issue's path. Its state SHALL be `dropped` with `dropped: true`, `moved` with an `idea`, and otherwise `pending` with no handler, `in-progress` when a scanned source holds a handler that the default branch tip does not, and `handled` when the default branch tip holds a handler and none is in progress.
+A file issue's handlers SHALL be the records and changes, active or archived, whose source is the issue's path, each read from the default branch tip when the tip holds it and from its first source otherwise. Its state SHALL be `dropped` with `dropped: true`, `moved` with an `idea`, and otherwise `pending` with no handler, `in-progress` when the tip does not hold a handler, and `handled` when it holds every handler.
 
 #### Scenario: Handler on a branch
 - **WHEN** the default branch tip holds `docket/issues/2026-11-02-x.md` and an unmerged branch holds a record whose source is that path
@@ -104,6 +104,14 @@ A file issue's handlers SHALL be the records and changes, active or archived, wh
 #### Scenario: Handler merged
 - **WHEN** the default branch tip holds the issue and a record whose source is its path, and no other source holds a handler the tip does not
 - **THEN** the issue's state is `handled`
+
+#### Scenario: Merged change not yet archived
+- **WHEN** the default branch tip holds the active change `add-x`, whose `docket.yaml` has the issue's path as its source
+- **THEN** the issue's state is `handled`
+
+#### Scenario: Merged record edited elsewhere
+- **WHEN** the default branch tip holds a record whose source is `review of #40`, and worktree B changes that record's source to the issue's path
+- **THEN** the record is not a handler of the issue
 
 ### Requirement: Issues listed by status
 `dkt status` SHALL list in `result.issues`, sorted by slug, every file issue the scan finds that is `pending` or `in-progress`, each with its slug, title and source from the front matter of its first source (null when unreadable), its state, its handlers (kind `record` or `change`, slug, and whether the default branch tip holds it) and its sources with their commits, and a line per issue after the records. With slugs it SHALL list no issue.

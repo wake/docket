@@ -50,11 +50,14 @@
 | Read files of a source | internal/scan/scan.go:ReadFiles | reuse | issues, records and archived metadata are read with it | `rg -n "func ReadFiles" internal/scan` |
 | A record's state: open or merged | internal/status/records.go:stateOf | reuse | a handler is merged when the default branch tip holds it | `rg -n "func stateOf" internal/status` |
 | A change's source, active or archived | internal/change/metadata.go:ReadMetadata | reuse | reads `docket.yaml` and the older `.openspec.yaml` | `rg -n "func ReadMetadata" internal/change` |
-| Active changes with their metadata | internal/status/load.go:Load | reuse | `Change.Metadata.Source` | `rg -n "Metadata.*Source" internal/status` |
+| Active changes and the sources that hold them | internal/scan/scan.go:Change | reuse | `status.Load` reads the first source only, but a change the tip holds must be read from the tip | `rg -n "type Change struct" internal/scan` |
+| The command flow of a dated file: name rules, path check, scan, write, refusals, `used` | internal/cli/cmd_record.go:recordCommand | extend | moved into `writeDated` so `dkt issue` runs the same code | `rg -n "func recordCommand" internal/cli` |
+| Decode one YAML mapping into a struct | internal/change/docket.go:ParseDocket | extend | its mapping check becomes `DecodeMapping`, which the issue front matter uses | `rg -n "not a YAML mapping" internal/change` |
+| Front matter and template as a new file | internal/record/record.go:Render | extend | its framing becomes `Wrap` | `rg -n "func Render" internal/record` |
 | Embed a template | schema.go:RecordTemplate | extend | an `IssueTemplate` beside it | `rg -n "go:embed" schema.go` |
 | Register a command | internal/cli/run.go:commands | extend | add `issueCommand` | `rg -n "var commands" internal/cli` |
 | Print a shipped template | internal/cli/cmd_workflow.go:workflowCommand | new | `dkt issue template` follows its `template` branch; there is nothing to call | `rg -n "args\[0\] == \"template\"" internal/cli` |
-| Issue front matter with `dropped` and `idea` | internal/change/docket.go:ParseDocket | new | `change.Docket` has no `dropped` or `idea`, and decoding into it drops them silently | `rg -n "type Docket struct" internal/change` |
+| Issue front matter with `dropped` and `idea` | internal/change/docket.go:Docket | new | `change.Docket` has no `dropped` or `idea`, and decoding into it drops them silently; the new type decodes with `DecodeMapping` | `rg -n "type Docket struct" internal/change` |
 
 ---
 
@@ -67,22 +70,27 @@
 **Files:**
 - Modify: `internal/record/parse.go`
 - Modify: `internal/record/record.go`
+- Modify: `internal/change/docket.go`
+- Create: `internal/cli/dated.go`
 - Modify: `internal/cli/cmd_record.go`
 - Modify: `internal/lint/record.go`
-- Test: `internal/record/parse_test.go`
+- Test: `internal/record/parse_test.go`, `internal/change/docket_test.go`
 
 **Interfaces:**
-- Produces: `record.Split(b []byte) (front []byte, sections []Section, plan change.Plan, err error)` — `err` is the missing-front-matter error `Parse` reports today; `Parse` becomes `Split` followed by `change.ParseDocket`.
+- Produces: `record.Split(b []byte) (front []byte, sections []Section, plan change.Plan, err error)` — the front matter lines blanked, then HTML comments blanked and fences masked before headings are read, exactly as `Parse` does now; `err` is the missing-front-matter error. `Parse` becomes `Split` followed by `change.ParseDocket`.
+- Produces: `record.Wrap(front []byte, template string) []byte` — `---\n`, front, `---\n\n`, template; `record.Render` calls it.
 - Produces: `record.ValidateName(command, name string) error` — the date message says "dkt <command> adds the date".
+- Produces: `change.DecodeMapping(b []byte, v any) error` — fails when `b` is not one YAML mapping or a key does not decode to its field's type; `ParseDocket` calls it.
+- Produces in `internal/cli`: `type datedFile struct{ Command, Dir string; Sources func(inv scan.Inventory, slug string) []scan.Source }` and `func writeDated(c *Context, d datedFile, name string, content []byte) (written, path string, used []string, out Outcome, done bool, err error)` — the name rules, the path check, the scan and its unreadable sources, `record.Create`, the link and too-long refusals, and the `used` list, as `cmd_record.go` runs them now; `done` is true when `out` (a finding, a refusal or unreadable sources) is the command's whole outcome. `recordCommand` keeps its flag checks and its result, and calls it.
 - Produces in `internal/lint`: `type sectionRules struct{ Prefix string; Sections []string; Optional string }` and `checkSections(r *run, c *loaded, name string, secs []record.Section, rules sectionRules)` reporting `<Prefix>-section` and `<Prefix>-too-long`; `checkRecordSections` calls it with `{"record", record.Sections, record.TasksSection}`.
 
 Structure only: every existing test passes unchanged in behavior.
 
-- [ ] **Step 1: Write `TestSplit`** in `internal/record/parse_test.go`: a file with front matter `title: X` and two sections returns `front == "title: X"`, two sections with their lines, no error; a file without the opening `---` returns the missing-front-matter error.
-- [ ] **Step 2: Run** `go test ./internal/record/ -run TestSplit` — FAIL (undefined: Split).
-- [ ] **Step 3: Extract `Split`** from `Parse`; `Parse` calls it. Change `ValidateName` to take the command; update `cmd_record.go`. Extract `checkSections` from `checkRecordSections`, with the rule names built from `Prefix` and the heading list from `Sections` plus `Optional`.
-- [ ] **Step 4: Run** `go test ./internal/record/ ./internal/lint/ ./internal/cli/ -run 'Record|Split'` — PASS, and the messages of the record findings are unchanged.
-- [ ] **Step 5: Commit** `refactor(record): split the parser and the section checks out for reuse`.
+- [ ] **Step 1: Write the failing tests.** `TestSplit` in `internal/record/parse_test.go`: a file with front matter `title: X` and two sections returns `front == "title: X"` and two sections with their lines; a `## Fake` heading inside an HTML comment and one inside a fenced block are not sections; a file without the opening `---` returns the missing-front-matter error. `TestDecodeMapping` in `internal/change/docket_test.go`: a list is an error; `dropped: yes` into a `*bool` field is an error; `dropped: true` decodes.
+- [ ] **Step 2: Run** `go test ./internal/record/ ./internal/change/ -run 'TestSplit|TestDecodeMapping'` — FAIL (undefined).
+- [ ] **Step 3: Extract** `Split` and `Wrap` from `Parse` and `Render`, `DecodeMapping` from `ParseDocket`, `writeDated` from `recordCommand`, `checkSections` from `checkRecordSections`. Change `ValidateName` to take the command.
+- [ ] **Step 4: Run** `go test ./internal/record/ ./internal/change/ ./internal/lint/ ./internal/cli/` — PASS, and the messages of the record findings and of `dkt record` are unchanged.
+- [ ] **Step 5: Commit** `refactor(record): share the parser, the writer and the section checks`.
 
 ### Task 2: Scan finds file issues
 
@@ -102,7 +110,7 @@ Structure only: every existing test passes unchanged in behavior.
 - An unreadable `docket/issues` is reported as `Unreadable{Source, Path: "docket/issues"}` and leaves the source readable, as the records folder does.
 
 - [ ] **Step 1: Structure commit.** Replace the `records []string, recErr error` pair in `readDisk`, `readTree`, `readTreeEach`, `readTrees` and `found.add` with lists keyed by folder, over a package list `datedDirs` that holds `record.Dir` only. Run `go test ./internal/scan/` — PASS. Commit `refactor(scan): read dated files from a list of folders`.
-- [ ] **Step 2: Write the failing tests:** `TestIssueOnABranch` (a branch and worktree B hold `docket/issues/2026-11-02-x.md`; the scan from worktree A reports it once, worktree B first, the branch second), `TestNoIssuesFolder` (no `docket/issues`: no issue, the source readable), `TestIssuesFolderUnreadable` (`docket/issues` is a file at a commit: one `Unreadable` with that path), and the batch-tree path in `trees_test.go` reading `docket/issues` at a commit.
+- [ ] **Step 2: Write the failing tests:** `TestIssueOnABranch` (a branch and worktree B hold `docket/issues/2026-11-02-x.md`; the scan from worktree A reports it once, worktree B first, the branch second), `TestNoIssuesFolder` (no `docket/issues`: no issue, the source readable), `TestIssuesFolderUnreadable` (`docket/issues` is a file at a commit: one `Unreadable` with that path), the batch-tree path in `trees_test.go` reading `docket/issues` at a commit, and a case in `tree_cases_test.go` that sends a commit through `readTreeEach` (the one-folder-at-a-time fallback the existing cases use) and still finds its issues.
 - [ ] **Step 3: Run** `go test ./internal/scan/ -run 'Issue'` — FAIL.
 - [ ] **Step 4: Add `issue.Dir` to `datedDirs`**, `Inventory.Issues`, `IssueSources`.
 - [ ] **Step 5: Run** `go test ./internal/scan/` — PASS.
@@ -125,7 +133,7 @@ Structure only: every existing test passes unchanged in behavior.
 - Modify: `internal/record/record_test.go`
 
 **Interfaces:**
-- Consumes: `record.Create`, `record.Slug`, `record.ValidateName("issue", name)`, `record.Split`, `scan.Inventory.IssueSources`.
+- Consumes: `writeDated` with `{Command: "issue", Dir: issue.Dir, Sources: (scan.Inventory).IssueSources}`, `record.Wrap`, `record.Split`, `change.DecodeMapping`.
 - Produces: `docket.IssueTemplate() string` (embeds `issue/template.md`).
 - Produces in `internal/issue`: `var Sections = []string{"Current", "Expected", "Unchanged", "Found"}`; `type FrontMatter struct{ Title string; Source string; Dropped *bool; Idea string }` with yaml keys `title`, `source`, `dropped`, `idea`; `func ParseFrontMatter(b []byte) (FrontMatter, error)` (fails when not a mapping or a key does not decode to its type; an invalid title reads as ""); `type File struct{ FrontMatter FrontMatter; FrontMatterErr error; Sections []record.Section }`; `func Parse(b []byte) File`; `func Render(title, source, template string) ([]byte, error)`; `type Result struct{ Slug, Path, Title, Source, Requested string; Used []string }` with json keys `slug`, `path`, `title`, `source`, `requested`, `used` (`used` never null).
 - Command: `dkt issue <name> --title <text> --source <text>` and `dkt issue template`; result of the latter `{"text": ...}`.
@@ -160,8 +168,8 @@ evidence (a log line, a commit, a link). -->
 
 - [ ] **Step 1: Write the failing tests** in `internal/issue/issue_test.go`: `TestParseFrontMatter` (`dropped: true` reads as true; `dropped: yes` is an error; `idea` read; a list is an error); `TestRender` (front matter keys in the order title, source, then the template). In `internal/cli/cmd_issue_test.go`, one test per scenario: `TestIssueTemplatePrinted` (`--json` `result.text` holds the four headings in order), `TestIssueWritten` (the slug, the file's front matter and sections, exit 0), `TestIssueMissingSource` (exit 2, nothing under `docket/issues`), `TestIssueNameWithDate` (exit 1, message says `dkt issue` adds the date), `TestIssueSameNameSameDay` (another worktree's branch holds the slug: `-2` written), `TestIssueUnreadableSource` (exit 3, nothing written), `TestIssueSymlinkedFolder` (exit 1, the link named, nothing written on either side), `TestIssueTemplateArgs` (`dkt issue template extra` and `dkt issue template --title X` exit 2). In `internal/record/record_test.go`, `TestCreateFailedWriteRemovesIssuesFolder`: `Create` into a missing `docket/issues` with a failing write leaves neither the file nor the folder.
 - [ ] **Step 2: Run** `go test ./internal/issue/ ./internal/cli/ ./internal/record/ -run 'Issue|FrontMatter|Render'` — FAIL.
-- [ ] **Step 3: Implement** `internal/issue`, the template and its embed, and `cmd_issue.go`, following `cmd_record.go`: usage errors before any read; `template` handled before the name rules, refusing any flag or other argument; `safepath.Check` on the issue path; the scan's unreadable sources stop it with exit 3; `record.Create` with `inv.IssueSources(cand) != nil` as `used`; a `*record.LinkError` becomes the symlink refusal naming `docket/issues/<name>`. Register `issueCommand` after `recordCommand`.
-- [ ] **Step 4: Run** `go test ./internal/issue/ ./internal/cli/ ./internal/record/` — PASS.
+- [ ] **Step 3: Implement** `internal/issue` (`ParseFrontMatter` on `change.DecodeMapping`, `Parse` on `record.Split`, `Render` on `record.Wrap`), the template and its embed, and `cmd_issue.go`: usage errors before any read; `template` handled before the name rules, refusing any flag or other argument; the rest through `writeDated`. Register `issueCommand` after `recordCommand`.
+- [ ] **Step 4: Run** `go test ./internal/issue/ ./internal/cli/ ./internal/record/` — PASS, and `npx -y jscpd@5.4.2 --format go --ignore "**/testdata/**,**/*_test.go" --baseline-from-ref origin/main --fail-on-new-clones=0 .` exits with 0.
 - [ ] **Step 5: Commit** `feat(issue): dkt issue writes a file issue from the shipped template`.
 
 ### Task 4: Lint file issues and the sources that name them
@@ -183,7 +191,7 @@ evidence (a log line, a commit, a link). -->
 - Produces: `lint.Input.AddedIssues []string` and `lint.Input.IssueTemplate string`; `lint.Report.Issues []string` (sorted, never nil in JSON); `dkt lint --json` `result.issues`.
 - `issue-source`: for each linted change (its metadata source) and each record the branch adds (its front matter source), a trimmed source starting with `docket/issues/` that is not a regular file in the worktree is reported, naming the source.
 
-- [ ] **Step 1: Write the failing tests** in `internal/lint/issue_test.go`, one per scenario: front matter with an `idea` naming no file, `dropped: false`, no `source`; `## Unchanged` empty; the template's `## Found` comment left (`placeholder`); `## Current` with 61 English words (`issue-too-long` naming `Current` and 61); a record source naming no issue, and one naming an issue that exists; a source with surrounding spaces naming an existing issue gives no finding; a change whose source names no issue. In `cmd_lint_test.go`: the branch adds `2026-11-02-b` while the default branch holds `2026-10-01-a` (only b linted, `result.issues` is `["2026-11-02-b"]`); no default branch with an uncommitted issue (exactly one unreadable entry, no issue finding).
+- [ ] **Step 1: Write the failing tests** in `internal/lint/issue_test.go`, one per scenario: front matter with an `idea` naming no file, an `idea` naming a folder under `docket/ideas/`, an `idea` naming a regular file outside it (`README.md`), `dropped: false`, no `source`; `## Unchanged` empty; the template's `## Found` comment left (`placeholder`); `## Current` with 61 English words (`issue-too-long` naming `Current` and 61); a record source naming no issue, and one naming an issue that exists; a source with surrounding spaces naming an existing issue gives no finding; a change whose source names no issue. In `cmd_lint_test.go`: the branch adds `2026-11-02-b` while the default branch holds `2026-10-01-a` (only b linted, `result.issues` is `["2026-11-02-b"]`); no default branch with an uncommitted issue (exactly one unreadable entry, no issue finding).
 - [ ] **Step 2: Run** `go test ./internal/lint/ ./internal/cli/ -run 'Issue'` — FAIL.
 - [ ] **Step 3: Implement** `lintIssues` beside `lintRecords`, run only when no name is given; front matter checks; `checkSections` with `{"issue", issue.Sections, ""}`; `checkPlaceholderFile`; `collectPlaceholders` for `issue/template.md`; `checkIssueSources`; `cmd_lint.go` asks `addedFiles` for `issue.Dir` too and fills `AddedIssues` and `IssueTemplate`.
 - [ ] **Step 4: Run** `go test ./internal/lint/ ./internal/cli/` — PASS.
@@ -191,7 +199,7 @@ evidence (a log line, a commit, a link). -->
 
 ### Task 5: dkt status lists file issues
 
-**Scenarios:** issues#handler-on-a-branch, issues#handler-merged, issues#pending-issue-listed, issues#issue-in-progress, issues#handled-issue-hidden, issues#dropped-and-moved-hidden, issues#issues-not-listed-with-slugs
+**Scenarios:** issues#handler-on-a-branch, issues#handler-merged, issues#merged-change-not-yet-archived, issues#merged-record-edited-elsewhere, issues#pending-issue-listed, issues#issue-in-progress, issues#handled-issue-hidden, issues#dropped-and-moved-hidden, issues#issues-not-listed-with-slugs
 
 **Review:** judgment
 
@@ -202,12 +210,12 @@ evidence (a log line, a commit, a link). -->
 - Create: `internal/cli/cmd_status_issues_test.go`
 
 **Interfaces:**
-- Consumes: `scan.Inventory.Issues`, `.Records`, `.Archived`, `scan.ReadFiles`, `issue.Parse`, `record.Parse`, `change.ReadMetadata`, `status.Change.Metadata`.
-- Produces: `status.Pending = "pending"`, `status.InProgress = "in-progress"`; `type Handler struct{ Kind, Slug string; Merged bool }` (json `kind`, `slug`, `merged`); `type Issue struct{ Slug string; Title, Source *string; State string; Handlers []Handler; Sources []scan.Source }` (json `slug`, `title`, `source`, `state`, `handlers`, `sources`; `handlers` never null); `func LoadIssues(g gitx.Git, inv scan.Inventory, changes []Change) ([]Issue, []scan.Unreadable, error)`.
+- Consumes: `scan.Inventory.Issues`, `.Records`, `.Changes`, `.Archived`, `scan.ReadFiles`, `issue.Parse`, `record.Parse`, `change.ReadMetadata`.
+- Produces: `status.Pending = "pending"`, `status.InProgress = "in-progress"`; `type Handler struct{ Kind, Slug string; Merged bool }` (json `kind`, `slug`, `merged`); `type Issue struct{ Slug string; Title, Source *string; State string; Handlers []Handler; Sources []scan.Source }` (json `slug`, `title`, `source`, `state`, `handlers`, `sources`; `handlers` never null); `func LoadIssues(g gitx.Git, inv scan.Inventory) ([]Issue, []scan.Unreadable, error)`.
 
-State, in this order: `dropped: true` hides the issue; an `idea` hides it; otherwise a handler that the default branch tip does not hold makes it `in-progress`; else a handler the tip holds makes it handled and hidden; else `pending`. Records come from every `inv.Records` entry, read from its first source; changes from `changes` (active) and from each `inv.Archived` folder's `docket.yaml` or `.openspec.yaml`, read from its first source. Read files once per source with `scan.ReadFiles`, and read no record or change at all when no issue is left to decide.
+State, in this order: `dropped: true` hides the issue; an `idea` hides it; otherwise a handler that the default branch tip does not hold makes it `in-progress`; else a handler the tip holds makes it handled and hidden; else `pending`. A record or change the tip holds (a `KindDefaultBranch` source among its sources) is read from the tip; any other from its first source. Records come from every `inv.Records` entry; changes from every active change in `inv.Changes` (its `docket.yaml`, or `.openspec.yaml` before it) and every `inv.Archived` folder's. Read files once per source with `scan.ReadFiles`, and read no record or change at all when no issue is left to decide.
 
-- [ ] **Step 1: Write the failing tests** in `internal/status/issues_test.go`: one per scenario of Issue state (`TestHandlerOnABranch`, `TestHandlerMerged`), and the Review Focus cases (a source with spaces matches; a sentence mentioning the path does not; `dropped: true` with an open record hidden; an archived change with only `.openspec.yaml` `x-source` counts as a merged handler; an issue only uncommitted in worktree B is `pending` with worktree B as its source). In `cmd_status_issues_test.go`, one per listing scenario: pending listed with no handler; in progress with an unmerged handler from worktree B; handled hidden; dropped and moved hidden; with the slug `add-x`, `result.issues` is `[]`; the human output has one line per listed issue after the records.
+- [ ] **Step 1: Write the failing tests** in `internal/status/issues_test.go`: one per scenario of Issue state (`TestHandlerOnABranch`, `TestHandlerMerged`, `TestMergedChangeNotYetArchived`, `TestMergedRecordEditedElsewhere`), and the Review Focus cases (a source with spaces matches; a sentence mentioning the path does not; `dropped: true` with an open record hidden; an archived change with only `.openspec.yaml` `x-source` counts as a merged handler; an issue only uncommitted in worktree B is `pending` with worktree B as its source; an issue whose file has no front matter is listed with `title` and `source` null, and an issue file that cannot be read adds an unreadable entry while the others are listed). In `cmd_status_issues_test.go`, one per listing scenario: pending listed with no handler; in progress with an unmerged handler from worktree B; handled hidden; dropped and moved hidden; with the slug `add-x`, `result.issues` is `[]`; the human output has one line per listed issue after the records.
 - [ ] **Step 2: Run** `go test ./internal/status/ ./internal/cli/ -run 'Issue|Handler'` — FAIL.
 - [ ] **Step 3: Implement** `LoadIssues` and wire it into `cmd_status.go` when no slug is given; its unreadable entries join the command's. Human line: `issue <slug> <state> <title>`, then ` (<kind> <slug>[ merged], ...)` when it has handlers.
 - [ ] **Step 4: Run** `go test ./internal/status/ ./internal/cli/` — PASS.

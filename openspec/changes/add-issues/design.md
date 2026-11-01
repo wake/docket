@@ -48,7 +48,14 @@ the agent.
 - **State.** `in-progress` wins over `handled`: one issue may need several
   records, and it is handled only when none is still open. A change counts
   whether active or archived, since a merged change stays active on the
-  default branch until it is archived at release. `dropped: true` and
+  default branch until it is archived at release.
+- **Which copy of a handler is read.** A record or change the default
+  branch tip holds is read from the tip; any other from its first source.
+  Every unmerged branch made from the default branch carries the tip's
+  records, so reading each record in each source would cost records times
+  sources, and an edit to a merged record elsewhere is not new work. The
+  cost: a branch that rewrites a merged record's source is not seen until
+  it merges. `dropped: true` and
   `idea` are the only states people write, because they are decisions, not
   facts `dkt` can see.
 - **An issue that needs design.** It gets `idea: <path>` naming the idea it
@@ -61,10 +68,12 @@ the agent.
 - **`template` is not a name.** `dkt issue template` prints the template,
   as `dkt workflow template` does; an issue cannot be named `template`.
 - **Reuse.** The record code that writes and checks files (`Create`, the
-  front-matter parser, `Words`, `ValidateName`, `Slug`) takes the folder
-  and the section list as parameters instead of having them fixed, and
-  issues call it. No second copy of the write path, so its guarantees hold
-  for both.
+  front-matter parser, `Words`, `ValidateName`, `Slug`), the command flow
+  of `dkt record` (checks, scan, write, result) and the YAML mapping decoder
+  of `docket.yaml` take the folder, the sections and the command name as
+  parameters instead of having them fixed, and issues call them. No second
+  copy of the write path, so its guarantees hold for both, and CI's
+  duplicate check finds no new clone.
 
 ## Risks / Trade-offs
 
