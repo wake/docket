@@ -24,16 +24,56 @@ asks the agent to run it.
 - It builds on `install-schema-per-machine`, which already has `dkt init`
   write something once per machine.
 
+## From the maintainer, 2026-11-01
+
+- It works like Claude Code's own `/init`: it can be typed in any project.
+  Whether the environment supports it is something the command checks.
+- It is a command used inside a session, but its steps are not limited to
+  an agent: what needs no judgment can also run from the CLI.
+- It first checks that superpowers and OpenSpec are installed; without
+  them, setting up Docket is of no use.
+- In an existing project it surveys the code and builds a code map or
+  index. The tools that could help are being collected into a report for
+  the maintainer to read first; see `2026-10-31-codebase-decomposition.md`.
+- After it, the project is ready to start development, or to start a
+  refactoring (`2026-10-31-refactoring.md`).
+
+## Found, 2026-11-01
+
+From the documentation of Claude Code 2.1.316 and Codex 0.153.4; nothing
+was tried.
+
+- User-level skills live in `~/.claude/skills/` for Claude Code and
+  `~/.agents/skills/` for Codex. Codex has no custom `/name`; a skill is
+  typed as `$name` or picked from `/skills`.
+- In Claude Code a personal skill wins over a project skill of the same
+  name, so the user-level entry must not be named `docket`, or it would
+  hide each project's own `docket` skill.
+- Claude Code picks up skills added to `.claude/skills/` while a session
+  runs, but not when that folder did not exist when the session started:
+  then the user types `/reload-skills`. Codex detects changes but says to
+  restart when one does not show. In a new project the command therefore
+  reads the `SKILL.md` files `dkt init` just wrote and follows them, rather
+  than handing over to `/docket-setup` by name.
+- A Claude Code plugin is installed by the user
+  (`claude plugin install <plugin> --marketplace wake/docket`, user scope by
+  default), its skills are typed as `/<plugin>:<skill>`, and the files in
+  its `bin/` are on the PATH of the agent's shell. Third-party marketplaces
+  do not update on their own unless the user turns it on. Codex has plugins
+  too (`codex plugin marketplace add owner/repo`); their layout was not
+  checked.
+
 ## Open questions
 
-- Who installs it: `dkt init` as part of its per-machine step, a separate
-  command, a plugin, or the user by hand. A user's own agent
-  configuration is more personal than OpenSpec's data directory, so
-  writing there may need its own consent.
-- Where Codex looks for user-level skills, and whether one copy can serve
-  both agents.
-- Its first install still needs `dkt init` from a terminal; it only saves
-  that step in later projects.
+- Who installs it: `dkt` at the user's request, as it installs the
+  per-machine schema, or a plugin. A user's own agent configuration is
+  more personal than OpenSpec's data directory, so writing there may need
+  its own consent. Prebuilt binaries (`2026-11-01-prebuilt-binaries.md`)
+  change the weighing, since a plugin could bring `dkt` with it.
+- Whether one skill folder can serve both agents: whether Codex ignores
+  Claude Code's frontmatter keys is not documented.
+- Its first install still needs a terminal; it only saves that step in
+  later projects.
 
 ## Related
 
