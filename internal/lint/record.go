@@ -17,18 +17,7 @@ func (r *run) lintRecords(named []string) {
 	var slugs []string
 	if len(r.in.Slugs) == 0 {
 		r.checkTrailers()
-		seen := map[string]bool{}
-		for _, p := range r.in.AddedRecords {
-			name, ok := strings.CutPrefix(p, record.Dir+"/")
-			if !ok || strings.Contains(name, "/") {
-				continue
-			}
-			if slug, ok := record.SlugOf(name); ok && !seen[slug] {
-				seen[slug] = true
-				slugs = append(slugs, slug)
-			}
-		}
-		sort.Strings(slugs)
+		slugs = addedSlugs(record.Dir, r.in.AddedRecords)
 	} else {
 		seen := map[string]bool{}
 		for _, slug := range named {
@@ -41,14 +30,9 @@ func (r *run) lintRecords(named []string) {
 	if len(slugs) == 0 {
 		return
 	}
-	entries, err := fs.ReadDir(r.in.Repo, record.Dir)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		r.unreadable(record.Dir, err)
+	regular, ok := r.regularNames(record.Dir)
+	if !ok {
 		return
-	}
-	regular := map[string]bool{}
-	for _, e := range entries {
-		regular[e.Name()] = e.Type().IsRegular()
 	}
 	for _, slug := range slugs {
 		name := slug + ".md"
@@ -73,6 +57,41 @@ func (r *run) lintRecords(named []string) {
 	}
 }
 
+// addedSlugs are the sorted slugs of the dated files directly under dir in
+// added.
+func addedSlugs(dir string, added []string) []string {
+	var slugs []string
+	seen := map[string]bool{}
+	for _, p := range added {
+		name, ok := strings.CutPrefix(p, dir+"/")
+		if !ok || strings.Contains(name, "/") {
+			continue
+		}
+		if slug, ok := record.SlugOf(name); ok && !seen[slug] {
+			seen[slug] = true
+			slugs = append(slugs, slug)
+		}
+	}
+	sort.Strings(slugs)
+	return slugs
+}
+
+// regularNames maps the entries of dir to whether each is a regular file. A
+// folder that does not exist is empty; any other failure is unreadable and
+// returns false.
+func (r *run) regularNames(dir string) (map[string]bool, bool) {
+	entries, err := fs.ReadDir(r.in.Repo, dir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		r.unreadable(dir, err)
+		return nil, false
+	}
+	regular := map[string]bool{}
+	for _, e := range entries {
+		regular[e.Name()] = e.Type().IsRegular()
+	}
+	return regular, true
+}
+
 // checkRecord applies the record rules to the record in file name of c.
 func checkRecord(r *run, c *loaded, name string, f record.File) {
 	checkRecordFrontMatter(r, c, name, f)
@@ -80,6 +99,9 @@ func checkRecord(r *run, c *loaded, name string, f record.File) {
 	checkTaskHeadings(r, c, name, f.Plan)
 	checkRecordTasks(r, c, name, f)
 	checkPlaceholderFile(r, c, name, c.Files[name])
+	if f.FrontMatterErr == nil {
+		checkIssueSource(r, c, name, f.FrontMatter.Source)
+	}
 }
 
 func checkRecordFrontMatter(r *run, c *loaded, name string, f record.File) {

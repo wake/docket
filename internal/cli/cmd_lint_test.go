@@ -292,3 +292,37 @@ func TestLintRecordTrailer(t *testing.T) {
 		t.Fatalf("no record-trailer:\n%s", so)
 	}
 }
+
+const lintIssue = "---\ntitle: T\nsource: s\n---\n\n" +
+	"## Current\n\na\n\n## Expected\n\nb\n\n## Unchanged\n\nc\n\n## Found\n\nd\n"
+
+func TestLintIssuesTheBranchAdds(t *testing.T) {
+	r := cleanRepo(t)
+	r.Commit("old issue", map[string]string{"docket/issues/2026-10-01-a.md": "bad\n"})
+	r.Git("checkout", "-q", "-b", "topic")
+	r.Commit("issue", map[string]string{"docket/issues/2026-11-02-b.md": lintIssue})
+	code, so, se := runLint(t, r.Dir, r.Env, "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	res := decode(t, so)["result"].(map[string]any)
+	if got := res["issues"]; !reflect.DeepEqual(got, []any{"2026-11-02-b"}) {
+		t.Fatalf("issues = %v\n%s", got, so)
+	}
+}
+
+func TestLintIssuesWithoutDefaultBranch(t *testing.T) {
+	r := lintFixture(t)
+	r.Git("branch", "-m", "main", "trunk")
+	r.Write("docket/issues/2026-11-02-b.md", "bad\n")
+	code, so, se := runLint(t, r.Dir, r.Env, "--json")
+	if code != 3 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := sourcesOf(t, so); !reflect.DeepEqual(got, []string{"added files"}) {
+		t.Fatalf("unreadable = %v\n%s", got, so)
+	}
+	if res := decode(t, so)["result"].(map[string]any); !reflect.DeepEqual(res["issues"], []any{}) {
+		t.Fatalf("issues = %v", res["issues"])
+	}
+}

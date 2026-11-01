@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/wake/docket"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/lint"
 	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/scan"
@@ -17,6 +18,7 @@ import (
 type LintResult struct {
 	Changes []string `json:"changes"`
 	Records []string `json:"records"`
+	Issues  []string `json:"issues"`
 }
 
 func lintCommand() Command {
@@ -31,15 +33,18 @@ func lintCommand() Command {
 			defer root.Close()
 
 			// One look at the branch: any failure is one unreadable entry.
-			in := lint.Input{Repo: root.FS(), Templates: docket.Schema(), Slugs: args, RecordTemplate: docket.RecordTemplate()}
+			in := lint.Input{Repo: root.FS(), Templates: docket.Schema(), Slugs: args, RecordTemplate: docket.RecordTemplate(), IssueTemplate: docket.IssueTemplate()}
 			base, err := branchBase(c)
 			if err == nil {
 				var all []string
-				if all, err = addedFiles(c, base, append(append([]string{}, lint.RoutedDirs...), record.Dir)...); err == nil {
+				if all, err = addedFiles(c, base, append(append([]string{}, lint.RoutedDirs...), record.Dir, issue.Dir)...); err == nil {
 					for _, f := range all {
-						if strings.HasPrefix(f, record.Dir+"/") {
+						switch {
+						case strings.HasPrefix(f, record.Dir+"/"):
 							in.AddedRecords = append(in.AddedRecords, f)
-						} else {
+						case strings.HasPrefix(f, issue.Dir+"/"):
+							in.AddedIssues = append(in.AddedIssues, f)
+						default:
 							in.Added = append(in.Added, f)
 						}
 					}
@@ -51,7 +56,7 @@ func lintCommand() Command {
 			in.AddedErr = err
 			rep := lint.Run(in)
 
-			out := Outcome{Result: LintResult{Changes: append([]string{}, rep.Changes...), Records: append([]string{}, rep.Records...)}}
+			out := Outcome{Result: LintResult{Changes: append([]string{}, rep.Changes...), Records: append([]string{}, rep.Records...), Issues: append([]string{}, rep.Issues...)}}
 			for _, f := range rep.Findings {
 				out.Findings = append(out.Findings, Finding{Rule: f.Rule, Message: f.Message, Change: f.Change, File: f.File, Line: f.Line})
 			}

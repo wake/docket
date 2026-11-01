@@ -36,6 +36,7 @@ type Unreadable struct {
 type Report struct {
 	Changes    []string
 	Records    []string
+	Issues     []string
 	Findings   []Finding
 	Unreadable []Unreadable
 }
@@ -45,7 +46,9 @@ type Report struct {
 // rule: the files the branch adds, or why they are unknown; AddedErr covers
 // the routed folders, the records and the commits. AddedRecords are the files
 // added under docket/records, Commits the commits from the merge base to HEAD,
-// and RecordTemplate the template of a new record (docket.RecordTemplate()).
+// RecordTemplate the template of a new record (docket.RecordTemplate()),
+// AddedIssues the files added under docket/issues and IssueTemplate the
+// template of a new issue (docket.IssueTemplate()).
 type Input struct {
 	Repo           fs.FS
 	Templates      fs.FS
@@ -53,6 +56,8 @@ type Input struct {
 	Added          []string
 	AddedErr       error
 	AddedRecords   []string
+	AddedIssues    []string
+	IssueTemplate  string
 	Commits        []gitx.Commit
 	RecordTemplate string
 }
@@ -131,6 +136,9 @@ func Run(in Input) Report {
 		rep.Changes = append(rep.Changes, slug)
 		checkProposal(r, c)
 		checkPlaceholders(r, c)
+		if m, err := change.ReadMetadata(c.Files); err == nil {
+			checkIssueSource(r, c, m.File, m.Source)
+		}
 		if c.Has(planFile) {
 			checkPlan(r, c)
 		}
@@ -143,10 +151,14 @@ func Run(in Input) Report {
 	}
 	r.lintRecords(recordNames)
 	if len(in.Slugs) == 0 {
+		r.lintIssues()
+	}
+	if len(in.Slugs) == 0 {
 		checkSpecTitles(r)
 	}
 	sort.Strings(rep.Changes)
 	sort.Strings(rep.Records)
+	sort.Strings(rep.Issues)
 	sort.SliceStable(rep.Findings, func(i, j int) bool {
 		a, b := rep.Findings[i], rep.Findings[j]
 		switch {

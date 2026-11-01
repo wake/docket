@@ -32,6 +32,9 @@ func (r *run) readPlaceholders() map[string]string {
 	if r.in.RecordTemplate != "" {
 		collectPlaceholders(out, "record/template.md", []byte(r.in.RecordTemplate))
 	}
+	if r.in.IssueTemplate != "" {
+		collectPlaceholders(out, "issue/template.md", []byte(r.in.IssueTemplate))
+	}
 	if r.in.Templates == nil {
 		r.unreadable(source, errors.New("no templates given"))
 		return out
