@@ -4,9 +4,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
+	"slices"
 
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/archive"
+	"github.com/wake/docket/internal/lint"
 	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/scan"
 	"github.com/wake/docket/internal/setup"
@@ -94,6 +97,32 @@ func inspectCommand() Command {
 			igF, igU := ignoredFindings(c, files)
 			out.Findings = append(out.Findings, igF...)
 			out.Unreadable = append(out.Unreadable, igU...)
+			root, err := os.OpenRoot(c.Repo.Root)
+			if err != nil {
+				return Outcome{Result: res}, err
+			}
+			defer root.Close()
+			var tf []lint.Finding
+			var tu, ou []lint.Unreadable
+			var others []lint.OtherSchema
+			// A symlinked openspec is already a symlink-refused finding; reading through it only adds noise.
+			if !slices.ContainsFunc(out.Findings, func(f Finding) bool { return f.Rule == "symlink-refused" }) {
+				tf, tu = lint.SpecTitles(root.FS())
+				others, ou = lint.OtherSchemas(root.FS())
+			}
+			for _, f := range tf {
+				out.Findings = append(out.Findings, Finding{Rule: f.Rule, Message: f.Message, Change: f.Change, File: f.File, Line: f.Line})
+			}
+			for _, o := range others {
+				out.Findings = append(out.Findings, Finding{
+					Rule:    "other-schema",
+					File:    "openspec/changes/" + o.Slug + "/.openspec.yaml",
+					Message: fmt.Sprintf("made with the %s schema; Docket leaves it to that schema's files (%d of %d steps ticked)", o.Schema, o.Ticked, o.Total),
+				})
+			}
+			for _, u := range append(tu, ou...) {
+				out.Unreadable = append(out.Unreadable, Unreadable{Source: u.Source, Reason: u.Reason})
+			}
 			state, osFinds, err := openSpecState(c)
 			if err != nil {
 				return Outcome{Result: res}, err
