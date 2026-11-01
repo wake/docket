@@ -98,32 +98,23 @@ func LoadRecords(g gitx.Git, inv scan.Inventory, q RecordQuery) (records []Recor
 	}
 	picked = append(picked, merged...)
 	// One read per first source; commits are read once per source commit.
-	groups := map[scan.Source][]scan.Record{}
-	var order []scan.Source
-	for _, r := range picked {
-		src := r.Sources[0]
-		if _, ok := groups[src]; !ok {
-			order = append(order, src)
-		}
-		groups[src] = append(groups[src], r)
+	groups, bad, err := readGroups(g, record.Dir, len(picked),
+		func(i int) scan.Source { return picked[i].Sources[0] },
+		func(i int) string { return picked[i].Slug + ".md" })
+	if err != nil {
+		return nil, 0, nil, err
 	}
-	for _, src := range order {
-		want := map[string]bool{}
-		for _, r := range groups[src] {
-			want[r.Slug+".md"] = true
-		}
-		files, bad, err := scan.ReadFiles(g, src, record.Dir, func(rel string) bool { return want[rel] })
-		if err != nil {
-			return nil, 0, nil, err
-		}
-		unread = append(unread, bad...)
+	unread = append(unread, bad...)
+	for _, grp := range groups {
+		src, files := grp.Src, grp.Files
 		var commits []gitx.Commit
 		if src.Commit != tip && strings.Trim(src.Commit, "0") != "" {
 			if commits, err = g.Commits(tip, src.Commit); err != nil {
 				return nil, 0, nil, err
 			}
 		}
-		for _, r := range groups[src] {
+		for _, i := range grp.Idx {
+			r := picked[i]
 			f := record.Parse(files[r.Slug+".md"])
 			rec := Record{Slug: r.Slug, Sources: r.Sources, State: stateOf(r),
 				Title: orNil(f.FrontMatter.Title), Kind: orNil(f.FrontMatter.Kind), Source: orNil(f.FrontMatter.Source)}
@@ -191,4 +182,43 @@ func orNil(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// sourceGroup is the items that are read from one source, by index, with the
+// files read for them.
+type sourceGroup struct {
+	Src   scan.Source
+	Idx   []int
+	Files map[string][]byte
+}
+
+// readGroups reads dir once per distinct source of the n items, keeping the
+// file nameOf names for each. Groups come in order of first appearance.
+func readGroups(g gitx.Git, dir string, n int, srcOf func(int) scan.Source, nameOf func(int) string) ([]sourceGroup, []scan.Unreadable, error) {
+	var groups []sourceGroup
+	at := map[scan.Source]int{}
+	want := map[scan.Source]map[string]bool{}
+	for i := 0; i < n; i++ {
+		src := srcOf(i)
+		k, ok := at[src]
+		if !ok {
+			k = len(groups)
+			at[src] = k
+			groups = append(groups, sourceGroup{Src: src})
+			want[src] = map[string]bool{}
+		}
+		groups[k].Idx = append(groups[k].Idx, i)
+		want[src][nameOf(i)] = true
+	}
+	var unread []scan.Unreadable
+	for k := range groups {
+		src := groups[k].Src
+		files, bad, err := scan.ReadFiles(g, src, dir, func(rel string) bool { return want[src][rel] })
+		if err != nil {
+			return nil, nil, err
+		}
+		unread = append(unread, bad...)
+		groups[k].Files = files
+	}
+	return groups, unread, nil
 }
