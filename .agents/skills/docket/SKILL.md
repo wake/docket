@@ -48,6 +48,8 @@ restructuring.
 
 An idea that is not ready goes to `docket/ideas/`, one file per idea.
 
+Work whose expected behavior is already settled, by a spec sentence, the docs or behavior that shipped, and that is not done now is an issue, not an idea: a bug found outside the work at hand, an optimization, a missing test, a request from someone else. When the project's `AGENTS.md` has a `## Issues` section, write the issue in the tool it names, with the sections `dkt issue template` prints; show it to the user and file it only once they agree. Otherwise run `dkt issue <name> --title "<one line>" --source "<where it was found>"` and fill its sections. When you cannot point to where the expected behavior is settled, it is an idea.
+
 ## The workflow file
 
 Right after triage, before any other step of the work, run
@@ -73,7 +75,7 @@ Right after triage, before any other step of the work, run
    A change's title, kind, source and base are in its `docket.yaml`; a new
    capability's delta folder has a `docket.yaml` with its title. When the
    slug is taken, `dkt new` creates the change under the first free suffix
-   (`-2`, `-3`, ...) and reports it; use the slug it reports.
+   (`-2`, `-3`, ...) and reports it; use the slug it reports. When the work handles an issue, `--source` is the issue alone: the path of a file issue (`docket/issues/<slug>.md`) or its address in the project's tool.
 2. superpowers:brainstorming writes its design into the change folder, not
    `docs/superpowers/specs/`: `proposal.md`, delta specs under `specs/`, and
    `design.md` when needed. Before writing each one, run
@@ -119,7 +121,7 @@ did. In a git worktree:
    (`refactor`), tests (`test`), prompt text (`prompt`), check settings
    (`checks`). The record's slug is its file name without `.md`: the
    date, the name, and a suffix when the name is taken. Use that slug,
-   as `dkt record` reports it, never the bare name you passed.
+   as `dkt record` reports it, never the bare name you passed. When the work handles an issue, `--source` is the issue alone: the path of a file issue (`docket/issues/<slug>.md`) or its address in the project's tool.
 2. Make the edit following the steps under `## Light review` in the
    workflow file. Fill the record's sections as the work and its review
    go, in a few sentences each, replacing the comments.
