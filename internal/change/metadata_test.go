@@ -71,7 +71,7 @@ func TestReadSchema(t *testing.T) {
 	if got, err := ReadSchema(map[string][]byte{}); err != nil || got != DocketSchema {
 		t.Errorf("no file: got %q, %v", got, err)
 	}
-	for _, in := range []string{"schema:\n", "schema: null\n", "schema: \"\"\n","schema: 1\n", "schema: true\n", "schema: [a]\n", "- a\n"} {
+	for _, in := range []string{"schema:\n", "schema: null\n", "schema: \"\"\n", "schema: 1\n", "schema: true\n", "schema: [a]\n", "- a\n"} {
 		if got, err := ReadSchema(map[string][]byte{OpenSpecFile: []byte(in)}); err == nil {
 			t.Errorf("%q: want error, got %q", in, got)
 		}
