@@ -65,6 +65,7 @@ the agent.
   record that fixes it may share one. `dkt lint <slug>`, `dkt status <slug>`
   and `dkt sync <slug>` keep reading a dated name as a record; issues are
   linted only when no name is given, and `dkt status` lists them only then.
+- **`dropped: yes`.** YAML 1.1 spellings of true, such as `yes`, decode as true into the `dropped` field, so they hide the issue like `true`; any value that does not decode as a boolean is a front-matter error.
 - **`template` is not a name.** `dkt issue template` prints the template,
   as `dkt workflow template` does; an issue cannot be named `template`.
 - **Reuse.** The record code that writes and checks files (`Create`, the
