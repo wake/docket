@@ -2,6 +2,7 @@ package lint
 
 import (
 	"io/fs"
+	"path"
 	"strings"
 
 	"github.com/wake/docket/internal/issue"
@@ -64,8 +65,17 @@ func (r *run) isFile(p, prefix string) bool {
 	if !strings.HasPrefix(p, prefix) || !fs.ValidPath(p) {
 		return false
 	}
-	fi, err := fs.Stat(r.in.Repo, p)
-	return err == nil && fi.Mode().IsRegular()
+	// A DirEntry's type does not follow links, as fs.Stat would.
+	entries, err := fs.ReadDir(r.in.Repo, path.Dir(p))
+	if err != nil {
+		return false
+	}
+	for _, e := range entries {
+		if e.Name() == path.Base(p) {
+			return e.Type().IsRegular()
+		}
+	}
+	return false
 }
 
 // checkIssueSource reports a source that starts with the issues folder but

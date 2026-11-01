@@ -1,8 +1,10 @@
 package lint
 
 import (
+	"io/fs"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/wake/docket"
 )
@@ -108,6 +110,37 @@ func TestRecordSourceNamesAnIssue(t *testing.T) {
 		if r := rec(src); len(recFindings(r, "issue-source")) != 0 {
 			t.Fatalf("%q: %+v", src, r.Findings)
 		}
+	}
+}
+
+func TestIssueIdeaLinkOrDotDot(t *testing.T) {
+	repo := repoWith(map[string]string{issuePath: "", "README.md": "x", "docket/ideas/real.md": "idea\n"})
+	repo["docket/ideas/link.md"] = &fstest.MapFile{Data: []byte("real.md"), Mode: fs.ModeSymlink}
+	for _, idea := range []string{"docket/ideas/link.md", "docket/ideas/../README.md"} {
+		repo[issuePath] = &fstest.MapFile{Data: []byte("---\ntitle: B\nsource: s\nidea: " + idea + "\n---\n\n" + issueBody())}
+		r := Run(Input{Repo: repo, Templates: docket.Schema(), AddedIssues: []string{issuePath}, IssueTemplate: docket.IssueTemplate()})
+		wantIssue(t, r, "issue-front-matter")
+	}
+}
+
+func TestNamedRunLintsNoIssue(t *testing.T) {
+	bad := "---\ntitle: B\nsource: s\n---\n\n" + strings.Replace(issueBody(), "The rest.", "", 1)
+	repo := repoWith(map[string]string{issuePath: bad, "openspec/changes/add-x/proposal.md": "x"})
+	for _, name := range []string{"add-x", "2026-10-30-fix-b"} {
+		r := Run(Input{Repo: repo, Templates: docket.Schema(), Slugs: []string{name}, AddedIssues: []string{issuePath}})
+		if len(r.Issues) != 0 || len(recFindings(r, "issue-section")) != 0 {
+			t.Fatalf("%s: %+v", name, r)
+		}
+	}
+}
+
+func TestRecordSourceSpacedNamesNoIssue(t *testing.T) {
+	in := recInput(map[string]string{
+		recPath(goodSlug): strings.Replace(goodRecord(), "source: a note", `source: "  docket/issues/2026-11-02-none.md "`, 1),
+	}, recPath(goodSlug))
+	f := wantRec(t, Run(in), "issue-source")
+	if !strings.Contains(f.Message, `"docket/issues/2026-11-02-none.md"`) {
+		t.Fatal(f.Message)
 	}
 }
 
