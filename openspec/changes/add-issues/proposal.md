@@ -117,7 +117,8 @@ files when it names none.
   `source`, `state` (`pending` or `in-progress`), `handlers` (each with
   `kind` `record` or `change`, `slug` and `merged`) and `sources`.
 - Lint findings `issue-front-matter`, `issue-section`, `issue-too-long`,
-  `placeholder`, `issue-source`.
+  `placeholder`, `issue-source`; `dkt lint --json` lists the linted issues
+  in `result.issues`.
 - A record or change names a file issue when its source is the issue's
   path, `docket/issues/<slug>.md`.
 
@@ -142,8 +143,8 @@ files when it names none.
   `issues#issue-front-matter-invalid`, `issues#source-names-no-issue`: lint
   checks file issues and the sources that name them.
 - `issues#pending-issue-listed`, `issues#issue-in-progress`,
-  `issues#handled-issue-hidden`, `issues#dropped-and-moved-hidden`: status
-  derives the state.
+  `issues#handled-issue-hidden`, `issues#dropped-and-moved-hidden`,
+  `issues#issues-not-listed-with-slugs`: status derives the state.
 - `issues#bug-found-out-of-scope`, `issues#issue-in-the-project-tool`,
   `issues#record-names-its-issue`: the skill's rules.
 - `workspace-scan#issue-on-a-branch`,

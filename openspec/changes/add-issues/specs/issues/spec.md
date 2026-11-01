@@ -106,7 +106,7 @@ A file issue's handlers SHALL be the records and changes, active or archived, wh
 - **THEN** the issue's state is `handled`
 
 ### Requirement: Issues listed by status
-`dkt status` SHALL list in `result.issues`, sorted by slug, every file issue the scan finds that is `pending` or `in-progress`, each with its slug, title and source from the front matter of its first source (null when unreadable), its state, its handlers (kind `record` or `change`, slug, and whether the default branch tip holds it) and its sources with their commits. The human output SHALL give a line per issue after the records.
+`dkt status` SHALL list in `result.issues`, sorted by slug, every file issue the scan finds that is `pending` or `in-progress`, each with its slug, title and source from the front matter of its first source (null when unreadable), its state, its handlers (kind `record` or `change`, slug, and whether the default branch tip holds it) and its sources with their commits, and a line per issue after the records. With slugs it SHALL list no issue.
 
 #### Scenario: Pending issue listed
 - **WHEN** the default branch tip holds `docket/issues/2026-11-02-x.md` and no record or change names it, and a user runs `dkt status --json`
@@ -123,6 +123,10 @@ A file issue's handlers SHALL be the records and changes, active or archived, wh
 #### Scenario: Dropped and moved hidden
 - **WHEN** one file issue has `dropped: true`, another has `idea: docket/ideas/2026-11-02-y.md`, and neither has a handler
 - **THEN** `result.issues` lists neither
+
+#### Scenario: Issues not listed with slugs
+- **WHEN** a file issue is pending and a user runs `dkt status add-x --json`
+- **THEN** `result.issues` is empty
 
 ### Requirement: Issues for settled work
 The `docket` skill SHALL have the agent turn work whose expected behavior is settled and that it does not do now into an issue: in the tool named by a `## Issues` section of the project's `AGENTS.md`, with the sections `dkt issue template` prints, once the user agrees to file it there; otherwise with `dkt issue`. Work whose expected behavior it cannot point to SHALL go to an idea.
