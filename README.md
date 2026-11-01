@@ -34,7 +34,7 @@ Docket reads the files in the repository and the git history. It does four kinds
 | Assemble | `brief`, `accept --export` | Gathers pieces from several files into a brief for an implementing agent, or into a page a client can review |
 | Wrap | `init`, `new`, `archive`, `rebase` | Installs the schema, runs the OpenSpec CLI and the checks above in a fixed order, and records the base commit and the evidence |
 
-The commands that write files are `init` (the schema, the skills and the Docket block), `new` (the change folder), `record` (a record under `docket/records/`), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
+The commands that write files are `init` (the schema, the skills, the `docket-init` command and the Docket block), `new` (the change folder), `record` (a record under `docket/records/`), `sync` (checkboxes), `archive` (through OpenSpec, plus spec titles and `evidence.md`) and `rebase` (the base line of `docket.yaml`, or of `.openspec.yaml` in a change made by an older dkt). None of them commits.
 
 ## What Docket is not
 
@@ -47,7 +47,7 @@ Docket does **not**:
 
 ## The workflow it assumes
 
-superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it. The `docket` skill carries these rules, and `dkt init` installs it. The review and verification steps of each path come from the user's workflow file (`~/.config/docket/workflow.md`, or under `XDG_CONFIG_HOME`). The agent writes it with the user from Docket's template at the first piece of work, and `dkt workflow` reports whether it is missing, lacks a path or was made from an older template. Setup is its own skill, `docket-setup`, which the user can also invoke to revise the file (`/docket-setup` in Claude Code, `$docket-setup` in Codex). To check a project's setup, the user invokes `docket-doctor`: it runs `dkt inspect`, checks what needs judgment, lists every problem and then fixes them with the user one at a time.
+superpowers starts the work. OpenSpec never starts a step on its own; it is called at three points: creating the change folder, validating it, and archiving it. The `docket` skill carries these rules, and `dkt init` installs it. The review and verification steps of each path come from the user's workflow file (`~/.config/docket/workflow.md`, or under `XDG_CONFIG_HOME`). The agent writes it with the user from Docket's template at the first piece of work, and `dkt workflow` reports whether it is missing, lacks a path or was made from an older template. In any project the user can type `/docket-init` (`$docket-init` in Codex) to check the environment and set the project up. Setup is its own skill, `docket-setup`, which the user can also invoke to revise the file (`/docket-setup` in Claude Code, `$docket-setup` in Codex). To check a project's setup, the user invokes `docket-doctor`: it runs `dkt inspect`, checks what needs judgment, lists every problem and then fixes them with the user one at a time.
 
 1. **Triage with brainstorming.** superpowers brainstorming reads the project and talks the idea through. When several paths apply, take the heaviest:
    - It changes a sentence in `openspec/specs/`: open a change and follow the steps below. So does any edit that sets an expectation no spec states and no existing behavior shows, such as a bug fix with no specified answer or a test that asserts new behavior, since it defines behavior.
@@ -132,7 +132,7 @@ go install github.com/wake/docket/cmd/dkt@latest
 
 `dkt init` and `dkt new` need the OpenSpec CLI 1.14.x on `PATH`, or set `DOCKET_OPENSPEC` to the command to run.
 
-`dkt init` writes the `docket` schema once per machine, to `$XDG_DATA_HOME/openspec/schemas/docket/` (by default `~/.local/share/openspec/schemas/docket/`), where OpenSpec looks for it. It sets `schema: docket` in `openspec/config.yaml`. A wrapper that gives OpenSpec another `XDG_DATA_HOME` or `HOME` needs `dkt` run with the same values. CI that runs `openspec` on a change runs `dkt init` first.
+`dkt init` writes the `docket` schema once per machine, to `$XDG_DATA_HOME/openspec/schemas/docket/` (by default `~/.local/share/openspec/schemas/docket/`), where OpenSpec looks for it. It sets `schema: docket` in `openspec/config.yaml`. A wrapper that gives OpenSpec another `XDG_DATA_HOME` or `HOME` needs `dkt` run with the same values. CI that runs `openspec` on a change runs `dkt init` first. It also writes the `docket-init` command to `~/.claude/skills/docket-init/` (under `CLAUDE_CONFIG_DIR` when set) and `~/.agents/skills/docket-init/`.
 
 ### Upgrading
 
