@@ -60,3 +60,20 @@ OpenSpec folder kept out of git, and a change made with OpenSpec's
 - Whether `dkt status` lists a change of another schema at all, and whether
   `dkt archive` refuses one.
 - Whether `dkt init` writes the ignore exception itself or only reports it.
+
+## Status
+
+Done by the change `adopt-existing-projects`. `dkt init` and `dkt inspect`
+report `install-ignored`, naming the rule, and never edit an ignore file
+(Found 1). A change of another schema is known by the `schema` in its
+`.openspec.yaml`: `dkt lint` checks only the titles of the capabilities it
+adds, `dkt status` shows its schema and `tasks.md` progress, `dkt archive`
+archives it without the plan and base checks, `dkt sync` and `dkt rebase`
+refuse it, and `dkt inspect` reports it (Found 2). `dkt inspect` also
+reports main specs without a title. `docket-doctor` handles the three
+findings with the user's consent and converts a change with no step ticked
+by its `convert.md`; `/docket-init` runs the doctor after `dkt init`
+(Found 3). The README's "Adopting Docket in an existing project" leaves
+OpenSpec content kept out of git to the project (Found 4). Both open
+questions are settled: status lists such a change and archive accepts it,
+and `dkt init` only reports the ignore exception.
