@@ -28,8 +28,8 @@ checked yet, with the reason.
   `openspec-missing` or `openspec-unsupported`, the user should install
   OpenSpec 1.14.x (`npm install -g @fission-ai/openspec@1.14`) or set
   `DOCKET_OPENSPEC` to a command that runs it, such as
-  `npx -y @fission-ai/openspec@1.14.3`. On an exit with 2 or 4, report
-  what it said.
+  `npx -y @fission-ai/openspec@1.14.3`. On an exit with 2 or 4, count
+  what it said as a problem too.
 - superpowers: check your own skill list for brainstorming, writing-plans
   and subagent-driven-development (Claude Code lists them as
   `superpowers:brainstorming` and so on). If any is missing: in Claude
@@ -41,7 +41,7 @@ Also note whether `.claude/skills/` and `.agents/skills/` exist in the
 repository now, before anything runs; step 5 uses that note.
 
 When anything is missing, report all of it together, with how to install
-each, and stop. Install nothing.
+each, and stop before step 2. Install nothing.
 
 ## 2. Run `dkt init --json`
 
