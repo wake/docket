@@ -79,9 +79,17 @@ func TestArchiveBothSchemas(t *testing.T) {
 	if err != nil || rep.Stopped != nil || len(rep.Archived) != 2 {
 		t.Fatalf("%v %+v", err, rep)
 	}
-	ev := readEvidence(t, e, rep, 0)
-	if !strings.Contains(ev, "| Schema | docket |\n| Skipped steps | none |\n") {
-		t.Fatalf("%s", ev)
+	want := map[string][]string{
+		"add-x": {"| Schema | docket |\n| Skipped steps | none |\n"},
+		"add-y": {"| Schema | spec-driven |\n", "| Skipped steps | plan, base |\n", "| Base | none |\n"},
+	}
+	for i, a := range rep.Archived {
+		ev := readEvidence(t, e, rep, i)
+		for _, w := range want[a.Change] {
+			if !strings.Contains(ev, w) {
+				t.Fatalf("%s: missing %q in:\n%s", a.Change, w, ev)
+			}
+		}
 	}
 }
 
@@ -180,12 +188,11 @@ func TestRebaseOtherSchemaUnreadableDelta(t *testing.T) {
 }
 
 func TestTrailersOtherSchema(t *testing.T) {
-	r, c1 := trailersRepo(t)
+	r, _ := trailersRepo(t)
 	r.Commit("add x", map[string]string{
 		"openspec/changes/add-x/.openspec.yaml": otherMeta,
 		"openspec/changes/add-x/plan.md":        trailersPlan,
 	})
-	_ = c1
 	checks, finds, err := Trailers(trailersEnv(t, r))
 	if err != nil || len(finds) != 0 {
 		t.Fatalf("%v %+v", err, finds)

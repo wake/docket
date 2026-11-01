@@ -47,7 +47,7 @@ func (ev evidence) render() string {
 		{"Date", ev.Date}, {"Docket", cell(ev.Docket)}, {"OpenSpec", cell(ev.OpenSpec)},
 		{"Repository", cell(evidenceOrigin(ev.Origin))}, {"HEAD", ev.Head},
 		{"Schema", cell(ev.Schema)}, {"Skipped steps", ev.skipped()},
-		{"Title", orNone(ev.Meta.Title)}, {"Kind", orNone(ev.Meta.Kind)}, {"Source", orNone(ev.Meta.Source)}, {"Base", cell(ev.Meta.Base)},
+		{"Title", orNone(ev.Meta.Title)}, {"Kind", orNone(ev.Meta.Kind)}, {"Source", orNone(ev.Meta.Source)}, {"Base", orNone(ev.Meta.Base)},
 	} {
 		fmt.Fprintf(&b, "| %s | %s |\n", row[0], row[1])
 	}
