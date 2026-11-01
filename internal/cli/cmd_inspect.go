@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/wake/docket"
 	"github.com/wake/docket/internal/archive"
@@ -106,7 +107,9 @@ func inspectCommand() Command {
 			var tu, ou []lint.Unreadable
 			var others []lint.OtherSchema
 			// A symlinked openspec is already a symlink-refused finding; reading through it only adds noise.
-			if !slices.ContainsFunc(out.Findings, func(f Finding) bool { return f.Rule == "symlink-refused" }) {
+			if !slices.ContainsFunc(out.Findings, func(f Finding) bool {
+				return f.Rule == "symlink-refused" && (f.File == "openspec" || strings.HasPrefix(f.File, "openspec/"))
+			}) {
 				tf, tu = lint.SpecTitles(root.FS())
 				others, ou = lint.OtherSchemas(root.FS())
 			}

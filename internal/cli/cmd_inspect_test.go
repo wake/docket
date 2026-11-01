@@ -206,6 +206,32 @@ func TestInspectSymlinkedSkillDirectory(t *testing.T) {
 	}
 }
 
+func TestInspectLinkedSkillStillChecksSpecs(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	link := filepath.Join(r.Dir, ".claude/skills/docket")
+	if err := os.RemoveAll(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(t.TempDir(), link); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(r.Dir, "openspec/specs/booking/spec.md")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("# booking\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	_, so, _ := runInspect(t, r.Dir, env, "--json")
+	if f := inspectFinding(t, so, "title-missing"); f["file"] != "openspec/specs/booking/docket.yaml" {
+		t.Errorf("file: %v", f["file"])
+	}
+}
+
 func TestInspectSymlinkedOpenSpec(t *testing.T) {
 	r := committedRepo(t)
 	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
