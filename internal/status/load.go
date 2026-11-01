@@ -39,6 +39,7 @@ type Activity struct {
 // Change is one active change with its phase, tasks and activity.
 type Change struct {
 	Slug         string        `json:"slug"`
+	Schema       string        `json:"schema"`
 	Title        *string       `json:"title"`
 	Sources      []scan.Source `json:"sources"`
 	Metadata     *Metadata     `json:"metadata"`
@@ -57,7 +58,7 @@ type Change struct {
 func Load(g gitx.Git, inv scan.Inventory, now time.Time) ([]Change, []scan.Unreadable, error) {
 	keep := func(rel string) bool {
 		switch rel {
-		case change.DocketFile, change.OpenSpecFile, "proposal.md", "design.md", "plan.md":
+		case change.DocketFile, change.OpenSpecFile, "proposal.md", "design.md", "plan.md", "tasks.md":
 			return true
 		}
 		_, ok := delta.CapabilityPath(rel)
@@ -77,6 +78,10 @@ func Load(g gitx.Git, inv scan.Inventory, now time.Time) ([]Change, []scan.Unrea
 		}
 		unread = append(unread, bad...)
 		ch := Change{Slug: c.Slug, Sources: c.Sources, Documents: documentsOf(files)}
+		// Invalid schema metadata counts as docket; dkt lint reports the file.
+		if ch.Schema, err = change.ReadSchema(files); err != nil {
+			ch.Schema = change.DocketSchema
+		}
 		base := ""
 		// Unreadable metadata leaves the change without metadata, title, base,
 		// commits and activity; dkt lint reports the file.
@@ -91,15 +96,21 @@ func Load(g gitx.Git, inv scan.Inventory, now time.Time) ([]Change, []scan.Unrea
 		if err != nil {
 			return nil, nil, err
 		}
-		var plan *change.Plan
-		var named []change.NamedTask
-		if b, ok := files["plan.md"]; ok {
-			p := change.ParsePlan(b)
-			plan = &p
-			// dkt status does not report unknown Task trailers; dkt sync does.
-			named, _, _ = change.NamedTasks(p, c.Slug, commits)
+		if ch.Schema != change.DocketSchema {
+			b, ok := files["tasks.md"]
+			ch.Phase, ch.Progress = SummarizeChecklist(b, ok)
+			ch.Tasks = []Task{}
+		} else {
+			var plan *change.Plan
+			var named []change.NamedTask
+			if b, ok := files["plan.md"]; ok {
+				p := change.ParsePlan(b)
+				plan = &p
+				// dkt status does not report unknown Task trailers; dkt sync does.
+				named, _, _ = change.NamedTasks(p, c.Slug, commits)
+			}
+			ch.Phase, ch.Tasks, ch.Progress = Summarize(plan, named)
 		}
-		ch.Phase, ch.Tasks, ch.Progress = Summarize(plan, named)
 		if ch.LastActivity, err = lastActivity(g, c.Slug, dir, base, src.Commit, commits, now); err != nil {
 			return nil, nil, err
 		}

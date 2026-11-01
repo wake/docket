@@ -277,3 +277,42 @@ func TestStatusUnreadableWorktree(t *testing.T) {
 		t.Fatalf("unreadable = %v", u)
 	}
 }
+
+func TestStatusOtherSchema(t *testing.T) {
+	r := cleanRepo(t)
+	w := r.AddWorktree(filepath.Join(t.TempDir(), "wt-other"), "br-other")
+	w.Write("openspec/changes/other/.openspec.yaml", "schema: spec-driven\n")
+	w.Write("openspec/changes/other/tasks.md", "- [x] a\n- [ ] b\n")
+	statusChange(t, r, "add-x")
+	code, so, se := runStatus(t, r.Dir, true)
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	schemas := map[string]string{}
+	for _, c := range statusChanges(t, so) {
+		m := c.(map[string]any)
+		schemas[m["slug"].(string)] = m["schema"].(string)
+	}
+	if schemas["other"] != "spec-driven" || schemas["add-x"] != "docket" {
+		t.Fatalf("schemas = %v", schemas)
+	}
+	_, text, _ := runStatus(t, r.Dir, false)
+	seen := 0
+	for _, line := range strings.Split(text, "\n") {
+		switch {
+		case strings.HasPrefix(line, "other  "):
+			seen++
+			if !strings.HasSuffix(line, " (spec-driven)") {
+				t.Errorf("line %q", line)
+			}
+		case strings.HasPrefix(line, "add-x  "):
+			seen++
+			if strings.Contains(line, "(") {
+				t.Errorf("line %q", line)
+			}
+		}
+	}
+	if seen != 2 {
+		t.Errorf("lines seen = %d in:\n%s", seen, text)
+	}
+}

@@ -366,3 +366,35 @@ func TestMetadataMissing(t *testing.T) {
 		t.Fatalf("change = %+v", c)
 	}
 }
+
+func TestLoadOtherSchema(t *testing.T) {
+	r, _ := baseRepo(t)
+	r.Git("checkout", "-q", "-b", "feat")
+	commitAt(r, day(1), "x", map[string]string{
+		folder("add-x", ".openspec.yaml"): "schema: spec-driven\n",
+		folder("add-x", "tasks.md"):       "- [x] a\n- [ ] b\n- [ ] c\n",
+	})
+	cs, unread := loadAt(t, r, t0.AddDate(0, 0, 5))
+	if len(unread) != 0 {
+		t.Fatalf("unreadable = %+v", unread)
+	}
+	c := mustFind(t, cs, "add-x")
+	want := Progress{StepsTicked: 1, StepsTotal: 3}
+	if c.Schema != "spec-driven" || c.Phase != Implementing || c.Progress != want || len(c.Tasks) != 0 || c.Tasks == nil {
+		t.Fatalf("schema %q phase %q progress %+v tasks %+v", c.Schema, c.Phase, c.Progress, c.Tasks)
+	}
+}
+
+func TestLoadDocketSchema(t *testing.T) {
+	r, _ := baseRepo(t)
+	r.Git("checkout", "-q", "-b", "feat")
+	commitAt(r, day(1), "x", map[string]string{
+		folder("add-x", ".openspec.yaml"): "schema: docket\n",
+		folder("add-x", "plan.md"):        "### Task 1: One\n\n- [ ] **Step 1: a**\n",
+	})
+	cs, _ := loadAt(t, r, t0.AddDate(0, 0, 5))
+	c := mustFind(t, cs, "add-x")
+	if c.Schema != "docket" || c.Phase != Ready || len(c.Tasks) != 1 {
+		t.Fatalf("schema %q phase %q tasks %+v", c.Schema, c.Phase, c.Tasks)
+	}
+}
