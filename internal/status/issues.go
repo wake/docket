@@ -63,6 +63,14 @@ func LoadBacklog(g gitx.Git, inv scan.Inventory) (Backlog, []scan.Unreadable, er
 	for _, is := range issues {
 		paths[issue.Dir+"/"+is.Slug+".md"] = true
 	}
+	tipIdeas, lines, bad, err := readTip(g, inv.DefaultBranch.Source())
+	if err != nil {
+		return Backlog{}, nil, err
+	}
+	unread = append(unread, bad...)
+	for p := range tipIdeas {
+		paths[p] = true
+	}
 	handlers, bad, err := findHandlers(g, inv, paths)
 	if err != nil {
 		return Backlog{}, nil, err
@@ -71,19 +79,12 @@ func LoadBacklog(g gitx.Git, inv scan.Inventory) (Backlog, []scan.Unreadable, er
 	out := issues[:0]
 	for _, is := range issues {
 		is.Handlers = handlers[issue.Dir+"/"+is.Slug+".md"]
-		is.State = Pending
-		held := false
-		for _, h := range is.Handlers {
-			if !h.Merged {
-				is.State = InProgress
-			}
-			held = held || h.Merged
-		}
-		if is.State == Pending && held {
+		if is.State = workState(false, is.Handlers); is.State == Done {
 			continue
 		}
 		out = append(out, is)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Slug < out[j].Slug })
-	return Backlog{Issues: out, Order: []OrderLine{}, Ideas: []Idea{}}, unread, nil
+	order, next, ideas := listIdeas(tipIdeas, lines, handlers)
+	return Backlog{Issues: out, Order: order, Next: next, Ideas: ideas}, unread, nil
 }
