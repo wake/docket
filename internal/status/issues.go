@@ -117,6 +117,10 @@ func LoadIssues(g gitx.Git, inv scan.Inventory) ([]Issue, []scan.Unreadable, err
 	for _, grp := range chGroups {
 		for _, i := range grp.Idx {
 			c := copies[i]
+			// When the tip holds the slug only its copies count, as for records.
+			if tipHeld[c.slug] && tipSource(c.srcs) == nil {
+				continue
+			}
 			files := map[string][]byte{}
 			for _, name := range []string{change.DocketFile, change.OpenSpecFile} {
 				if b, ok := grp.Files[c.rel+"/"+name]; ok {

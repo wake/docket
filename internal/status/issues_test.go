@@ -177,6 +177,24 @@ func TestIssueWithoutFrontMatterAndUnreadable(t *testing.T) {
 	}
 }
 
+func TestChangeCopiesElsewhereIgnoredWhenTipHolds(t *testing.T) {
+	other := "title: X\nsource: other\n"
+	named := "title: X\nsource: " + issAF + "\n"
+	for name, c := range map[string][2]string{
+		"tip archived, branch active": {"openspec/changes/archive/2026-11-01-add-x/docket.yaml", "openspec/changes/add-x/docket.yaml"},
+		"tip active, branch archived": {"openspec/changes/add-x/docket.yaml", "openspec/changes/archive/2026-11-01-add-x/docket.yaml"},
+	} {
+		r, _ := baseRepo(t)
+		r.Commit("issue and tip copy", map[string]string{issAF: issText, c[0]: other})
+		w := r.AddWorktree(filepath.Join(t.TempDir(), "wt"), "elsewhere")
+		w.Commit("other copy", map[string]string{c[1]: named})
+		is, _ := loadIssues(t, r)
+		if len(is) != 1 || is[0].State != Pending || len(is[0].Handlers) != 0 {
+			t.Errorf("%s: issues = %+v", name, is)
+		}
+	}
+}
+
 func TestChangeActiveAndArchivedIsOneHandler(t *testing.T) {
 	meta := "title: X\nsource: " + issAF + "\n"
 	r, _ := baseRepo(t)
