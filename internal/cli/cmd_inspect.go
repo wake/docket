@@ -64,7 +64,11 @@ func inspectCommand() Command {
 			if err != nil {
 				out.Findings = append(out.Findings, Finding{Rule: "schema-missing", Message: err.Error()})
 			}
-			rep, err := setup.Inspect(c.Repo.Root, setup.Dirs{Schema: schemaDir}, shippedAssets())
+			skillDirs, err := setup.UserSkillDirs(c.Env, c.UserHome)
+			if err != nil {
+				out.Findings = append(out.Findings, Finding{Rule: "user-skill-missing", Message: err.Error()})
+			}
+			rep, err := setup.Inspect(c.Repo.Root, setup.Dirs{Schema: schemaDir, UserSkills: skillDirs}, shippedAssets())
 			if err != nil {
 				return Outcome{Result: res}, envOrErr(err)
 			}
@@ -153,6 +157,8 @@ func inspectStatus(f setup.File, cfg setup.ConfigSchema) (status, rule, msg stri
 	switch f.Kind {
 	case setup.KindSkill:
 		name, what = "skill", "the shipped skill"
+	case setup.KindUserSkill:
+		name, what = "user-skill", "the shipped skill"
 	case setup.KindBlock:
 		name, what = "agents-block", "the shipped one"
 	}

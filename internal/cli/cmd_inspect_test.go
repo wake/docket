@@ -675,7 +675,12 @@ func TestInspectNothingWritten(t *testing.T) {
 	}
 	fake, log := testutil.FakeOpenSpec(t, "1.14.3")
 	env = append(env, "DOCKET_OPENSPEC="+fake)
-	xdg, home := envValue(env, "XDG_CONFIG_HOME"), envValue(env, "HOME")
+	for _, d := range []string{".claude", ".agents"} {
+		if err := os.RemoveAll(filepath.Join(userHome(r.Dir), d, "skills/docket-init")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	xdg, home := envValue(env, "XDG_CONFIG_HOME"), userHome(r.Dir)
 	snaps := [3]map[string]string{snapshot(t, r.Dir), snapshot(t, xdg), snapshot(t, home)}
 	status := r.Git("status", "--porcelain")
 
@@ -690,7 +695,7 @@ func TestInspectNothingWritten(t *testing.T) {
 			t.Errorf("unexpected %s", x)
 		}
 	}
-	for _, want := range []string{"schema-differs", "skill-differs", "agents-block-differs", "workflow-missing", "no-task-commits"} {
+	for _, want := range []string{"schema-differs", "skill-differs", "agents-block-differs", "workflow-missing", "no-task-commits", "user-skill-missing"} {
 		if !rules[want] {
 			t.Errorf("no %s finding: %s", want, so)
 		}
@@ -849,6 +854,29 @@ func TestInspectNoHomeForSchema(t *testing.T) {
 	}
 }
 
+func TestInspectNoHomeForCommand(t *testing.T) {
+	r := committedRepo(t)
+	env, _ := inspectEnv(t)
+	var so, se bytes.Buffer
+	code := Run(Options{Args: []string{"inspect", "--json"}, Dir: r.Dir, Env: bareEnv(env), UserHome: nil, Stdout: &so, Stderr: &se})
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so.String())
+	}
+	found := false
+	for _, f := range decode(t, so.String())["findings"].([]any) {
+		m := f.(map[string]any)
+		if m["rule"] == "user-skill-missing" && m["message"] == userdirs.ErrNoHome.Error() {
+			found = true
+			if _, has := m["file"]; has {
+				t.Errorf("finding has a file: %v", m)
+			}
+		}
+	}
+	if !found {
+		t.Errorf("no user-skill-missing finding: %s", so.String())
+	}
+}
+
 func TestInspectRelativeDataHome(t *testing.T) {
 	r := committedRepo(t)
 	env, _ := inspectEnv(t)
@@ -951,5 +979,103 @@ func TestInspectNothingWrittenWithProjectCopy(t *testing.T) {
 	}
 	for i, d := range dirs {
 		sameSnapshot(t, before[i], snapshot(t, d))
+	}
+}
+
+// installedRepo is a committed repository with init run on it.
+func installedRepo(t *testing.T) *testutil.Repo {
+	t.Helper()
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	return r
+}
+
+func TestInspectRelativeClaudeConfigDir(t *testing.T) {
+	r := installedRepo(t)
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, append(env, "CLAUDE_CONFIG_DIR=claude"), "--json")
+	f := findingOf(t, so, "user-skill-missing")
+	if code != 1 || f == nil || !strings.Contains(f["message"].(string), "CLAUDE_CONFIG_DIR is not an absolute path") {
+		t.Fatalf("exit %d finding %v\n%s", code, f, so)
+	}
+	if len(inspectFiles(t, so)) == 0 {
+		t.Error("no files listed")
+	}
+}
+
+func TestInspectUserSkillDiffers(t *testing.T) {
+	r := installedRepo(t)
+	p := filepath.Join(userHome(r.Dir), ".claude/skills/docket-init/SKILL.md")
+	if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	f := findingOf(t, so, "user-skill-differs")
+	if code != 1 || f == nil || f["file"] != p || f["message"] != "differs from the shipped skill; dkt init --force overwrites it" {
+		t.Fatalf("exit %d finding %v\n%s", code, f, so)
+	}
+	if e := inspectFiles(t, so)[p]; e == nil || e["status"] != "differs" || e["kind"] != "user-skill" {
+		t.Errorf("file entry: %v", e)
+	}
+}
+
+func TestInspectSymlinkedCommandFolder(t *testing.T) {
+	r := installedRepo(t)
+	link := filepath.Join(userHome(r.Dir), ".agents/skills/docket-init")
+	outside := t.TempDir()
+	if err := os.RemoveAll(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	var sym []any
+	for _, f := range decode(t, so)["findings"].([]any) {
+		if f.(map[string]any)["rule"] == "symlink-refused" {
+			sym = append(sym, f)
+		}
+	}
+	if code != 1 || len(sym) != 1 || sym[0].(map[string]any)["file"] != link {
+		t.Fatalf("exit %d symlink findings %v\n%s", code, sym, so)
+	}
+	if u, _ := decode(t, so)["unreadable"].([]any); len(u) != 0 {
+		t.Errorf("unreadable: %v", u)
+	}
+	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
+		t.Errorf("outside written: %v", ents)
+	}
+}
+
+func TestInspectCommandNotInstalled(t *testing.T) {
+	r := installedRepo(t)
+	dir := filepath.Join(userHome(r.Dir), ".agents/skills/docket-init")
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	files := inspectFiles(t, so)
+	n := 0
+	for _, f := range decode(t, so)["findings"].([]any) {
+		m := f.(map[string]any)
+		if m["rule"] == "user-skill-missing" && m["message"] == "not installed; run dkt init" {
+			n++
+		}
+	}
+	for _, rel := range []string{"SKILL.md", "agents/openai.yaml"} {
+		if e := files[filepath.Join(dir, rel)]; e == nil || e["status"] != "missing" || e["kind"] != "user-skill" {
+			t.Errorf("%s: %v", rel, e)
+		}
+	}
+	if n != 2 {
+		t.Errorf("user-skill-missing findings = %d: %s", n, so)
 	}
 }

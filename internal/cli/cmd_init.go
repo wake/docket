@@ -13,7 +13,7 @@ import (
 
 // shippedAssets are the files this build of dkt installs.
 func shippedAssets() setup.Assets {
-	return setup.Assets{Schema: docket.Schema(), Skills: docket.Skills(), Block: docket.Block()}
+	return setup.Assets{Schema: docket.Schema(), Skills: docket.Skills(), Block: docket.Block(), UserSkills: docket.UserSkills()}
 }
 
 // problemFindings maps the problems that stopped a check to findings and
@@ -62,6 +62,10 @@ func initCommand() Command {
 			if err != nil {
 				return Outcome{}, EnvError{Msg: err.Error()}
 			}
+			skillDirs, err := setup.UserSkillDirs(c.Env, c.UserHome)
+			if err != nil {
+				return Outcome{}, EnvError{Msg: err.Error()}
+			}
 			// The runner is created only when openspec/ is missing, so a
 			// repository that already has it needs no OpenSpec CLI.
 			initOpenSpec := func() error {
@@ -72,7 +76,7 @@ func initCommand() Command {
 				_, err = r.Run("init", "--tools", "none")
 				return err
 			}
-			res, err := setup.Init(c.Repo.Root, setup.Dirs{Schema: schemaDir}, shippedAssets(), force, initOpenSpec)
+			res, err := setup.Init(c.Repo.Root, setup.Dirs{Schema: schemaDir, UserSkills: skillDirs}, shippedAssets(), force, initOpenSpec)
 			var ref *setup.Refused
 			if errors.As(err, &ref) {
 				out := Outcome{Result: res}
@@ -96,6 +100,8 @@ func initCommand() Command {
 						rule, msg = "config-schema-other", "names another schema; dkt init leaves it, and dkt new still uses docket"
 					case setup.KindSkill:
 						rule, msg = "skill-differs", "differs from the shipped skill; use --force to overwrite"
+					case setup.KindUserSkill:
+						rule, msg = "user-skill-differs", "differs from the shipped skill; use --force to overwrite"
 					case setup.KindBlock:
 						rule, msg = "agents-block-differs", "the Docket block differs from the shipped one; use --force to replace it"
 					}

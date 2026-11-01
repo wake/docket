@@ -208,6 +208,16 @@ func TestRerunNoDifferences(t *testing.T) {
 		}
 		times[filepath.Join(r.Dir, rel)] = i.ModTime().UnixNano()
 	}
+	for _, base := range []string{".claude", ".agents"} {
+		for _, rel := range []string{"SKILL.md", "agents/openai.yaml"} {
+			p := skillRel(filepath.Join(userHome(r.Dir), base), rel)
+			i, err := os.Stat(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			times[p] = i.ModTime().UnixNano()
+		}
+	}
 	code, so, _ := runInit(t, r.Dir, cmd, "--json")
 	if code != 0 {
 		t.Fatalf("exit %d\n%s", code, so)
@@ -1250,5 +1260,122 @@ func TestFolderWithoutSchemaLeft(t *testing.T) {
 		if f.(map[string]any)["file"] == "openspec/schemas/docket" {
 			t.Errorf("finding names the folder: %v", f)
 		}
+	}
+}
+
+// skillRel is a file of the docket-init skill under a user-level config folder.
+func skillRel(base, rel string) string { return filepath.Join(base, "skills/docket-init", rel) }
+
+// initIn runs init --json on r with extra variables added to the shared ones.
+func initIn(t *testing.T, r *testutil.Repo, extra []string, args ...string) (int, string, string) {
+	t.Helper()
+	var so, se bytes.Buffer
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+testutil.OpenSpecCmd(t), "XDG_DATA_HOME="+dataHome(r.Dir), "HOME="+userHome(r.Dir))
+	code := Run(Options{Args: append([]string{"init", "--json"}, args...), Dir: r.Dir, Env: append(env, extra...), Stdout: &so, Stderr: &se})
+	return code, so.String(), se.String()
+}
+
+func TestInitUserSkill(t *testing.T) {
+	r := committedRepo(t)
+	code, so, se := runInit(t, r.Dir, testutil.OpenSpecCmd(t))
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	h := userHome(r.Dir)
+	for _, base := range []string{filepath.Join(h, ".claude"), filepath.Join(h, ".agents")} {
+		for _, rel := range []string{"SKILL.md", "agents/openai.yaml"} {
+			if p := skillRel(base, rel); !strings.Contains(so, "written     "+p+"\n") {
+				t.Errorf("no written line for %s:\n%s", p, so)
+			}
+		}
+	}
+	r2 := committedRepo(t)
+	code, so, se = initIn(t, r2, nil)
+	if code != 0 {
+		t.Fatalf("json exit %d\n%s\n%s", code, so, se)
+	}
+	files := map[string]string{}
+	for _, f := range resultOf(t, so)["files"].([]any) {
+		m := f.(map[string]any)
+		files[m["path"].(string)] = m["status"].(string)
+	}
+	for _, rel := range []string{".claude/skills/docket-init/SKILL.md", ".claude/skills/docket-init/agents/openai.yaml", ".agents/skills/docket-init/SKILL.md", ".agents/skills/docket-init/agents/openai.yaml"} {
+		if files[filepath.Join(userHome(r2.Dir), rel)] != "written" {
+			t.Errorf("%s: %v", rel, files)
+		}
+	}
+}
+
+func TestInitClaudeConfigDir(t *testing.T) {
+	r := committedRepo(t)
+	cfg := filepath.Join(t.TempDir(), "claude")
+	if code, so, se := initIn(t, r, []string{"CLAUDE_CONFIG_DIR=" + cfg}); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	for _, p := range []string{skillRel(cfg, "SKILL.md"), skillRel(filepath.Join(userHome(r.Dir), ".agents"), "SKILL.md")} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("missing %s", p)
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(userHome(r.Dir), ".claude")); err == nil {
+		t.Error("home .claude was written")
+	}
+}
+
+func TestInitRelativeClaudeConfigDir(t *testing.T) {
+	r := committedRepo(t)
+	code, so, se := initIn(t, r, []string{"CLAUDE_CONFIG_DIR=claude"})
+	if code != 4 || !strings.Contains(se, "CLAUDE_CONFIG_DIR is not an absolute path") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	nothingWritten(t, r)
+	for _, d := range []string{dataHome(r.Dir), filepath.Join(userHome(r.Dir), ".agents")} {
+		if _, err := os.Lstat(d); err == nil {
+			t.Errorf("%s was written", d)
+		}
+	}
+}
+
+func TestInitUserSkillDiffers(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, se := initIn(t, r, nil); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	p := skillRel(filepath.Join(userHome(r.Dir), ".agents"), "SKILL.md")
+	if err := os.WriteFile(p, []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, so, se := initIn(t, r, nil)
+	f := findingOf(t, so, "user-skill-differs")
+	if code != 1 || f == nil || f["file"] != p || f["message"] != "differs from the shipped skill; use --force to overwrite" {
+		t.Fatalf("exit %d finding %v\n%s\n%s", code, f, so, se)
+	}
+	if code, so, se := initIn(t, r, nil, "--force"); code != 0 || !strings.Contains(so, `"overwritten"`) {
+		t.Fatalf("force: exit %d\n%s\n%s", code, so, se)
+	}
+}
+
+func TestInitSymlinkedCommandFolder(t *testing.T) {
+	r := committedRepo(t)
+	outside := t.TempDir()
+	link := filepath.Join(userHome(r.Dir), ".claude/skills/docket-init")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, r.Dir)
+	code, so, se := initIn(t, r, nil)
+	fnds, _ := decode(t, so)["findings"].([]any)
+	if code != 1 || len(fnds) != 1 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if f := fnds[0].(map[string]any); f["rule"] != "symlink-refused" || f["file"] != link {
+		t.Errorf("finding: %v", f)
+	}
+	sameSnapshot(t, before, snapshot(t, r.Dir))
+	if ents, _ := os.ReadDir(outside); len(ents) != 0 {
+		t.Errorf("outside written: %v", ents)
 	}
 }
