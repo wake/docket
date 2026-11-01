@@ -58,6 +58,7 @@ Docket **不會**：
    第二、第三條路徑的工作不開 change，但會在 `docket/records/` 留一份紀錄，由 `dkt record` 寫出、`dkt lint` 檢查，它的 commit 帶 `Record: <slug>`，trailer 指不到任何紀錄時 `dkt lint` 會回報。`dkt status` 列出未合併的紀錄，`dkt sync` 勾選它們的任務。`dkt new` 和 `dkt record` 在 slug 已被用掉時，會改用空著的 `-2`（再來 `-3`，依此類推）後綴。
 
    預期行為已經確定、現在不做的工作是 issue，不是 idea。issue 有四節（`## Current`、`## Expected`、`## Unchanged`、`## Found`，`dkt issue template` 會印出）。專案若把 issue 放在外部工具，就在 `AGENTS.md` 的 `## Issues` 一節寫明，agent 經使用者同意後把 issue 開在那裡；否則 `dkt issue` 寫出 `docket/issues/<日期>-<name>.md`。來源是該 issue 路徑的紀錄或 change 就是處理它的工作，`dkt status` 依這些紀錄與 change 列出待處理或進行中的檔案 issue。`dkt lint` 會檢查分支新增的檔案 issue（front matter、四節、字數上限），並回報來源指向不存在的檔案 issue 的紀錄或 change；`dkt status --json` 把未結的 issue 列在 `result.issues`。`dkt` 不會呼叫外部工具。
+   idea 是檔案 `docket/ideas/<file>.md`，front matter 有 `title`，可選 `dropped: true` 與 `needs`（idea 路徑的清單）。`docket/order.md` 是 `# Order` 加上 ``1. `docket/ideas/<file>.md` `` 這樣的行，從 1 起編號、沒有核取方塊；idea 完成後該行仍留著。idea 的狀態：`dropped`；否則沒有處理者是 `pending`，有來源為其路徑的紀錄或 change 不在預設分支上是 `in-progress`，每個處理者都在預設分支上是 `done`。`dkt lint` 檢查 order 與 idea，並回報來源指向不存在的 idea 的紀錄或 change；`dkt status --json` 把 order 列在 `result.order`，第一個 `pending` 或 `in-progress` 的行放在 `result.next`，order 之外待處理或進行中的 idea 列在 `result.ideas`。只有預設分支上的 idea 與 order 算數。
 2. **開 change。**在 git worktree 裡執行 `dkt new <slug>`，它會呼叫 `openspec new change`。
 3. **寫提案與 delta。**
    - brainstorming 直接把 `proposal.md` 和 `specs/**/spec.md` 寫進 change 資料夾，需要時再加 `design.md`。

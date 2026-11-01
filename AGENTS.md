@@ -16,8 +16,8 @@ with `go install ./cmd/dkt`. Upcoming work is ordered in `docket/order.md`.
 
 Before writing a proposal or a plan, read `docs/ARCHITECTURE.md` for module
 boundaries and shared capabilities. Ideas are in `docket/ideas/`, one per
-file; `docket/order.md` lists the ones queued, in order, and the first
-unticked line is the next piece of work.
+file; `docket/order.md` lists the ones queued, in order, and the line
+`dkt status` reports as next is the next piece of work.
 
 ## Development
 
