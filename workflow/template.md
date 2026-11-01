@@ -52,7 +52,9 @@ confirm, triage again.
 
 ## Direct merge
 
-Pass the automated checks. No review.
+Run only the checks that read what the edit changed: none when it changes
+only docs that nothing builds, embeds or tests; the build and the tests
+when it changes code, test files or dependency manifests. No review.
 
 ## Reviews
 

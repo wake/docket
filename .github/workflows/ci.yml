@@ -8,7 +8,32 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # Docs that nothing builds, embeds or tests. Any other path, or a diff that fails, runs everything.
+          docs='^((docket/ideas|docs)/.+\.md|docket/order\.md|README(\.zh-TW)?\.md)$'
+          # Only the root package can embed these paths; once it does, they are code.
+          if ! grep -hE '^//go:embed' ./*.go | grep -qE '[[:space:]]["`]?(docs|docket|README|\*)' &&
+             files=$(git diff --no-renames --name-only "$BASE" HEAD) &&
+             ! printf '%s\n' "$files" | grep -qvE "$docs"; then
+            echo code=false >> "$GITHUB_OUTPUT"
+          else
+            echo code=true >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -22,6 +47,8 @@ jobs:
       - run: go test ./...
 
   openspec:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -37,6 +64,8 @@ jobs:
           OPENSPEC_TELEMETRY: "0"
 
   duplicates:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -47,6 +76,7 @@ jobs:
           node-version: 22
       - run: npx -y jscpd@5.4.2 --format go --ignore "**/testdata/**,**/*_test.go" --baseline-from-ref origin/main --fail-on-new-clones=0 .
 
+  # Runs on every change: it reads the trailers of each commit, not only files.
   lint:
     runs-on: ubuntu-latest
     steps:
