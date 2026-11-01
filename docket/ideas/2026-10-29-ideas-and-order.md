@@ -87,3 +87,21 @@ to the default branch, without a pull request.
   A `domain:` field is designed with them
   (`2026-10-30-spec-domains.md`). `dkt` lists and groups by these fields;
   the order itself stays the maintainer's decision.
+
+## Status
+
+Done by the change `add-idea-state` (v0.15.0), which took the proposal under
+Parallel work instead of two decided points:
+
+- Nothing ticks the order and there is no `to:`. An idea's state comes from
+  the records and changes whose source names it, as an issue's does.
+  `docket/order.md` has no checkboxes, and `dkt sync` has no order check.
+- `dkt status` reports the state: `result.order`, `result.next` and
+  `result.ideas`. Ideas and the order are read from the default branch tip.
+- A source names the path in its first field, so the sources written before
+  this change still count.
+- `needs:` is a list of idea paths; status shows the ones a line still waits
+  on.
+- The classification fields were left out: issues took the fixes,
+  optimizations and tests out of the ideas. Domains stay with
+  `2026-10-30-spec-domains.md`.
