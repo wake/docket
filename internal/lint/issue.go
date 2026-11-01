@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/issue"
 )
 
@@ -82,7 +83,7 @@ func (r *run) isFile(p, prefix string) bool {
 // names no regular file there. file is the file that holds the source.
 func checkIssueSource(r *run, c *loaded, file, source string) {
 	s := strings.TrimSpace(source)
-	if strings.HasPrefix(s, issue.Dir+"/") && !r.isFile(s, issue.Dir+"/") {
+	if p := change.SourcePath(s); strings.HasPrefix(p, issue.Dir+"/") && !r.isFile(p, issue.Dir+"/") {
 		r.add(c, "issue-source", file, 1, "source %q names no issue file", s)
 	}
 }

@@ -3,7 +3,6 @@ package status
 import (
 	"slices"
 	"sort"
-	"strings"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
@@ -64,7 +63,7 @@ func LoadIssues(g gitx.Git, inv scan.Inventory) ([]Issue, []scan.Unreadable, err
 	}
 	// One handler per kind and slug.
 	add := func(kind, slug, source string, merged bool) {
-		is, ok := named[strings.TrimSpace(source)]
+		is, ok := named[change.SourcePath(source)]
 		if !ok || slices.ContainsFunc(is.Handlers, func(h Handler) bool { return h.Kind == kind && h.Slug == slug }) {
 			return
 		}

@@ -211,3 +211,13 @@ func TestChangeActiveAndArchivedIsOneHandler(t *testing.T) {
 	is, _ := loadIssues(t, r2)
 	only(t, is, InProgress, Handler{Kind: "change", Slug: "add-x"})
 }
+
+func TestHandlerWithANote(t *testing.T) {
+	r, _ := baseRepo(t)
+	r.Commit("issue", map[string]string{issAF: issText,
+		"docket/records/2026-11-02-fix-a.md": recordNaming("\"" + issAF + ", found while fixing y\""),
+	})
+	if is, _ := loadIssues(t, r); len(is) != 0 {
+		t.Fatalf("source with a note should hand the issue over: %+v", is)
+	}
+}

@@ -154,3 +154,18 @@ func TestChangeSourceNamesNoIssue(t *testing.T) {
 		t.Fatalf("%+v", r.Findings)
 	}
 }
+
+func TestSourceWithANoteNamesNoIssue(t *testing.T) {
+	src := "docket/issues/2026-11-02-x.md, from review of #40"
+	run := func(files map[string]string) Report {
+		files[recPath(goodSlug)] = strings.Replace(goodRecord(), "source: a note", "source: \""+src+"\"", 1)
+		return Run(recInput(files, recPath(goodSlug)))
+	}
+	f := wantRec(t, run(map[string]string{}), "issue-source")
+	if !strings.Contains(f.Message, src) {
+		t.Fatal(f.Message)
+	}
+	if r := run(map[string]string{"docket/issues/2026-11-02-x.md": goodIssue()}); len(recFindings(r, "issue-source")) != 0 {
+		t.Fatalf("%+v", r)
+	}
+}

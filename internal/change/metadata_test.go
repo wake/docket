@@ -77,3 +77,21 @@ func TestReadSchema(t *testing.T) {
 		}
 	}
 }
+
+func TestSourcePath(t *testing.T) {
+	for in, want := range map[string]string{
+		"docket/ideas/x.md":                            "docket/ideas/x.md",
+		"  docket/ideas/x.md  ":                        "docket/ideas/x.md",
+		"docket/ideas/x.md, item 1 of docket/order.md": "docket/ideas/x.md",
+		"docket/ideas/x.md (order 5)":                  "docket/ideas/x.md",
+		"docket/ideas/x.md,":                           "docket/ideas/x.md",
+		"see docket/ideas/x.md":                        "see",
+		"":                                             "",
+		"   ":                                          "",
+		"a,,":                                          "a,",
+	} {
+		if got := SourcePath(in); got != want {
+			t.Errorf("SourcePath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
