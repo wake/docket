@@ -155,3 +155,4 @@ files when it names none.
 | Date | Source | Change | Impact |
 |---|---|---|---|
 | 2026-11-01 | plan review (codex) | A handler the default branch tip holds is read from the tip; two state scenarios added; the command flow, the YAML decoder and the front-matter framing shared with records | Tasks 1 and 5 grow; no new task |
+| 2026-11-01 | pre-merge review (codex, fresh-context spec review) | Only the tip's copies of a change the tip holds count as handlers; the READMEs and the architecture notes say what lint and status do with issues; `dropped: yes` noted in the design | One fix commit each to Tasks 5 and 6; no new task |
