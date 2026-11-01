@@ -50,6 +50,49 @@ parsing is deterministic, but the tool is aimed at AI coding assistants.
 - Language parsers and outside tools would tie Docket to them. Any use of
   one would be optional, at the user's request.
 
+## Decided, 2026-11-01
+
+From a survey of the tools with the maintainer: of the tools for static
+structure, git history and code indexes, most are no longer maintained,
+cover one language, or need a runtime of their own, and the one that
+clusters automatically does not read Go. Automatic clustering also scores
+low against the architecture people draw.
+
+- Docket uses no outside tool for this. It does only what it can do
+  itself: git, the files, and prompt text.
+- The approach with evidence is an interface list. In the RepoReuse
+  preprint (arXiv 2609.35357), agents reused existing code in 67.8% of
+  cases with an interface list, 29.2% with the full source and 30.0% with
+  nothing; the interface condition also told the agent to reuse, so the
+  two effects are not separated. Its entries hold the module, the name,
+  the signature, the return contract and one line on behavior.
+
+## Interface list, not decided
+
+No single method gives signatures in every language without a parser
+library or each language's own toolchain:
+
+- tree-sitter is the closest to one: one runtime, a grammar per language.
+  Its tag queries give names and positions, not signatures. In Go, the
+  official bindings need cgo, and the pure-Go runtime is pre-1.0, with a
+  few grammars under GPL or MPL.
+- universal-ctags fills signatures only for C-like languages.
+- Each language's own declaration output has its own needs: TypeScript
+  and Swift build first, Python's `stubgen` imports the code, rustdoc
+  JSON is nightly only.
+
+Direction:
+
+- Go: `dkt` builds the list with the standard library (`go/parser`,
+  `go/doc`).
+- Other languages: a prompt fixes the format, and the agent writes the
+  list in the session from the project's own toolchain or by reading the
+  code. The behavior line needs judgment anyway. `dkt` checks only the
+  format and whether the list is out of date.
+- First, a small trial on one existing package: no map, a list of names,
+  and the interface list with a reuse instruction. The trial decides
+  whether the list becomes a fixed feature.
+
 ## Trial, 2026-10-31
 
 A baseline of one package of the Purdex repository (`internal/redact`, 174
