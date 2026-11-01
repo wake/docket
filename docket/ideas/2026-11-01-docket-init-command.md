@@ -61,6 +61,17 @@ Split: this idea is the command itself, steps 1, 2, 3, 5 and 6, mostly
 joining what exists. Step 4 comes from the three ideas it names, each
 done as its own piece of work; the command takes each part up as it ships.
 
+## Decided, 2026-11-01
+
+`dkt init` installs the command at user level, `~/.claude/skills/docket-init/`
+for Claude Code (`/docket-init`) and `~/.agents/skills/docket-init/` for
+Codex (`$docket-init`), the way it installs the per-machine schema: it
+writes a missing copy and prints its path, reports one that differs, and
+`--force` overwrites it. Only `dkt init` writes it. A plugin was dropped:
+it would still need `dkt` installed on its own (carrying built binaries in
+the plugin's git source is not practical), and Codex would need a second
+format.
+
 ## Found, 2026-11-01
 
 From the documentation of Claude Code 2.1.316 and Codex 0.153.4; nothing
