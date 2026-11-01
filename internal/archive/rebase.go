@@ -26,7 +26,7 @@ type RebaseReport struct {
 // the change.
 func Rebase(e Env, slug string) (RebaseReport, error) {
 	rep := RebaseReport{Change: slug, Changed: []Drift{}}
-	head, c, finds, unread, err := loadAtHead(e, slug, loadOpts{Deltas: true})
+	head, c, finds, unread, err := loadAtHead(e, slug, loadOpts{Deltas: true, RefuseOther: "rebase"})
 	if err != nil {
 		return rep, err
 	}

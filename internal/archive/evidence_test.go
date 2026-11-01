@@ -24,7 +24,7 @@ func TestEvidenceWritten(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "# Evidence: add-x\n\n| Field | Value |\n|---|---|\n| Date | 2026-11-02 |\n| Docket | 0.1.0 |\n| OpenSpec | 1.14.3 |\n" +
-		"| Repository | none |\n| HEAD | " + head + " |\n| Title | none |\n| Kind | feature |\n| Source | a \\| b |\n| Base | " + base + " |\n\n" +
+		"| Repository | none |\n| HEAD | " + head + " |\n| Schema | docket |\n| Skipped steps | none |\n| Title | none |\n| Kind | feature |\n| Source | a \\| b |\n| Base | " + base + " |\n\n" +
 		"## Task commits\n\n| Task | Commit | Subject |\n|---|---|---|\n" +
 		"| 1 | " + first + " | work on add-x |\n| 1 | " + head + " | plan |\n| 2 | none | |\n\n" +
 		"## Checks\n\n- `openspec validate add-x --strict`: Change is valid\n- Base check: 1 requirements checked, none changed since the base\n"

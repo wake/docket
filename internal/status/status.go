@@ -39,6 +39,25 @@ type Progress struct {
 	StepsTotal  int `json:"steps_total"`
 }
 
+// SummarizeChecklist gives the phase and progress of a change of another
+// schema from its tasks.md: ok is false when the file is missing. Its boxes
+// count as steps; there are no tasks.
+func SummarizeChecklist(tasks []byte, ok bool) (phase string, progress Progress) {
+	if !ok {
+		return Design, progress
+	}
+	progress.StepsTicked, progress.StepsTotal = change.Checkboxes(tasks)
+	switch {
+	case progress.StepsTotal == 0:
+		return Design, progress
+	case progress.StepsTicked == 0:
+		return Ready, progress
+	case progress.StepsTicked == progress.StepsTotal:
+		return Done, progress
+	}
+	return Implementing, progress
+}
+
 // Summarize gives the phase, the tasks (plan order, then cancelled) and the
 // progress of a change. plan is nil when the change has no plan.md; named
 // holds the tasks some commit names.

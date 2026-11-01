@@ -206,6 +206,32 @@ func TestInspectSymlinkedSkillDirectory(t *testing.T) {
 	}
 }
 
+func TestInspectLinkedSkillStillChecksSpecs(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	link := filepath.Join(r.Dir, ".claude/skills/docket")
+	if err := os.RemoveAll(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(t.TempDir(), link); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(r.Dir, "openspec/specs/booking/spec.md")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("# booking\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	_, so, _ := runInspect(t, r.Dir, env, "--json")
+	if f := inspectFinding(t, so, "title-missing"); f["file"] != "openspec/specs/booking/docket.yaml" {
+		t.Errorf("file: %v", f["file"])
+	}
+}
+
 func TestInspectSymlinkedOpenSpec(t *testing.T) {
 	r := committedRepo(t)
 	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
@@ -215,7 +241,20 @@ func TestInspectSymlinkedOpenSpec(t *testing.T) {
 	if err := os.RemoveAll(link); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(t.TempDir(), link); err != nil {
+	target := t.TempDir()
+	for name, body := range map[string]string{
+		"specs/booking/spec.md":        "# Booking\n",
+		"changes/add-x/.openspec.yaml": "schema: spec-driven\n",
+		"changes/add-x/tasks.md":       "- [ ] 1.1 a\n",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(target, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(target, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
 	const rel = ".claude/skills/docket/SKILL.md"
@@ -236,6 +275,8 @@ func TestInspectSymlinkedOpenSpec(t *testing.T) {
 			if m["file"] != "openspec" {
 				t.Errorf("symlink finding: %v", m)
 			}
+		case "title-missing", "other-schema":
+			t.Errorf("read through the linked openspec: %v", m)
 		case "skill-differs":
 			if m["file"] == rel {
 				differs = true
@@ -1077,5 +1118,76 @@ func TestInspectCommandNotInstalled(t *testing.T) {
 	}
 	if n != 2 {
 		t.Errorf("user-skill-missing findings = %d: %s", n, so)
+	}
+}
+
+// inspectFinding returns the finding of rule in an --json output.
+func inspectFinding(t *testing.T, so, rule string) map[string]any {
+	t.Helper()
+	for _, f := range decode(t, so)["findings"].([]any) {
+		if m := f.(map[string]any); m["rule"] == rule {
+			return m
+		}
+	}
+	t.Fatalf("no %s finding: %s", rule, so)
+	return nil
+}
+
+func TestInspectMainSpecTitle(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	p := filepath.Join(r.Dir, "openspec/specs/booking/spec.md")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("# booking\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	f := inspectFinding(t, so, "title-missing")
+	if f["file"] != "openspec/specs/booking/docket.yaml" {
+		t.Errorf("file: %v", f["file"])
+	}
+	lc, lo, _ := runLint(t, r.Dir, env, "--json")
+	if lc == 0 {
+		t.Fatalf("lint exit 0: %s", lo)
+	}
+	if got, want := f["message"], inspectFinding(t, lo, "title-missing")["message"]; got != want {
+		t.Errorf("message %v, lint %v", got, want)
+	}
+}
+
+func TestInspectOtherSchema(t *testing.T) {
+	r := committedRepo(t)
+	if code, so, _ := runInit(t, r.Dir, testutil.OpenSpecCmd(t)); code != 0 {
+		t.Fatalf("init: %d %s", code, so)
+	}
+	d := filepath.Join(r.Dir, "openspec/changes/add-x")
+	if err := os.MkdirAll(d, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for n, s := range map[string]string{".openspec.yaml": "schema: spec-driven\n", "tasks.md": "- [ ] a\n- [ ] b\n- [ ] c\n- [ ] d\n"} {
+		if err := os.WriteFile(filepath.Join(d, n), []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env, _ := inspectEnv(t)
+	code, so, _ := runInspect(t, r.Dir, env, "--json")
+	if code != 1 {
+		t.Fatalf("exit %d: %s", code, so)
+	}
+	f := inspectFinding(t, so, "other-schema")
+	if f["file"] != "openspec/changes/add-x/.openspec.yaml" {
+		t.Errorf("file: %v", f["file"])
+	}
+	want := "made with the spec-driven schema; Docket leaves it to that schema's files (0 of 4 steps ticked)"
+	if f["message"] != want {
+		t.Errorf("message: %v", f["message"])
 	}
 }

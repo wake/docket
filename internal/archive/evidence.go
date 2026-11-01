@@ -12,12 +12,12 @@ import (
 
 // evidence is what evidence.md records about one archived change.
 type evidence struct {
-	Slug, Date, Docket, OpenSpec, Origin, Head string
-	Meta                                       change.Metadata
-	Tasks                                      []change.Task
-	Commits                                    map[int][]gitx.Commit // by task number, oldest first
-	Validate                                   string                // first line of validate's output
-	Checked                                    int
+	Slug, Date, Docket, OpenSpec, Origin, Head, Schema string
+	Meta                                               change.Metadata
+	Tasks                                              []change.Task
+	Commits                                            map[int][]gitx.Commit // by task number, oldest first
+	Validate                                           string                // first line of validate's output
+	Checked                                            int
 }
 
 var cellReplacer = strings.NewReplacer("|", `\|`, "\r\n", " ", "\n", " ", "\r", " ")
@@ -32,13 +32,22 @@ func orNone(s string) string {
 	return cell(s)
 }
 
+// skipped names the steps Docket does not run for the change's schema.
+func (ev evidence) skipped() string {
+	if ev.Schema == change.DocketSchema {
+		return "none"
+	}
+	return "plan, base"
+}
+
 func (ev evidence) render() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Evidence: %s\n\n| Field | Value |\n|---|---|\n", ev.Slug)
 	for _, row := range [][2]string{
 		{"Date", ev.Date}, {"Docket", cell(ev.Docket)}, {"OpenSpec", cell(ev.OpenSpec)},
 		{"Repository", cell(evidenceOrigin(ev.Origin))}, {"HEAD", ev.Head},
-		{"Title", orNone(ev.Meta.Title)}, {"Kind", orNone(ev.Meta.Kind)}, {"Source", orNone(ev.Meta.Source)}, {"Base", cell(ev.Meta.Base)},
+		{"Schema", cell(ev.Schema)}, {"Skipped steps", ev.skipped()},
+		{"Title", orNone(ev.Meta.Title)}, {"Kind", orNone(ev.Meta.Kind)}, {"Source", orNone(ev.Meta.Source)}, {"Base", orNone(ev.Meta.Base)},
 	} {
 		fmt.Fprintf(&b, "| %s | %s |\n", row[0], row[1])
 	}
@@ -57,8 +66,10 @@ func (ev evidence) render() string {
 			fmt.Fprintf(&b, "| %d | %s | %s |\n", t.Number, c.SHA, cell(c.Subject))
 		}
 	}
-	fmt.Fprintf(&b, "\n## Checks\n\n- `openspec validate %s --strict`: %s\n- Base check: %d requirements checked, none changed since the base\n",
-		ev.Slug, strings.TrimSpace(ev.Validate), ev.Checked)
+	fmt.Fprintf(&b, "\n## Checks\n\n- `openspec validate %s --strict`: %s\n", ev.Slug, strings.TrimSpace(ev.Validate))
+	if ev.Schema == change.DocketSchema {
+		fmt.Fprintf(&b, "- Base check: %d requirements checked, none changed since the base\n", ev.Checked)
+	}
 	return b.String()
 }
 

@@ -171,6 +171,9 @@ func statusLine(ch status.Change) string {
 	if ch.Uncommitted != nil {
 		line += fmt.Sprintf("  %d uncommitted", *ch.Uncommitted)
 	}
+	if ch.Schema != change.DocketSchema {
+		line += " (" + ch.Schema + ")"
+	}
 	return line
 }
 

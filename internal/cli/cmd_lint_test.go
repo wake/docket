@@ -82,6 +82,33 @@ func lintFixture(t *testing.T) *testutil.Repo {
 	return r
 }
 
+func TestLintOtherSchemaJSON(t *testing.T) {
+	r := lintFixture(t)
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "changes")
+	code, so, se := runLint(t, r.Dir, r.Env, "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	if got := decode(t, so)["result"].(map[string]any)["other_schema"]; !reflect.DeepEqual(got, []any{}) {
+		t.Fatalf("other_schema = %#v, want []", got)
+	}
+	r.Write("openspec/changes/add-z/.openspec.yaml", "schema: spec-driven\n")
+	r.Write("openspec/changes/add-z/proposal.md", "# loose\n")
+	code, so, se = runLint(t, r.Dir, r.Env, "--json")
+	if code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+	want := []any{map[string]any{"slug": "add-z", "schema": "spec-driven"}}
+	if got := decode(t, so)["result"].(map[string]any)["other_schema"]; !reflect.DeepEqual(got, want) {
+		t.Fatalf("other_schema = %#v", got)
+	}
+	code, so, se = runLint(t, r.Dir, r.Env)
+	if code != 0 || !strings.Contains(so, "other schema  add-z: spec-driven\n") {
+		t.Fatalf("exit %d\n%s\n%s", code, so, se)
+	}
+}
+
 func sourcesOf(t *testing.T, so string) []string {
 	t.Helper()
 	var out []string

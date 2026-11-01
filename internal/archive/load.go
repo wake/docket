@@ -18,6 +18,7 @@ import (
 type loadedChange struct {
 	Slug      string
 	Dir       string // repository-relative, slash-separated
+	Schema    string
 	Meta      change.Metadata
 	Plan      change.Plan
 	PlanBytes []byte
@@ -64,7 +65,12 @@ func loadAtHead(e Env, slug string, o loadOpts) (head string, c *loadedChange, f
 // loadOpts says what loadChange reads beyond the metadata: Plan reads
 // plan.md, BaseIsCommit requires the base to name a commit, Deltas reads the
 // delta specs.
-type loadOpts struct{ Plan, BaseIsCommit, Deltas bool }
+// RefuseOther, when set to "sync" or "rebase", makes a change of another
+// schema an other-schema finding worded for that command.
+type loadOpts struct {
+	Plan, BaseIsCommit, Deltas bool
+	RefuseOther                string
+}
 
 // loadChange reads openspec/changes/<slug>/ as o asks. It returns nil
 // together with the findings and unreadable sources when the change cannot
@@ -106,7 +112,7 @@ func loadChange(e Env, slug string, o loadOpts) (*loadedChange, []Finding, []Unr
 	c := &loadedChange{Slug: slug, Dir: dir, Deltas: map[string]delta.Delta{}}
 
 	files := map[string][]byte{}
-	for _, name := range []string{change.DocketFile, change.OpenSpecFile} {
+	readFile := func(name string) {
 		b, rerr := fs.ReadFile(rfs, c.path(name))
 		switch {
 		case errors.Is(rerr, fs.ErrNotExist):
@@ -116,7 +122,24 @@ func loadChange(e Env, slug string, o loadOpts) (*loadedChange, []Finding, []Unr
 			files[name] = b
 		}
 	}
+	readFile(change.OpenSpecFile)
 	if len(unread) == 0 {
+		var serr error
+		if c.Schema, serr = change.ReadSchema(files); serr != nil {
+			add("metadata-invalid", change.OpenSpecFile, "%v", serr)
+			return nil, finds, unread
+		}
+		if c.Schema != change.DocketSchema {
+			if o.RefuseOther != "" {
+				add("other-schema", change.OpenSpecFile, "made with the %s schema; dkt %s works only on changes of the docket schema", c.Schema, o.RefuseOther)
+				return nil, finds, unread
+			}
+			o.Plan = false // a change of another schema has no docket.yaml, base or plan.md to read
+		} else {
+			readFile(change.DocketFile)
+		}
+	}
+	if len(unread) == 0 && c.Schema == change.DocketSchema {
 		m, merr := change.ReadMetadata(files)
 		switch {
 		case merr != nil:

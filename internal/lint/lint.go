@@ -39,6 +39,9 @@ type Report struct {
 	Issues     []string
 	Findings   []Finding
 	Unreadable []Unreadable
+
+	// OtherSchema lists the linted changes of another schema, sorted by slug.
+	OtherSchema []OtherSchema
 }
 
 // Input says what to lint. Repo is the worktree root and Templates is the
@@ -129,11 +132,21 @@ func Run(in Input) Report {
 		slugs = r.scope(changeNames)
 	}
 	for _, slug := range slugs {
-		c, ok := r.load(slug)
+		schema, schemaErr := readSchema(in.Repo, slug)
+		other := schemaErr == nil && schema != change.DocketSchema
+		c, ok := r.load(slug, other)
 		if !ok {
 			continue
 		}
 		rep.Changes = append(rep.Changes, slug)
+		if schemaErr != nil {
+			r.add(c, "metadata-invalid", change.OpenSpecFile, 0, "%s is not valid: %v", change.OpenSpecFile, schemaErr)
+		}
+		if other {
+			rep.OtherSchema = append(rep.OtherSchema, OtherSchema{Slug: slug, Schema: schema})
+			checkDeltaTitles(r, c, deltas(c))
+			continue
+		}
 		checkProposal(r, c)
 		checkPlaceholders(r, c)
 		if m, err := change.ReadMetadata(c.Files); err == nil {
@@ -144,7 +157,8 @@ func Run(in Input) Report {
 		}
 		ds := deltas(c)
 		checkStructure(r, c, ds)
-		checkTitles(r, c, ds)
+		checkTitles(r, c)
+		checkDeltaTitles(r, c, ds)
 		if c.Has(planFile) {
 			checkScenarios(r, c, ds)
 		}
@@ -159,6 +173,7 @@ func Run(in Input) Report {
 	sort.Strings(rep.Changes)
 	sort.Strings(rep.Records)
 	sort.Strings(rep.Issues)
+	sort.Slice(rep.OtherSchema, func(i, j int) bool { return rep.OtherSchema[i].Slug < rep.OtherSchema[j].Slug })
 	sort.SliceStable(rep.Findings, func(i, j int) bool {
 		a, b := rep.Findings[i], rep.Findings[j]
 		switch {
@@ -245,9 +260,10 @@ func (r *run) missing(slug string) {
 	})
 }
 
-// load reads every regular file of a change. It returns false, after
-// listing the folder as unreadable, when the folder cannot be read.
-func (r *run) load(slug string) (*loaded, bool) {
+// load reads every regular file of a change, or with specsOnly just its
+// .openspec.yaml and the files under specs/. It returns false, after listing
+// the folder as unreadable, when the folder cannot be read.
+func (r *run) load(slug string, specsOnly bool) (*loaded, bool) {
 	c := &loaded{Slug: slug, Dir: path.Join(changesDir, slug), Files: map[string][]byte{}, bad: map[string]bool{}}
 	var dirErr error
 	_ = fs.WalkDir(r.in.Repo, c.Dir, func(p string, d fs.DirEntry, err error) error {
@@ -262,10 +278,16 @@ func (r *run) load(slug string) (*loaded, bool) {
 			}
 			return nil
 		}
+		rel := strings.TrimPrefix(p, c.Dir+"/")
+		if specsOnly && p != c.Dir && rel != change.OpenSpecFile && rel != "specs" && !strings.HasPrefix(rel, "specs/") {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
 		if !d.Type().IsRegular() {
 			return nil
 		}
-		rel := strings.TrimPrefix(p, c.Dir+"/")
 		b, err := fs.ReadFile(r.in.Repo, p)
 		if err != nil {
 			c.bad[rel] = true

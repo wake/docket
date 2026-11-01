@@ -13,9 +13,9 @@ import (
 
 const specsDir = "openspec/specs"
 
-// checkTitles reports a change, or a delta of a capability with no main
-// spec, that has no title, and any docket.yaml that does not parse.
-func checkTitles(r *run, c *loaded, ds []capDelta) {
+// checkTitles reports a change that has no title, and a docket.yaml that
+// does not parse.
+func checkTitles(r *run, c *loaded) {
 	if !c.Skipped(change.DocketFile) {
 		if b, ok := c.Files[change.DocketFile]; ok {
 			r.checkDocket(c, c.Path(change.DocketFile), b)
@@ -24,6 +24,11 @@ func checkTitles(r *run, c *loaded, ds []capDelta) {
 				"change %q has no title; a change made by an older dkt moves x-kind, x-source and x-base from .openspec.yaml into docket.yaml as kind, source and base", c.Slug)
 		}
 	}
+}
+
+// checkDeltaTitles reports a delta of a capability with no main spec that
+// has no title, and any docket.yaml beside a delta that does not parse.
+func checkDeltaTitles(r *run, c *loaded, ds []capDelta) {
 	for _, d := range ds {
 		name := path.Join(path.Dir(d.File), change.DocketFile)
 		if c.Skipped(name) {
@@ -42,6 +47,14 @@ func checkTitles(r *run, c *loaded, ds []capDelta) {
 			r.unreadable(path.Join(specsDir, d.Cap, "spec.md"), err)
 		}
 	}
+}
+
+// SpecTitles checks the docket.yaml beside every main spec of repo, as Run
+// does when no change is named.
+func SpecTitles(repo fs.FS) ([]Finding, []Unreadable) {
+	rep := Report{}
+	checkSpecTitles(&run{in: Input{Repo: repo}, rep: &rep})
+	return rep.Findings, rep.Unreadable
 }
 
 // checkSpecTitles checks the docket.yaml beside every main spec.

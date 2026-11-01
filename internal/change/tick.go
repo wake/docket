@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+
+	"github.com/wake/docket/internal/markdown"
 )
 
 // Step is one checkbox line of a plan task. Line is 1-based.
@@ -18,6 +20,25 @@ var (
 	unticked  = regexp.MustCompile(`^[ \t]*[-*+][ \t]+\[( )\]`)
 	bomPrefix = []byte("\xef\xbb\xbf")
 )
+
+// Checkboxes counts the checkbox lines of b outside fenced code and HTML
+// comments, and how many of them are ticked.
+func Checkboxes(b []byte) (ticked, total int) {
+	lines := markdown.Lines(b)
+	mask := markdown.FenceMask(lines)
+	for i, l := range markdown.BlankComments(lines, mask) {
+		if mask[i] {
+			continue
+		}
+		if m := stepRe.FindStringSubmatch(l); m != nil {
+			total++
+			if m[1] != " " {
+				ticked++
+			}
+		}
+	}
+	return
+}
 
 // lineStarts returns the byte offset in b of the start of every line, counted
 // as markdown.Lines counts them: after a leading BOM, with CRLF and lone CR

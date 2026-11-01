@@ -39,6 +39,37 @@ func parseMetadata(b []byte) (Metadata, error) {
 	return Metadata{Kind: o.Kind, Source: o.Source, Base: o.Base, Created: o.Created, File: OpenSpecFile}, nil
 }
 
+// DocketSchema is the schema of a change whose .openspec.yaml is missing or
+// names none.
+const DocketSchema = "docket"
+
+// ReadSchema returns the schema .openspec.yaml declares, or DocketSchema when
+// the file or the key is missing. It fails when the file is not a YAML mapping
+// or the value is not a YAML string.
+func ReadSchema(files map[string][]byte) (string, error) {
+	b, ok := files[OpenSpecFile]
+	if !ok {
+		return DocketSchema, nil
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(b, &doc); err != nil {
+		return "", err
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
+		return "", fmt.Errorf("not a YAML mapping")
+	}
+	m := doc.Content[0].Content
+	for i := 0; i+1 < len(m); i += 2 {
+		if m[i].Value == "schema" {
+			if m[i+1].Tag != "!!str" || m[i+1].Value == "" {
+				return "", fmt.Errorf("schema is not a string")
+			}
+			return m[i+1].Value, nil
+		}
+	}
+	return DocketSchema, nil
+}
+
 // ReadMetadata reads a change's metadata from its files, keyed by path
 // relative to the change folder. docket.yaml wins when present; otherwise the
 // x- keys of .openspec.yaml are used and there is no title. Created always

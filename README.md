@@ -144,6 +144,15 @@ In a project set up by dkt v0.6.0, run `dkt init --force` to take the new Docket
 
 In a project set up by dkt v0.9.2 or earlier, the schema is a copy in `openspec/schemas/docket/`. Run `dkt init`. Check that it removed `openspec/schemas/docket/` and set `schema: docket` in `openspec/config.yaml`, and commit both. Everyone who works on the project upgrades dkt and runs `dkt init`, once per machine. A copy that you edited is left alone, and `dkt init` reports it as `schema-edited`.
 
+### Adopting Docket in an existing project
+
+Run `/docket-init`, or run `dkt init` and then the `docket-doctor` skill. The doctor reads `dkt inspect` and proposes each fix. It edits only after you agree.
+
+- Files that `dkt init` installs but that the ignore rules keep out (`install-ignored`): add the narrowest rule that lets them in, for `.claude/` that is `.claude/*` and `!.claude/skills/`, then commit them. `dkt init` and `dkt inspect` never edit an ignore file.
+- Main specs without a title (`title-missing`): the doctor drafts a title for each and writes them after you agree.
+- A change made with another OpenSpec schema (`schema:` in its `.openspec.yaml`, such as `spec-driven`) keeps its own files. `dkt lint` checks only the titles of the capabilities it adds. `dkt status` shows its schema and `tasks.md` progress. `dkt archive` archives it without the plan and base checks. `dkt sync` and `dkt rebase` refuse it. A change with no step ticked can be converted to the `docket` schema, by the agent following `docket-doctor/convert.md`, after you agree.
+- OpenSpec content that the project keeps out of version control on purpose is the project's to commit, rewrite or drop before relying on it. The doctor edits nothing there.
+
 ## Requirements (planned)
 
 - git

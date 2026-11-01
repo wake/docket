@@ -163,3 +163,28 @@ func TestOnlyCancelledTasksIsDesign(t *testing.T) {
 		t.Fatalf("got %q %+v %+v", phase, tasks, prog)
 	}
 }
+
+func TestSummarizeChecklist(t *testing.T) {
+	cases := []struct {
+		name          string
+		tasks         string
+		ok            bool
+		phase         string
+		ticked, total int
+	}{
+		{"no file", "", false, Design, 0, 0},
+		{"no box", "text\n", true, Design, 0, 0},
+		{"none ticked", "- [ ] a\n", true, Ready, 0, 1},
+		{"some ticked", "- [x] a\n- [ ] b\n- [ ] c\n", true, Implementing, 1, 3},
+		{"all ticked", "- [x] a\n- [x] b\n", true, Done, 2, 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			phase, p := SummarizeChecklist([]byte(tc.tasks), tc.ok)
+			want := Progress{StepsTicked: tc.ticked, StepsTotal: tc.total}
+			if phase != tc.phase || p != want {
+				t.Fatalf("got %q %+v, want %q %+v", phase, p, tc.phase, want)
+			}
+		})
+	}
+}
