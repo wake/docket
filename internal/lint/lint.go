@@ -144,7 +144,8 @@ func Run(in Input) Report {
 		}
 		ds := deltas(c)
 		checkStructure(r, c, ds)
-		checkTitles(r, c, ds)
+		checkTitles(r, c)
+		checkDeltaTitles(r, c, ds)
 		if c.Has(planFile) {
 			checkScenarios(r, c, ds)
 		}
