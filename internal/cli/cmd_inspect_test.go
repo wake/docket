@@ -782,10 +782,14 @@ func TestInspectDefaultBranchFlag(t *testing.T) {
 		t.Errorf("default_branch: %v", got)
 	}
 	code, so, _ = runInspect(t, r.Dir, env, "--json", "--default-branch", "nope")
-	if code == 4 {
+	if code != 1 {
 		t.Fatalf("exit %d: %s", code, so)
 	}
 	assertNoBranchResult(t, so)
+	_, text, _ := runInspect(t, r.Dir, env, "--default-branch", "nope")
+	if !strings.Contains(text, "skipped  trailers: no default branch found: \"nope\"\n") {
+		t.Errorf("text output: %s", text)
+	}
 	_, so, _ = runInspect(t, r.Dir, env, "--json")
 	for _, f := range decode(t, so)["findings"].([]any) {
 		if f.(map[string]any)["change"] == "add-x" {

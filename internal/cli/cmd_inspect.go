@@ -111,7 +111,7 @@ func inspectCommand() Command {
 			}
 
 			if noBranch {
-				out.Human = append(out.Human, "skipped  trailers: no default branch found")
+				out.Human = append(out.Human, "skipped  trailers: "+dbErr.Error())
 			} else {
 				res.DefaultBranch = &db.Name
 				checks, tFinds, err := archive.Trailers(archive.Env{Git: c.Git, Root: c.Repo.Root, Default: db})
