@@ -55,6 +55,7 @@ func readTip(g gitx.Git, tip scan.Source) (map[string]tipIdea, []idea.Line, []sc
 		if rel == "order.md" {
 			continue
 		}
+		// An idea whose front matter does not parse is still listed; lint reports it.
 		fm, _ := idea.Parse(b)
 		ideas["docket/"+rel] = tipIdea{title: orNil(fm.Title), dropped: fm.Dropped != nil && *fm.Dropped, needs: fm.Needs}
 	}

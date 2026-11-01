@@ -37,9 +37,9 @@ type Backlog struct {
 	Ideas  []Idea
 }
 
-// LoadBacklog lists the issues that are pending or in progress. An issue that
-// is dropped, moved to an idea, or handled by work the default branch holds is
-// not listed.
+// LoadBacklog loads the issues, the order and the ideas. Of the issues it
+// lists those that are pending or in progress: one that is dropped, moved to
+// an idea, or handled by work the default branch holds is not listed.
 func LoadBacklog(g gitx.Git, inv scan.Inventory) (Backlog, []scan.Unreadable, error) {
 	issues := []Issue{}
 	groups, unread, err := readGroups(g, issue.Dir, len(inv.Issues),
