@@ -197,6 +197,17 @@ func TestCreateFailedWriteLeavesNothing(t *testing.T) {
 	}
 }
 
+func TestCreateFailedWriteRemovesIssuesFolder(t *testing.T) {
+	root := t.TempDir()
+	failWrite(t, nil)
+	if _, err := Create(filepath.Join(root, "docket", "issues"), "x", never, []byte("x")); err == nil {
+		t.Fatal("no error")
+	}
+	if exists(filepath.Join(root, "docket")) {
+		t.Error("docket or docket/issues was left")
+	}
+}
+
 func TestCreateFailedWriteKeepsExistingFolders(t *testing.T) {
 	root := t.TempDir()
 	if err := os.Mkdir(filepath.Join(root, "docket"), 0o755); err != nil {

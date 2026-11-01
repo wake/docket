@@ -30,6 +30,13 @@ var recordTemplate string
 // four sections, each holding a comment that says what to write.
 func RecordTemplate() string { return recordTemplate }
 
+//go:embed issue/template.md
+var issueTemplate string
+
+// IssueTemplate returns the body of a new file issue, issue/template.md: the
+// four sections, each holding a comment that says what to write.
+func IssueTemplate() string { return issueTemplate }
+
 // Schema returns the files of schema/docket, with paths relative
 // to that directory (schema.yaml, templates/proposal.md, ...).
 func Schema() fs.FS {

@@ -47,11 +47,7 @@ func recordCommand() Command {
 				return out, err
 			}
 			res := record.Result{Slug: written, Path: path, Title: title, Kind: kind, Source: source, Requested: slug, Used: used}
-			human := []string{"created " + path}
-			if written != slug {
-				human = append([]string{usedLine(slug, used, written)}, human...)
-			}
-			return Outcome{Result: res, Human: human}, nil
+			return createdOutcome(res, slug, written, path, used), nil
 		},
 	}
 }

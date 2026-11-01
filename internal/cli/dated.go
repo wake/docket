@@ -17,6 +17,16 @@ type datedFile struct {
 	Sources      func(inv scan.Inventory, slug string) []scan.Source
 }
 
+// createdOutcome is the outcome of a dated file written: res with the line
+// "created path", preceded by the used-slug line when a suffix was taken.
+func createdOutcome(res any, slug, written, path string, used []string) Outcome {
+	human := []string{"created " + path}
+	if written != slug {
+		human = append([]string{usedLine(slug, used, written)}, human...)
+	}
+	return Outcome{Result: res, Human: human}
+}
+
 // writeDated creates the file for name under d.Dir, in the first free slug
 // from today's date and name. done is true when out (a finding, a refusal or
 // unreadable sources) is the command's whole outcome. used lists where the
