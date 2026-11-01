@@ -77,11 +77,11 @@
 **Interfaces:**
 - Produces: `const DocketSchema = "docket"`; `func ReadSchema(files map[string][]byte) (string, error)` — the `schema` of `files[OpenSpecFile]`; `DocketSchema` when the file or the key is missing; an error when the file is not a YAML mapping or the value's node is not a YAML string (tag `!!str`). `func Checkboxes(b []byte) (ticked, total int)` — every line `stepRe` matches outside fenced code and HTML comments (`markdown.FenceMask`, then `markdown.BlankComments`).
 
-- [ ] **Step 1: Write the failing tests.** `TestReadSchema` table: `schema: spec-driven\ncreated: 2026-01-02\n` → `spec-driven`; `created: 2026-01-02\n` → `docket`; no `.openspec.yaml` → `docket`; errors for `schema:\n`, `schema: null\n`, `schema: 1\n`, `schema: true\n`, `schema: [a]\n` and `- a\n`. `TestCheckboxes`: `"- [x] 1.1 a\n- [ ] 1.2 b\n  * [X] c\n"` → 2, 3; a checkbox inside a ```` ``` ```` fence is not counted; a checkbox on a line inside a multi-line `<!-- ... -->` is not counted; `"no boxes\n"` → 0, 0.
-- [ ] **Step 2: Run** `go test ./internal/change -run 'TestReadSchema|TestCheckboxes'` — expect FAIL (undefined).
-- [ ] **Step 3: Implement** both in the named files; `ReadSchema` decodes the same document node `parseMetadata` checks.
-- [ ] **Step 4: Run** `go test ./internal/change` — expect PASS.
-- [ ] **Step 5: Commit** (`Task: 1`).
+- [x] **Step 1: Write the failing tests.** `TestReadSchema` table: `schema: spec-driven\ncreated: 2026-01-02\n` → `spec-driven`; `created: 2026-01-02\n` → `docket`; no `.openspec.yaml` → `docket`; errors for `schema:\n`, `schema: null\n`, `schema: 1\n`, `schema: true\n`, `schema: [a]\n` and `- a\n`. `TestCheckboxes`: `"- [x] 1.1 a\n- [ ] 1.2 b\n  * [X] c\n"` → 2, 3; a checkbox inside a ```` ``` ```` fence is not counted; a checkbox on a line inside a multi-line `<!-- ... -->` is not counted; `"no boxes\n"` → 0, 0.
+- [x] **Step 2: Run** `go test ./internal/change -run 'TestReadSchema|TestCheckboxes'` — expect FAIL (undefined).
+- [x] **Step 3: Implement** both in the named files; `ReadSchema` decodes the same document node `parseMetadata` checks.
+- [x] **Step 4: Run** `go test ./internal/change` — expect PASS.
+- [x] **Step 5: Commit** (`Task: 1`).
 
 ### Task 2: Report installed files that git ignores
 
@@ -99,19 +99,19 @@
 - Produces: `type Ignore struct { Path, Source, Pattern string; Line int }`; `func (g Git) Ignored(paths []string) ([]Ignore, error)` — one `git check-ignore -v -z --stdin` with the paths NUL-separated on stdin; exit 1 is an empty answer; an entry whose pattern starts with `!` is dropped (a negated match means not ignored); tracked paths are not reported (git's default).
 - Produces (cli): `func ignoredFindings(c *Context, files []setup.File) ([]Finding, []Unreadable)` — checks every `File` whose `Path` is not absolute and whose `Status` is not `Removed`.
 
-- [ ] **Step 1: Write the failing gitx tests** in a `testutil.NewRepo` with a commit: `.gitignore` holding `.claude/*`, `!.claude/skills/`, `openspec/`, `AGENTS.md`, with `AGENTS.md` force-added. `Ignored` of `.claude/skills/docket/SKILL.md`, `.claude/settings.local.json`, `openspec/config.yaml` (not on disk), `AGENTS.md` returns exactly `.claude/settings.local.json` (`.gitignore`, 1, `.claude/*`) and `openspec/config.yaml` (`.gitignore`, 3, `openspec/`). No paths ignored → empty slice, nil error. A path outside the repository (`../outside`) → a non-nil error (git exits 128).
-- [ ] **Step 2: Run** `go test ./internal/gitx -run TestIgnored` — expect FAIL.
-- [ ] **Step 3: Implement** `Ignored`.
-- [ ] **Step 4: Write the failing cli tests.**
+- [x] **Step 1: Write the failing gitx tests** in a `testutil.NewRepo` with a commit: `.gitignore` holding `.claude/*`, `!.claude/skills/`, `openspec/`, `AGENTS.md`, with `AGENTS.md` force-added. `Ignored` of `.claude/skills/docket/SKILL.md`, `.claude/settings.local.json`, `openspec/config.yaml` (not on disk), `AGENTS.md` returns exactly `.claude/settings.local.json` (`.gitignore`, 1, `.claude/*`) and `openspec/config.yaml` (`.gitignore`, 3, `openspec/`). No paths ignored → empty slice, nil error. A path outside the repository (`../outside`) → a non-nil error (git exits 128).
+- [x] **Step 2: Run** `go test ./internal/gitx -run TestIgnored` — expect FAIL.
+- [x] **Step 3: Implement** `Ignored`.
+- [x] **Step 4: Write the failing cli tests.**
   - `TestInitIgnoredSkill`: committed repo with `.gitignore` line 3 `.claude/`; `dkt init` exits 1; every `.claude/skills/...` file exists; one `install-ignored` finding per file with message `ignored by .gitignore:3: .claude/`; `.gitignore` byte-for-byte unchanged.
   - `TestInitTrackedNotReported`: `.gitignore` holds `AGENTS.md` and `AGENTS.md` is committed → no `install-ignored` names it.
   - `TestInitNegatedRuleNotReported`: `.claude/*` and `!.claude/skills/` → no `install-ignored`.
   - `TestInspectIgnoredFile`: `.git/info/exclude` with `openspec/` on line 7 and no `openspec/` folder → `install-ignored` naming `openspec/config.yaml`, message `ignored by .git/info/exclude:7: openspec/`; the exclude file unchanged.
   - `TestIgnoredFindingsGitFails`: `ignoredFindings` with a `Context` whose `Git.Dir` is a directory outside any repository and files `AGENTS.md` and `.claude/skills/docket/SKILL.md` → no finding, and one unreadable entry per path, `source` the path.
   - Existing clean-setup tests (`TestInspectCleanSetup`, `TestRerunNoDifferences`) still pass: nothing is ignored there.
-- [ ] **Step 5: Run** `go test ./internal/cli -run 'TestInitIgnored|TestInitTracked|TestInitNegated|TestInspectIgnored'` — expect FAIL.
-- [ ] **Step 6: Implement** `ignoredFindings` in `internal/cli/ignored.go`, call it in `dkt init` after a successful `setup.Init` (not on refusal), and in `dkt inspect` on `rep.Files`; a git error lists each path asked about as unreadable.
-- [ ] **Step 7: Run** `go vet ./... && go test ./...` — expect PASS. Commit (`Task: 2`).
+- [x] **Step 5: Run** `go test ./internal/cli -run 'TestInitIgnored|TestInitTracked|TestInitNegated|TestInspectIgnored'` — expect FAIL.
+- [x] **Step 6: Implement** `ignoredFindings` in `internal/cli/ignored.go`, call it in `dkt init` after a successful `setup.Init` (not on refusal), and in `dkt inspect` on `rep.Files`; a git error lists each path asked about as unreadable.
+- [x] **Step 7: Run** `go vet ./... && go test ./...` — expect PASS. Commit (`Task: 2`).
 
 ### Task 3: lint a change of another schema
 
@@ -127,8 +127,8 @@
 - Consumes: `change.ReadSchema`, `change.DocketSchema`, `change.Checkboxes` (Task 1).
 - Produces: `type OtherSchema struct { Slug, Schema string; Ticked, Total int }`; `Report.OtherSchema []OtherSchema` (sorted by slug); `func SpecTitles(repo fs.FS) ([]Finding, []Unreadable)` — the main-spec title check `Run` does when no change is named; `func OtherSchemas(repo fs.FS) ([]OtherSchema, []Unreadable)` — every active change under `openspec/changes/` of another schema, with the checkboxes of its `tasks.md`.
 
-- [ ] **Step 1: Restructure (no behavior change).** Split `checkTitles` into the change-title part and `checkDeltaTitles(r *run, c *loaded, ds []capDelta)`; add `SpecTitles` wrapping `checkSpecTitles`. Run `go test ./internal/lint` — PASS. Commit (`Task: 3`, `refactor(lint): split the title checks`).
-- [ ] **Step 2: Write the failing tests.**
+- [x] **Step 1: Restructure (no behavior change).** Split `checkTitles` into the change-title part and `checkDeltaTitles(r *run, c *loaded, ds []capDelta)`; add `SpecTitles` wrapping `checkSpecTitles`. Run `go test ./internal/lint` — PASS. Commit (`Task: 3`, `refactor(lint): split the title checks`).
+- [x] **Step 2: Write the failing tests.**
   - `TestOtherSchemaChange` (lint package): `add-x` with `.openspec.yaml` `schema: spec-driven`, a `proposal.md` lacking Non-Goals, a `tasks.md`, no `docket.yaml`, a delta for an existing main spec `booking` (which has its title) → no finding names `add-x`; `Report.OtherSchema` is `[{add-x spec-driven ...}]`; `add-x` is in `Report.Changes`.
   - `TestOtherSchemaNewCapability`: same with a delta for `waitlist` and no main spec → exactly one finding, `title-missing` for `waitlist`; with a `specs/waitlist/docket.yaml` holding a YAML list → `metadata-invalid` instead.
   - `TestOtherSchemaNamed`: `Run` with `Slugs: ["add-x"]` gives the same findings as the unnamed run for `add-x`.
@@ -136,9 +136,9 @@
   - `TestInvalidSchema`: `add-y` whose `.openspec.yaml` holds `schema: 1` → a `metadata-invalid` finding on `openspec/changes/add-y/.openspec.yaml`, `add-y` is not in `Report.OtherSchema`, and its other findings are those of a `docket` change (for example `title-missing` for its missing `docket.yaml`).
   - `TestOtherSchemas`: two changes, one `docket`, one `spec-driven` with 1 of 3 boxes ticked → one entry, Ticked 1, Total 3; the `archive` folder is not listed.
   - cli `TestLintOtherSchemaJSON`: `dkt lint --json` → `result.other_schema` is `[{"slug":"add-x","schema":"spec-driven"}]`, exit 0; text output has the line `other schema  add-x: spec-driven`; with no such change `result.other_schema` is `[]`.
-- [ ] **Step 3: Run** `go test ./internal/lint ./internal/cli -run 'OtherSchema'` — expect FAIL.
-- [ ] **Step 4: Implement.** In `Run`, read `openspec/changes/<slug>/.openspec.yaml` before the folder walk. For another schema, load only `.openspec.yaml` and the files under `specs/`, record it, and run only `deltas` and `checkDeltaTitles`. On a schema error, add `metadata-invalid` on that file and lint the change as `docket`. `OtherSchemas` uses the same reading and also counts the `tasks.md` checkboxes (an unreadable `tasks.md` is listed as unreadable there). `LintResult.OtherSchema` maps to `{slug, schema}`.
-- [ ] **Step 5: Run** `go vet ./... && go test ./...` — expect PASS. Commit (`Task: 3`).
+- [x] **Step 3: Run** `go test ./internal/lint ./internal/cli -run 'OtherSchema'` — expect FAIL.
+- [x] **Step 4: Implement.** In `Run`, read `openspec/changes/<slug>/.openspec.yaml` before the folder walk. For another schema, load only `.openspec.yaml` and the files under `specs/`, record it, and run only `deltas` and `checkDeltaTitles`. On a schema error, add `metadata-invalid` on that file and lint the change as `docket`. `OtherSchemas` uses the same reading and also counts the `tasks.md` checkboxes (an unreadable `tasks.md` is listed as unreadable there). `LintResult.OtherSchema` maps to `{slug, schema}`.
+- [x] **Step 5: Run** `go vet ./... && go test ./...` — expect PASS. Commit (`Task: 3`).
 
 ### Task 4: dkt inspect reports main-spec titles and changes of another schema
 
@@ -153,13 +153,13 @@
 **Interfaces:**
 - Consumes: `lint.SpecTitles`, `lint.OtherSchemas` (Task 3).
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `TestInspectMainSpecTitle`: after init, add `openspec/specs/booking/spec.md` with no `docket.yaml` → `title-missing` naming `openspec/specs/booking/docket.yaml`, message equal to `dkt lint`'s for it; exit 1.
   - `TestInspectOtherSchema`: `openspec/changes/add-x/.openspec.yaml` `schema: spec-driven`, `tasks.md` with four unticked boxes → `other-schema`, `file` `openspec/changes/add-x/.openspec.yaml`, message `made with the spec-driven schema; Docket leaves it to that schema's files (0 of 4 steps ticked)`.
   - `TestInspectCleanSetup` and `TestInspectNothingWritten` still pass (their main specs, if any, have titles; add none).
-- [ ] **Step 2: Run** `go test ./internal/cli -run 'TestInspectMainSpecTitle|TestInspectOtherSchema'` — expect FAIL.
-- [ ] **Step 3: Implement** in `inspectCommand`, reading the worktree through `os.OpenRoot(c.Repo.Root)` as `dkt lint` does; unreadable entries join `out.Unreadable`.
-- [ ] **Step 4: Run** `go test ./internal/cli` — expect PASS. Commit (`Task: 4`).
+- [x] **Step 2: Run** `go test ./internal/cli -run 'TestInspectMainSpecTitle|TestInspectOtherSchema'` — expect FAIL.
+- [x] **Step 3: Implement** in `inspectCommand`, reading the worktree through `os.OpenRoot(c.Repo.Root)` as `dkt lint` does; unreadable entries join `out.Unreadable`.
+- [x] **Step 4: Run** `go test ./internal/cli` — expect PASS. Commit (`Task: 4`).
 
 ### Task 5: dkt status shows the schema
 
@@ -175,10 +175,10 @@
 - Consumes: `change.ReadSchema`, `change.Checkboxes` (Task 1).
 - Produces: `Change.Schema string` (`json:"schema"`); `func SummarizeChecklist(tasks []byte, ok bool) (phase string, progress Progress)` — `ok` false or no box → `Design`; none ticked → `Ready`; all → `Done`; else `Implementing`; `StepsTicked`/`StepsTotal` the box counts, tasks 0 of 0.
 
-- [ ] **Step 1: Write the failing tests.** `TestSummarizeChecklist` table: no file → design 0/0; `"- [ ] a\n"` → ready 0/1; one of three ticked → implementing 1/3; all ticked → done. `TestLoadOtherSchema`: a change with `schema: spec-driven`, `tasks.md` one of three ticked, no `plan.md` → `Schema` `spec-driven`, phase `implementing`, steps 1/3, tasks `[]`, tasks 0/0. `TestLoadDocketSchema`: a change made with `schema: docket` → `Schema` `docket`, phase from its plan. cli `TestStatusOtherSchema`: JSON has `"schema":"spec-driven"`; the text line ends with ` (spec-driven)`; a `docket` change's line has no suffix.
-- [ ] **Step 2: Run** `go test ./internal/status ./internal/cli -run 'Checklist|OtherSchema|DocketSchema'` — expect FAIL.
-- [ ] **Step 3: Implement.** `Load` keeps `tasks.md`, sets `Schema` (a schema error leaves `Schema` `docket` and adds no unreadable entry, as unusable metadata does; the existing `TestMetadataUnusable` cases keep passing unchanged), and uses `SummarizeChecklist` for another schema instead of the plan.
-- [ ] **Step 4: Run** `go vet ./... && go test ./...` — expect PASS. Commit (`Task: 5`).
+- [x] **Step 1: Write the failing tests.** `TestSummarizeChecklist` table: no file → design 0/0; `"- [ ] a\n"` → ready 0/1; one of three ticked → implementing 1/3; all ticked → done. `TestLoadOtherSchema`: a change with `schema: spec-driven`, `tasks.md` one of three ticked, no `plan.md` → `Schema` `spec-driven`, phase `implementing`, steps 1/3, tasks `[]`, tasks 0/0. `TestLoadDocketSchema`: a change made with `schema: docket` → `Schema` `docket`, phase from its plan. cli `TestStatusOtherSchema`: JSON has `"schema":"spec-driven"`; the text line ends with ` (spec-driven)`; a `docket` change's line has no suffix.
+- [x] **Step 2: Run** `go test ./internal/status ./internal/cli -run 'Checklist|OtherSchema|DocketSchema'` — expect FAIL.
+- [x] **Step 3: Implement.** `Load` keeps `tasks.md`, sets `Schema` (a schema error leaves `Schema` `docket` and adds no unreadable entry, as unusable metadata does; the existing `TestMetadataUnusable` cases keep passing unchanged), and uses `SummarizeChecklist` for another schema instead of the plan.
+- [x] **Step 4: Run** `go vet ./... && go test ./...` — expect PASS. Commit (`Task: 5`).
 
 ### Task 6: archive, sync and rebase a change of another schema
 
@@ -194,7 +194,7 @@
 - Consumes: `change.ReadSchema`, `change.DocketSchema` (Task 1); lint's other-schema behavior (Task 3) through `Input.Lint`.
 - Produces: `loadedChange.Schema string`; `evidence.Schema string` and `evidence.Skipped []string`.
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `TestArchiveOtherSchema`: `add-x` with `schema: spec-driven`, `tasks.md`, no `plan.md` or `docket.yaml`, merged → archived, exit 0; its `evidence.md` has `| Schema | spec-driven |` and `| Skipped steps | plan, base |`.
   - `TestArchiveOtherSchemaUntitledCapability`: same with a new capability `waitlist` and no title beside its delta → stops at `lint` with `title-missing`, and the fake OpenSpec log has no `archive` call.
   - `TestArchiveBothSchemas`: `dkt archive add-x add-y`, `add-x` of the docket schema, `add-y` of another → both archived; `add-x`'s evidence says `| Schema | docket |` and `| Skipped steps | none |`.
@@ -203,9 +203,9 @@
   - `TestArchiveInvalidSchema`: `schema: 1` → refused with `metadata-invalid` on `.openspec.yaml`.
   - `TestTrailersOtherSchema`: `add-x` in the default branch's tree with `schema: spec-driven`, a `plan.md` with one task and no `Change: add-x` commit → no `no-task-commits`; the `TrailerCheck` for `add-x` is skipped with reason `made with the spec-driven schema`.
   - Existing evidence tests updated for the two new rows.
-- [ ] **Step 2: Run** `go test ./internal/archive ./internal/cli -run 'OtherSchema|BothSchemas'` — expect FAIL.
-- [ ] **Step 3: Implement.** `loadChange` reads `.openspec.yaml` and the schema first (an error is `metadata-invalid`). A new `loadOpts.RefuseOther bool`, set by `Sync` and `Rebase`, makes it return the `other-schema` finding right then. Otherwise, for another schema, it reads no `docket.yaml`, requires no base and no `plan.md`, and still reads deltas when asked. `archiveRun.change` skips `computeSync`/plan findings and `checkBase` for it and fills `Skipped`. `Trailers` reads each change's schema before its plan and skips another schema with the reason.
-- [ ] **Step 4: Run** `go vet ./... && go test ./...` — expect PASS. Commit (`Task: 6`).
+- [x] **Step 2: Run** `go test ./internal/archive ./internal/cli -run 'OtherSchema|BothSchemas'` — expect FAIL.
+- [x] **Step 3: Implement.** `loadChange` reads `.openspec.yaml` and the schema first (an error is `metadata-invalid`). A new `loadOpts.RefuseOther bool`, set by `Sync` and `Rebase`, makes it return the `other-schema` finding right then. Otherwise, for another schema, it reads no `docket.yaml`, requires no base and no `plan.md`, and still reads deltas when asked. `archiveRun.change` skips `computeSync`/plan findings and `checkBase` for it and fills `Skipped`. `Trailers` reads each change's schema before its plan and skips another schema with the reason.
+- [x] **Step 4: Run** `go vet ./... && go test ./...` — expect PASS. Commit (`Task: 6`).
 
 ### Task 7: The doctor's adoption steps and the conversion guide
 
@@ -218,13 +218,13 @@
 - Create: `.agents/skills/docket-doctor/convert.md`, `.claude/skills/docket-doctor/convert.md`
 - Modify: `.agents/skills/docket/SKILL.md`, `.claude/skills/docket/SKILL.md`
 
-- [ ] **Step 1: Doctor `SKILL.md`** (both copies identical). Step 1 lists the new findings. Step 4 gets three entries, in the doctor's style:
+- [x] **Step 1: Doctor `SKILL.md`** (both copies identical). Step 1 lists the new findings. Step 4 gets three entries, in the doctor's style:
   - `install-ignored`: group the findings by rule; before proposing, list the files the fix would let git see, including files under that directory ignored today (`git ls-files --others --ignored --exclude-standard -- <dir>`); propose the narrowest rule (for `.claude/`: `.claude/*` and `!.claude/skills/`); say whether the ignore file is shared (`.gitignore`) or only on this machine (`.git/info/exclude`, `core.excludesFile`); edit only after the user agrees. For `openspec/` kept out of git, point to the README's adoption steps.
   - `title-missing`: read each spec's Purpose, draft a title (the title form `dkt lint` checks), list all of them, write every `docket.yaml` only after the user agrees, then run `dkt lint`.
   - `other-schema`: with 0 steps ticked, propose converting it by `convert.md` in this skill's folder; otherwise propose no conversion, say to finish it with its own files and archive it with `dkt archive`, and list the capabilities it adds that have no title beside their delta (offer to draft them as for `title-missing`).
-- [ ] **Step 2: `convert.md`** (both copies identical), steps in order: work in the change's own worktree; set `schema: docket` in `.openspec.yaml` first; write `docket.yaml` with `title`, `kind` and `source` confirmed with the user and `base` the merge base of HEAD and the default branch; run `openspec instructions proposal --change <slug> --json` and add the sections the proposal lacks; give each capability it adds a `docket.yaml` title beside its delta; write `plan.md` from `tasks.md` with superpowers:writing-plans following `openspec instructions plan --change <slug>`, then delete `tasks.md`; run `dkt lint <slug>` until it reports nothing; the change then continues at its plan stage, where the workflow's plan review comes next. Nothing is committed without the user.
-- [ ] **Step 3: `docket` skill** (both copies identical): one rule under Full review — a change whose `.openspec.yaml` names another schema follows that schema's files, gets no `plan.md` unless converted (see `docket-doctor`), and is still archived with `dkt archive`.
-- [ ] **Step 4: Verify.** `diff -r .agents/skills/docket-doctor .claude/skills/docket-doctor` and the same for `docket` print nothing; `go test .` passes (`TestInstalledSkillMatchesShipped`, frontmatter tests); each edited file reads through as an agent would follow it. Commit (`Task: 7`).
+- [x] **Step 2: `convert.md`** (both copies identical), steps in order: work in the change's own worktree; set `schema: docket` in `.openspec.yaml` first; write `docket.yaml` with `title`, `kind` and `source` confirmed with the user and `base` the merge base of HEAD and the default branch; run `openspec instructions proposal --change <slug> --json` and add the sections the proposal lacks; give each capability it adds a `docket.yaml` title beside its delta; write `plan.md` from `tasks.md` with superpowers:writing-plans following `openspec instructions plan --change <slug>`, then delete `tasks.md`; run `dkt lint <slug>` until it reports nothing; the change then continues at its plan stage, where the workflow's plan review comes next. Nothing is committed without the user.
+- [x] **Step 3: `docket` skill** (both copies identical): one rule under Full review — a change whose `.openspec.yaml` names another schema follows that schema's files, gets no `plan.md` unless converted (see `docket-doctor`), and is still archived with `dkt archive`.
+- [x] **Step 4: Verify.** `diff -r .agents/skills/docket-doctor .claude/skills/docket-doctor` and the same for `docket` print nothing; `go test .` passes (`TestInstalledSkillMatchesShipped`, frontmatter tests); each edited file reads through as an agent would follow it. Commit (`Task: 7`).
 
 ### Task 8: README and architecture notes
 
@@ -235,6 +235,6 @@
 **Files:**
 - Modify: `README.md`, `README.zh-TW.md`, `docs/ARCHITECTURE.md`
 
-- [ ] **Step 1: README (both languages):** a section on adopting Docket in an existing project: run `/docket-init` (or `dkt init` then `docket-doctor`); fix ignored install files; give main specs titles; changes of another schema are left to their own files and archived with `dkt archive`, and one not started can be converted; OpenSpec content kept out of git is the project's to commit, rewrite or drop before relying on it.
-- [ ] **Step 2: ARCHITECTURE.md:** the capability table adds `change.ReadSchema`, `change.Checkboxes`, `gitx.Git.Ignored`, `lint.SpecTitles`, `lint.OtherSchemas`, `status.SummarizeChecklist`.
-- [ ] **Step 3: Verify** each file reads through and the zh-TW section says what the English one does. Commit (`Task: 8`).
+- [x] **Step 1: README (both languages):** a section on adopting Docket in an existing project: run `/docket-init` (or `dkt init` then `docket-doctor`); fix ignored install files; give main specs titles; changes of another schema are left to their own files and archived with `dkt archive`, and one not started can be converted; OpenSpec content kept out of git is the project's to commit, rewrite or drop before relying on it.
+- [x] **Step 2: ARCHITECTURE.md:** the capability table adds `change.ReadSchema`, `change.Checkboxes`, `gitx.Git.Ignored`, `lint.SpecTitles`, `lint.OtherSchemas`, `status.SummarizeChecklist`.
+- [x] **Step 3: Verify** each file reads through and the zh-TW section says what the English one does. Commit (`Task: 8`).
