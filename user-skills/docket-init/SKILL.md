@@ -37,6 +37,9 @@ checked yet, with the reason.
   `/plugins` and search for superpowers; in other agents, see
   https://github.com/obra/superpowers. Then start a new session.
 
+Also note whether `.claude/skills/` and `.agents/skills/` exist in the
+repository now, before anything runs; step 5 uses that note.
+
 When anything is missing, report all of it together, with how to install
 each, and stop. Install nothing.
 
@@ -73,7 +76,7 @@ commit.
 
 - In a repository with no commit, say that the first commit gives it the
   default branch `dkt new` needs.
-- In Claude Code, when `.claude/skills/` did not exist before this run,
+- In Claude Code, when the step 1 note says `.claude/skills/` did not exist,
   say to type `/reload-skills`. In Codex, say to restart when `$docket`
   does not show.
 
