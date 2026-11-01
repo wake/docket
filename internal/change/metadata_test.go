@@ -56,3 +56,24 @@ func TestSetKeyKeepsInput(t *testing.T) {
 		t.Fatalf("input changed or error: %q %v", in, err)
 	}
 }
+
+func TestReadSchema(t *testing.T) {
+	ok := []struct{ name, in, want string }{
+		{"declared", "schema: spec-driven\ncreated: 2026-01-02\n", "spec-driven"},
+		{"no key", "created: 2026-01-02\n", DocketSchema},
+	}
+	for _, tt := range ok {
+		got, err := ReadSchema(map[string][]byte{OpenSpecFile: []byte(tt.in)})
+		if err != nil || got != tt.want {
+			t.Errorf("%s: got %q, %v", tt.name, got, err)
+		}
+	}
+	if got, err := ReadSchema(map[string][]byte{}); err != nil || got != DocketSchema {
+		t.Errorf("no file: got %q, %v", got, err)
+	}
+	for _, in := range []string{"schema:\n", "schema: null\n", "schema: 1\n", "schema: true\n", "schema: [a]\n", "- a\n"} {
+		if got, err := ReadSchema(map[string][]byte{OpenSpecFile: []byte(in)}); err == nil {
+			t.Errorf("%q: want error, got %q", in, got)
+		}
+	}
+}

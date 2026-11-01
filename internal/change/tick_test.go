@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+func TestCheckboxes(t *testing.T) {
+	tests := []struct {
+		name, in      string
+		ticked, total int
+	}{
+		{"mixed", "- [x] 1.1 a\n- [ ] 1.2 b\n  * [X] c\n", 2, 3},
+		{"fence", "- [x] a\n```\n- [x] b\n- [ ] c\n```\n", 1, 1},
+		{"comment", "- [ ] a\n<!--\n- [x] b\n-->\n", 0, 1},
+		{"none", "no boxes\n", 0, 0},
+	}
+	for _, tt := range tests {
+		if ti, to := Checkboxes([]byte(tt.in)); ti != tt.ticked || to != tt.total {
+			t.Errorf("%s: got %d, %d", tt.name, ti, to)
+		}
+	}
+}
+
 func TestTick(t *testing.T) {
 	tests := []struct {
 		name, in string
