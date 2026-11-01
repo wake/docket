@@ -22,13 +22,17 @@ const schemaDir = "openspec/schemas/docket/"
 // sibling of the repository so it never holds the real one.
 func dataHome(dir string) string { return dir + ".data" }
 
+// userHome is the HOME the runs on the repository at dir share, a sibling of
+// the repository so it never holds the real one.
+func userHome(dir string) string { return dir + ".home" }
+
 // machineFile is the path of a schema file under the per-machine directory.
 func machineFile(dir, rel string) string { return filepath.Join(dataHome(dir), schemaDir, rel) }
 
 func runInit(t *testing.T, dir, openspec string, args ...string) (int, string, string) {
 	t.Helper()
 	var so, se bytes.Buffer
-	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+openspec, "XDG_DATA_HOME="+dataHome(dir))
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+openspec, "XDG_DATA_HOME="+dataHome(dir), "HOME="+userHome(dir))
 	code := Run(Options{Args: append([]string{"init"}, args...), Dir: dir, Env: env, Stdout: &so, Stderr: &se})
 	return code, so.String(), se.String()
 }

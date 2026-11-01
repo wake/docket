@@ -21,7 +21,7 @@ import (
 func runInspect(t *testing.T, dir string, env []string, args ...string) (int, string, string) {
 	t.Helper()
 	var so, se bytes.Buffer
-	env = append(append([]string{}, env...), "XDG_DATA_HOME="+dataHome(dir))
+	env = append(append([]string{}, env...), "XDG_DATA_HOME="+dataHome(dir), "HOME="+userHome(dir))
 	code := Run(Options{Args: append([]string{"inspect"}, args...), Dir: dir, Env: env, Stdout: &so, Stderr: &se})
 	return code, so.String(), se.String()
 }
