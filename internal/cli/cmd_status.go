@@ -127,10 +127,11 @@ func statusCommand() Command {
 			unread = append(unread, recUnread...)
 			issues := []status.Issue{}
 			if len(args) == 0 {
-				var issUnread []scan.Unreadable
-				if issues, issUnread, err = status.LoadIssues(c.Git, inv); err != nil {
+				backlog, issUnread, err := status.LoadBacklog(c.Git, inv)
+				if err != nil {
 					return Outcome{}, err
 				}
+				issues = backlog.Issues
 				unread = append(unread, issUnread...)
 			}
 			out.Unreadable = append(scanUnreadable(inv.Unreadable), scanUnreadable(unread)...)
@@ -205,16 +206,21 @@ func statusIssueLine(is status.Issue) string {
 	if is.Title != nil {
 		line += fmt.Sprintf(" %q", *is.Title)
 	}
-	var hs []string
-	for _, h := range is.Handlers {
+	return line + handlerList(is.Handlers)
+}
+
+// handlerList is " (record a, change b merged)", or "" without handlers.
+func handlerList(hs []status.Handler) string {
+	var parts []string
+	for _, h := range hs {
 		s := h.Kind + " " + h.Slug
 		if h.Merged {
 			s += " merged"
 		}
-		hs = append(hs, s)
+		parts = append(parts, s)
 	}
-	if len(hs) > 0 {
-		line += " (" + strings.Join(hs, ", ") + ")"
+	if len(parts) == 0 {
+		return ""
 	}
-	return line
+	return " (" + strings.Join(parts, ", ") + ")"
 }

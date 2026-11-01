@@ -195,7 +195,7 @@ func Scan(g gitx.Git, db DefaultBranch) (Inventory, error) {
 		f.add(src, rank, t.active, t.archived, t.dated)
 	}
 
-	dbSrc := Source{Kind: KindDefaultBranch, Name: db.Ref, Commit: db.Commit}
+	dbSrc := db.Source()
 	if t := trees[db.Commit]; inv.noteRead(dbSrc, t.datedErr, t.err) {
 		f.add(dbSrc, rankDefaultBranch, t.active, t.archived, t.dated)
 	}

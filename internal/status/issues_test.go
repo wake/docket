@@ -32,11 +32,11 @@ func loadIssues(t *testing.T, r *testutil.Repo) ([]Issue, []scan.Unreadable) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	issues, unread, err := LoadIssues(g, inv)
+	b, unread, err := LoadBacklog(g, inv)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return issues, unread
+	return b.Issues, unread
 }
 
 // only checks that exactly one issue is listed, in the state and with the handlers.

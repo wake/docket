@@ -20,6 +20,11 @@ type DefaultBranch struct {
 	Commit string // commit the tip points at
 }
 
+// Source is the default branch tip as a source.
+func (db DefaultBranch) Source() Source {
+	return Source{Kind: KindDefaultBranch, Name: db.Ref, Commit: db.Commit}
+}
+
 const (
 	remotePrefix = "refs/remotes/origin/"
 	headsPrefix  = "refs/heads/"
