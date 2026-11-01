@@ -7,7 +7,7 @@
 5. [x] `docket/ideas/2026-10-31-global-schema.md`
 6. [x] `docket/ideas/2026-11-01-issues.md`
 7. [x] `docket/ideas/2026-11-01-docket-init-command.md`
-8. [ ] `docket/ideas/2026-10-31-existing-project-adoption.md`
+8. [x] `docket/ideas/2026-10-31-existing-project-adoption.md`
 9. [x] `docket/ideas/2026-10-29-records.md`
 10. [ ] `docket/ideas/2026-10-29-ideas-and-order.md`
 11. [ ] `docket/ideas/2026-10-29-commit-gate.md`

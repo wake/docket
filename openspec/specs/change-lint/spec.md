@@ -171,7 +171,7 @@ For every delta file OpenSpec 1.14 accepts, Docket's reading SHALL produce the s
 - **THEN** Docket's reading and OpenSpec's output match for every example
 
 ### Requirement: Titles
-lint SHALL report `title-missing` for a linted change without a title; for a linted change's delta of a capability that has no main spec in the worktree, when no title sits beside that delta; and, when no change is named, for every main spec without a title. A `docket.yaml` that is not a YAML mapping SHALL be reported as `metadata-invalid`.
+lint SHALL report `title-missing` for a linted change without a title, unless it is a change of another schema; for a linted change's delta of a capability that has no main spec in the worktree, when no title sits beside that delta; and, when no change is named, for every main spec without a title. A `docket.yaml` that is not a YAML mapping SHALL be reported as `metadata-invalid`.
 
 #### Scenario: Change without title
 - **WHEN** `add-x` has no `docket.yaml` and a user runs `dkt lint add-x`
@@ -197,6 +197,10 @@ lint SHALL report `title-missing` for a linted change without a title; for a lin
 - **WHEN** `openspec/changes/add-x/docket.yaml` holds a YAML list
 - **THEN** lint reports a `metadata-invalid` finding on that file
 
+#### Scenario: Change of another schema has no title
+- **WHEN** `add-x` is a change of another schema with no `docket.yaml`
+- **THEN** lint reports no `title-missing` finding naming `openspec/changes/add-x/docket.yaml`
+
 ### Requirement: Issues linted
 When no name is given, `dkt lint` SHALL also lint every file issue under `docket/issues/` that the branch adds, committed since the merge base with the default branch or not yet committed, reading it from the worktree as it is. When the branch's added files cannot be read, the one unreadable entry `Routing` lists SHALL stand for the issues too. A name given on the command line SHALL NOT name an issue.
 
@@ -207,3 +211,14 @@ When no name is given, `dkt lint` SHALL also lint every file issue under `docket
 #### Scenario: Issues without a default branch
 - **WHEN** the repository has no default branch Docket can find and the worktree holds an uncommitted file issue
 - **THEN** lint lists exactly one unreadable entry and reports no finding for the issue
+
+### Requirement: Changes of another schema
+lint SHALL list each linted change of another schema in `result.other_schema`, with its slug and schema, and in the text output. It SHALL apply to such a change only the title rule for a capability it adds that has no main spec, and none of the other rules on its proposal, deltas, plan or metadata.
+
+#### Scenario: Change of another schema
+- **WHEN** `add-x` has `schema: spec-driven` in its `.openspec.yaml`, a `proposal.md` without Non-Goals, a `tasks.md`, no `docket.yaml`, and a delta for the existing capability `booking`, and a user runs `dkt lint --json`
+- **THEN** `result.other_schema` holds `add-x` with `spec-driven`, no finding names `add-x`, and the command exits with 0
+
+#### Scenario: New capability of another schema
+- **WHEN** the same `add-x` has a delta for `waitlist`, the worktree has no `openspec/specs/waitlist/spec.md`, and no `docket.yaml` sits beside that delta
+- **THEN** lint reports a `title-missing` finding for `waitlist` and no other finding for `add-x`
