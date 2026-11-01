@@ -30,10 +30,11 @@ const (
 type FileKind string
 
 const (
-	KindSchema FileKind = "schema"
-	KindSkill  FileKind = "skill"
-	KindBlock  FileKind = "block"
-	KindConfig FileKind = "config"
+	KindSchema    FileKind = "schema"
+	KindSkill     FileKind = "skill"
+	KindBlock     FileKind = "block"
+	KindUserSkill FileKind = "user-skill"
+	KindConfig    FileKind = "config"
 )
 
 // File is one installed file; Path is relative to the repository root, or
@@ -61,16 +62,19 @@ type Skill struct {
 }
 
 // Dirs are the per-machine destinations. An empty Schema leaves the schema
-// out.
+// out; an empty UserSkills leaves the user-level skills out.
 type Dirs struct {
-	Schema string
+	Schema     string
+	UserSkills []string
 }
 
 // Assets are the files Init installs.
 type Assets struct {
 	Schema fs.FS   // installed under schemaDir
 	Skills []Skill // each installed under <root>/<name> for each of skillRoots
-	Block  string  // the Docket block kept in AGENTS.md and CLAUDE.md
+	// UserSkills are installed under <dir>/<name> for each of Dirs.UserSkills.
+	UserSkills []Skill
+	Block      string // the Docket block kept in AGENTS.md and CLAUDE.md
 }
 
 // ProblemKind says why a path stopped Init.
@@ -281,7 +285,8 @@ func Inspect(root string, dirs Dirs, a Assets) (Report, error) {
 
 // targetsOf lists every file to install: the schema in schemaDir (none when
 // it is empty), config.yaml when withConfig is set, the skills in each of
-// skillRoots, then AGENTS.md and CLAUDE.md (whose bytes are decided later).
+// skillRoots, AGENTS.md and CLAUDE.md (whose bytes are decided later), then
+// the user-level skills in each of dirs.UserSkills.
 func targetsOf(a Assets, dirs Dirs, withConfig bool) ([]target, error) {
 	var out []target
 	add := func(src fs.FS, dir string, kind FileKind, base string) error {
@@ -313,6 +318,13 @@ func targetsOf(a Assets, dirs Dirs, withConfig bool) ([]target, error) {
 		}
 	}
 	out = append(out, target{rel: agentsFile, kind: KindBlock}, target{rel: claudeFile, kind: KindBlock})
+	for _, dir := range dirs.UserSkills {
+		for _, sk := range a.UserSkills {
+			if err := add(sk.Files, sk.Name, KindUserSkill, dir); err != nil {
+				return nil, err
+			}
+		}
+	}
 	return out, nil
 }
 

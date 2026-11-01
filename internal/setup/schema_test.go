@@ -4,10 +4,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"testing/fstest"
 
 	"github.com/wake/docket/internal/safepath"
+	"github.com/wake/docket/internal/userdirs"
 )
 
 func TestSchemaDir(t *testing.T) {
@@ -138,5 +140,27 @@ func TestOldSchemaIsShipped(t *testing.T) {
 	got, err := HashDir("../testutil/testdata/schema-v0.9.1")
 	if err != nil || got != "edc92ac411c0e925656d58d8ac7de51b08bdd47b9e92356c4cca073b58bcefde" || !IsShipped(got) {
 		t.Errorf("got %q, %v", got, err)
+	}
+}
+
+func TestUserSkillDirs(t *testing.T) {
+	rows := []struct {
+		name string
+		env  []string
+		want []string
+		err  error
+	}{
+		{"home only", []string{"HOME=/h"}, []string{"/h/.claude/skills", "/h/.agents/skills"}, nil},
+		{"config dir", []string{"HOME=/h", "CLAUDE_CONFIG_DIR=/c"}, []string{"/c/skills", "/h/.agents/skills"}, nil},
+		{"duplicate dropped", []string{"HOME=/h", "CLAUDE_CONFIG_DIR=/h/.agents"}, []string{"/h/.agents/skills"}, nil},
+		{"config dir without home", []string{"CLAUDE_CONFIG_DIR=/c"}, nil, userdirs.ErrNoHome},
+	}
+	for _, r := range rows {
+		t.Run(r.name, func(t *testing.T) {
+			got, err := UserSkillDirs(r.env, nil)
+			if !errors.Is(err, r.err) || !slices.Equal(got, r.want) {
+				t.Errorf("got %q, %v; want %q, %v", got, err, r.want, r.err)
+			}
+		})
 	}
 }

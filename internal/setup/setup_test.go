@@ -23,7 +23,12 @@ var skills = []Skill{
 	}},
 }
 
-var assets = Assets{Schema: schema, Skills: skills, Block: "<!-- docket:start -->\nblock\n<!-- docket:end -->"}
+var userSkills = []Skill{{"docket-init", fstest.MapFS{
+	"SKILL.md":           {Data: []byte("# init\n")},
+	"agents/openai.yaml": {Data: []byte("policy: {}\n")},
+}}}
+
+var assets = Assets{Schema: schema, Skills: skills, UserSkills: userSkills, Block: "<!-- docket:start -->\nblock\n<!-- docket:end -->"}
 
 // mdir is the per-machine schema directory a test uses for the repository at
 // root: beside it, so each test has its own and never the real one.
@@ -564,4 +569,233 @@ func TestRemovalRechecksTheMachineCopy(t *testing.T) {
 		t.Errorf("ProjectCopy = %v", r.ProjectCopy)
 	}
 	noneRemoved(t, root, r)
+}
+
+// udirs are the user-level skills directories a test uses for the repository
+// at root: beside it, never the real ones.
+func udirs(root string) []string { return []string{root + ".claude/skills", root + ".agents/skills"} }
+
+func userDirs(root string) Dirs { return Dirs{Schema: mdir(root), UserSkills: udirs(root)} }
+
+func mustRead(t *testing.T, p string) string {
+	t.Helper()
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func mustWrite(t *testing.T, p, s string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(s), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func exists(p string) bool { _, err := os.Lstat(p); return err == nil }
+
+func userSkillFiles(r Result) []File {
+	var out []File
+	for _, f := range r.Files {
+		if f.Kind == KindUserSkill {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func TestInitUserSkillsFresh(t *testing.T) {
+	root := t.TempDir()
+	r, err := Init(root, userDirs(root), assets, false, func() error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := userSkillFiles(r); len(got) != 4 {
+		t.Fatalf("user-skill files = %v", got)
+	}
+	st := statuses(r)
+	for _, d := range udirs(root) {
+		for rel, want := range map[string]string{"SKILL.md": "# init\n", "agents/openai.yaml": "policy: {}\n"} {
+			p := filepath.Join(d, "docket-init", rel)
+			if st[p] != Written {
+				t.Errorf("%s: status %q", p, st[p])
+			}
+			if got := mustRead(t, p); got != want {
+				t.Errorf("%s: %q", p, got)
+			}
+		}
+	}
+}
+
+func TestInitUserSkillDiffers(t *testing.T) {
+	root := t.TempDir()
+	if _, err := Init(root, userDirs(root), assets, false, func() error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(udirs(root)[1], "docket-init", "SKILL.md")
+	mustWrite(t, p, "mine\n")
+	r, err := Init(root, userDirs(root), assets, false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statuses(r)[p] != Differs || mustRead(t, p) != "mine\n" {
+		t.Errorf("without force: %q, %q", statuses(r)[p], mustRead(t, p))
+	}
+	r, err = Init(root, userDirs(root), assets, true, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statuses(r)[p] != Overwritten || mustRead(t, p) != "# init\n" {
+		t.Errorf("with force: %q, %q", statuses(r)[p], mustRead(t, p))
+	}
+}
+
+func TestInitUserSkillFolderLinked(t *testing.T) {
+	root := t.TempDir()
+	ud := udirs(root)
+	other := t.TempDir()
+	if err := os.MkdirAll(ud[0], 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(ud[0], "docket-init")
+	if err := os.Symlink(other, link); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Init(root, userDirs(root), assets, true, func() error { return nil })
+	var ref *Refused
+	if !errors.As(err, &ref) {
+		t.Fatalf("err = %v", err)
+	}
+	found := false
+	for _, p := range ref.Problems {
+		found = found || (p.Kind == ProblemSymlink && strings.Contains(p.Err.Error(), link))
+	}
+	if !found {
+		t.Errorf("problems = %v", ref.Problems)
+	}
+	if es, _ := os.ReadDir(other); len(es) != 0 {
+		t.Errorf("wrote under the link target: %v", es)
+	}
+	for _, p := range []string{ud[1], filepath.Join(root, "openspec"), filepath.Join(root, "AGENTS.md"), mdir(root)} {
+		if exists(p) {
+			t.Errorf("%s was created", p)
+		}
+	}
+}
+
+func TestInitUserSkillsDirLinked(t *testing.T) {
+	root := t.TempDir()
+	ud := udirs(root)
+	other := t.TempDir()
+	if err := os.MkdirAll(filepath.Dir(ud[0]), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, ud[0]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Init(root, userDirs(root), assets, false, func() error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustRead(t, filepath.Join(other, "docket-init", "SKILL.md")); got != "# init\n" {
+		t.Errorf("target holds %q", got)
+	}
+}
+
+func TestInitUserSkillsLeaveOthers(t *testing.T) {
+	root := t.TempDir()
+	ud := udirs(root)
+	mine := map[string]string{
+		filepath.Join(ud[0], "docket-init", "notes.md"): "notes\n",
+		filepath.Join(ud[0], "mine", "SKILL.md"):        "mine\n",
+		root + ".claude/settings.json":                  "{}\n",
+	}
+	for p, s := range mine {
+		mustWrite(t, p, s)
+	}
+	r, err := Init(root, userDirs(root), assets, true, func() error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	for p, s := range mine {
+		if got := mustRead(t, p); got != s {
+			t.Errorf("%s changed to %q", p, got)
+		}
+		if _, ok := statuses(r)[p]; ok {
+			t.Errorf("%s is in the result", p)
+		}
+	}
+}
+
+func TestInitProjectRefusalWritesNoUserSkill(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".claude/skills"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(t.TempDir(), filepath.Join(root, ".claude/skills/docket")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Init(root, userDirs(root), assets, false, func() error { return nil })
+	var ref *Refused
+	if !errors.As(err, &ref) {
+		t.Fatalf("err = %v", err)
+	}
+	for _, d := range udirs(root) {
+		if exists(filepath.Join(d, "docket-init")) {
+			t.Errorf("%s was created", d)
+		}
+	}
+}
+
+func TestInitUserSkillFolderIsFile(t *testing.T) {
+	root := t.TempDir()
+	ud := udirs(root)
+	mustWrite(t, filepath.Join(ud[0], "docket-init"), "file\n")
+	_, err := Init(root, userDirs(root), assets, false, func() error { return nil })
+	var ref *Refused
+	if !errors.As(err, &ref) {
+		t.Fatalf("err = %v", err)
+	}
+	if exists(ud[1]) || exists(mdir(root)) || mustRead(t, filepath.Join(ud[0], "docket-init")) != "file\n" {
+		t.Error("something was written")
+	}
+}
+
+func TestInspectUserSkills(t *testing.T) {
+	root := t.TempDir()
+	rep, err := Inspect(root, userDirs(root), assets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, f := range rep.Files {
+		if f.Kind == KindUserSkill {
+			n++
+			if f.Status != Written {
+				t.Errorf("%s: %q", f.Path, f.Status)
+			}
+		}
+	}
+	if n != 4 {
+		t.Errorf("user-skill files = %d", n)
+	}
+	for _, d := range udirs(root) {
+		if exists(d) {
+			t.Errorf("%s was created", d)
+		}
+	}
+}
+
+func TestInitNoUserSkillDirs(t *testing.T) {
+	root := t.TempDir()
+	r, err := Init(root, dirs(root), assets, false, func() error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := userSkillFiles(r); len(got) != 0 {
+		t.Errorf("user-skill files = %v", got)
+	}
 }
