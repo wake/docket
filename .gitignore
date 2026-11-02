@@ -1,4 +1,5 @@
 .claude/worktrees/
 .superpowers/
-/dkt
-/dist/
+
+# Local pages; the repository is public, never commit these.
+docs/pages/
