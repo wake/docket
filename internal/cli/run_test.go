@@ -43,6 +43,13 @@ func TestUsageErrorsText(t *testing.T) {
 	}
 }
 
+func TestJSONAfterTerminatorIsPositional(t *testing.T) {
+	code, out, errs := run(t, "nosuch", "--", "--json")
+	if code != 2 || out != "" || !strings.Contains(errs, "usage:") {
+		t.Fatalf("code=%d out=%q err=%q", code, out, errs)
+	}
+}
+
 func TestHelp(t *testing.T) {
 	for _, a := range []string{"--help", "-h"} {
 		code, out, errs := run(t, a)

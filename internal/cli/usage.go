@@ -19,7 +19,10 @@ func usage(w io.Writer, msg string) {
 // would read as true: --json, -json, or --json=<bool>.
 func jsonRequested(args []string) bool {
 	for _, a := range args {
-		a = strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-")
+		if a == "--" {
+			return false
+		}
+		a =strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-")
 		if a == "json" {
 			return true
 		}
