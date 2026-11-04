@@ -11,6 +11,8 @@ func TestResolveVersion(t *testing.T) {
 		{"dev", "v0.16.0+dirty", "dev"},
 		{"dev", "(devel)", "dev"},
 		{"dev", "", "dev"},
+		{"", "v0.16.0", "v0.16.0"},
+		{"", "", "dev"},
 	}
 	for _, c := range cases {
 		if got := ResolveVersion(c.stamped, c.bi); got != c.want {
