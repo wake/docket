@@ -7,6 +7,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+
+	"github.com/wake/docket/internal/gitx"
 )
 
 // Version is the dkt version; release builds set it with -ldflags.
@@ -39,7 +41,7 @@ func Run(o Options) int {
 		return finish(o, "version", asJSON, Outcome{
 			Result: map[string]string{"version": Version},
 			Human:  []string{"dkt " + Version},
-		}, nil)
+		}, identify(o), nil)
 	}
 	if len(rest) == 0 {
 		return usageFailure(o, asJSON, "no command given")
@@ -53,16 +55,16 @@ func Run(o Options) int {
 func usageFailure(o Options, asJSON bool, msg string) int {
 	usage(o.Stderr, msg)
 	out := Outcome{Findings: []Finding{{Rule: "usage", Message: msg}}}
-	return finish(o, "", asJSON, out, UsageError{Msg: msg})
+	return finish(o, "", asJSON, out, nil, UsageError{Msg: msg})
 }
 
 // finish writes the outcome and maps it to the exit code; every exit of Run
 // that has an outcome goes through here.
-func finish(o Options, name string, asJSON bool, out Outcome, err error) int {
+func finish(o Options, name string, asJSON bool, out Outcome, repo *Repo, err error) int {
 	code := ExitCode(out, err)
 	var werr error
 	if asJSON {
-		werr = writeJSON(o.Stdout, name, nil, out, code)
+		werr = writeJSON(o.Stdout, name, repo, out, code)
 	} else if err == nil {
 		werr = writeText(o.Stdout, name, out, code)
 	}
@@ -73,4 +75,33 @@ func finish(o Options, name string, asJSON bool, out Outcome, err error) int {
 		}
 	}
 	return code
+}
+
+// identify reads the repository root, head, branch and origin on a best-effort
+// basis: any error from git (not a repository, git missing, a failure) gives
+// nil, since --version needs no repository.
+func identify(o Options) *Repo {
+	g := gitx.Git{Dir: o.Dir, Env: o.Env}
+	root, err := g.Toplevel()
+	if err != nil {
+		return nil
+	}
+	g.Dir = root
+	r := &Repo{Root: root}
+	if sha, ok, err := g.Head(); err != nil {
+		return nil
+	} else if ok {
+		r.Head = &sha
+	}
+	if name, ok, err := g.Branch(); err != nil {
+		return nil
+	} else if ok {
+		r.Branch = &name
+	}
+	if url, ok, err := g.RemoteURL("origin"); err != nil {
+		return nil
+	} else if ok {
+		r.Origin = &url
+	}
+	return r
 }
