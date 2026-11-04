@@ -22,6 +22,6 @@ Docket is a development workflow management framework built on superpowers and O
    - OpenSpec: follow https://github.com/Fission-AI/OpenSpec/blob/main/install.md
    - superpowers: in Claude Code, `claude plugin install superpowers@claude-plugins-official`; in Codex, `codex plugin add superpowers@openai-curated-remote`
 
-3. Run `dkt init --json --tools <AI tool>`, with `<AI tool>` the AI coding tool you are using: `claude` for Claude Code, `codex` for Codex. Follow its instructions for the rest, commit the files involved, and help reload the skills.
+3. Run `dkt init --json --tools <coding agent>`, with `<coding agent>` the coding agent you are using: `claude` for Claude Code, `codex` for Codex. Follow its instructions for the rest, commit the files involved, and help reload the skills.
 
 4. Run `dkt inspect --json` to confirm the setup is complete, or whether the docket-doctor skill is needed.
