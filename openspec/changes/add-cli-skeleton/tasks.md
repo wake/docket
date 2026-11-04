@@ -33,13 +33,13 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (environment-dependent behavior)
 **Files:** `internal/gitx/git.go`, `internal/gitx/git_test.go`, `internal/testutil/repo.go`, `internal/cli/run.go`, `internal/cli/repo_test.go`
 
-- [ ] 4.1 Port from `v0.15.0` the subset of `internal/gitx/git.go` named in design.md and its tests, and `internal/testutil/repo.go` (`Env`, `NewRepo`, `Commit`, and what they need); verify the ported tests pass
-- [ ] 4.2 Write failing tests for the scenarios Detached HEAD, No origin remote, No commits yet and Outside a repository, plus: on a branch, `repo.branch` is its name and `repo.origin` is the `origin` URL; with `git` missing from `PATH`, `dkt --version --json` exits 0 with `repo` null; verify they fail
-- [ ] 4.3 Make `--version` identify the repository on a best-effort basis (design.md, Repository identity) and put it in the envelope; verify every test from 4.2 passes
+- [x] 4.1 Port from `v0.15.0` the subset of `internal/gitx/git.go` named in design.md and its tests, and `internal/testutil/repo.go` (`Env`, `NewRepo`, `Commit`, and what they need); verify the ported tests pass
+- [x] 4.2 Write failing tests for the scenarios Detached HEAD, No origin remote, No commits yet and Outside a repository, plus: on a branch, `repo.branch` is its name and `repo.origin` is the `origin` URL; with `git` missing from `PATH`, `dkt --version --json` exits 0 with `repo` null; verify they fail
+- [x] 4.3 Make `--version` identify the repository on a best-effort basis (design.md, Repository identity) and put it in the envelope; verify every test from 4.2 passes
 
 ## 5. Integration
 
-- [ ] 5.1 Run `go vet ./...`, `go test ./...` and `openspec validate add-cli-skeleton --strict`; build `dkt` into a temporary directory and run `dkt --version`, `dkt --version --json`, `dkt nosuch`, `dkt` and `dkt --help` inside this repository and outside any repository; verify each output and exit code matches the spec
+- [x] 5.1 Run `go vet ./...`, `go test ./...` and `openspec validate add-cli-skeleton --strict`; build `dkt` into a temporary directory and run `dkt --version`, `dkt --version --json`, `dkt nosuch`, `dkt` and `dkt --help` inside this repository and outside any repository; verify each output and exit code matches the spec
 
 ## Workflow follow-up
 
