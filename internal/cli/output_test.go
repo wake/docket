@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -15,17 +16,17 @@ func run(t *testing.T, args ...string) (int, string, string) {
 }
 
 func TestVersionText(t *testing.T) {
-	code, out, _ := run(t, "--version")
-	if code != 0 || out != "dkt dev\n" {
-		t.Fatalf("code=%d out=%q", code, out)
+	code, out, errs := run(t, "--version")
+	if code != 0 || out != "dkt dev\n" || errs != "" {
+		t.Fatalf("code=%d out=%q err=%q", code, out, errs)
 	}
 }
 
 func TestVersionJSONEnvelope(t *testing.T) {
 	for _, args := range [][]string{{"--version", "--json"}, {"--json", "--version"}} {
-		code, out, _ := run(t, args...)
-		if code != 0 {
-			t.Fatalf("%v: code=%d", args, code)
+		code, out, errs := run(t, args...)
+		if code != 0 || errs != "" {
+			t.Fatalf("%v: code=%d err=%q", args, code, errs)
 		}
 		if strings.Count(strings.TrimSpace(out), "\n") != 0 {
 			t.Fatalf("%v: not one line: %q", args, out)
@@ -46,5 +47,31 @@ func TestVersionJSONEnvelope(t *testing.T) {
 				t.Errorf("%v: %s = %s, want %s", args, k, m[k], v)
 			}
 		}
+	}
+}
+
+type failWriter struct{}
+
+func (failWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
+
+func TestWriteJSONMarshalFailure(t *testing.T) {
+	var buf bytes.Buffer
+	err := writeJSON(&buf, "x", nil, Outcome{Result: make(chan int)}, 0)
+	if err == nil {
+		t.Fatal("want error")
+	}
+	var m struct {
+		OK       bool
+		Findings []Finding
+	}
+	if e := json.Unmarshal(buf.Bytes(), &m); e != nil || m.OK || len(m.Findings) != 1 || m.Findings[0].Rule != "internal" {
+		t.Fatalf("out=%q err=%v", buf.String(), e)
+	}
+}
+
+func TestRunWriterErrorIsNonZero(t *testing.T) {
+	var errb bytes.Buffer
+	if code := Run(Options{Args: []string{"--version"}, Stdout: failWriter{}, Stderr: &errb}); code == 0 {
+		t.Fatal("want non-zero")
 	}
 }
