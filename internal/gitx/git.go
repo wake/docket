@@ -208,9 +208,3 @@ func (g Git) Branch() (string, bool, error) {
 func (g Git) RemoteURL(name string) (string, bool, error) {
 	return g.runOptional("config", "--get", "remote."+name+".url")
 }
-
-// RefExists reports whether ref resolves to an object.
-func (g Git) RefExists(ref string) (bool, error) {
-	_, ok, err := g.runOptional("rev-parse", "--verify", "-q", ref)
-	return ok, err
-}
