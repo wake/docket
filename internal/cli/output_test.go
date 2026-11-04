@@ -50,6 +50,38 @@ func TestVersionJSONEnvelope(t *testing.T) {
 	}
 }
 
+func TestFindingOptionalFieldsJSON(t *testing.T) {
+	var buf bytes.Buffer
+	o := Outcome{Findings: []Finding{{Rule: "r", Message: "m", Change: "c", File: "f.md", Line: 7}, {Rule: "r", Message: "m"}}}
+	if err := writeJSON(&buf, "x", nil, o, 1); err != nil {
+		t.Fatal(err)
+	}
+	var m struct{ Findings []map[string]any }
+	if err := json.Unmarshal(buf.Bytes(), &m); err != nil || len(m.Findings) != 2 {
+		t.Fatalf("%v %s", err, buf.String())
+	}
+	full, bare := m.Findings[0], m.Findings[1]
+	if full["change"] != "c" || full["file"] != "f.md" || full["line"] != float64(7) {
+		t.Errorf("full = %v", full)
+	}
+	for _, k := range []string{"change", "file", "line"} {
+		if _, ok := bare[k]; ok {
+			t.Errorf("bare has %s: %v", k, bare)
+		}
+	}
+}
+
+func TestFindingTextFormat(t *testing.T) {
+	var buf bytes.Buffer
+	o := Outcome{Findings: []Finding{{Rule: "r", Message: "m", Change: "c", File: "f.md", Line: 7}, {Rule: "r", Message: "m", File: "f.md"}}}
+	if err := writeText(&buf, "x", o, 1); err != nil {
+		t.Fatal(err)
+	}
+	if want := "r: m (f.md:7) [c]\nr: m (f.md)\n"; buf.String() != want {
+		t.Errorf("got %q, want %q", buf.String(), want)
+	}
+}
+
 type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
