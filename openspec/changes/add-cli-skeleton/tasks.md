@@ -24,9 +24,9 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (error path)
 **Files:** `internal/cli/run.go`, `internal/cli/usage.go`, `internal/cli/envelope.go`, `internal/cli/run_test.go`, `internal/cli/envelope_test.go`
 
-- [ ] 3.1 Write failing tests for the scenarios JSON on failure, Envelope on a usage error, Unknown command, No command and Help, plus: `-h` behaves like `--help`; `--json` before the command name (`dkt --json nosuch`) and after it (`dkt nosuch --json`) both give one JSON object; `dkt --json` with no command gives one JSON object with `ok` false, all eight fields and `command` the empty string; a usage error in JSON mode still prints the usage to standard error; verify they fail
-- [ ] 3.2 Write a failing test for `func ExitCode(o Outcome, err error) int` in `internal/cli/envelope.go`: no error and no findings or unreadable gives 0; findings give 1; unreadable gives 3, also when there are findings; a `UsageError` gives 2; an `EnvError` gives 4; any other error gives 1; verify it fails
-- [ ] 3.3 Port the dispatch and usage output from `v0.15.0:internal/cli/run.go` with an empty command table and without `--default-branch`, and `ExitCode` with `UsageError` and `EnvError`, used by `Run` for every exit; verify every test from 3.1–3.2 passes
+- [x] 3.1 Write failing tests for the scenarios JSON on failure, Envelope on a usage error, Unknown command, No command and Help, plus: `-h` behaves like `--help`; `--json` before the command name (`dkt --json nosuch`) and after it (`dkt nosuch --json`) both give one JSON object; `dkt --json` with no command gives one JSON object with `ok` false, all eight fields and `command` the empty string; a usage error in JSON mode still prints the usage to standard error; verify they fail
+- [x] 3.2 Write a failing test for `func ExitCode(o Outcome, err error) int` in `internal/cli/envelope.go`: no error and no findings or unreadable gives 0; findings give 1; unreadable gives 3, also when there are findings; a `UsageError` gives 2; an `EnvError` gives 4; any other error gives 1; verify it fails
+- [x] 3.3 Port the dispatch and usage output from `v0.15.0:internal/cli/run.go` with an empty command table and without `--default-branch`, and `ExitCode` with `UsageError` and `EnvError`, used by `Run` for every exit; verify every test from 3.1–3.2 passes
 
 ## 4. Repository identity
 
