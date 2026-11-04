@@ -201,7 +201,12 @@ func (g Git) Head() (string, bool, error) {
 
 // Branch returns the checked-out branch; ok is false when HEAD is detached.
 func (g Git) Branch() (string, bool, error) {
-	return g.runOptional("symbolic-ref", "-q", "--short", "HEAD")
+	// Not --short: it prints heads/<name> when a tag has the same name.
+	ref, ok, err := g.runOptional("symbolic-ref", "-q", "HEAD")
+	if !ok || err != nil {
+		return "", false, err
+	}
+	return strings.TrimPrefix(ref, "refs/heads/"), true, nil
 }
 
 // RemoteURL returns the URL configured for the named remote.

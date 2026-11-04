@@ -88,6 +88,16 @@ func TestBranchDetached(t *testing.T) {
 	}
 }
 
+func TestBranchWithSameNamedTag(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("one", map[string]string{"a": "1"})
+	r.Git("tag", "main")
+	name, ok, err := Git{Dir: r.Dir, Env: r.Env}.Branch()
+	if err != nil || !ok || name != "main" {
+		t.Fatalf("Branch = %q, %v, %v; want main", name, ok, err)
+	}
+}
+
 func TestRemoteURLMissing(t *testing.T) {
 	r := testutil.NewRepo(t)
 	g := Git{Dir: r.Dir, Env: r.Env}
