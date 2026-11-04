@@ -50,6 +50,15 @@ func TestJSONAfterTerminatorIsPositional(t *testing.T) {
 	}
 }
 
+func TestHelpIgnoresJSON(t *testing.T) {
+	for _, args := range [][]string{{"--help", "--json"}, {"--json", "--help"}, {"-h", "--json"}} {
+		code, out, errs := run(t, args...)
+		if code != 0 || !strings.HasPrefix(out, "usage:") || errs != "" {
+			t.Errorf("%v: code=%d out=%q err=%q", args, code, out, errs)
+		}
+	}
+}
+
 func TestHelp(t *testing.T) {
 	for _, a := range []string{"--help", "-h"} {
 		code, out, errs := run(t, a)
