@@ -7,17 +7,17 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks
 **Files:** `go.mod`, `cmd/dkt/main.go`, `internal/cli/run.go`
 
-- [ ] 1.1 Create `go.mod` (`module github.com/wake/docket`, `go 1.24`, no requirements), `internal/cli` with `var Version = "dev"`, `type Options struct { Args []string; Dir string; Env []string; Stdout, Stderr io.Writer }` and `func Run(o Options) int`, and `cmd/dkt/main.go`, which fills `Options` from the process and exits with `Run`'s result; verify `go build ./...` and `go vet ./...` pass
+- [x] 1.1 Create `go.mod` (`module github.com/wake/docket`, `go 1.24`, no requirements), `internal/cli` with `var Version = "dev"`, `type Options struct { Args []string; Dir string; Env []string; Stdout, Stderr io.Writer }` and `func Run(o Options) int`, and `cmd/dkt/main.go`, which fills `Options` from the process and exits with `Run`'s result; verify `go build ./...` and `go vet ./...` pass
 
 ## 2. Envelope, version and JSON output
 
 **Review:** judgment (public output format)
 **Files:** `internal/cli/envelope.go`, `internal/cli/output.go`, `internal/cli/version.go`, `internal/cli/run.go`, `cmd/dkt/main.go`, `internal/cli/output_test.go`, `internal/cli/version_test.go`, `cmd/dkt/main_test.go`
 
-- [ ] 2.1 Write failing tests for the scenarios JSON on success, Envelope fields present and Working tree build, plus: text mode prints exactly `dkt dev\n`; `findings` and `unreadable` encode as `[]`, never `null`; verify they fail
-- [ ] 2.2 Write a failing test for `func ResolveVersion(stamped, buildInfo string) string` in `internal/cli/version.go`: a stamped value other than `dev` wins; otherwise a build-info version matching `^v\d+\.\d+\.\d+$` is used; `v0.0.0-20261104074825-4c775bd664cc`, `v0.16.0+dirty`, `(devel)` and the empty string give `dev`; verify it fails
-- [ ] 2.3 Write a failing test for the scenario Release build in `cmd/dkt/main_test.go`: build the binary with `go build -ldflags "-X github.com/wake/docket/internal/cli.Version=v0.16.0"` into the test's temporary directory, run `--version` and expect `dkt v0.16.0\n` and exit 0, then run `--version --json` and expect both `result.version` and `version` to be `v0.16.0`; verify it fails
-- [ ] 2.4 Port the envelope types and writers (`Finding`, `Unreadable`, `Repo`, `Outcome`, `writeJSON`, `writeText`) and implement `--version` in text and JSON mode and `ResolveVersion`, called from `main`; verify every test from 2.1–2.3 passes
+- [x] 2.1 Write failing tests for the scenarios JSON on success, Envelope fields present and Working tree build, plus: text mode prints exactly `dkt dev\n`; `findings` and `unreadable` encode as `[]`, never `null`; verify they fail
+- [x] 2.2 Write a failing test for `func ResolveVersion(stamped, buildInfo string) string` in `internal/cli/version.go`: a stamped value other than `dev` wins; otherwise a build-info version matching `^v\d+\.\d+\.\d+$` is used; `v0.0.0-20261104074825-4c775bd664cc`, `v0.16.0+dirty`, `(devel)` and the empty string give `dev`; verify it fails
+- [x] 2.3 Write a failing test for the scenario Release build in `cmd/dkt/main_test.go`: build the binary with `go build -ldflags "-X github.com/wake/docket/internal/cli.Version=v0.16.0"` into the test's temporary directory, run `--version` and expect `dkt v0.16.0\n` and exit 0, then run `--version --json` and expect both `result.version` and `version` to be `v0.16.0`; verify it fails
+- [x] 2.4 Port the envelope types and writers (`Finding`, `Unreadable`, `Repo`, `Outcome`, `writeJSON`, `writeText`) and implement `--version` in text and JSON mode and `ResolveVersion`, called from `main`; verify every test from 2.1–2.3 passes
 
 ## 3. Usage errors, help and exit codes
 
