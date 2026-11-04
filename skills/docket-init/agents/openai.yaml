@@ -1,2 +1,5 @@
+interface:
+  display_name: "Docket init"
+  short_description: "Set up Docket in this project"
 policy:
   allow_implicit_invocation: false
