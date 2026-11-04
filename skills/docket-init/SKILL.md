@@ -20,7 +20,7 @@ Docket is a development workflow management framework built on superpowers and O
    - not a git directory: name the folder where you will run `git init` and have the user confirm it. If it is a home directory, a temporary directory, or does not look like a project, first ask where the project is.
    - dkt: `curl -fsSL https://raw.githubusercontent.com/wake/docket/main/install.sh | sh` (installs `~/.local/bin/dkt`)
    - OpenSpec: follow https://github.com/Fission-AI/OpenSpec/blob/main/install.md
-   - superpowers: follow https://github.com/obra/superpowers/blob/main/README.md#installation
+   - superpowers: in Claude Code, `claude plugin install superpowers@claude-plugins-official`; in Codex, `codex plugin add superpowers@openai-curated-remote`
 
 3. Run `dkt init --json`, follow its instructions for the rest, commit the files involved, and help reload the skills.
 
