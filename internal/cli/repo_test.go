@@ -100,6 +100,20 @@ func TestRepoOutsideRepository(t *testing.T) {
 	}
 }
 
+func TestRepoRootFromSubdirectory(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("one", map[string]string{"a/b/f": "1"})
+	want := r.Git("rev-parse", "--show-toplevel")
+	code, raw := versionRepo(t, filepath.Join(r.Dir, "a", "b"), r.Env)
+	var got repoJSON
+	if err := json.Unmarshal(raw, &got); code != 0 || err != nil {
+		t.Fatalf("code = %d, repo = %s (%v)", code, raw, err)
+	}
+	if got.Root != want {
+		t.Errorf("root = %q, want %q", got.Root, want)
+	}
+}
+
 func TestRepoGitMissing(t *testing.T) {
 	r := testutil.NewRepo(t)
 	env := append(append([]string{}, r.Env...), "PATH="+t.TempDir())
