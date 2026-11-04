@@ -1,5 +1,47 @@
 package cli
 
+import "errors"
+
+// UsageError reports a wrong command line (exit 2).
+type UsageError struct{ Msg string }
+
+func (e UsageError) Error() string { return e.Msg }
+
+// EnvError reports an unusable environment (exit 4).
+type EnvError struct{ Msg string }
+
+func (e EnvError) Error() string { return e.Msg }
+
+func asUsage(err error) bool {
+	var v UsageError
+	var p *UsageError
+	return errors.As(err, &v) || errors.As(err, &p)
+}
+
+func asEnv(err error) bool {
+	var v EnvError
+	var p *EnvError
+	return errors.As(err, &v) || errors.As(err, &p)
+}
+
+// ExitCode maps an outcome and error to the process exit code. Unreadable
+// sources (3) win over findings (1).
+func ExitCode(o Outcome, err error) int {
+	switch {
+	case err != nil && asUsage(err):
+		return 2
+	case err != nil && asEnv(err):
+		return 4
+	case err != nil:
+		return 1
+	case len(o.Unreadable) > 0:
+		return 3
+	case len(o.Findings) > 0:
+		return 1
+	}
+	return 0
+}
+
 // Finding is one problem a command found.
 type Finding struct {
 	Rule    string `json:"rule"`
