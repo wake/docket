@@ -10,6 +10,8 @@ main is being rebuilt from scratch. The previous version is on the `legacy` bran
 
 During the rebuild, do not use dkt; use OpenSpec's built-in workflow:
 
+- If there is no `openspec/` yet, run `openspec init --tools <coding agent>` (for example `claude` or `codex`) and commit the files it creates.
+- Start a change with `openspec new change <slug>`, which uses the default spec-driven schema.
 - Each change lives in `openspec/changes/<slug>/`: `proposal.md`, `specs/`, `design.md` when needed, and `tasks.md`. Before writing each one, run `openspec instructions <artifact> --change <slug>` for its template and rules.
 - superpowers' brainstorming and writing-plans do not write to their default location, `docs/superpowers/`: the design goes into the change folder, and the task list into `tasks.md`.
 - Implement from `tasks.md` with superpowers' test-driven-development and subagent-driven-development.
@@ -19,7 +21,7 @@ Once `dkt init`, `dkt new`, `dkt sync` and `dkt lint` exist, run `dkt init` on t
 
 ## Development
 
-- The Go module is at the repository root: `go vet ./...`, `go test ./...`.
+- The Go module goes at the repository root and is created by the first rebuild change. Once `go.mod` exists, check with `go vet ./...` and `go test ./...`.
 - Requires OpenSpec 1.7.0 or later.
 
 ## Prompt files
