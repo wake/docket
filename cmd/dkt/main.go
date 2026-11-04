@@ -4,11 +4,17 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/wake/docket/internal/cli"
 )
 
 func main() {
+	bi := ""
+	if info, ok := debug.ReadBuildInfo(); ok {
+		bi = info.Main.Version
+	}
+	cli.Version = cli.ResolveVersion(cli.Version, bi)
 	dir, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "dkt: %v\n", err)
