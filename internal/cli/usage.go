@@ -22,7 +22,7 @@ func jsonRequested(args []string) bool {
 		if a == "--" {
 			return false
 		}
-		a =strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-")
+		a = strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-")
 		if a == "json" {
 			return true
 		}
