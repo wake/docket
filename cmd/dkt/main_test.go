@@ -90,10 +90,17 @@ func TestBuildInfoVersion(t *testing.T) {
 	r.Git("commit", "-q", "-m", "snapshot")
 	r.Git("tag", "v1.2.3")
 	bin := filepath.Join(t.TempDir(), "dkt") // outside the repository: keeps the tree clean
-	build := exec.Command("go", "build", "-o", bin, "./cmd/dkt")
+	build := exec.Command("go", "build", "-buildvcs=true", "-o", bin, "./cmd/dkt")
 	build.Dir = src
-	// The Go toolchain keeps the process environment; only git is isolated.
-	build.Env = append(os.Environ(), "GOFLAGS=", "GIT_CONFIG_NOSYSTEM=1",
+	// The Go toolchain keeps the process environment minus every GIT_*
+	// variable; git itself is isolated.
+	var base []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "GIT_") {
+			base = append(base, kv)
+		}
+	}
+	build.Env = append(base, "GOFLAGS=", "GIT_CONFIG_NOSYSTEM=1",
 		"GIT_CONFIG_GLOBAL="+envValue(env, "GIT_CONFIG_GLOBAL"))
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
