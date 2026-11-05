@@ -20,7 +20,7 @@ Defines how `dkt sync` ticks a change's plan.md from commit trailers, so that pl
 - **THEN** `dkt sync add-x` does not take that commit for Task 1
 
 ### Requirement: Ticks from trailers
-For each task a commit names, `dkt sync <slug>` SHALL tick every unticked step of that task in `openspec/changes/<slug>/plan.md`: each `- [ ]` checkbox line between the `### Task N:` heading and the next heading of level 1 to 3, outside fenced code and HTML comments. It SHALL leave the steps of every other task as they were.
+For each task a commit names, `dkt sync <slug>` SHALL tick every unticked step of that task in `openspec/changes/<slug>/plan.md`: each `- [ ]` checkbox line between the `### Task N:` heading and the next heading of level 1 to 3, outside fenced code and HTML comments. A heading inside fenced code or an HTML comment is not a heading. It SHALL leave the steps of every other task as they were.
 
 #### Scenario: Task with commits ticked
 - **WHEN** two commits carry `Change: add-x/3`, and Task 3 has four unticked steps
@@ -33,6 +33,10 @@ For each task a commit names, `dkt sync <slug>` SHALL tick every unticked step o
 #### Scenario: Checkbox in a code block
 - **WHEN** Task 1 has commits and a fenced code block in it holds a line `- [ ] example`
 - **THEN** `dkt sync add-x` ticks Task 1's steps and leaves that line as it was
+
+#### Scenario: Heading in a comment
+- **WHEN** plan.md holds `### Task 1: hidden` inside an HTML comment, followed by a `- [ ]` line outside it, and a commit carries `Change: add-x/1`
+- **THEN** `dkt sync add-x` reports `trailer-unknown-task` for Task 1 and leaves that line as it was
 
 ### Requirement: Only checkboxes change
 `dkt sync` SHALL change nothing but `[ ]` to `[x]` in the steps it ticks. It SHALL never untick a step, never touch another file, never commit, and SHALL NOT require the OpenSpec CLI. It SHALL keep plan.md's line endings and mode. When a symbolic link is on the path to plan.md, it SHALL read and write nothing there, report `symlink-refused` naming the link, and exit with 1, with or without `--check`.
@@ -76,7 +80,7 @@ For each task a commit names, `dkt sync <slug>` SHALL tick every unticked step o
 - **THEN** `dkt sync add-x --check` exits with 0
 
 ### Requirement: Change and plan found
-`dkt sync <slug>` SHALL read `openspec/changes/<slug>/plan.md` in the repository. A slug that holds `/` or `\`, or is `.` or `..`, names no change: it SHALL be a usage error (exit 2), and nothing is read. When the folder does not exist it SHALL report `change-missing`; when it has no plan.md, `plan-missing`; in both cases it SHALL write nothing and exit with 1. An unreadable plan.md SHALL be listed as `cli-output` requires.
+`dkt sync <slug>` SHALL read `openspec/changes/<slug>/plan.md` in the repository. A slug that is empty, holds `/` or `\`, or is `.` or `..`, names no change: it SHALL be a usage error (exit 2), and nothing is read. When the folder does not exist it SHALL report `change-missing`; when it has no plan.md, `plan-missing`; in both cases it SHALL write nothing and exit with 1. An unreadable plan.md SHALL be listed as `cli-output` requires.
 
 #### Scenario: No such change
 - **WHEN** `openspec/changes/add-y/` does not exist and a user runs `dkt sync add-y`
@@ -94,7 +98,7 @@ For each task a commit names, `dkt sync <slug>` SHALL tick every unticked step o
 - **THEN** the findings hold `other-schema` naming `openspec/changes/add-x/.openspec.yaml` and `spec-driven`, no file changes, and dkt exits with 1
 
 ### Requirement: Sync result
-The `result` of `dkt sync` SHALL hold `slug`, `check`, and `tasks`: every `### Task` of plan.md in order, with its `number`, `name`, `commits` (the full SHAs that name it, oldest first), `steps` (its number of steps), `done` (its ticked steps after the run, or as the file is with `--check`) and `ticked` (the steps this run ticked, or would tick with `--check`). Without `--json`, the output SHALL list each task with its done and total steps and its commits.
+The `result` of `dkt sync` SHALL hold `slug`, `check`, and `tasks`: every `### Task` of plan.md in order, with its `number`, `name`, `commits` (the full SHAs that name it, oldest first), `steps` (its number of steps), `done` (its ticked steps after the run, or as the file is with `--check`) and `ticked` (the steps this run ticked, or would tick with `--check`). Without `--json`, the output SHALL list each task with its done and total steps and its number of commits.
 
 #### Scenario: Result after ticking
 - **WHEN** Task 1 has two steps, one ticked, and one commit names it, and a user runs `dkt sync add-x --json`
