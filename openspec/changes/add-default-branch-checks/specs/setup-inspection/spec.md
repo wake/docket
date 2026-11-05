@@ -20,11 +20,15 @@
 - **THEN** no `trailer-missing` finding names `add-z`
 
 ### Requirement: Default branch in the inspect result
-`dkt inspect` SHALL report in `result.default_branch` the name of the default branch the trailer check read, or null when there is none. Without a default branch it SHALL skip that check, say so in the text output, and not fail for it.
+`dkt inspect` SHALL report in `result.default_branch` the name of the default branch the trailer check read, or null when it did not run. It SHALL skip that check, say why in the text output, and not fail for it, when there is no default branch or when the repository is a shallow clone, whose history may not hold the commits that carry the trailers.
 
 #### Scenario: Inspect without a default branch
 - **WHEN** no default branch can be found and a user runs `dkt inspect --json`
 - **THEN** `result.default_branch` is null and no finding is `trailer-missing`
+
+#### Scenario: Shallow clone
+- **WHEN** the repository was cloned with `--depth 1`, and the default branch's tip holds `add-x`, with a plan.md that has a task, whose `Change` trailers are on earlier commits only
+- **THEN** `dkt inspect --json` reports no `trailer-missing`, `result.default_branch` is null, and the text output says the check was skipped for a shallow clone
 
 ### Requirement: Main spec titles inspected
 `dkt inspect` SHALL report `title-missing` for each main spec in the worktree that has no title, as change-lint's Main spec titles requirement says, naming its `spec.md`.
