@@ -235,6 +235,20 @@ func TestAnyNumberOfPositionals(t *testing.T) {
 	}
 }
 
+func TestAnyNumberOfPositionalsAroundFlag(t *testing.T) {
+	var got []string
+	cmds := []func() Command{func() Command {
+		return Command{Name: "x", Usage: "x [<s>...]", Args: -1,
+			Run: func(_ *Context, a []string) (Outcome, error) { got = a; return Outcome{}, nil }}
+	}}
+	r := testutil.NewRepo(t)
+	var out, errb bytes.Buffer
+	code := RunWith(Options{Args: []string{"x", "a", "--json", "b"}, Dir: r.Dir, Env: r.Env, Stdout: &out, Stderr: &errb}, cmds)
+	if code != 0 || strings.Join(got, ",") != "a,b" || !strings.HasPrefix(out.String(), "{") {
+		t.Fatalf("code=%d got=%v out=%q err=%q", code, got, out.String(), errb.String())
+	}
+}
+
 func TestSyncStillTakesOnePositional(t *testing.T) {
 	if code, _, errs := run(t, "sync", "a", "b"); code != 2 || !strings.Contains(errs, `unexpected argument "b"`) {
 		t.Fatalf("code=%d err=%q", code, errs)
