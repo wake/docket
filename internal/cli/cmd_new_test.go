@@ -128,22 +128,29 @@ func TestNewText(t *testing.T) {
 }
 
 func TestNewUsageErrors(t *testing.T) { // Missing source, Unknown kind, Title on two lines, Kind outside the list, Blank title, Source on two lines
-	cases := map[string][]string{
-		"missing source": {"add-x", "--kind", "feature", "--title", "X"},
-		"missing kind":   {"add-x", "--source", "x", "--title", "X"},
-		"missing title":  {"add-x", "--kind", "feature", "--source", "x"},
-		"missing slug":   {"--kind", "feature", "--source", "x", "--title", "X"},
-		"unknown kind":   {"add-x", "--kind", "fix", "--source", "x", "--title", "X"},
-		"two-line title": {"add-x", "--kind", "feature", "--source", "x", "--title", "Line one\nline two"},
-		"blank title":    {"add-x", "--kind", "feature", "--source", "x", "--title", "   "},
-		"two-line src":   {"add-x", "--kind", "feature", "--title", "X", "--source", "a\nb"},
+	cases := map[string]struct {
+		args []string
+		want string
+	}{
+		"missing source": {[]string{"add-x", "--kind", "feature", "--title", "X"}, "new needs --source"},
+		"missing kind":   {[]string{"add-x", "--source", "x", "--title", "X"}, "new needs --kind"},
+		"missing title":  {[]string{"add-x", "--kind", "feature", "--source", "x"}, "new needs --title"},
+		"missing slug":   {[]string{"--kind", "feature", "--source", "x", "--title", "X"}, "missing argument"},
+		"unknown kind":   {[]string{"add-x", "--kind", "fix", "--source", "x", "--title", "X"}, `unknown kind \"fix\"`},
+		"two-line title": {[]string{"add-x", "--kind", "feature", "--source", "x", "--title", "Line one\nline two"}, "new needs --title"},
+		"blank title":    {[]string{"add-x", "--kind", "feature", "--source", "x", "--title", "   "}, "new needs --title"},
+		"blank source":   {[]string{"add-x", "--kind", "feature", "--source", "  ", "--title", "X"}, "new needs --source"},
+		"two-line src":   {[]string{"add-x", "--kind", "feature", "--title", "X", "--source", "a\nb"}, "new needs --source"},
 	}
-	for name, args := range cases {
+	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			e := newProject(t)
-			code, _, raw, calls := e.doNew(t, e.r.Dir, nil, args...)
+			code, _, raw, calls := e.doNew(t, e.r.Dir, nil, tc.args...)
 			if code != 2 || calls != "" || e.exists("openspec/changes/add-x") {
 				t.Fatalf("code=%d calls=%q %s", code, calls, raw)
+			}
+			if !strings.Contains(raw, tc.want) {
+				t.Errorf("no %q in %s", tc.want, raw)
 			}
 			if name == "unknown kind" {
 				for _, k := range []string{"feature", "change-request", "baseline"} {
@@ -235,6 +242,14 @@ func TestNewSuffixAlsoUsed(t *testing.T) { // Suffix also used
 	if code != 0 || m.Result.Slug != "add-x-3" || !e.exists("openspec/changes/add-x-3") {
 		t.Fatalf("code=%d %s", code, raw)
 	}
+	if len(m.Result.Used) != 1 {
+		t.Fatalf("used %+v", m.Result.Used)
+	}
+	for _, u := range m.Result.Used {
+		if !strings.HasSuffix(u.Path, "/add-x") && !strings.HasSuffix(u.Path, "-add-x") {
+			t.Errorf("used lists %s", u.Path)
+		}
+	}
 }
 
 func TestNewStrayFile(t *testing.T) { // a stray file in this worktree
@@ -261,7 +276,7 @@ func TestNewUnreadable(t *testing.T) { // Worktree directory missing
 func TestNewOpenSpecFails(t *testing.T) { // OpenSpec fails
 	e := newProject(t)
 	code, m, raw, calls := e.doNew(t, e.r.Dir, []string{"FAKE_OPENSPEC_NEW_FAIL=1"}, okArgs...)
-	if code != 1 || !hasRule(m, "openspec-failed") || !strings.Contains(raw, "new") || e.exists("openspec/changes/add-x") || !strings.Contains(calls, "new\tchange\tadd-x") {
+	if code != 1 || !hasRule(m, "openspec-failed") || !strings.Contains(raw, "new change add-x --schema docket") || !strings.Contains(raw, "exited with 2") || !strings.Contains(raw, "fake failure") || e.exists("openspec/changes/add-x") || !strings.Contains(calls, "new\tchange\tadd-x") {
 		t.Fatalf("code=%d %s", code, raw)
 	}
 }
@@ -284,7 +299,7 @@ func TestNewLinkAppearsWhileRunning(t *testing.T) {
 	e := newProject(t)
 	target := filepath.Join(t.TempDir(), "victim")
 	code, m, raw, _ := e.doNew(t, e.r.Dir, []string{"FAKE_OPENSPEC_NEW_LINK=" + target}, okArgs...)
-	if code != 1 || !hasRule(m, "symlink-refused") || !e.exists("openspec/changes/add-x/.openspec.yaml") {
+	if code != 1 || !hasRule(m, "symlink-refused") || !strings.Contains(raw, "openspec/changes/add-x/proposal.md") || !e.exists("openspec/changes/add-x/.openspec.yaml") {
 		t.Fatalf("code=%d %s", code, raw)
 	}
 	if _, err := os.Stat(target); err == nil {
@@ -369,5 +384,20 @@ func TestNewTextUsed(t *testing.T) {
 	want := "add-x is used at openspec/changes/archive/2026-01-02-add-x in refs/heads/b2, refs/heads/b3, refs/heads/b4 and 1 more\ncreated openspec/changes/add-x-2\n"
 	if code != 0 || out != want {
 		t.Errorf("%d %q", code, out)
+	}
+}
+
+func TestNewFailureLeavesLinkedFolder(t *testing.T) { // cleanup never removes through a link
+	e := newProject(t)
+	target := t.TempDir()
+	keep := filepath.Join(target, "keep")
+	os.WriteFile(keep, []byte("k"), 0o644)
+	code, m, raw, _ := e.doNew(t, e.r.Dir, []string{"FAKE_OPENSPEC_NEW_DIRLINK=" + target}, okArgs...)
+	fi, err := os.Lstat(filepath.Join(e.r.Dir, "openspec/changes/add-x"))
+	if code != 1 || !hasRule(m, "openspec-failed") || !strings.Contains(raw, "left in place") || err != nil || fi.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("code=%d %s", code, raw)
+	}
+	if b, err := os.ReadFile(keep); err != nil || string(b) != "k" {
+		t.Errorf("target changed: %q %v", b, err)
 	}
 }

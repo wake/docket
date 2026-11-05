@@ -95,6 +95,11 @@ new)
     exit 1
   fi
   if [ -n "$FAKE_OPENSPEC_NEW_SLEEP" ]; then sleep "$FAKE_OPENSPEC_NEW_SLEEP"; fi
+  if [ -n "$FAKE_OPENSPEC_NEW_DIRLINK" ]; then
+    ln -s "$FAKE_OPENSPEC_NEW_DIRLINK" "openspec/changes/$slug"
+    echo "fake failure" >&2
+    exit 2
+  fi
   mkdir -p "openspec/changes/$slug"
   printf 'schema: %s\ncreated: 2026-01-01\n' "$schema" > "openspec/changes/$slug/.openspec.yaml"
   if [ -n "$FAKE_OPENSPEC_NEW_LINK" ]; then ln -s "$FAKE_OPENSPEC_NEW_LINK" "openspec/changes/$slug/proposal.md"; fi
@@ -113,7 +118,9 @@ esac
 // `new change <slug> [--schema <s>]` refuses an uppercase slug or an existing folder as OpenSpec does,
 // else creates openspec/changes/<slug>/.openspec.yaml, and honours: FAKE_OPENSPEC_NEW_SLEEP=<seconds>
 // (sleep before creating), FAKE_OPENSPEC_NEW_LINK=<target> (after creating, make proposal.md a link to it)
-// and FAKE_OPENSPEC_NEW_FAIL=1 (after creating, print "fake failure" and exit 2).
+// FAKE_OPENSPEC_NEW_FAIL=1 (after creating, print "fake failure" and exit 2) and
+// FAKE_OPENSPEC_NEW_DIRLINK=<target> (instead of creating the folder, make it a link to the
+// existing directory <target>, then fail as FAKE_OPENSPEC_NEW_FAIL does).
 func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 	t.Helper()
 	dir := t.TempDir()
