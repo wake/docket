@@ -108,7 +108,7 @@ func Run(in Input) (Report, error) {
 	for _, slug := range r.scope(in.Slugs) {
 		c := r.load(slug)
 		changes = append(changes, c)
-		if c.Schema == docketSchema {
+		if c.Schema == docketSchema && !c.failed {
 			needOpenSpec = true
 		}
 	}

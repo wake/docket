@@ -234,6 +234,7 @@ func checkPlaceholderFile(r *state, c *loaded, name string, known map[string]str
 	}
 	for _, m := range commentRe.FindAllIndex(blank, -1) {
 		report(m[0], m[1])
+		blankRange(blank, m[0], m[1]) // tags inside any comment belong to the comment
 	}
 	for _, m := range angleRe.FindAllIndex(blank, -1) {
 		report(m[0], m[1])
