@@ -66,18 +66,21 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 		cmd.Define(fs)
 	}
 	fs.BoolVar(&ctx.JSON, "json", asJSON, "print one JSON object")
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			commandHelp(o.Stdout, cmd, fs)
-			return 0
-		}
+	err := fs.Parse(args)
+	if errors.Is(err, flag.ErrHelp) {
+		commandHelp(o.Stdout, cmd, fs)
+		return 0
+	}
+	if err == nil && fs.NArg() > 0 {
+		err = fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	}
+	if err != nil {
 		msg := err.Error()
 		fmt.Fprintf(o.Stderr, "dkt %s: %s\nusage: dkt %s\n", cmd.Name, msg, cmd.Usage)
 		out := Outcome{Findings: []Finding{{Rule: "usage", Message: msg}}}
 		return finish(o, cmd.Name, ctx.JSON || jsonRequested(args), out, nil, UsageError{Msg: msg})
 	}
 	var out Outcome
-	var err error
 	ctx.Git = gitx.Git{Dir: o.Dir, Env: o.Env}
 	if ctx.Repo, err = identify(ctx); err == nil {
 		out, err = cmd.Run(ctx, fs.Args())
