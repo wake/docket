@@ -1,0 +1,58 @@
+#!/bin/sh
+# dkt for developing Docket. In any worktree of the repository that holds this
+# script, it runs dkt built from the local main branch, rebuilding bin/dkt in
+# the main worktree whenever main has moved; elsewhere it runs the next dkt on
+# PATH.
+set -eu
+
+self=$(cd "$(dirname "$0")" && pwd -P)
+
+run_next() {
+	# Each wrapper passed through adds its directory, so that links to this
+	# script or copies of it on PATH cannot loop.
+	DKT_DEV_SKIP=${DKT_DEV_SKIP:-}:$self
+	export DKT_DEV_SKIP
+	rest=$PATH:
+	while [ -n "$rest" ]; do
+		d=${rest%%:*}
+		rest=${rest#*:}
+		[ -n "$d" ] && [ -f "$d/dkt" ] && [ -x "$d/dkt" ] || continue
+		case "$DKT_DEV_SKIP:" in *":$(cd "$d" 2>/dev/null && pwd -P):"*) continue ;; esac
+		exec "$d/dkt" "$@"
+	done
+	echo "dkt: no dkt on PATH besides this wrapper ($self)" >&2
+	exit 127
+}
+
+# The git common directory of directory $1, shared by all its worktrees.
+common_dir() {
+	g=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && (cd "$g" && pwd -P)
+}
+mine=$(common_dir "$self") || mine=
+here=$(common_dir .) || here=
+[ -n "$mine" ] && [ "$mine" = "$here" ] || run_next "$@"
+
+root=$(git -C "$self" worktree list --porcelain | sed -n '1s/^worktree //p')
+want=$(git -C "$root" rev-parse --verify -q 'refs/heads/main^{commit}') || {
+	echo "dkt: no main branch to build in $root" >&2
+	exit 1
+}
+bin=$root/bin
+if [ ! -x "$bin/dkt" ] || [ "$(cat "$bin/dkt.rev" 2>/dev/null)" != "$want" ]; then
+	short=$(git -C "$root" rev-parse --short "$want")
+	echo "dkt: building main@$short into $bin/dkt" >&2
+	src=$(mktemp -d)
+	trap 'rm -rf "$src"' EXIT
+	# Build the commit, not the main worktree's files, which may hold uncommitted edits.
+	git -C "$root" archive "$want" | tar -x -C "$src"
+	mkdir -p "$bin"
+	(cd "$src" && go build -trimpath -o "$bin/dkt.$$" \
+		-ldflags "-X github.com/wake/docket/internal/cli.Version=main@$short" ./cmd/dkt)
+	# The binary first, so that a run in between sees an old rev and rebuilds.
+	mv -f "$bin/dkt.$$" "$bin/dkt"
+	printf '%s\n' "$want" >"$bin/dkt.rev.$$"
+	mv -f "$bin/dkt.rev.$$" "$bin/dkt.rev"
+	rm -rf "$src"
+	trap - EXIT
+fi
+exec "$bin/dkt" "$@"
