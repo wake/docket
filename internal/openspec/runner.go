@@ -55,10 +55,19 @@ type FailedError struct {
 	Command []string
 	Code    int
 	Stderr  string
+	// Messages are the status messages OpenSpec printed on stdout as JSON, when it did.
+	Messages []string
 }
 
 func (e *FailedError) Error() string {
-	return fmt.Sprintf("%s exited with %d: %s", strings.Join(e.Command, " "), e.Code, strings.TrimSpace(e.Stderr))
+	s := fmt.Sprintf("%s exited with %d", strings.Join(e.Command, " "), e.Code)
+	if stderr := strings.TrimSpace(e.Stderr); stderr != "" {
+		s += ": " + stderr
+	}
+	if len(e.Messages) > 0 {
+		s += ": " + strings.Join(e.Messages, "; ")
+	}
+	return s
 }
 
 // envValue returns the last value of key in env (the one a child would see).

@@ -1,0 +1,135 @@
+{
+  "id": "add-x",
+  "title": "add-x",
+  "deltaCount": 6,
+  "deltas": [
+    {
+      "spec": "booking",
+      "operation": "ADDED",
+      "description": "Add requirement: A user SHALL join when full.",
+      "requirement": {
+        "name": "Join when full",
+        "text": "A user SHALL join when full.",
+        "scenarios": [
+          {
+            "name": "Join when full — rejected",
+            "rawText": "- **WHEN** full\n- **THEN** rejected"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "Join when full",
+          "text": "A user SHALL join when full.",
+          "scenarios": [
+            {
+              "name": "Join when full — rejected",
+              "rawText": "- **WHEN** full\n- **THEN** rejected"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "spec": "booking",
+      "operation": "MODIFIED",
+      "description": "Modify requirement: A user SHALL leave the waitlist at any time.",
+      "requirement": {
+        "name": "Leave",
+        "text": "A user SHALL leave the waitlist at any time.",
+        "scenarios": [
+          {
+            "name": "Leave anytime",
+            "rawText": "- **WHEN** a user leaves\n- **THEN** they are off the list"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "Leave",
+          "text": "A user SHALL leave the waitlist at any time.",
+          "scenarios": [
+            {
+              "name": "Leave anytime",
+              "rawText": "- **WHEN** a user leaves\n- **THEN** they are off the list"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "spec": "booking",
+      "operation": "REMOVED",
+      "description": "Remove requirement: **Reason**: gone\n**Migration**: none",
+      "requirement": {
+        "name": "Old",
+        "text": "**Reason**: gone\n**Migration**: none",
+        "scenarios": []
+      },
+      "requirements": [
+        {
+          "name": "Old",
+          "text": "**Reason**: gone\n**Migration**: none",
+          "scenarios": []
+        }
+      ]
+    },
+    {
+      "spec": "booking",
+      "operation": "RENAMED",
+      "description": "Rename requirement from \"Join\" to \"Join the list\"",
+      "rename": {
+        "from": "Join",
+        "to": "Join the list"
+      }
+    },
+    {
+      "spec": "rooms",
+      "operation": "ADDED",
+      "description": "Add requirement: The system SHALL list rooms.",
+      "requirement": {
+        "name": "Room list",
+        "text": "The system SHALL list rooms.",
+        "scenarios": [
+          {
+            "name": "List",
+            "rawText": "- **WHEN** asked\n- **THEN** listed"
+          }
+        ]
+      },
+      "requirements": [
+        {
+          "name": "Room list",
+          "text": "The system SHALL list rooms.",
+          "scenarios": [
+            {
+              "name": "List",
+              "rawText": "- **WHEN** asked\n- **THEN** listed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "spec": "rooms",
+      "operation": "ADDED",
+      "description": "Add requirement: The system SHALL do nothing.",
+      "requirement": {
+        "name": "No scenario",
+        "text": "The system SHALL do nothing.",
+        "scenarios": []
+      },
+      "requirements": [
+        {
+          "name": "No scenario",
+          "text": "The system SHALL do nothing.",
+          "scenarios": []
+        }
+      ]
+    }
+  ],
+  "root": {
+    "path": "/repo",
+    "source": "nearest"
+  }
+}

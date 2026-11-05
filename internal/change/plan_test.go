@@ -49,7 +49,12 @@ func TestParsePlan(t *testing.T) {
 		if !reflect.DeepEqual(p.Tasks, want) {
 			t.Fatalf("tasks = %+v\nwant %+v", p.Tasks, want)
 		}
-		if !reflect.DeepEqual(p.Cancelled, []int{2, 7}) {
+		wantC := []Cancelled{
+			{Number: 2, Name: "x", Reason: "why", Line: 24, OK: true},
+			{Number: 7, Line: 25},
+			{Line: 27},
+		}
+		if !reflect.DeepEqual(p.Cancelled, wantC) {
 			t.Fatalf("cancelled = %v", p.Cancelled)
 		}
 	}
@@ -65,7 +70,7 @@ func TestParsePlanTaskHeadingLevel(t *testing.T) {
 
 func TestParsePlanCancelledHeadingCase(t *testing.T) {
 	p := ParsePlan([]byte("## cancelled tasks\n\n- Task 4: x - dropped\n"))
-	if !reflect.DeepEqual(p.Cancelled, []int{4}) {
+	if want := []Cancelled{{Number: 4, Name: "x", Reason: "dropped", Line: 3, OK: true}}; !reflect.DeepEqual(p.Cancelled, want) {
 		t.Fatalf("cancelled = %v", p.Cancelled)
 	}
 }
@@ -96,5 +101,128 @@ func TestParsePlanHeadingsInComments(t *testing.T) {
 	p = ParsePlan([]byte("<!--\n## Cancelled Tasks\n- Task 3: gone\n-->\n"))
 	if len(p.Cancelled) != 0 {
 		t.Fatalf("%v", p.Cancelled)
+	}
+}
+
+func TestParsePlanScenarios(t *testing.T) {
+	cases := []struct {
+		line string
+		want []string
+	}{
+		{"**Scenarios:** `a`, b ,`c d`", []string{"a", "b", "c d"}},
+		{"**Scenarios:** none", nil},
+		{"**Scenarios:**", []string{""}},
+	}
+	for _, c := range cases {
+		p := ParsePlan([]byte("### Task 1: A\n\n" + c.line + "\n"))
+		if p.Tasks[0].ScenariosLine != 3 || !reflect.DeepEqual(p.Tasks[0].Scenarios, c.want) {
+			t.Errorf("%q: %+v", c.line, p.Tasks[0])
+		}
+	}
+	p := ParsePlan([]byte("### Task 1: A\n- [ ] s\n"))
+	if p.Tasks[0].ScenariosLine != 0 || p.Tasks[0].Scenarios != nil {
+		t.Errorf("%+v", p.Tasks[0])
+	}
+}
+
+func TestParsePlanCompensates(t *testing.T) {
+	p := ParsePlan([]byte("### Task 1: A\n**Compensates:** Task 3\n**Compensates:** the third\n"))
+	want := []Ref{{Number: 3, Line: 2, OK: true}, {Line: 3}}
+	if !reflect.DeepEqual(p.Tasks[0].Compensates, want) {
+		t.Fatalf("%+v", p.Tasks[0].Compensates)
+	}
+}
+
+func TestParsePlanBadHeadings(t *testing.T) {
+	p := ParsePlan([]byte("## Task 3: x\n#### Task 4: y\n### Task 0: z\n### Task 2 - x\n### Tasks left\n### Task 5: ok\n"))
+	want := []BadHeading{
+		{"Task 3: x", 2, 1}, {"Task 4: y", 4, 2}, {"Task 0: z", 3, 3}, {"Task 2 - x", 3, 4},
+	}
+	if !reflect.DeepEqual(p.BadHeadings, want) {
+		t.Fatalf("bad = %+v", p.BadHeadings)
+	}
+	if len(p.Tasks) != 1 || p.Tasks[0].Number != 5 {
+		t.Fatalf("tasks = %+v", p.Tasks)
+	}
+}
+
+func TestParsePlanCancelledBullets(t *testing.T) {
+	p := ParsePlan([]byte("## Cancelled Tasks\n- Task 5: Name - reason\n- Task 5: Name\n"))
+	want := []Cancelled{
+		{Number: 5, Name: "Name", Reason: "reason", Line: 2, OK: true},
+		{Number: 5, Line: 3},
+	}
+	if !reflect.DeepEqual(p.Cancelled, want) {
+		t.Fatalf("%+v", p.Cancelled)
+	}
+}
+
+func TestParsePlanReuse(t *testing.T) {
+	p := ParsePlan([]byte("# Plan\n\n## reuse\n\n| A | B |\n|---|---|\n| 1 | 2 |\n"))
+	if p.ReuseLine != 3 || p.Reuse == nil || !reflect.DeepEqual(p.Reuse.Header, []string{"A", "B"}) ||
+		len(p.Reuse.Rows) != 1 || p.Reuse.Rows[0].Index != 6 {
+		t.Fatalf("%d %+v", p.ReuseLine, p.Reuse)
+	}
+	p = ParsePlan([]byte("## Reuse\n\nnothing\n"))
+	if p.ReuseLine != 1 || p.Reuse != nil {
+		t.Fatalf("%d %+v", p.ReuseLine, p.Reuse)
+	}
+	p = ParsePlan([]byte("# Plan\n"))
+	if p.ReuseLine != 0 || p.Reuse != nil {
+		t.Fatalf("%d %+v", p.ReuseLine, p.Reuse)
+	}
+}
+
+func TestParsePlanHiddenStructure(t *testing.T) {
+	src := "### Task 1: A\n<!--\n**Scenarios:** x\n**Compensates:** Task 2\n-->\n```\n**Scenarios:** y\n**Compensates:** Task 3\n```\n" +
+		"<!--\n## Task 9: h\n## Reuse\n-->\n```\n## Reuse\n## Task 8: f\n- Task 7: a - b\n```\n<!-- ## Cancelled Tasks -->\n- Task 6: c - d\n"
+	p := ParsePlan([]byte(src))
+	if t0 := p.Tasks[0]; t0.ScenariosLine != 0 || len(t0.Compensates) != 0 {
+		t.Fatalf("%+v", t0)
+	}
+	if len(p.BadHeadings) != 0 || p.ReuseLine != 0 || len(p.Cancelled) != 0 {
+		t.Fatalf("%+v", p)
+	}
+}
+
+func TestParsePlanFirstReuseWins(t *testing.T) {
+	p := ParsePlan([]byte("## Reuse\n\n| A |\n|---|\n| 1 |\n\n## Reuse\n\n| B |\n|---|\n| 2 |\n"))
+	if p.ReuseLine != 1 || p.Reuse == nil || p.Reuse.Header[0] != "A" {
+		t.Fatalf("%d %+v", p.ReuseLine, p.Reuse)
+	}
+}
+
+func TestParsePlanCancelledInMultiLineComment(t *testing.T) {
+	p := ParsePlan([]byte("## Cancelled Tasks\n<!--\n- Task 5: Name - reason\n-->\n"))
+	if len(p.Cancelled) != 0 {
+		t.Fatalf("%+v", p.Cancelled)
+	}
+}
+
+func TestParsePlanReuseTableInComment(t *testing.T) {
+	p := ParsePlan([]byte("## Reuse\n<!--\n| X |\n|---|\n| 0 |\n-->\n| A |\n|---|\n| 1 |\n"))
+	if p.Reuse == nil || p.Reuse.Header[0] != "A" {
+		t.Fatalf("%+v", p.Reuse)
+	}
+}
+
+func TestParsePlanCompensatesTrailingText(t *testing.T) {
+	p := ParsePlan([]byte("### Task 1: A\n**Compensates:** Task 3 and 4\n"))
+	if want := []Ref{{Line: 2}}; !reflect.DeepEqual(p.Tasks[0].Compensates, want) {
+		t.Fatalf("%+v", p.Tasks[0].Compensates)
+	}
+}
+
+func TestParsePlanScenariosNoneCase(t *testing.T) {
+	p := ParsePlan([]byte("### Task 1: A\n**Scenarios:** None\n"))
+	if p.Tasks[0].ScenariosLine != 2 || p.Tasks[0].Scenarios != nil {
+		t.Fatalf("%+v", p.Tasks[0])
+	}
+}
+
+func TestParsePlanFirstScenariosLineCounts(t *testing.T) {
+	p := ParsePlan([]byte("### Task 1: A\n**Scenarios:** a\n**Scenarios:** b\n"))
+	if p.Tasks[0].ScenariosLine != 2 || !reflect.DeepEqual(p.Tasks[0].Scenarios, []string{"a"}) {
+		t.Fatalf("%+v", p.Tasks[0])
 	}
 }

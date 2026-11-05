@@ -110,10 +110,35 @@ func TestBlankComments(t *testing.T) {
 	}
 }
 
+func TestCodeSpans(t *testing.T) {
+	tests := []struct {
+		in   string
+		want [][2]int
+	}{
+		{"a `b` c", [][2]int{{2, 5}}},
+		{"``x`y``", [][2]int{{0, 7}}},
+		{"a ` b", nil},
+		{"`a` and `b`", [][2]int{{0, 3}, {8, 11}}},
+		{"`` a ` b", nil},
+	}
+	for _, tc := range tests {
+		got := CodeSpans(tc.in)
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("CodeSpans(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}
+
 func TestHeadingsTrimFEFF(t *testing.T) {
 	lines := []string{"## Why\ufeff"}
 	got := Headings(lines, FenceMask(lines))
 	if want := []Heading{{2, "Why", 0}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("Headings = %+v, want %+v", got, want)
+	}
+}
+
+func TestCodeSpansShorterRunDoesNotClose(t *testing.T) {
+	if got, want := CodeSpans("`a``b`"), [][2]int{{0, 6}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("CodeSpans = %v, want %v", got, want)
 	}
 }

@@ -78,7 +78,7 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 		commandHelp(o.Stdout, cmd, fs)
 		return 0
 	}
-	if err == nil && len(pos) > cmd.Args {
+	if err == nil && cmd.Args >= 0 && len(pos) > cmd.Args {
 		err = fmt.Errorf("unexpected argument %q", pos[cmd.Args])
 	} else if err == nil && len(pos) < cmd.Args {
 		err = fmt.Errorf("missing argument: dkt %s", cmd.Usage)

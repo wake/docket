@@ -1,0 +1,46 @@
+{
+  "id": "booking",
+  "title": "booking",
+  "overview": "Waitlist for bookings.",
+  "requirementCount": 3,
+  "requirements": [
+    {
+      "name": "Join",
+      "text": "A user SHALL join the waitlist.",
+      "scenarios": [
+        {
+          "name": "Success",
+          "rawText": "- **WHEN** a user joins\n- **THEN** they are on the list"
+        }
+      ]
+    },
+    {
+      "name": "Leave",
+      "text": "A user SHALL leave the waitlist.",
+      "scenarios": [
+        {
+          "name": "Success",
+          "rawText": "- **WHEN** a user leaves\n- **THEN** they are off the list"
+        }
+      ]
+    },
+    {
+      "name": "Old",
+      "text": "Old thing SHALL go.",
+      "scenarios": [
+        {
+          "name": "Old one",
+          "rawText": "- **WHEN** x\n- **THEN** y"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "format": "openspec"
+  },
+  "root": {
+    "path": "/repo",
+    "source": "nearest"
+  }
+}

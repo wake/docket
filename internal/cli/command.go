@@ -18,13 +18,13 @@ type Context struct {
 // Command is one dkt subcommand.
 type Command struct {
 	Name, Usage string
-	Args        int // how many positional arguments it takes
+	Args        int // how many positional arguments it takes; -1 means any number
 	Define      func(fs *flag.FlagSet)
 	Run         func(c *Context, args []string) (Outcome, error)
 }
 
 // commands is the real command set.
-var commands = []func() Command{initCommand, inspectCommand, newCommand, syncCommand}
+var commands = []func() Command{initCommand, inspectCommand, newCommand, syncCommand, lintCommand}
 
 func syncCommand() Command {
 	var check bool

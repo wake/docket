@@ -13,7 +13,7 @@ import (
 	"github.com/wake/docket/internal/testutil"
 )
 
-// TestRealOpenSpec runs dkt init and dkt inspect against the real OpenSpec CLI
+// TestRealOpenSpec runs dkt init, dkt new, dkt inspect and dkt lint against the real OpenSpec CLI
 // named by DOCKET_OPENSPEC. CI runs it for OpenSpec 1.14.0 and the latest release.
 func TestRealOpenSpec(t *testing.T) {
 	if os.Getenv("DOCKET_TEST_OPENSPEC") != "1" {
@@ -108,5 +108,70 @@ func TestRealOpenSpec(t *testing.T) {
 	}
 	if len(in.Findings) != 0 {
 		t.Errorf("inspect findings: %+v", in.Findings)
+	}
+
+	// dkt lint: a clean change, then an unclaimed scenario, then a scenario-less requirement.
+	base := filepath.Join(r.Dir, "openspec/changes/add-x")
+	write := func(rel, body string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(base, rel)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(base, rel), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fm := strings.TrimSuffix(string(change.FrontMatter("Add x", "feature", "x")), "---\n")
+	write("proposal.md", fm+"specs:\n  rooms: Rooms\n---\n\n# Proposal\n\n## Why\n\nPeople need to see the rooms.\n\n"+
+		"## What Changes\n\nA room list.\n\n## Non-Goals\n\nNo booking.\n\n## Capabilities\n\nRooms.\n\n## Impact\n\nNone.\n")
+	scenario := "#### Scenario: List\n- **WHEN** a user asks for rooms\n- **THEN** the rooms are listed\n"
+	delta := "## ADDED Requirements\n\n### Requirement: Room list\nThe system SHALL list rooms.\n\n"
+	write("specs/rooms/spec.md", delta+scenario)
+	plan := func(scenarios string) string {
+		return "# Implementation Plan\n\n## Reuse\n\n| Need | Existing (path:symbol) | Decision | Reason | Evidence |\n|---|---|---|---|---|\n" +
+			"| Config | openspec/config.yaml | reuse | Already there | read it |\n\n### Task 1: Room list\n\n**Scenarios:** " + scenarios + "\n\n- [ ] **Step 1: List rooms**\n"
+	}
+	write("plan.md", plan("rooms#list"))
+
+	lint := func(wantCode int, args ...string) lintOut {
+		t.Helper()
+		code, out, errs := runIn(t, r.Dir, env, append([]string{"lint", "--json"}, args...)...)
+		var l lintOut
+		if err := json.Unmarshal([]byte(out), &l); err != nil {
+			t.Fatalf("lint: %q %q: %v", out, errs, err)
+		}
+		if code != wantCode {
+			t.Fatalf("lint %v: code=%d, want %d: out=%q err=%q", args, code, wantCode, out, errs)
+		}
+		return l
+	}
+	hasRule := func(l lintOut, rule, sub string) bool {
+		for _, f := range l.Findings {
+			if f.Rule == rule && strings.Contains(f.Message, sub) {
+				return true
+			}
+		}
+		return false
+	}
+
+	l := lint(0, "add-x")
+	if len(l.Findings) != 0 || l.Result == nil || len(l.Result.Changes) != 1 || l.Result.Changes[0] != (lintChange{Slug: "add-x", Schema: "docket"}) || l.Result.Specs != 0 {
+		t.Errorf("clean lint: findings=%+v result=%+v", l.Findings, l.Result)
+	}
+
+	write("plan.md", plan("none"))
+	if l = lint(1, "add-x"); !hasRule(l, "scenario-unclaimed", "rooms#list") {
+		t.Errorf("want scenario-unclaimed for rooms#list: %+v", l.Findings)
+	}
+
+	write("plan.md", plan("rooms#list"))
+	write("specs/rooms/spec.md", delta)
+	if l = lint(1, "add-x"); !hasRule(l, "openspec-invalid", "") {
+		t.Errorf("want openspec-invalid: %+v", l.Findings)
+	}
+
+	l = lint(1)
+	if l.Result == nil || len(l.Result.Changes) != 1 || l.Result.Changes[0].Slug != "add-x" || l.Result.Specs != 0 {
+		t.Errorf("lint without a name: result=%+v", l.Result)
 	}
 }

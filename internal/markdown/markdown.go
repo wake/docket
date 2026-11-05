@@ -155,3 +155,45 @@ func BlankComments(lines []string, mask []bool) []string {
 	}
 	return out
 }
+
+// CodeSpans returns the byte ranges [start, end) of the inline code spans on
+// one line, delimiters included. A run of N backticks opens a span and the
+// next run of exactly N closes it; an unmatched run is literal text.
+func CodeSpans(line string) [][2]int {
+	var spans [][2]int
+	for i := 0; i < len(line); {
+		if line[i] != '`' {
+			i++
+			continue
+		}
+		n := backtickRun(line, i)
+		end := -1
+		for j := i + n; j < len(line); {
+			if line[j] != '`' {
+				j++
+				continue
+			}
+			m := backtickRun(line, j)
+			if m == n {
+				end = j + m
+				break
+			}
+			j += m
+		}
+		if end < 0 {
+			i += n
+			continue
+		}
+		spans = append(spans, [2]int{i, end})
+		i = end
+	}
+	return spans
+}
+
+func backtickRun(s string, i int) int {
+	n := 0
+	for i+n < len(s) && s[i+n] == '`' {
+		n++
+	}
+	return n
+}
