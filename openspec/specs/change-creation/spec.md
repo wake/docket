@@ -1,4 +1,4 @@
-# change-creation Specification
+# Change Creation Specification
 
 ## Purpose
 Defines how `dkt new` opens a change: a slug never used before, the `docket` schema, and the change's title, kind and source written where Docket reads them.

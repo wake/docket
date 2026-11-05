@@ -1,4 +1,4 @@
-# workspace-scan Specification
+# Workspace Scan Specification
 
 ## Purpose
 Defines where Docket looks for changes, so that a change in progress in another worktree, on another branch or on another machine is seen, and a place Docket could not read is never taken for an empty one.

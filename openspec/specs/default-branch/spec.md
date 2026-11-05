@@ -1,4 +1,4 @@
-# default-branch Specification
+# Default Branch Specification
 
 ## Purpose
 Defines which branch dkt treats as the default branch, the one changes are merged into, and which commit is its tip, so that every check about what reaches that branch looks at the same commit.

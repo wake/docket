@@ -1,4 +1,4 @@
-# cli-output Specification
+# CLI Output Specification
 
 ## Purpose
 Defines what every `dkt` command prints and returns, so that scripts, CI and coding agents can rely on the same output shape and exit codes from any command.

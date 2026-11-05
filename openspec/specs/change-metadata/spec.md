@@ -1,4 +1,4 @@
-# change-metadata Specification
+# Change Metadata Specification
 
 ## Purpose
 Defines where a change's title, kind and source are kept, in the front matter of its `proposal.md`, and what form each takes, so that every command reads them the same way.

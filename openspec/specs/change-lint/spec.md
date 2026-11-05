@@ -1,4 +1,4 @@
-# change-lint Specification
+# Change Lint Specification
 
 ## Purpose
 Defines the rules `dkt lint` checks in a change and in the main specs' titles, so that the rules joining superpowers and OpenSpec fail visibly when they are broken instead of living only in prompts.

@@ -1,4 +1,4 @@
-# project-setup Specification
+# Project Setup Specification
 
 ## Purpose
 Defines how `dkt init` prepares a project for Docket: which files it writes, what it does with files that already exist, and what its result tells the user, while leaving the user's other coding agent and OpenSpec configuration alone.
