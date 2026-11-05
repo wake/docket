@@ -479,3 +479,26 @@ func TestSyncOutsideRepository(t *testing.T) { // Sync outside a repository
 		t.Fatalf("%d %s", code, raw)
 	}
 }
+
+func TestSyncHeadingInComment(t *testing.T) { // Heading in a comment
+	p := "<!--\n### Task 1: hidden\n-->\n- [ ] unrelated\n"
+	r := syncRepo(t, p)
+	trail(r, "add-x/1")
+	code, m, raw := doSync(t, r, "add-x")
+	if code != 1 || ruleList(m.Findings) != "trailer-unknown-task" || readPlan(t, r) != p {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestSyncEmptySlug(t *testing.T) {
+	r := syncRepo(t, plan4)
+	r.Write("openspec/changes/plan.md", "### Task 1: One\n\n- [ ] a\n")
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "stray")
+	trail(r, "/1")
+	code, _, raw := doSync(t, r, "")
+	b, _ := os.ReadFile(filepath.Join(r.Dir, "openspec/changes/plan.md"))
+	if code != 2 || string(b) != "### Task 1: One\n\n- [ ] a\n" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}

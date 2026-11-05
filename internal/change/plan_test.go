@@ -80,3 +80,21 @@ func TestParsePlanBodyEndsAtLevelThree(t *testing.T) {
 		t.Fatalf("tasks = %+v", p.Tasks)
 	}
 }
+
+func TestParsePlanHeadingsInComments(t *testing.T) {
+	// multi-line and one-line comment headings are not tasks
+	p := ParsePlan([]byte("<!--\n### Task 1: hidden\n-->\n- [ ] unrelated\n<!-- ### Task 2: x -->\n- [ ] more\n"))
+	if len(p.Tasks) != 0 {
+		t.Fatalf("%+v", p.Tasks)
+	}
+	// a heading in a comment inside a task does not end its body
+	p = ParsePlan([]byte("### Task 1: A\n- [ ] a\n<!--\n### Task 2: x\n-->\n- [ ] b\n"))
+	if len(p.Tasks) != 1 || len(p.Tasks[0].Steps) != 2 {
+		t.Fatalf("%+v", p.Tasks)
+	}
+	// Cancelled Tasks inside a comment gives nothing
+	p = ParsePlan([]byte("<!--\n## Cancelled Tasks\n- Task 3: gone\n-->\n"))
+	if len(p.Cancelled) != 0 {
+		t.Fatalf("%v", p.Cancelled)
+	}
+}
