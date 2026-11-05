@@ -102,7 +102,7 @@ func TestLintOpenSpecMissing(t *testing.T) {
 
 func TestLintMainSpecsNeedNoOpenSpec(t *testing.T) {
 	r := testutil.NewRepo(t)
-	r.Write("openspec/specs/foo/spec.md", "# Foo\n\n## Purpose\nx\n")
+	r.Write("openspec/specs/foo/spec.md", "# Foo Bar Specification\n\n## Purpose\nx\n")
 	code, m, raw := lintWithoutOpenSpec(t, r)
 	if code != 0 || m.Result == nil || m.Result.Specs != 1 {
 		t.Fatalf("%d %s", code, raw)
