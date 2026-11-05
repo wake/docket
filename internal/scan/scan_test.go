@@ -252,9 +252,9 @@ func TestUnreadableWorktreeDirectory(t *testing.T) {
 
 func TestOrderWorktreesThenRefsSortedByPath(t *testing.T) {
 	r := newRepo(t)
+	commitRef(r, "refs/heads/f", map[string]string{"openspec/changes/beta/p.md": "x"})
 	write(t, r.Dir, "openspec/changes/zed/p.md")
 	write(t, r.Dir, "openspec/changes/alpha/p.md")
-	commitRef(r, "refs/heads/f", map[string]string{"openspec/changes/beta/p.md": "x"})
 	inv := scanOK(t, r)
 	var got []string
 	for _, u := range inv.Uses {
@@ -267,7 +267,11 @@ func TestOrderWorktreesThenRefsSortedByPath(t *testing.T) {
 
 func TestRefReadFailureIsUnreadable(t *testing.T) {
 	r := newRepo(t)
-	r.Git("update-ref", "refs/heads/broken", r.Git("rev-parse", "HEAD:README.md")) // a blob, not a commit
+	blob := r.Git("rev-parse", "HEAD:README.md")
+	// update-ref refuses a non-commit, so write the ref file by hand.
+	if err := os.WriteFile(filepath.Join(r.Dir, ".git/refs/heads/broken"), []byte(blob+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	inv := scanOK(t, r)
 	if len(inv.Unreadable) != 1 || inv.Unreadable[0].Source != "refs/heads/broken" {
 		t.Errorf("got %+v", inv)
