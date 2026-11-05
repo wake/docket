@@ -354,11 +354,11 @@ func TestInitOpenSpecUnusable(t *testing.T) {
 
 func TestInitOpenSpecFails(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "nosuch")
-	if code != 1 || !strings.Contains(calls, "init") {
+	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", []string{"OPENSPEC_TELEMETRY=1"}, "--tools", "nosuch")
+	if code != 1 || !strings.Contains(calls, "OPENSPEC_TELEMETRY=0\tinit\t--tools\tnosuch\n") || strings.Contains(calls, "OPENSPEC_TELEMETRY=1") {
 		t.Fatalf("code=%d calls=%q", code, calls)
 	}
-	if len(m.Findings) != 1 || m.Findings[0].Rule != "openspec-failed" || !strings.Contains(m.Findings[0].Message, "nosuch") {
+	if len(m.Findings) != 1 || m.Findings[0].Rule != "openspec-failed" || !strings.Contains(m.Findings[0].Message, "init --tools nosuch exited with 1: error: unknown tool 'nosuch'") {
 		t.Errorf("%+v", m.Findings)
 	}
 	if _, err := os.Stat(filepath.Join(r.Dir, skillPath)); err == nil {
