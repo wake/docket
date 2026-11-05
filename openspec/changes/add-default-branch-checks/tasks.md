@@ -36,9 +36,9 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (output format)
 **Files:** `internal/lint/lint.go`, `internal/lint/document.go`, `internal/lint/routing.go`, `internal/lint/routing_test.go`, `internal/lint/document_test.go`, `internal/cli/cmd_lint.go`, `internal/cli/cmd_lint_test.go`
 
-- [ ] 3.1 In its own commit, make `checkSpecTitles` into `SpecTitles(root fs.FS) ([]Finding, []Unreadable, int)` that `Run` calls (design.md, Main spec titles shared), changing no test; verify `go test ./...` passes
-- [ ] 3.2 Write failing tests for every scenario of change-lint's Design and plan routing and its modified Lint result, plus: `Added` nil reports nothing and empty reports nothing; a routing finding has no change and no line; routing is reported with a change named and without; the text output's skip lines for no default branch and for no merge base; `default_branch` is the name when the rule ran and null when there is no merge base (unrelated histories, and an unborn HEAD with a default branch on `origin`); verify they fail
-- [ ] 3.3 Implement the routing rule and `default_branch` (design.md, Routing); verify every test passes
+- [x] 3.1 In its own commit, make `checkSpecTitles` into `SpecTitles(root fs.FS) ([]Finding, []Unreadable, int)` that `Run` calls (design.md, Main spec titles shared), changing no test; verify `go test ./...` passes
+- [x] 3.2 Write failing tests for every scenario of change-lint's Design and plan routing and its modified Lint result, plus: `Added` nil reports nothing and empty reports nothing; a routing finding has no change and no line; routing is reported with a change named and without; the text output's skip lines for no default branch and for no merge base; `default_branch` is the name when the rule ran and null when there is no merge base (unrelated histories, and an unborn HEAD with a default branch on `origin`); verify they fail
+- [x] 3.3 Implement the routing rule and `default_branch` (design.md, Routing); verify every test passes
 
 ## 4. Trailers and titles in dkt inspect
 
