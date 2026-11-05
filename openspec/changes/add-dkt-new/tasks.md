@@ -26,39 +26,39 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (public interface)
 **Files:** `internal/cli/command.go`, `internal/cli/run.go`, `internal/cli/command_test.go`
 
-- [ ] 1.1 Write failing tests, through `RunWith` with a test command that takes one positional: the positional before, between and after flags is received and the flags keep their values; none, or two, is a usage error (exit 2) naming the command's usage; `init` and `inspect` still refuse any positional; verify they fail
-- [ ] 1.2 Add `Args` to `Command` and alternate flag parsing with positionals (design.md, Positional arguments); verify every test passes
+- [x] 1.1 Write failing tests, through `RunWith` with a test command that takes one positional: the positional before, between and after flags is received and the flags keep their values; none, or two, is a usage error (exit 2) naming the command's usage; `init` and `inspect` still refuse any positional; verify they fail
+- [x] 1.2 Add `Args` to `Command` and alternate flag parsing with positionals (design.md, Positional arguments); verify every test passes
 
 ## 2. Change metadata
 
 **Review:** checks
 **Files:** `internal/change/metadata.go`, `internal/change/metadata_test.go`
 
-- [ ] 2.1 Write failing tests for the scenario Front matter written (change-metadata), and for the form check: blank, only whitespace, a `\n`, a `\r`, invalid UTF-8 are refused; leading spaces are kept; a title holding `"`, `\`, `:`, `#`, a tab and a non-ASCII letter is written so that it reads back as the same string (decode the quoted value with `strconv.Unquote`); the slug rules: `2026-10-24-add-x` and `archive` refused, `add-2026-10-24` and `archived-x` accepted; `Suffixed`; verify they fail
-- [ ] 2.2 Implement them (design.md, Front matter); verify every test passes
+- [x] 2.1 Write failing tests for the scenario Front matter written (change-metadata), and for the form check: blank, only whitespace, a `\n`, a `\r`, invalid UTF-8 are refused; leading spaces are kept; a title holding `"`, `\`, `:`, `#`, a tab and a non-ASCII letter is written so that it reads back as the same string (decode the quoted value with `strconv.Unquote`); the slug rules: `2026-10-24-add-x` and `archive` refused, `add-2026-10-24` and `archived-x` accepted; `Suffixed`; verify they fail
+- [x] 2.2 Implement them (design.md, Front matter); verify every test passes
 
 ## 3. Workspace scan
 
 **Review:** judgment (environment-dependent behavior, error paths)
 **Files:** `internal/scan/scan.go`, `internal/scan/scan_test.go`, `internal/gitx/worktree.go`, `internal/gitx/refs.go`, `internal/gitx/*_test.go`
 
-- [ ] 3.1 Write failing tests for every scenario of workspace-scan, plus: a bare repository's entry and `refs/remotes/origin/HEAD` add no source; two refs at one commit are both sources of its uses; an archived folder whose name does not start with a date, and a file named like a change, are not uses; a link entry inside a worktree's `openspec/changes` is not a use; a branch whose tree holds a file, a symbolic link or a submodule at `openspec/changes/<slug>` reports no use for it; a worktree directory that cannot be read (mode 000) is unreadable with the reason; verify they fail
-- [ ] 3.2 Implement `internal/scan` and the git helpers (design.md, Workspace scan); verify every test passes
+- [x] 3.1 Write failing tests for every scenario of workspace-scan, plus: a bare repository's entry and `refs/remotes/origin/HEAD` add no source; two refs at one commit are both sources of its uses; an archived folder whose name does not start with a date, and a file named like a change, are not uses; a link entry inside a worktree's `openspec/changes` is not a use; a branch whose tree holds a file, a symbolic link or a submodule at `openspec/changes/<slug>` reports no use for it; a worktree directory that cannot be read (mode 000) is unreadable with the reason; verify they fail
+- [x] 3.2 Implement `internal/scan` and the git helpers (design.md, Workspace scan); verify every test passes
 
 ## 4. dkt new
 
 **Review:** judgment (error paths, output format)
 **Files:** `internal/cli/cmd_new.go`, `internal/cli/cmd_new_test.go`, `internal/cli/runner.go`, `internal/cli/command.go`, `internal/cli/cmd_init.go`, `internal/testutil/openspec.go`
 
-- [ ] 4.1 Extend the fake OpenSpec with `new change` (design.md, Tests), and write failing tests for every scenario of change-creation, the scenarios Kind outside the list, Blank title and Source on two lines (change-metadata), and New outside a repository (cli-output), plus: in the scenario Changes folder is a link, the fake's log is empty (not even `--version` ran); OpenSpec missing and too old exit 4 with nothing created; the fake's log shows `new change <slug> --schema docket`; a `config.yaml` naming another schema still gets `--schema docket`; a stray file `openspec/changes/add-x` in this worktree makes the slug `add-x-2`; a link appearing on the path while OpenSpec runs leaves the folder and gives `symlink-refused`; the text output names the folder and, after a suffix, the used folders with at most three sources; verify they fail
-- [ ] 4.2 Implement `dkt new` (design.md, Order of steps, Lock, OpenSpec failure, Result); verify every test passes
+- [x] 4.1 Extend the fake OpenSpec with `new change` (design.md, Tests), and write failing tests for every scenario of change-creation, the scenarios Kind outside the list, Blank title and Source on two lines (change-metadata), and New outside a repository (cli-output), plus: in the scenario Changes folder is a link, the fake's log is empty (not even `--version` ran); OpenSpec missing and too old exit 4 with nothing created; the fake's log shows `new change <slug> --schema docket`; a `config.yaml` naming another schema still gets `--schema docket`; a stray file `openspec/changes/add-x` in this worktree makes the slug `add-x-2`; a link appearing on the path while OpenSpec runs leaves the folder and gives `symlink-refused`; the text output names the folder and, after a suffix, the used folders with at most three sources; verify they fail
+- [x] 4.2 Implement `dkt new` (design.md, Order of steps, Lock, OpenSpec failure, Result); verify every test passes
 
 ## 5. Real OpenSpec
 
 **Review:** checks
 **Files:** `internal/cli/realopenspec_test.go`
 
-- [ ] 5.1 Change `TestRealOpenSpec` to open its change with `dkt new add-x --json --kind feature --source x --title "Add x"`: exit 0, `result.slug` is `add-x`, `.openspec.yaml` names `docket`, `proposal.md` holds the front matter; the `instructions` and `status` calls stay; verify it is skipped without `DOCKET_TEST_OPENSPEC=1` and passes locally with OpenSpec 1.7.0 and the latest
+- [x] 5.1 Change `TestRealOpenSpec` to open its change with `dkt new add-x --json --kind feature --source x --title "Add x"`: exit 0, `result.slug` is `add-x`, `.openspec.yaml` names `docket`, `proposal.md` holds the front matter; the `instructions` and `status` calls stay; verify it is skipped without `DOCKET_TEST_OPENSPEC=1` and passes locally with OpenSpec 1.7.0 and the latest
 - [ ] 5.2 Verify the `openspec` CI job passes for both versions on the pull request
 
 ## 6. Integration
@@ -66,5 +66,5 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks
 **Files:** none beyond earlier groups
 
-- [ ] 6.1 Build dkt into a temporary `GOBIN`; in a new repository set up with `dkt init --tools claude` and committed, run `dkt new add-x --kind feature --source x --title "Add x"` twice and check the second creates `add-x-2` and names the first; add a second worktree holding an uncommitted `add-y` and check `dkt new add-y` in the first takes `add-y-2`
-- [ ] 6.2 Run `gofmt -l .`, `go vet ./...` and `go test ./...`; verify they are clean
+- [x] 6.1 Build dkt into a temporary `GOBIN`; in a new repository set up with `dkt init --tools claude` and committed, run `dkt new add-x --kind feature --source x --title "Add x"` twice and check the second creates `add-x-2` and names the first; add a second worktree holding an uncommitted `add-y` and check `dkt new add-y` in the first takes `add-y-2`
+- [x] 6.2 Run `gofmt -l .`, `go vet ./...` and `go test ./...`; verify they are clean
