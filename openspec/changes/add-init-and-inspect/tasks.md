@@ -24,8 +24,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (environment-dependent behavior, error path)
 **Files:** `internal/openspec/runner.go`, `internal/openspec/runner_test.go`, `internal/testutil/openspec.go`
 
-- [ ] 1.1 Port `FakeOpenSpec` into `internal/testutil/openspec.go`, extended as design.md (Tests) says, and write failing tests for the scenarios Override with npx, Default from PATH, Every invocation, Too old, Newer version accepted and CLI missing, plus: `1.10.0` is accepted (numbers compare as numbers, not text); `abc` and a non-zero exit of `--version` are unsupported; a failed call returns an error carrying the command, the exit status and standard error; verify they fail
-- [ ] 1.2 Port `internal/openspec/runner.go` with the minimum version and `OPENSPEC_TELEMETRY=0` (design.md, OpenSpec runner); verify every test from 1.1 passes
+- [x] 1.1 Port `FakeOpenSpec` into `internal/testutil/openspec.go`, extended as design.md (Tests) says, and write failing tests for the scenarios Override with npx, Default from PATH, Every invocation, Too old, Newer version accepted and CLI missing, plus: `1.10.0` is accepted (numbers compare as numbers, not text); `abc` and a non-zero exit of `--version` are unsupported; a failed call returns an error carrying the command, the exit status and standard error; verify they fail
+- [x] 1.2 Port `internal/openspec/runner.go` with the minimum version and `OPENSPEC_TELEMETRY=0` (design.md, OpenSpec runner); verify every test from 1.1 passes
 
 ## 2. Command table, help and repository
 
