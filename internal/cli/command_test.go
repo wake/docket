@@ -155,3 +155,75 @@ func TestFlagValueReachesRun(t *testing.T) {
 		t.Errorf("code=%d got=%q err=%q", code, got, errb.String())
 	}
 }
+
+func positionalCmd(gotArgs *[]string, gotTools *string) []func() Command {
+	return []func() Command{func() Command {
+		var tools string
+		return Command{
+			Name: "x", Usage: "x <slug> [--tools <t>]", Args: 1,
+			Define: func(fs *flag.FlagSet) { fs.StringVar(&tools, "tools", "", "") },
+			Run: func(_ *Context, a []string) (Outcome, error) {
+				*gotArgs, *gotTools = a, tools
+				return Outcome{}, nil
+			},
+		}
+	}}
+}
+
+func TestPositionalPlacement(t *testing.T) {
+	for _, args := range [][]string{
+		{"x", "s", "--tools", "c"},
+		{"x", "--tools", "c", "s"},
+		{"x", "--tools", "c", "s", "--json"},
+		{"x", "--json", "s", "--tools", "c"},
+		{"x", "--tools", "c", "--", "s"},
+	} {
+		var a []string
+		var tools string
+		r := testutil.NewRepo(t)
+		var out, errb bytes.Buffer
+		code := RunWith(Options{Args: args, Dir: r.Dir, Env: r.Env, Stdout: &out, Stderr: &errb}, positionalCmd(&a, &tools))
+		if code != 0 || len(a) != 1 || a[0] != "s" || tools != "c" {
+			t.Errorf("%v: code=%d args=%v tools=%q err=%q", args, code, a, tools, errb.String())
+		}
+	}
+}
+
+func TestPositionalCountWrong(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		msg  string
+	}{
+		{[]string{"x"}, "missing argument"},
+		{[]string{"x", "--tools", "c"}, "missing argument"},
+		{[]string{"x", "a", "b"}, `unexpected argument "b"`},
+		{[]string{"x", "a", "--tools", "c", "b"}, `unexpected argument "b"`},
+	} {
+		for _, j := range []bool{false, true} {
+			args := tc.args
+			if j {
+				args = append(append([]string{}, args...), "--json")
+			}
+			var a []string
+			var tools string
+			var out, errb bytes.Buffer
+			code := RunWith(Options{Args: args, Dir: t.TempDir(), Stdout: &out, Stderr: &errb}, positionalCmd(&a, &tools))
+			if code != 2 || a != nil || !strings.Contains(errb.String(), tc.msg) || !strings.Contains(errb.String(), "usage: dkt x <slug>") {
+				t.Errorf("%v: code=%d args=%v err=%q", args, code, a, errb.String())
+			}
+			if j != strings.HasPrefix(out.String(), "{") {
+				t.Errorf("%v: json=%v out=%q", args, j, out.String())
+			}
+		}
+	}
+}
+
+func TestZeroArgCommandsRefusePositional(t *testing.T) {
+	for _, name := range []string{"init", "inspect"} {
+		for _, args := range [][]string{{name, "a"}, {name, "--json", "a"}, {name, "--", "a"}} {
+			if code, _, errs := run(t, args...); code != 2 || !strings.Contains(errs, `unexpected argument "a"`) {
+				t.Errorf("%v: code=%d err=%q", args, code, errs)
+			}
+		}
+	}
+}
