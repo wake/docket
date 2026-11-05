@@ -28,6 +28,26 @@ func TestWriteIgnoresStaleTempFile(t *testing.T) {
 	}
 }
 
+func TestWriteKeepsModeTheUmaskWouldStrip(t *testing.T) {
+	if umask()&0o066 == 0 {
+		t.Skip("the umask strips no group or other bits")
+	}
+	root := t.TempDir()
+	put(t, root, ".claude/skills/docket/SKILL.md", "mine")
+	p := filepath.Join(root, ".claude/skills/docket/SKILL.md")
+	if err := os.Chmod(p, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	ds, _ := decideT(t, root, true)
+	if err := Write(root, ds); err != nil {
+		t.Fatal(err)
+	}
+	fi, _ := os.Stat(p)
+	if fi.Mode().Perm() != 0o666 {
+		t.Errorf("existing mode %v, want 0666", fi.Mode().Perm())
+	}
+}
+
 func TestDecideNonRegularIsUnreadable(t *testing.T) {
 	for _, kind := range []string{"fifo", "dir"} {
 		root := t.TempDir()
