@@ -119,7 +119,7 @@ When a path `dkt init` would write passes through a symbolic link inside the rep
 - **THEN** nothing is written there or anywhere else, the finding `symlink-refused` names `.claude/skills/docket`, and dkt exits with 1
 
 ### Requirement: Ignored install paths
-After writing, `dkt init` SHALL report `install-ignored` for each file it wrote or kept that git ignores and does not track, naming the ignore file, the line and the pattern, and SHALL exit with 1. It SHALL still write such a file, and SHALL NOT change any ignore file.
+After writing, `dkt init` SHALL report `install-ignored` for each of its own files in `files`, written, kept or unchanged, that git ignores and does not track, naming the ignore file, the line and the pattern, and SHALL exit with 1. It SHALL still write such a file, and SHALL NOT change any ignore file.
 
 #### Scenario: Ignored skill reported
 - **WHEN** `.gitignore` holds `.claude/` on its third line and a user runs `dkt init --tools claude`

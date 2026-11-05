@@ -30,7 +30,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 ## 2. Command table, help and repository
 
 **Review:** judgment (public interface)
-**Files:** `internal/cli/run.go`, `internal/cli/usage.go`, `internal/cli/command.go`, `internal/cli/run_test.go`, `internal/cli/command_test.go`
+**Files:** `internal/cli/run.go`, `internal/cli/usage.go`, `internal/cli/command.go`, `internal/cli/envelope.go`, `internal/cli/output.go`, `internal/cli/command_test.go`
 
 - [x] 2.1 Write failing tests for the scenarios Command help, Help ignores --json and Outside a repository (for `dkt init` and `dkt inspect`), plus: `dkt inspect --help` lists `--json`; `dkt init --nosuch` exits with 2 and prints `dkt init`'s usage to standard error; with `git` missing from `PATH`, `dkt inspect --json` reports `git-missing` and exits with 4; `dkt nosuch` still exits with 2; the existing tests in `run_test.go` still pass; verify the new ones fail
 - [x] 2.2 Add the command table with `init` and `inspect` (flags only; their run functions return an error until groups 7 and 8), per-command help, and the repository check (design.md, Commands and help); verify every test from 2.1 passes
@@ -46,7 +46,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 ## 4. File statuses
 
 **Review:** judgment (the rules both commands share)
-**Files:** `internal/setup/setup.go`, `internal/setup/history.go`, `internal/setup/setup_test.go`, `internal/safepath/safepath.go`, `internal/safepath/safepath_test.go`
+**Files:** `internal/setup/setup.go`, `internal/setup/history.go`, `internal/setup/setup_test.go`, `internal/setup/fix_test.go`, `internal/safepath/safepath.go`, `internal/safepath/safepath_test.go`
 
 - [x] 4.1 Port `internal/safepath` with its tests; verify they pass
 - [x] 4.2 Write failing tests, at the level of the decision table (design.md, One decision table), for: every target `missing` in an empty repository; every target `same` after writing the shipped files; a file equal to an injected earlier-release hash is `outdated` with action update; an edited file is `differs` with action keep, and overwrite with force; the two skill targets are decided separately; a symbolic link on `.claude/skills/docket` is a refusal naming it; an unreadable `SKILL.md` is a refusal listing it as unreadable; a file the user added under `.claude/skills/docket/` is not a target; verify they fail
@@ -55,7 +55,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 ## 5. config.yaml
 
 **Review:** judgment (parser of user files)
-**Files:** `internal/setup/config.go`, `internal/setup/config_test.go`, `internal/setup/setup.go`
+**Files:** `internal/setup/config.go`, `internal/setup/config_test.go`, `internal/setup/config_fix_test.go`, `internal/setup/setup.go`, `internal/setup/setup_test.go`
 
 - [x] 5.1 Write failing tests for the `schema` line and the `operations` section (design.md, config.yaml), from the scenarios Default schema replaced, Other schema kept, Section appended, Edited guidance kept, Config file created and Unreadable schema key, plus: 1.7.0's exact `config.yaml` (design.md, Context) becomes `schema: docket`, the same comments, and the shipped section, compared byte for byte; `schema: "spec-driven"` and `schema: spec-driven # default` are replaced too, keeping the quotes' place, the comment and a CRLF line ending byte for byte; an `operations` section equal to an injected earlier-release hash is replaced and the file listed as `updated`; a column-0 comment after the section ends it, and every byte from that comment on is kept; two `schema:` lines, two `operations:` lines, `operations: {}`, and each refused form of design.md (`{`, `[`, a quoted key, `schema :`, `?`, `---` at the first column) are unreadable; an `operations:` indented under another key is not top-level; a file without a final newline gets one before the section; `--force` changes neither another schema nor other guidance; verify they fail
 - [x] 5.2 Port `schemaKey` and `NameDocket` without `crossCheck`, add the refused forms and the `operations` section, and give `openspec/config.yaml` its place in the decision table with the statuses and findings of the specs; verify every test from 5.1 passes
@@ -63,7 +63,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 ## 6. Git listings
 
 **Review:** checks (ported with their tests)
-**Files:** `internal/gitx/ignore.go`, `internal/gitx/ignore_test.go`, `internal/gitx/added.go`, `internal/gitx/added_test.go`
+**Files:** `internal/gitx/git.go`, `internal/gitx/ignore.go`, `internal/gitx/ignore_test.go`, `internal/gitx/added.go`, `internal/gitx/added_test.go`
 
 - [x] 6.1 Port `gitx.Ignored` with its tests, and add tests that a tracked file is never reported and that a path that does not exist yet is still reported when a rule ignores it; verify they pass
 - [x] 6.2 Port `Git.status`, `Git.changedPaths` and `splitNUL` with their tests, and add a test that a path holding a space, a quote and a newline comes back whole; verify they pass
@@ -71,7 +71,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 ## 7. dkt inspect
 
 **Review:** judgment (output format)
-**Files:** `internal/cli/cmd_inspect.go`, `internal/cli/cmd_inspect_test.go`
+**Files:** `internal/cli/cmd_inspect.go`, `internal/cli/cmd_inspect_test.go`, `internal/cli/setup.go`, `internal/cli/command.go`, `internal/cli/command_test.go`, `cmd/dkt/main_test.go`, `internal/setup/**` (exports `Earlier` for tests)
 
 - [x] 7.1 Write failing tests for the scenarios Nothing written, Clean setup, Statuses listed, Before init, Edited skill, File from an earlier release (setup-inspection), Before init config, Other schema reported, Linked skill folder inspected, Old OpenSpec, No OpenSpec, Ignored OpenSpec folder and Unreadable installed file, plus: an `operations` section equal to an earlier release's gives `guidance-outdated`; a `config.yaml` with `schema:` and its value on the next line, and one with two `operations:` lines, are listed in `unreadable` and give neither `config-schema-default` nor `guidance-missing`, and dkt exits with 3; the text output has the OpenSpec line and one line per file; verify they fail
 - [x] 7.2 Implement `dkt inspect` on the decision table, the runner and the ignore check (design.md, Output); verify every test from 7.1 passes
@@ -79,7 +79,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 ## 8. dkt init
 
 **Review:** judgment (error paths, output format)
-**Files:** `internal/cli/cmd_init.go`, `internal/cli/cmd_init_test.go`, `internal/setup/openspecinit.go`, `internal/setup/openspecinit_test.go`
+**Files:** `internal/cli/cmd_init.go`, `internal/cli/cmd_init_test.go`, `internal/cli/command.go`, `internal/cli/command_test.go`, `internal/testutil/openspec.go`
 
 - [x] 8.1 Write failing tests for every scenario of project-setup, and for Too old, CLI missing and openspec init fails (openspec-runtime) run through `dkt init`, plus: `openspec/config.yaml` created by `openspec init` is listed once, with kind `config` and status `created`; an untracked file that existed before `openspec init` is not listed; a tracked, clean file the fake `openspec init` changes is listed with kind `openspec` and status `updated`; a file the fake creates whose name holds a space and a quote is listed by its exact path; a run that keeps a file and writes others still writes them; the text output lists the files and the next steps; verify they fail
 - [x] 8.2 Implement `dkt init`: checks before writing, `openspec init` with the before-and-after listing (design.md, Files openspec init created), writes, the ignore check, the result and the next steps; verify every test from 8.1 passes
