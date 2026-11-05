@@ -97,8 +97,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks
 **Files:** none beyond earlier groups
 
-- [ ] 10.1 Build dkt with `go install ./cmd/dkt` into a temporary `GOBIN`, then in a new repository follow `skills/docket-init/SKILL.md` steps 3 and 4 by hand: `dkt init --json --tools claude`, commit exactly the files it lists, and `dkt inspect --json`; verify `dkt inspect` reports no finding and `git status` is clean after the commit
-- [ ] 10.2 Run `gofmt -l .`, `go vet ./...` and `go test ./...`; verify they are clean
+- [x] 10.1 Build dkt with `go install ./cmd/dkt` into a temporary `GOBIN`, then in a new repository follow `skills/docket-init/SKILL.md` steps 3 and 4 by hand: `dkt init --json --tools claude`, commit exactly the files it lists, and `dkt inspect --json`; verify `dkt inspect` reports no finding and `git status` is clean after the commit
+- [x] 10.2 Run `gofmt -l .`, `go vet ./...` and `go test ./...`; verify they are clean
 
 ## Workflow follow-up
 
