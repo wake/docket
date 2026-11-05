@@ -237,4 +237,7 @@ func lintChange(r *state, c *loaded) {
 	}
 	checkSections(r, c)
 	checkPlaceholders(r, c)
+	if c.Has(planFile) {
+		checkPlan(r, c)
+	}
 }
