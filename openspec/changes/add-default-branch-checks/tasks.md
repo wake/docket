@@ -53,8 +53,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks
 **Files:** none beyond earlier groups
 
-- [ ] 5.1 Build dkt into a temporary `GOBIN`; in a clone of a repository set up with `dkt init` (so `origin/HEAD` exists), open a change with a plan with one task, commit it with `Change: <slug>/1`, squash-merge it into `main` with `git merge --squash` and a commit message without the trailer, push, fetch, and check that `dkt inspect` reports `trailer-missing` for it; on a new branch write `docs/superpowers/plans/x.md` and check that `dkt lint` reports `routing` for it; run both in this repository and check that `dkt inspect` names `main` and reports nothing about trailers
-- [ ] 5.2 Run `gofmt -l .`, `go vet ./...` and `go test ./...`; verify they are clean
+- [x] 5.1 Build dkt into a temporary `GOBIN`; in a clone of a repository set up with `dkt init` (so `origin/HEAD` exists), open a change with a plan with one task, commit it with `Change: <slug>/1`, squash-merge it into `main` with `git merge --squash` and a commit message without the trailer, push, fetch, and check that `dkt inspect` reports `trailer-missing` for it; on a new branch write `docs/superpowers/plans/x.md` and check that `dkt lint` reports `routing` for it; run both in this repository and check that `dkt inspect` names `main` and reports nothing about trailers
+- [x] 5.2 Run `gofmt -l .`, `go vet ./...` and `go test ./...`; verify they are clean
 
 ## Workflow follow-up
 
