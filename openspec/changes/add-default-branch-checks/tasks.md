@@ -21,15 +21,15 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks (restructuring)
 **Files:** `internal/gitx/log.go`, `internal/gitx/log_test.go`, `internal/cli/cmd_sync.go`
 
-- [ ] 1.1 Verify `go test ./internal/gitx/ ./internal/cli/` passes; give `ChangeTrailers` a `rev string` parameter, pass `"HEAD"` from `dkt sync` and the existing tests, and change nothing else; verify `go test ./...` passes and that mutating the revision in `dkt sync` to another value fails a test
+- [x] 1.1 Verify `go test ./internal/gitx/ ./internal/cli/` passes; give `ChangeTrailers` a `rev string` parameter, pass `"HEAD"` from `dkt sync` and the existing tests, and change nothing else; verify `go test ./...` passes and that mutating the revision in `dkt sync` to another value fails a test
 
 ## 2. Git calls
 
 **Review:** judgment (environment-dependent)
 **Files:** `internal/gitx/branch.go`, `internal/gitx/branch_test.go`, `internal/gitx/blobs.go`, `internal/gitx/blobs_test.go`
 
-- [ ] 2.1 Write failing tests for every scenario of default-branch, plus: `origin/HEAD` pointing outside `refs/remotes/origin/` is ignored; `origin/HEAD` pointing to `refs/remotes/origin/trunk`, which does not exist, while a local `trunk` does, gives `trunk` with the local commit; a `main` that exists only as `refs/remotes/origin/main` is found; `MergeBase` of two commits on related branches, and of unrelated histories (false); `ReadBlobs` returns the files that exist at a commit, leaves out a missing path and a directory, keeps a file's bytes exactly (a CRLF line, no trailing newline), and still reads a file asked for right after a missing path and right after a directory; `AddedSince` lists a file committed on the branch, a staged one and an untracked one under the given folders, not a file that exists at the base and was changed, not an ignored one, not a file outside the folders, not a committed file deleted from the worktree, not a staged new file later deleted from the worktree, each once, sorted, and a path with a space; verify they fail
-- [ ] 2.2 Implement `DefaultBranch`, `MergeBase`, `ReadBlobs` and `AddedSince` (design.md, Git calls); verify every test passes
+- [x] 2.1 Write failing tests for every scenario of default-branch, plus: `origin/HEAD` pointing outside `refs/remotes/origin/` is ignored; `origin/HEAD` pointing to `refs/remotes/origin/trunk`, which does not exist, while a local `trunk` does, gives `trunk` with the local commit; a `main` that exists only as `refs/remotes/origin/main` is found; `MergeBase` of two commits on related branches, and of unrelated histories (false); `ReadBlobs` returns the files that exist at a commit, leaves out a missing path and a directory, keeps a file's bytes exactly (a CRLF line, no trailing newline), and still reads a file asked for right after a missing path and right after a directory; `AddedSince` lists a file committed on the branch, a staged one and an untracked one under the given folders, not a file that exists at the base and was changed, not an ignored one, not a file outside the folders, not a committed file deleted from the worktree, not a staged new file later deleted from the worktree, each once, sorted, and a path with a space; verify they fail
+- [x] 2.2 Implement `DefaultBranch`, `MergeBase`, `ReadBlobs` and `AddedSince` (design.md, Git calls); verify every test passes
 
 ## 3. Routing and shared titles in dkt lint
 
