@@ -77,7 +77,7 @@ func inspectCommand() Command {
 			var out Outcome
 			var ver string
 			var verr error
-			if r, err := openspec.New(c.Dir, c.Env); err != nil {
+			if r, err := openspec.New(c.Repo.Root, c.Env); err != nil {
 				verr = err
 			} else {
 				ver, verr = r.CheckVersion()
