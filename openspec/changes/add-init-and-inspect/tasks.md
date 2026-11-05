@@ -73,8 +73,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (output format)
 **Files:** `internal/cli/cmd_inspect.go`, `internal/cli/cmd_inspect_test.go`
 
-- [ ] 7.1 Write failing tests for the scenarios Nothing written, Clean setup, Statuses listed, Before init, Edited skill, File from an earlier release (setup-inspection), Before init config, Other schema reported, Linked skill folder inspected, Old OpenSpec, No OpenSpec, Ignored OpenSpec folder and Unreadable installed file, plus: an `operations` section equal to an earlier release's gives `guidance-outdated`; a `config.yaml` with `schema:` and its value on the next line, and one with two `operations:` lines, are listed in `unreadable` and give neither `config-schema-default` nor `guidance-missing`, and dkt exits with 3; the text output has the OpenSpec line and one line per file; verify they fail
-- [ ] 7.2 Implement `dkt inspect` on the decision table, the runner and the ignore check (design.md, Output); verify every test from 7.1 passes
+- [x] 7.1 Write failing tests for the scenarios Nothing written, Clean setup, Statuses listed, Before init, Edited skill, File from an earlier release (setup-inspection), Before init config, Other schema reported, Linked skill folder inspected, Old OpenSpec, No OpenSpec, Ignored OpenSpec folder and Unreadable installed file, plus: an `operations` section equal to an earlier release's gives `guidance-outdated`; a `config.yaml` with `schema:` and its value on the next line, and one with two `operations:` lines, are listed in `unreadable` and give neither `config-schema-default` nor `guidance-missing`, and dkt exits with 3; the text output has the OpenSpec line and one line per file; verify they fail
+- [x] 7.2 Implement `dkt inspect` on the decision table, the runner and the ignore check (design.md, Output); verify every test from 7.1 passes
 
 ## 8. dkt init
 
