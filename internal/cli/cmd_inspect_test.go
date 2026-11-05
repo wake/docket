@@ -442,6 +442,14 @@ func TestInspectTrailerOnLaterCommitAndSlugAlone(t *testing.T) {
 	}
 }
 
+func TestInspectTrailerSlugPrefixDoesNotCount(t *testing.T) {
+	r := trailerRepo(t, "work\n\nChange: add-x-2/1", "add-x")
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "openspec/changes/add-x/plan.md" {
+		t.Errorf("%+v", m.Findings)
+	}
+}
+
 func TestInspectTrailerSkips(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Git("checkout", "-q", "-b", "main")
