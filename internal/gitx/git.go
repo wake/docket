@@ -131,11 +131,19 @@ func (g Git) gitMarkerPossible() bool {
 
 // output runs git and returns raw stdout.
 func (g Git) output(args ...string) ([]byte, error) {
+	return g.outputIn("", args...)
+}
+
+// outputIn is output with stdin fed to git when it is not empty.
+func (g Git) outputIn(stdin string, args ...string) ([]byte, error) {
 	bin, err := g.lookPath()
 	if err != nil {
 		return nil, err
 	}
 	cmd := exec.Command(bin, args...)
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
 	cmd.Dir = g.Dir
 	cmd.Env = g.Env
 	var stdout, stderr bytes.Buffer
