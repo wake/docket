@@ -184,3 +184,45 @@ func TestParsePlanHiddenStructure(t *testing.T) {
 		t.Fatalf("%+v", p)
 	}
 }
+
+func TestParsePlanFirstReuseWins(t *testing.T) {
+	p := ParsePlan([]byte("## Reuse\n\n| A |\n|---|\n| 1 |\n\n## Reuse\n\n| B |\n|---|\n| 2 |\n"))
+	if p.ReuseLine != 1 || p.Reuse == nil || p.Reuse.Header[0] != "A" {
+		t.Fatalf("%d %+v", p.ReuseLine, p.Reuse)
+	}
+}
+
+func TestParsePlanCancelledInMultiLineComment(t *testing.T) {
+	p := ParsePlan([]byte("## Cancelled Tasks\n<!--\n- Task 5: Name - reason\n-->\n"))
+	if len(p.Cancelled) != 0 {
+		t.Fatalf("%+v", p.Cancelled)
+	}
+}
+
+func TestParsePlanReuseTableInComment(t *testing.T) {
+	p := ParsePlan([]byte("## Reuse\n<!--\n| X |\n|---|\n| 0 |\n-->\n| A |\n|---|\n| 1 |\n"))
+	if p.Reuse == nil || p.Reuse.Header[0] != "A" {
+		t.Fatalf("%+v", p.Reuse)
+	}
+}
+
+func TestParsePlanCompensatesTrailingText(t *testing.T) {
+	p := ParsePlan([]byte("### Task 1: A\n**Compensates:** Task 3 and 4\n"))
+	if want := []Ref{{Line: 2}}; !reflect.DeepEqual(p.Tasks[0].Compensates, want) {
+		t.Fatalf("%+v", p.Tasks[0].Compensates)
+	}
+}
+
+func TestParsePlanScenariosNoneCase(t *testing.T) {
+	p := ParsePlan([]byte("### Task 1: A\n**Scenarios:** None\n"))
+	if p.Tasks[0].ScenariosLine != 2 || p.Tasks[0].Scenarios != nil {
+		t.Fatalf("%+v", p.Tasks[0])
+	}
+}
+
+func TestParsePlanFirstScenariosLineCounts(t *testing.T) {
+	p := ParsePlan([]byte("### Task 1: A\n**Scenarios:** a\n**Scenarios:** b\n"))
+	if p.Tasks[0].ScenariosLine != 2 || !reflect.DeepEqual(p.Tasks[0].Scenarios, []string{"a"}) {
+		t.Fatalf("%+v", p.Tasks[0])
+	}
+}
