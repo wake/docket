@@ -4,26 +4,26 @@ Docket is a development workflow framework: it combines superpowers and OpenSpec
 
 This is a public repository: write everything in English, and never commit host-specific details, names, personal paths or sensitive information.
 
-## During the rebuild
+## Workflow
 
-main is being rebuilt from scratch. The previous version is on the `legacy` branch and the tag `v0.15.0`, for reference only; do not merge it back.
+This repository is developed with Docket's own workflow: follow the docket skill (installed by `dkt init` in `.claude/skills/docket/` and `.agents/skills/docket/`).
 
-During the rebuild, do not use dkt; use OpenSpec's built-in workflow:
-
-- If there is no `openspec/` yet, run `openspec init --tools <coding agent>` (for example `claude` or `codex`) and commit the files it creates.
-- Start a change with `openspec new change <slug>`, which uses the default spec-driven schema.
-- Each change lives in `openspec/changes/<slug>/`: `proposal.md`, `specs/`, `design.md` when needed, and `tasks.md`. Before writing each one, run `openspec instructions <artifact> --change <slug>` for its template and rules.
-- superpowers' brainstorming and writing-plans do not write to their default location, `docs/superpowers/`: the design goes into the change folder, and the task list into `tasks.md`.
-- Implement from `tasks.md` with superpowers' test-driven-development and subagent-driven-development.
-- When done, archive with OpenSpec.
-
-Once `dkt init`, `dkt new`, `dkt sync` and `dkt lint` exist, run `dkt init` on this repository, switch to Docket's own workflow, and update this section.
+- Use dkt from this repository's main branch, installed with `go install ./cmd/dkt`.
+- The previous version is on the `legacy` branch and the tag `v0.15.0`, for reference only; do not merge it back.
+- The changes in `openspec/changes/archive/` from the rebuild were made with OpenSpec's default spec-driven schema; leave them as they are.
+- A pull request that changes `shipped/` also runs `dkt init --force`, so that the copies installed in this repository follow.
+- Until the release process exists, archive each change in its own pull request, as its last commit, instead of at release time.
+- `dkt record`, `dkt issue`, `dkt status` and `dkt conflicts`, which the docket skill names, do not exist yet. Until they do:
+  - Light review opens no record: commits carry no trailer, and the pull request description says what changed and how it was verified.
+  - To record an issue, tell the user instead; it is recorded once `dkt issue` exists.
+  - Before working in parallel, compare the plans' `**Files:**` yourself.
+  - The user decides the next piece of work.
 
 ## Development
 
-- The Go module goes at the repository root and is created by the first rebuild change. Once `go.mod` exists, check with `go vet ./...` and `go test ./...`.
+- Check with `go vet ./...` and `go test ./...`.
 - Requires OpenSpec 1.14.0 or later.
 
 ## Prompt files
 
-Text agents act on: `AGENTS.md`, `CLAUDE.md`, `skills/`, `shipped/`. When you add, move or remove such a file, update this list in the same pull request.
+Text agents act on: `AGENTS.md`, `CLAUDE.md`, `skills/`, `shipped/`; the copies of `shipped/` that `dkt init` installs (`.claude/skills/docket/`, `.agents/skills/docket/`, `openspec/schemas/docket/` and `operations` in `openspec/config.yaml`); and OpenSpec's `.claude/commands/opsx/` and `.claude/skills/openspec-*/`. When you add, move or remove such a file, update this list in the same pull request.

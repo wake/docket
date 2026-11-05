@@ -1,4 +1,4 @@
-# openspec-runtime Specification
+# OpenSpec Runtime Specification
 
 ## Purpose
 Defines how dkt commands deal with the OpenSpec environment they depend on: how the CLI is called, which versions are accepted, and how a failed call is handled.

@@ -1,4 +1,4 @@
-# plan-sync Specification
+# Plan Sync Specification
 
 ## Purpose
 Defines how `dkt sync` ticks a change's plan.md from commit trailers, so that plan.md stays the only task list even though superpowers records its progress elsewhere and never ticks the plan.

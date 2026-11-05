@@ -1,4 +1,4 @@
-# setup-inspection Specification
+# Setup Inspection Specification
 
 ## Purpose
 Defines what `dkt inspect` checks and reports about a project's Docket setup: docket-init uses it to confirm the setup is complete, and docket-doctor to learn what to fix. It writes nothing.
