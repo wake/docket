@@ -28,15 +28,16 @@ func fixture(t *testing.T, name string) string {
 }
 
 // jsonRunner returns a Runner whose fake answers args with code and body.
-func jsonRunner(t *testing.T, code int, body string, args []string) (*openspec.Runner, string) {
+func jsonRunner(t *testing.T, code int, body string, args []string) *openspec.Runner {
 	t.Helper()
 	dir := t.TempDir()
 	testutil.OpenSpecAnswer(t, dir, code, body, args...)
-	return newRunner(t, "1.14.0", "FAKE_OPENSPEC_JSON="+dir)
+	r, _ := newRunner(t, "1.14.0", "FAKE_OPENSPEC_JSON="+dir)
+	return r
 }
 
 func TestShowChange(t *testing.T) {
-	r, _ := jsonRunner(t, 0, fixture(t, "show-change.json"), changeArgs)
+	r := jsonRunner(t, 0, fixture(t, "show-change.json"), changeArgs)
 	got, err := r.ShowChange("add-x")
 	if err != nil {
 		t.Fatal(err)
@@ -50,13 +51,39 @@ func TestShowChange(t *testing.T) {
 		{Spec: "booking", Operation: "REMOVED", Requirements: []openspec.Requirement{{Name: "Old"}}},
 		{Spec: "booking", Operation: "RENAMED", Rename: &openspec.Rename{From: "Join", To: "Join the list"}},
 	}
-	if !reflect.DeepEqual(got[:4], want) {
-		t.Fatalf("got %+v\nwant %+v", got[:4], want)
+	want = append(want,
+		openspec.Delta{Spec: "rooms", Operation: "ADDED", Requirements: []openspec.Requirement{{Name: "Room list", Scenarios: []openspec.Scenario{{Name: "List"}}}}},
+		openspec.Delta{Spec: "rooms", Operation: "ADDED", Requirements: []openspec.Requirement{{Name: "No scenario"}}},
+	)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v\nwant %+v", got, want)
+	}
+}
+
+func TestShowChangeNoDeltasKey(t *testing.T) {
+	r := jsonRunner(t, 0, `{"x":1}`, changeArgs)
+	if _, err := r.ShowChange("add-x"); err == nil || !strings.Contains(err.Error(), "openspec show add-x") {
+		t.Fatalf("err = %v", err)
+	}
+	r = jsonRunner(t, 0, `{"deltas":[]}`, changeArgs)
+	if got, err := r.ShowChange("add-x"); err != nil || len(got) != 0 {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+}
+
+func TestValidateMissingItem(t *testing.T) {
+	r := jsonRunner(t, 1, `{"items":[{"id":"other","valid":false,"issues":[{"level":"ERROR","path":"x","message":"no"}]}]}`, validArgs)
+	if _, err := r.Validate("add-x"); err == nil || !strings.Contains(err.Error(), "add-x") {
+		t.Fatalf("err = %v", err)
+	}
+	r = jsonRunner(t, 0, `{"items":[]}`, validArgs)
+	if _, err := r.Validate("add-x"); err == nil || !strings.Contains(err.Error(), "openspec validate add-x") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestShowSpec(t *testing.T) {
-	r, _ := jsonRunner(t, 0, fixture(t, "show-spec.json"), specArgs)
+	r := jsonRunner(t, 0, fixture(t, "show-spec.json"), specArgs)
 	got, err := r.ShowSpec("booking")
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +99,7 @@ func TestShowSpec(t *testing.T) {
 }
 
 func TestValidateIssues(t *testing.T) {
-	r, _ := jsonRunner(t, 1, fixture(t, "validate-invalid.json"), validArgs)
+	r := jsonRunner(t, 1, fixture(t, "validate-invalid.json"), validArgs)
 	got, err := r.Validate("add-x")
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +112,7 @@ func TestValidateIssues(t *testing.T) {
 
 func TestValidateLine(t *testing.T) {
 	body := `{"items":[{"id":"other","issues":[{"level":"ERROR","path":"x","message":"no"}]},{"id":"add-x","issues":[{"level":"WARNING","path":"a/spec.md","message":"m","line":7}]}]}`
-	r, _ := jsonRunner(t, 1, body, validArgs)
+	r := jsonRunner(t, 1, body, validArgs)
 	got, err := r.Validate("add-x")
 	want := []openspec.Issue{{Level: "WARNING", Path: "a/spec.md", Message: "m", Line: 7}}
 	if err != nil || !reflect.DeepEqual(got, want) {
@@ -94,7 +121,7 @@ func TestValidateLine(t *testing.T) {
 }
 
 func TestValidateValid(t *testing.T) {
-	r, _ := jsonRunner(t, 0, `{"items":[{"id":"add-x","valid":true,"issues":[]}]}`, validArgs)
+	r := jsonRunner(t, 0, `{"items":[{"id":"add-x","valid":true,"issues":[]}]}`, validArgs)
 	got, err := r.Validate("add-x")
 	if err != nil || len(got) != 0 {
 		t.Fatalf("got %+v, %v", got, err)
@@ -102,7 +129,7 @@ func TestValidateValid(t *testing.T) {
 }
 
 func TestShowFailedHasMessages(t *testing.T) {
-	r, _ := jsonRunner(t, 1, fixture(t, "show-missing.json"), changeArgs)
+	r := jsonRunner(t, 1, fixture(t, "show-missing.json"), changeArgs)
 	_, err := r.ShowChange("add-x")
 	var fe *openspec.FailedError
 	if !errors.As(err, &fe) {
@@ -117,20 +144,20 @@ func TestShowFailedHasMessages(t *testing.T) {
 }
 
 func TestValidateNoItemsFails(t *testing.T) {
-	r, _ := jsonRunner(t, 1, `{"status":[{"message":"boom"},{"message":"bang"}]}`, validArgs)
+	r := jsonRunner(t, 1, `{"status":[{"message":"boom"},{"message":"bang"}]}`, validArgs)
 	_, err := r.Validate("add-x")
 	var fe *openspec.FailedError
 	if !errors.As(err, &fe) || !reflect.DeepEqual(fe.Messages, []string{"boom", "bang"}) || !strings.HasSuffix(fe.Error(), ": boom; bang") {
 		t.Fatalf("err = %v", err)
 	}
-	r, _ = jsonRunner(t, 0, `{"x":1}`, validArgs)
+	r = jsonRunner(t, 0, `{"x":1}`, validArgs)
 	if _, err := r.Validate("add-x"); err == nil || !strings.Contains(err.Error(), "openspec validate") {
 		t.Fatalf("err = %v", err)
 	}
 }
 
 func TestShowUndecodable(t *testing.T) {
-	r, _ := jsonRunner(t, 0, "not json", specArgs)
+	r := jsonRunner(t, 0, "not json", specArgs)
 	_, err := r.ShowSpec("booking")
 	if err == nil || !strings.Contains(err.Error(), "openspec show booking") {
 		t.Fatalf("err = %v", err)
@@ -138,7 +165,7 @@ func TestShowUndecodable(t *testing.T) {
 }
 
 func TestShowIgnoresUnknownFields(t *testing.T) {
-	r, _ := jsonRunner(t, 0, `{"zzz":1,"requirements":[{"name":"A","extra":true,"scenarios":[{"name":"S","new":1}]}]}`, specArgs)
+	r := jsonRunner(t, 0, `{"zzz":1,"requirements":[{"name":"A","extra":true,"scenarios":[{"name":"S","new":1}]}]}`, specArgs)
 	got, err := r.ShowSpec("booking")
 	if err != nil || len(got) != 1 || got[0].Name != "A" || got[0].Scenarios[0].Name != "S" {
 		t.Fatalf("got %+v, %v", got, err)
@@ -146,7 +173,7 @@ func TestShowIgnoresUnknownFields(t *testing.T) {
 }
 
 func TestShowChangeUndecodable(t *testing.T) {
-	r, _ := jsonRunner(t, 0, "not json", changeArgs)
+	r := jsonRunner(t, 0, "not json", changeArgs)
 	_, err := r.ShowChange("add-x")
 	if err == nil || !strings.Contains(err.Error(), "openspec show add-x") {
 		t.Fatalf("err = %v", err)
