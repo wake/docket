@@ -29,3 +29,14 @@ A title, and a source, SHALL be one line of valid UTF-8 text that is not empty a
 #### Scenario: Source on two lines
 - **WHEN** a user runs `dkt new add-x --kind feature --title X --source` with a value holding a line break
 - **THEN** nothing is created and dkt exits with 2
+
+### Requirement: Change schema
+A change's schema SHALL be the value of the top-level `schema` key of its `.openspec.yaml`, as OpenSpec writes it, plain or quoted. A change whose `.openspec.yaml` is missing or has no `schema` key SHALL have the schema `docket`. A change whose schema is not `docket` is a change of another schema.
+
+#### Scenario: Schema read
+- **WHEN** `openspec/changes/add-x/.openspec.yaml` holds `schema: spec-driven` and `created: 2026-01-01`
+- **THEN** the schema of `add-x` is `spec-driven`
+
+#### Scenario: No schema key
+- **WHEN** `openspec/changes/add-x/.openspec.yaml` holds only `created: 2026-01-01`
+- **THEN** the schema of `add-x` is `docket`
