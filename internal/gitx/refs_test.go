@@ -2,6 +2,7 @@ package gitx
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
@@ -31,8 +32,13 @@ func TestTreeDirsOnlyTrees(t *testing.T) {
 	r.Write("openspec/changes/add-x/p.md", "x")
 	r.Write("openspec/changes/a-file", "x")
 	r.Write("openspec/changes/archive/2026-01-02-old/p.md", "x")
+	r.Git("add", "-A")
 	r.Git("update-index", "--add", "--cacheinfo", "160000,1111111111111111111111111111111111111111,openspec/changes/sub")
-	c := r.Commit("one", nil)
+	r.Git("commit", "-q", "-m", "one")
+	c := r.Git("rev-parse", "HEAD")
+	if !strings.Contains(r.Git("ls-tree", c, "openspec/changes/sub"), "commit") {
+		t.Fatal("the commit does not hold the gitlink")
+	}
 	g := Git{Dir: r.Dir, Env: r.Env}
 	got, err := g.TreeDirs(c, "openspec/changes/", "openspec/changes/archive/")
 	if err != nil {

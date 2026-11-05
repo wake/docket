@@ -164,6 +164,11 @@ func TestBareEntryAndOriginHeadAddNoSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	write(t, bare, "openspec/changes/add-y/p.md")
+	inv, err = Changes(gitx.Git{Dir: bare, Env: r.Env})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(inv.Unreadable) != 0 || len(inv.Uses) != 1 || inv.Uses[0].Source != "refs/heads/f" {
 		t.Errorf("bare: %+v", inv)
 	}
@@ -225,8 +230,12 @@ func TestFileLinkOrSubmoduleAtChangePathIsNoUse(t *testing.T) {
 	if err := os.Symlink("README.md", filepath.Join(r.Dir, "openspec/changes/a-link")); err != nil {
 		t.Fatal(err)
 	}
+	r.Git("add", "-A")
 	r.Git("update-index", "--add", "--cacheinfo", "160000,1111111111111111111111111111111111111111,openspec/changes/sub")
-	r.Commit("odd", nil)
+	r.Git("commit", "-q", "-m", "odd")
+	if !strings.Contains(r.Git("ls-tree", "HEAD", "openspec/changes/sub"), "commit") {
+		t.Fatal("the commit does not hold the gitlink")
+	}
 	r.Git("checkout", "-q", "main")
 	inv := scanOK(t, r)
 	if len(inv.Uses) != 0 || len(inv.Unreadable) != 0 {
@@ -265,6 +274,57 @@ func TestOrderWorktreesThenRefsSortedByPath(t *testing.T) {
 	}
 }
 
+func TestChangesFromSubdirectory(t *testing.T) {
+	r := newRepo(t)
+	commitRef(r, "refs/heads/f", map[string]string{"openspec/changes/add-x/p.md": "x"})
+	write(t, r.Dir, "sub/dir/keep")
+	inv, err := Changes(gitx.Git{Dir: filepath.Join(r.Dir, "sub/dir"), Env: r.Env})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Use{Slug: "add-x", Path: "openspec/changes/add-x", Source: "refs/heads/f"}
+	if !slices.Contains(inv.Uses, want) {
+		t.Errorf("got %+v", inv)
+	}
+}
+
+func TestOpenspecThatIsAFileHoldsNoUse(t *testing.T) {
+	r := newRepo(t)
+	b := addWorktree(t, r, "b")
+	write(t, b, "openspec")
+	c := addWorktree(t, r, "c")
+	write(t, c, "openspec/changes")
+	inv := scanOK(t, r)
+	if len(inv.Uses) != 0 || len(inv.Unreadable) != 0 {
+		t.Errorf("got %+v", inv)
+	}
+}
+
+func TestDatedArchiveFolderOnDisk(t *testing.T) {
+	r := newRepo(t)
+	b := addWorktree(t, r, "b")
+	write(t, b, "openspec/changes/archive/2026-01-02-add-z/p.md")
+	inv := scanOK(t, r)
+	want := Use{Slug: "add-z", Archived: true, Path: "openspec/changes/archive/2026-01-02-add-z", Source: b}
+	if !slices.Contains(inv.Uses, want) || len(inv.Unreadable) != 0 {
+		t.Errorf("got %+v", inv)
+	}
+}
+
+func TestLinkedArchiveFolderOnly(t *testing.T) {
+	r := newRepo(t)
+	b := addWorktree(t, r, "b")
+	write(t, b, "openspec/changes/add-x/p.md")
+	if err := os.Symlink(t.TempDir(), filepath.Join(b, "openspec/changes/archive")); err != nil {
+		t.Fatal(err)
+	}
+	inv := scanOK(t, r)
+	if len(inv.Unreadable) != 1 || inv.Unreadable[0].Source != b ||
+		!strings.Contains(inv.Unreadable[0].Reason, "openspec/changes/archive") {
+		t.Errorf("got %+v", inv)
+	}
+}
+
 func TestRefReadFailureIsUnreadable(t *testing.T) {
 	r := newRepo(t)
 	blob := r.Git("rev-parse", "HEAD:README.md")
@@ -273,7 +333,8 @@ func TestRefReadFailureIsUnreadable(t *testing.T) {
 		t.Fatal(err)
 	}
 	inv := scanOK(t, r)
-	if len(inv.Unreadable) != 1 || inv.Unreadable[0].Source != "refs/heads/broken" {
+	if len(inv.Unreadable) != 1 || inv.Unreadable[0].Source != "refs/heads/broken" ||
+		!strings.Contains(inv.Unreadable[0].Reason, "ls-tree") {
 		t.Errorf("got %+v", inv)
 	}
 }
