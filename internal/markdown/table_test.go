@@ -60,3 +60,9 @@ func TestFindTable(t *testing.T) {
 		}
 	})
 }
+
+func TestFindTableDelimiterNeedsDashes(t *testing.T) {
+	if _, ok := find(t, []string{"| A | B |", "| | |", "| 1 | 2 |"}); ok {
+		t.Fatal("found table with a dashless delimiter")
+	}
+}

@@ -136,3 +136,9 @@ func TestHeadingsTrimFEFF(t *testing.T) {
 		t.Fatalf("Headings = %+v, want %+v", got, want)
 	}
 }
+
+func TestCodeSpansShorterRunDoesNotClose(t *testing.T) {
+	if got, want := CodeSpans("`a``b`"), [][2]int{{0, 6}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("CodeSpans = %v, want %v", got, want)
+	}
+}
