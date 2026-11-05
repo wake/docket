@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/safepath"
@@ -125,11 +126,14 @@ func worktreeDirs(root string) (paths []string, reason string) {
 		if errors.As(err, &se) {
 			return nil, se.Path + " is a symbolic link; Docket does not read through it"
 		}
+		if errors.Is(err, syscall.ENOTDIR) || strings.HasSuffix(err.Error(), "is not a directory") {
+			return nil, "" // a file where a folder would be: no changes here
+		}
 		return nil, err.Error()
 	}
 	for _, dir := range []string{changesDir, archiveDir} {
 		entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(dir)))
-		if errors.Is(err, fs.ErrNotExist) {
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
 			continue
 		}
 		if err != nil {

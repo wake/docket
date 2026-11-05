@@ -30,7 +30,7 @@ func (g Git) Refs() ([]Ref, error) {
 // TreeDirs returns the paths among paths' matches in commit's tree that are
 // directories (type tree), in git's order. A file, link or submodule is left out.
 func (g Git) TreeDirs(commit string, paths ...string) ([]string, error) {
-	out, err := g.output(append([]string{"ls-tree", "-z", "-d", commit, "--"}, paths...)...)
+	out, err := g.output(append([]string{"ls-tree", "-z", "-d", "--full-tree", commit, "--"}, paths...)...)
 	if err != nil {
 		return nil, err
 	}
