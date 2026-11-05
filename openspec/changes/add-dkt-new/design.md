@@ -39,7 +39,7 @@ Nothing runs before step 5 and nothing is written before step 8. The schema is p
 `v0.15.0`'s `lockOpenSpec`: an exclusive `flock` on the `openspec/` directory, held from before the scan until `proposal.md` is written. It serializes runs in one worktree; runs in different worktrees see each other's folders through the scan, and a race between them in the same instant is accepted (Risks).
 
 ### OpenSpec failure
-Under the lock, and with no folder of that name before step 7, whatever is under `openspec/changes/<slug>/` after a failed `openspec new change` was made by this run; it is removed, unless a link is now on its path, in which case it is left (and the finding says so). Ported from `v0.15.0`'s `cleanup`.
+After a failed `openspec new change`, `dkt new` removes only what OpenSpec is known to write: `openspec/changes/<slug>/.openspec.yaml`, then the folder with a plain `os.Remove`, which fails on a folder that is not empty. A link now on the folder's path, or any file it did not expect, leaves the folder in place, and the finding says so. Unlike `v0.15.0`'s `cleanup`, which removed the whole folder, this never deletes a file another process put there while OpenSpec ran.
 
 ### Workspace scan
 A new package `internal/scan`, a reduced port of `v0.15.0`'s:
@@ -49,7 +49,7 @@ A new package `internal/scan`, a reduced port of `v0.15.0`'s:
 - The scan reads git's state as it is: no fetch, no network.
 
 ### Result
-`used` groups the uses of the requested slug by folder path, each with the sources that hold it, in the order the scan found them (worktrees first, then refs in `for-each-ref` order), because one archived folder usually appears on many branches. The text output prints one line per folder, naming at most three sources and how many more.
+`used` groups the uses of the requested slug by folder path, each with the sources that hold it, in the order the scan found them (worktrees first, then refs in `for-each-ref` order), because one archived folder usually appears on many branches. The text output prints one line per folder, naming at most three sources and how many more. When the requested slug was skipped only because a non-directory entry of that name is in this worktree's `openspec/changes/`, which the scan does not count, `used` gets that path with this worktree's root as its source, so the reason for the suffix is never hidden.
 
 ### Front matter
 `internal/change` holds the kinds, the title-and-source form check (one line: no `\n` or `\r`; valid UTF-8; not only whitespace; the value is kept as given, not trimmed) and the front matter writer. `title` and `source` are written with Go's `strconv.Quote`: for valid UTF-8 its escapes (`\"`, `\\`, `\t`, `\xXX`, `\uXXXX`, `\UXXXXXXXX`, …) are all valid YAML double-quoted escapes. `proposal.md` is created with `O_CREATE|O_EXCL|O_NOFOLLOW`, mode 0644 subject to the umask. Reading the front matter comes with `dkt lint`.
@@ -64,4 +64,6 @@ A new package `internal/scan`, a reduced port of `v0.15.0`'s:
 - [Two runs in different worktrees choose the same free slug in the same instant] → accepted: each sees the other only once its folder exists; the second branch's PR then shows a duplicate slug, which `dkt lint` can report later.
 - [A repository with many branches costs one `git ls-tree` per distinct commit] → accepted; reading refs at the same commit once keeps the common case small.
 - [A deleted worktree that git still lists blocks `dkt new` until `git worktree prune`] → intended: a place Docket cannot read is never taken for empty; the reason says how to clear it.
+- [A folder on the change's path replaced by a link between the last check and the write of `proposal.md`] → accepted, as for `dkt init`: a process that can replace folders in the user's working tree can already write wherever the user can.
+- [Usage errors beyond parsing (an unknown kind, a blank title) are checked after the repository, so outside one they exit 4, not 2] → accepted, as `dkt init --tools` does.
 - [`openspec status` counts a proposal holding only front matter as done] → accepted: the `docket` skill has the agent write the proposal right after `dkt new`, and `dkt lint` reports missing sections.

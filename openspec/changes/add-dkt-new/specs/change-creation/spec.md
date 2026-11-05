@@ -61,7 +61,7 @@ Before it runs OpenSpec, `dkt new` SHALL check that `openspec/schemas/docket/sch
 - **THEN** dkt creates `openspec/changes/add-x-3/`
 
 ### Requirement: Unreadable source blocks creation
-When the workspace scan reports any source as unreadable, `dkt new` SHALL create nothing, run nothing, list the source as `cli-output` requires, and exit with 3, because it cannot show that the slug is unused.
+When the workspace scan reports any source as unreadable, `dkt new` SHALL create nothing, SHALL NOT run `openspec new change`, SHALL list the source as `cli-output` requires, and SHALL exit with 3, because it cannot show that the slug is unused.
 
 #### Scenario: Worktree directory missing
 - **WHEN** a worktree that git lists has no directory on disk and a user runs `dkt new add-x --kind feature --source x --title X`
@@ -81,12 +81,16 @@ The `result` of `dkt new` SHALL hold `slug` (the slug created), `requested` (the
 - **WHEN** no source uses `add-x` and a user runs `dkt new add-x --json --kind feature --source x --title X`
 - **THEN** `result.slug` and `result.requested` are `add-x`, `result.path` is `openspec/changes/add-x`, and `result.used` is an empty list
 
-### Requirement: OpenSpec failure leaves nothing
-When `openspec new change` fails, `dkt new` SHALL report `openspec-failed` as `openspec-runtime` says, SHALL remove whatever this run created under `openspec/changes/<slug>/`, and SHALL write no `proposal.md`.
+### Requirement: OpenSpec failure cleaned up
+When `openspec new change` fails, `dkt new` SHALL report `openspec-failed` as `openspec-runtime` says and write no `proposal.md`. It SHALL remove `openspec/changes/<slug>/` when that folder holds nothing but `.openspec.yaml`; otherwise it SHALL leave the folder as it is and say so in the finding.
 
 #### Scenario: OpenSpec fails
 - **WHEN** `openspec new change` exits with a non-zero status after creating `openspec/changes/add-x/`
 - **THEN** `openspec/changes/add-x/` does not exist, the finding `openspec-failed` names the command, and dkt exits with 1
+
+#### Scenario: Other files kept
+- **WHEN** `openspec new change` fails after `openspec/changes/add-x/` gained a file other than `.openspec.yaml`
+- **THEN** the folder and that file remain, the finding says the folder was left in place, and dkt exits with 1
 
 ### Requirement: Symbolic links refused
 When a symbolic link is on the path from the repository root to `openspec/changes/<slug>/proposal.md`, `dkt new` SHALL run nothing, write nothing on either side of the link, report `symlink-refused` naming the link, and exit with 1.
