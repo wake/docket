@@ -1,28 +1,38 @@
 #!/bin/sh
-# dkt for developing Docket. In any worktree of this repository it runs dkt
-# built from the local main branch, rebuilding bin/dkt in the main worktree
-# whenever main has moved; elsewhere it runs the next dkt on PATH.
+# dkt for developing Docket. In any worktree of the repository that holds this
+# script, it runs dkt built from the local main branch, rebuilding bin/dkt in
+# the main worktree whenever main has moved; elsewhere it runs the next dkt on
+# PATH.
 set -eu
 
+self=$(cd "$(dirname "$0")" && pwd -P)
+
 run_next() {
-	self=$(cd "$(dirname "$0")" && pwd -P)
+	# Each wrapper passed through adds its directory, so that links to this
+	# script or copies of it on PATH cannot loop.
+	DKT_DEV_SKIP=${DKT_DEV_SKIP:-}:$self
+	export DKT_DEV_SKIP
 	rest=$PATH:
 	while [ -n "$rest" ]; do
 		d=${rest%%:*}
 		rest=${rest#*:}
 		[ -n "$d" ] && [ -f "$d/dkt" ] && [ -x "$d/dkt" ] || continue
-		[ "$(cd "$d" 2>/dev/null && pwd -P)" != "$self" ] || continue
+		case "$DKT_DEV_SKIP:" in *":$(cd "$d" 2>/dev/null && pwd -P):"*) continue ;; esac
 		exec "$d/dkt" "$@"
 	done
-	echo "dkt: no dkt on PATH besides $self" >&2
+	echo "dkt: no dkt on PATH besides this wrapper ($self)" >&2
 	exit 127
 }
 
-root=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
-if [ -z "$root" ] || ! grep -qx 'module github.com/wake/docket' "$root/go.mod" 2>/dev/null; then
-	run_next "$@"
-fi
+# The git common directory of directory $1, shared by all its worktrees.
+common_dir() {
+	g=$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && (cd "$g" && pwd -P)
+}
+mine=$(common_dir "$self") || mine=
+here=$(common_dir .) || here=
+[ -n "$mine" ] && [ "$mine" = "$here" ] || run_next "$@"
 
+root=$(git -C "$self" worktree list --porcelain | sed -n '1s/^worktree //p')
 want=$(git -C "$root" rev-parse --verify -q 'refs/heads/main^{commit}') || {
 	echo "dkt: no main branch to build in $root" >&2
 	exit 1

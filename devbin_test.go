@@ -1,12 +1,14 @@
 package docket
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wake/docket/internal/testutil"
 )
@@ -46,7 +48,7 @@ func TestDevWrapper(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the wrapper is a POSIX shell script")
 	}
-	wrapper, err := filepath.Abs("tools/dev-bin/dkt")
+	script, err := os.ReadFile("tools/dev-bin/dkt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,21 +56,36 @@ func TestDevWrapper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	release := t.TempDir()
-	writeFiles(t, release, map[string]string{"dkt": "#!/bin/sh\necho release \"$@\"\n"})
 
 	r := testutil.NewRepo(t)
+	files := map[string]string{"tools/dev-bin/dkt": string(script)}
+	for name, body := range fakeDocket {
+		files[name] = body
+	}
+	writeFiles(t, r.Dir, files)
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "one")
+	wrapper := filepath.Join(r.Dir, "tools/dev-bin/dkt")
+
+	// After the wrapper on PATH: a link back to it, then the released dkt.
+	loop, release := t.TempDir(), t.TempDir()
+	if err := os.Symlink(wrapper, filepath.Join(loop, "dkt")); err != nil {
+		t.Fatal(err)
+	}
+	writeFiles(t, release, map[string]string{"dkt": "#!/bin/sh\necho release \"$@\"\n"})
 	var env []string
 	for _, kv := range r.Env {
 		if v, ok := strings.CutPrefix(kv, "PATH="); ok {
-			kv = "PATH=" + filepath.Dir(wrapper) + ":" + release + ":" + v
+			kv = "PATH=" + strings.Join([]string{filepath.Dir(wrapper), loop, release, v}, ":")
 		}
 		env = append(env, kv)
 	}
 	env = append(env, "GOCACHE="+strings.TrimSpace(string(gocache)))
 	dkt := func(dir string) string {
 		t.Helper()
-		cmd := exec.Command(wrapper, "a b")
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, wrapper, "a b")
 		cmd.Dir, cmd.Env = dir, env
 		out, err := cmd.Output()
 		if err != nil {
@@ -78,9 +95,6 @@ func TestDevWrapper(t *testing.T) {
 	}
 	short := func() string { return r.Git("rev-parse", "--short", "main") }
 
-	writeFiles(t, r.Dir, fakeDocket)
-	r.Git("add", "-A")
-	r.Git("commit", "-q", "-m", "one")
 	if got, want := dkt(r.Dir), "main@"+short()+" [a b]"; got != want {
 		t.Errorf("first run = %q, want %q", got, want)
 	}
@@ -97,9 +111,12 @@ func TestDevWrapper(t *testing.T) {
 		t.Errorf("after main moved = %q, want %q", got, want)
 	}
 
-	// Outside this repository: a plain directory, and a repository of another project.
+	// Outside this repository: a plain directory, another project's
+	// repository, and another clone of this one.
 	other := testutil.NewRepo(t)
-	for _, dir := range []string{t.TempDir(), other.Dir} {
+	clone := filepath.Join(t.TempDir(), "clone")
+	r.Git("clone", "-q", r.Dir, clone)
+	for _, dir := range []string{t.TempDir(), other.Dir, clone} {
 		if got, want := dkt(dir), "release a b"; got != want {
 			t.Errorf("in %s = %q, want %q", dir, got, want)
 		}
