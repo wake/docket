@@ -42,6 +42,8 @@ func isBlank(l string) bool { return strings.TrimSpace(l) == "" }
 
 func isIndented(l string) bool { return l != "" && (l[0] == ' ' || l[0] == '\t') }
 
+var docEnd = regexp.MustCompile(`^\.\.\.([ \t#]|$)`)
+
 var spacedKey = regexp.MustCompile(`^(schema|operations)[ \t]+:`)
 
 // parsedConfig is what the line reader found. A line index of -1 means not found.
@@ -56,6 +58,9 @@ type parsedConfig struct {
 
 func parseConfig(b []byte) (*parsedConfig, error) {
 	p := &parsedConfig{schemaLine: -1, opStart: -1}
+	if bytes.HasPrefix(b, []byte("\xef\xbb\xbf")) {
+		return nil, errors.New("the file starts with a byte order mark")
+	}
 	p.lines = strings.SplitAfter(string(b), "\n")
 	if p.lines[len(p.lines)-1] == "" {
 		p.lines = p.lines[:len(p.lines)-1]
@@ -67,7 +72,7 @@ func parseConfig(b []byte) (*parsedConfig, error) {
 		off += len(l)
 		body := strings.TrimSuffix(strings.TrimSuffix(l, "\n"), "\r")
 		if body != "" && !isIndented(body) && body[0] != '#' {
-			if strings.ContainsRune("{[\"'?", rune(body[0])) || strings.HasPrefix(body, "---") {
+			if strings.ContainsRune("{[\"'?%", rune(body[0])) || strings.HasPrefix(body, "---") || docEnd.MatchString(body) {
 				return nil, errors.New("a line at the first column starts with " + body[:1] + ", which is not a plain top-level entry")
 			}
 			if spacedKey.MatchString(body) {
@@ -147,7 +152,7 @@ func (p *parsedConfig) readSchema(i, lineOff int, body string) error {
 }
 
 func (p *parsedConfig) section() string {
-	return trimBlank(strings.Join(p.lines[p.opStart:p.opEnd], ""))
+	return trimBlank(strings.ReplaceAll(strings.Join(p.lines[p.opStart:p.opEnd], ""), "\r\n", "\n"))
 }
 
 // planConfig works out the bytes openspec/config.yaml should have, given its
@@ -199,7 +204,10 @@ func planConfig(got, ops []byte) ([]byte, ConfigState, error) {
 			out = append([]byte("schema: docket\n"), out...)
 		} else {
 			// the schema line precedes or follows the section; offsets shift only after the section
-			q, _ := parseConfig(out)
+			q, err := parseConfig(out)
+			if err != nil {
+				return nil, ConfigState{}, err
+			}
 			out = append(append(slices.Clone(out[:q.schemaStart]), "docket"...), out[q.schemaEnd:]...)
 		}
 	}
