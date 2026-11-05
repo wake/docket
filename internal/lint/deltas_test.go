@@ -85,11 +85,11 @@ func TestScenarioUnclaimed(t *testing.T) {
 	r1 := req("Join", "Join when full")
 	d := doc(r1)
 	f := &fakeOS{deltas: []openspec.Delta{delta("ADDED", "booking", r1)}}
-	rep := lintDeltas(t, f, map[string]string{pl: goodPlan, dp("booking"): d})
+	rep := lintDeltas(t, f, map[string]string{pl: goodPlan, dp("booking"): d, mp("booking"): doc()})
 	if !has(rep, "scenario-unclaimed", dp("booking"), lineOf(d, "Scenario: Join when full"), "booking#join-when-full") || len(rep.Findings) != 1 {
 		t.Fatalf("%+v", rep.Findings)
 	}
-	rep = lintDeltas(t, f, map[string]string{pl: planWith("**Scenarios:** booking#join-when-full"), dp("booking"): d})
+	rep = lintDeltas(t, f, map[string]string{pl: planWith("**Scenarios:** booking#join-when-full"), dp("booking"): d, mp("booking"): doc()})
 	if len(rep.Findings) != 0 {
 		t.Fatalf("%+v", rep.Findings)
 	}

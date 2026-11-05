@@ -80,7 +80,8 @@ type state struct {
 	in  Input
 	rep *Report
 
-	os OpenSpec // kept for the delta rules
+	os    OpenSpec // kept for the delta rules
+	mains map[string]*mainSpec
 
 	known     map[string]string
 	knownDone bool
@@ -240,4 +241,5 @@ func lintChange(r *state, c *loaded) {
 	if c.Has(planFile) {
 		checkPlan(r, c)
 	}
+	checkDeltas(r, c)
 }
