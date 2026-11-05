@@ -8,7 +8,7 @@ import (
 )
 
 // openSpecConfig is the openspec/config.yaml that OpenSpec 1.7.0 writes.
-const openSpecConfig = `schema: docket
+const openSpecConfig = `schema: spec-driven
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.

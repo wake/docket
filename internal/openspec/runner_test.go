@@ -194,7 +194,7 @@ func TestFakeInitWritesFiles(t *testing.T) {
 		}
 	}
 	b, _ := os.ReadFile(filepath.Join(r.Dir, "openspec/config.yaml"))
-	if !strings.HasPrefix(string(b), "schema: docket\n\n# Project context") {
+	if !strings.HasPrefix(string(b), "schema: spec-driven\n\n# Project context") {
 		t.Errorf("config = %q", b)
 	}
 }
