@@ -1,0 +1,48 @@
+#!/bin/sh
+# dkt for developing Docket. In any worktree of this repository it runs dkt
+# built from the local main branch, rebuilding bin/dkt in the main worktree
+# whenever main has moved; elsewhere it runs the next dkt on PATH.
+set -eu
+
+run_next() {
+	self=$(cd "$(dirname "$0")" && pwd -P)
+	rest=$PATH:
+	while [ -n "$rest" ]; do
+		d=${rest%%:*}
+		rest=${rest#*:}
+		[ -n "$d" ] && [ -f "$d/dkt" ] && [ -x "$d/dkt" ] || continue
+		[ "$(cd "$d" 2>/dev/null && pwd -P)" != "$self" ] || continue
+		exec "$d/dkt" "$@"
+	done
+	echo "dkt: no dkt on PATH besides $self" >&2
+	exit 127
+}
+
+root=$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')
+if [ -z "$root" ] || ! grep -qx 'module github.com/wake/docket' "$root/go.mod" 2>/dev/null; then
+	run_next "$@"
+fi
+
+want=$(git -C "$root" rev-parse --verify -q 'refs/heads/main^{commit}') || {
+	echo "dkt: no main branch to build in $root" >&2
+	exit 1
+}
+bin=$root/bin
+if [ ! -x "$bin/dkt" ] || [ "$(cat "$bin/dkt.rev" 2>/dev/null)" != "$want" ]; then
+	short=$(git -C "$root" rev-parse --short "$want")
+	echo "dkt: building main@$short into $bin/dkt" >&2
+	src=$(mktemp -d)
+	trap 'rm -rf "$src"' EXIT
+	# Build the commit, not the main worktree's files, which may hold uncommitted edits.
+	git -C "$root" archive "$want" | tar -x -C "$src"
+	mkdir -p "$bin"
+	(cd "$src" && go build -trimpath -o "$bin/dkt.$$" \
+		-ldflags "-X github.com/wake/docket/internal/cli.Version=main@$short" ./cmd/dkt)
+	# The binary first, so that a run in between sees an old rev and rebuilds.
+	mv -f "$bin/dkt.$$" "$bin/dkt"
+	printf '%s\n' "$want" >"$bin/dkt.rev.$$"
+	mv -f "$bin/dkt.rev.$$" "$bin/dkt.rev"
+	rm -rf "$src"
+	trap - EXIT
+fi
+exec "$bin/dkt" "$@"
