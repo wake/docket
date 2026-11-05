@@ -3,6 +3,7 @@ package setup
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -214,22 +215,31 @@ var rename = os.Rename
 // permission bits are kept exactly (keepMode); a new file gets perm subject
 // to the umask.
 func install(dst string, data []byte, perm os.FileMode, keepMode bool, rel string) (err error) {
-	f, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".docket-tmp-*")
+	var f *os.File
+	var tmp string
+	for try := 0; try < 10; try++ {
+		var rnd [8]byte
+		if _, err = rand.Read(rnd[:]); err != nil {
+			return fmt.Errorf("write %s: %w", rel, err)
+		}
+		tmp = filepath.Join(filepath.Dir(dst), "."+filepath.Base(dst)+".docket-tmp-"+hex.EncodeToString(rnd[:]))
+		// a new file gets perm as is, so the kernel applies the umask
+		f, err = os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, perm)
+		if !errors.Is(err, fs.ErrExist) {
+			break
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("write %s: %w", rel, err)
 	}
-	tmp := f.Name()
 	defer func() {
 		if err != nil {
 			os.Remove(tmp)
 		}
 	}()
-	if !keepMode {
-		m := syscall.Umask(0)
-		syscall.Umask(m)
-		perm &^= os.FileMode(m)
+	if keepMode {
+		err = f.Chmod(perm)
 	}
-	err = f.Chmod(perm)
 	if err == nil {
 		_, err = f.Write(data)
 	}
