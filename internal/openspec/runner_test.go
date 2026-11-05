@@ -41,8 +41,8 @@ func newRunner(t *testing.T, version string, extra ...string) (*openspec.Runner,
 }
 
 func TestOverrideWithNpx(t *testing.T) {
-	fake, log := testutil.FakeOpenSpec(t, "1.7.0")
-	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+fake+" -y @fission-ai/openspec@1.7.0")
+	fake, log := testutil.FakeOpenSpec(t, "1.14.0")
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+fake+" -y @fission-ai/openspec@1.14.0")
 	r, err := openspec.New(t.TempDir(), env)
 	if err != nil {
 		t.Fatal(err)
@@ -51,8 +51,8 @@ func TestOverrideWithNpx(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := [][]string{
-		{"OPENSPEC_TELEMETRY=0", "-y", "@fission-ai/openspec@1.7.0", "--version"},
-		{"OPENSPEC_TELEMETRY=0", "-y", "@fission-ai/openspec@1.7.0", "init", "--tools", "claude"},
+		{"OPENSPEC_TELEMETRY=0", "-y", "@fission-ai/openspec@1.14.0", "--version"},
+		{"OPENSPEC_TELEMETRY=0", "-y", "@fission-ai/openspec@1.14.0", "init", "--tools", "claude"},
 	}
 	if got := readLog(t, log); !reflect.DeepEqual(got, want) {
 		t.Fatalf("log = %q, want %q", got, want)
@@ -60,7 +60,7 @@ func TestOverrideWithNpx(t *testing.T) {
 }
 
 func TestDefaultFromPath(t *testing.T) {
-	fake, log := testutil.FakeOpenSpec(t, "1.7.0")
+	fake, log := testutil.FakeOpenSpec(t, "1.14.0")
 	bin := t.TempDir()
 	b, err := os.ReadFile(fake)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestDefaultFromPath(t *testing.T) {
 }
 
 func TestTelemetryOffOnEveryInvocation(t *testing.T) {
-	r, log := newRunner(t, "1.7.0", "OPENSPEC_TELEMETRY=1")
+	r, log := newRunner(t, "1.14.0", "OPENSPEC_TELEMETRY=1")
 	if _, err := r.Run("--help"); err != nil {
 		t.Fatal(err)
 	}
@@ -100,16 +100,16 @@ func TestTelemetryOffOnEveryInvocation(t *testing.T) {
 }
 
 func TestTooOld(t *testing.T) {
-	r, log := newRunner(t, "1.6.2")
+	r, log := newRunner(t, "1.13.2")
 	_, err := r.Run("init", "--tools", "claude")
 	var ue *openspec.UnsupportedError
-	if !errors.As(err, &ue) || ue.Found != "1.6.2" {
+	if !errors.As(err, &ue) || ue.Found != "1.13.2" {
 		t.Fatalf("err = %#v", err)
 	}
 	if got := readLog(t, log); len(got) != 1 {
 		t.Fatalf("only --version should run: %q", got)
 	}
-	for _, want := range []string{"1.6.2", "1.7.0", "DOCKET_OPENSPEC"} {
+	for _, want := range []string{"1.13.2", "1.14.0", "DOCKET_OPENSPEC"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("message %q lacks %q", err.Error(), want)
 		}
@@ -118,10 +118,10 @@ func TestTooOld(t *testing.T) {
 
 func TestVersionAcceptance(t *testing.T) {
 	cases := map[string]bool{
-		"1.7.0": true, "1.7.1": true, "1.10.0": true, "2.0.0": true, "10.0.0": true,
-		"1.6.9": false, "1.7": false, "abc": false, "v1.7.0": false, "1.7.0-beta": false,
-		"1.7.x": false, "": false,
-		"1.7.0\n": true, "  1.7.0  \n": true, "1.7.0\nupdate available": false,
+		"1.14.0": true, "1.14.1": true, "1.20.0": true, "2.0.0": true, "10.0.0": true,
+		"1.13.2": false, "1.7.0": false, "1.14": false, "abc": false, "v1.14.0": false, "1.14.0-beta": false,
+		"1.14.x": false, "": false,
+		"1.14.0\n": true, "  1.14.0  \n": true, "1.14.0\nupdate available": false,
 	}
 	for v, ok := range cases {
 		r, _ := newRunner(t, v)
@@ -137,7 +137,7 @@ func TestVersionAcceptance(t *testing.T) {
 }
 
 func TestFailingVersionIsUnsupported(t *testing.T) {
-	r, _ := newRunner(t, "1.7.0", "FAKE_OPENSPEC_FAIL=--version")
+	r, _ := newRunner(t, "1.14.0", "FAKE_OPENSPEC_FAIL=--version")
 	_, err := r.CheckVersion()
 	var ue *openspec.UnsupportedError
 	var ua *openspec.UnavailableError
@@ -173,7 +173,7 @@ func TestUnstartableProgramIsUnavailable(t *testing.T) {
 }
 
 func TestFailureCarriesCommandCodeStderr(t *testing.T) {
-	r, _ := newRunner(t, "1.7.0")
+	r, _ := newRunner(t, "1.14.0")
 	_, err := r.Run("init", "--tools", "nosuch")
 	var fe *openspec.FailedError
 	if !errors.As(err, &fe) || fe.Code != 1 || !strings.Contains(fe.Stderr, "nosuch") {
@@ -190,7 +190,7 @@ func TestFailureCarriesCommandCodeStderr(t *testing.T) {
 }
 
 func TestFakeInitWritesFiles(t *testing.T) {
-	r, _ := newRunner(t, "1.7.0")
+	r, _ := newRunner(t, "1.14.0")
 	if _, err := r.Run("init", "--tools", "claude"); err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestFakeInitWritesFiles(t *testing.T) {
 }
 
 func TestEnvironmentPassesThrough(t *testing.T) {
-	fake, log := testutil.FakeOpenSpec(t, "1.7.0")
+	fake, log := testutil.FakeOpenSpec(t, "1.14.0")
 	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+fake, "FOO=bar")
 	r, err := openspec.New(t.TempDir(), env)
 	if err != nil {
@@ -222,14 +222,14 @@ func TestEnvironmentPassesThrough(t *testing.T) {
 }
 
 func TestFakeCreatesEmptyLog(t *testing.T) {
-	_, log := testutil.FakeOpenSpec(t, "1.7.0")
+	_, log := testutil.FakeOpenSpec(t, "1.14.0")
 	if got := readLog(t, log); len(got) != 0 {
 		t.Fatalf("log = %q", got)
 	}
 }
 
 func TestRepoOpenspecNotFoundThroughPath(t *testing.T) {
-	fake, _ := testutil.FakeOpenSpec(t, "1.7.0")
+	fake, _ := testutil.FakeOpenSpec(t, "1.14.0")
 	b, err := os.ReadFile(fake)
 	if err != nil {
 		t.Fatal(err)
@@ -253,7 +253,7 @@ func TestRepoOpenspecNotFoundThroughPath(t *testing.T) {
 }
 
 func TestRelativeOverrideResolvesAgainstDir(t *testing.T) {
-	fake, _ := testutil.FakeOpenSpec(t, "1.7.0")
+	fake, _ := testutil.FakeOpenSpec(t, "1.14.0")
 	b, _ := os.ReadFile(fake)
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {

@@ -3,9 +3,10 @@ package setup
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"os"
 	"strings"
 	"testing"
+
+	"github.com/wake/docket/internal/testutil"
 )
 
 const testOps = "operations:\n  archive:\n    guidance:\n      - \"x\"\n"
@@ -16,12 +17,8 @@ func plan(t *testing.T, in string) (string, ConfigState, error) {
 	return string(out), st, err
 }
 
-func TestPlanConfigOpenSpec170Fixture(t *testing.T) {
-	b, err := os.ReadFile("../../.superpowers/sdd/add-init-and-inspect/openspec-1.7.0-config.yaml")
-	if err != nil {
-		t.Skip("fixture not present")
-	}
-	in := string(b)
+func TestPlanConfigOpenSpecDefault(t *testing.T) {
+	in := testutil.OpenSpecConfig
 	out, st, err := plan(t, in)
 	if err != nil {
 		t.Fatal(err)

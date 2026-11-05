@@ -15,7 +15,7 @@ import (
 )
 
 // Minimum is the oldest OpenSpec version Docket works with; there is no upper bound.
-const Minimum = "1.7.0"
+const Minimum = "1.14.0"
 
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
@@ -138,7 +138,7 @@ func (r *Runner) exec(args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
-// atLeastMinimum compares MAJOR.MINOR.PATCH numerically (so 1.10.0 > 1.7.0).
+// atLeastMinimum compares MAJOR.MINOR.PATCH numerically (so 1.20.0 > 1.14.0).
 func atLeastMinimum(v string) bool {
 	got, want := strings.Split(v, "."), strings.Split(Minimum, ".")
 	for i := range want {

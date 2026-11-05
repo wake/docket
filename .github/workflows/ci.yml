@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        openspec: ['1.7.0', 'latest']
+        openspec: ['1.14.0', 'latest']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7

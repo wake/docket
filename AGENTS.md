@@ -22,7 +22,7 @@ Once `dkt init`, `dkt new`, `dkt sync` and `dkt lint` exist, run `dkt init` on t
 ## Development
 
 - The Go module goes at the repository root and is created by the first rebuild change. Once `go.mod` exists, check with `go vet ./...` and `go test ./...`.
-- Requires OpenSpec 1.7.0 or later.
+- Requires OpenSpec 1.14.0 or later.
 
 ## Prompt files
 

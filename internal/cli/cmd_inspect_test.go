@@ -94,7 +94,7 @@ func TestInspectNothingWritten(t *testing.T) {
 	before := snapshot(r.Dir)
 	exclude := filepath.Join(r.Dir, ".git/info/exclude")
 	b0, _ := os.ReadFile(exclude)
-	code, _, _ := inspect(t, r, "1.7.0", false)
+	code, _, _ := inspect(t, r, "1.14.0", false)
 	b1, _ := os.ReadFile(exclude)
 	if code != 1 || snapshot(r.Dir) != before || string(b0) != string(b1) {
 		t.Errorf("code=%d, tree changed", code)
@@ -104,12 +104,12 @@ func TestInspectNothingWritten(t *testing.T) {
 func TestInspectCleanSetup(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
-	code, m, _ := inspect(t, r, "1.7.0", false)
+	code, m, _ := inspect(t, r, "1.14.0", false)
 	if code != 0 || len(m.Findings) != 0 || len(m.Unreadable) != 0 {
 		t.Fatalf("code=%d %+v", code, m)
 	}
 	o := m.Result.OpenSpec
-	if o.Version == nil || *o.Version != "1.7.0" || o.Minimum != "1.7.0" || !o.Supported {
+	if o.Version == nil || *o.Version != "1.14.0" || o.Minimum != "1.14.0" || !o.Supported {
 		t.Errorf("openspec = %+v", o)
 	}
 	if len(m.Result.Files) == 0 {
@@ -124,7 +124,7 @@ func TestInspectCleanSetup(t *testing.T) {
 
 func TestInspectBeforeInit(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, m, _ := inspect(t, r, "1.7.0", false)
+	code, m, _ := inspect(t, r, "1.14.0", false)
 	got := rules(m)
 	for _, k := range []string{"schema-missing", "skill-missing", "config-schema-default", "guidance-missing"} {
 		if _, ok := got[k]; !ok {
@@ -150,7 +150,7 @@ func TestInspectEditedSkill(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
 	r.Write(".claude/skills/docket/SKILL.md", "mine")
-	_, m, _ := inspect(t, r, "1.7.0", false)
+	_, m, _ := inspect(t, r, "1.14.0", false)
 	if one(m, "skill-differs") != ".claude/skills/docket/SKILL.md" {
 		t.Errorf("%+v", m.Findings)
 	}
@@ -165,7 +165,7 @@ func TestInspectConfigOutdatedAndOther(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
 	r.Write("openspec/config.yaml", "schema: spec-driven\n")
-	_, m, _ := inspect(t, r, "1.7.0", false)
+	_, m, _ := inspect(t, r, "1.14.0", false)
 	got := rules(m)
 	if _, ok := got["config-schema-default"]; !ok {
 		t.Errorf("%v", got)
@@ -179,7 +179,7 @@ func TestInspectConfigOutdatedAndOther(t *testing.T) {
 		}
 	}
 	r.Write("openspec/config.yaml", "schema: team-flow\n")
-	_, m, _ = inspect(t, r, "1.7.0", false)
+	_, m, _ = inspect(t, r, "1.14.0", false)
 	if one(m, "config-schema-other") != "openspec/config.yaml" {
 		t.Errorf("%+v", m.Findings)
 	}
@@ -208,7 +208,7 @@ func TestInspectSymlinkedSkillFolder(t *testing.T) {
 	if err := os.Symlink(t.TempDir(), filepath.Join(r.Dir, ".claude/skills/docket")); err != nil {
 		t.Fatal(err)
 	}
-	code, m, _ := inspect(t, r, "1.7.0", false)
+	code, m, _ := inspect(t, r, "1.14.0", false)
 	if code != 1 || one(m, "symlink-refused") != ".claude/skills/docket" {
 		t.Errorf("code=%d %+v", code, m.Findings)
 	}
@@ -217,16 +217,16 @@ func TestInspectSymlinkedSkillFolder(t *testing.T) {
 func TestInspectOpenSpecVersions(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
-	code, m, _ := inspect(t, r, "1.6.2", false)
+	code, m, _ := inspect(t, r, "1.13.2", false)
 	o := m.Result.OpenSpec
-	if code != 1 || o.Version == nil || *o.Version != "1.6.2" || o.Supported {
+	if code != 1 || o.Version == nil || *o.Version != "1.13.2" || o.Supported {
 		t.Errorf("code=%d %+v", code, o)
 	}
 	if _, ok := rules(m)["openspec-unsupported"]; !ok {
 		t.Errorf("%+v", m.Findings)
 	}
 	code, m, _ = inspect(t, r, "", false)
-	if code != 1 || m.Result.OpenSpec.Version != nil || m.Result.OpenSpec.Supported || m.Result.OpenSpec.Minimum != "1.7.0" {
+	if code != 1 || m.Result.OpenSpec.Version != nil || m.Result.OpenSpec.Supported || m.Result.OpenSpec.Minimum != "1.14.0" {
 		t.Errorf("code=%d %+v", code, m.Result.OpenSpec)
 	}
 	if _, ok := rules(m)["openspec-missing"]; !ok {
@@ -237,7 +237,7 @@ func TestInspectOpenSpecVersions(t *testing.T) {
 func TestInspectIgnored(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Write(".git/info/exclude", "# 1\n# 2\n# 3\n# 4\n# 5\n# 6\nopenspec/\n")
-	_, m, _ := inspect(t, r, "1.7.0", false)
+	_, m, _ := inspect(t, r, "1.14.0", false)
 	for _, f := range m.Findings {
 		if f.Rule == "install-ignored" && f.File == "openspec/config.yaml" {
 			if !strings.Contains(f.Message, ".git/info/exclude:7: openspec/") {
@@ -259,7 +259,7 @@ func TestInspectUnreadable(t *testing.T) {
 	if err := os.Mkdir(p, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	code, m, _ := inspect(t, r, "1.7.0", false)
+	code, m, _ := inspect(t, r, "1.14.0", false)
 	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != ".agents/skills/docket/SKILL.md" {
 		t.Errorf("code=%d %+v", code, m.Unreadable)
 	}
@@ -270,7 +270,7 @@ func TestInspectUnparsableConfig(t *testing.T) {
 		r := testutil.NewRepo(t)
 		installed(t, r)
 		r.Write("openspec/config.yaml", c)
-		code, m, _ := inspect(t, r, "1.7.0", false)
+		code, m, _ := inspect(t, r, "1.14.0", false)
 		got := rules(m)
 		_, a := got["config-schema-default"]
 		_, b := got["guidance-missing"]
@@ -301,7 +301,7 @@ func TestInspectOutdatedTemplate(t *testing.T) {
 	}
 	r.Write(path, "an earlier release\n")
 	withEarlier(t, path, "an earlier release\n")
-	code, m, _ := inspect(t, r, "1.7.0", false)
+	code, m, _ := inspect(t, r, "1.14.0", false)
 	if code != 1 || one(m, "schema-outdated") != path {
 		t.Fatalf("code=%d %+v", code, m.Findings)
 	}
@@ -318,7 +318,7 @@ func TestInspectOutdatedGuidance(t *testing.T) {
 	sec := "operations:\n  apply:\n    guidance:\n      - old\n"
 	r.Write("openspec/config.yaml", "schema: docket\n\n"+sec)
 	withEarlier(t, "openspec/config.yaml#operations", sec)
-	code, m, _ := inspect(t, r, "1.7.0", false)
+	code, m, _ := inspect(t, r, "1.14.0", false)
 	if code != 1 || len(m.Findings) != 1 || one(m, "guidance-outdated") != "openspec/config.yaml" {
 		t.Errorf("code=%d %+v", code, m.Findings)
 	}
@@ -327,7 +327,7 @@ func TestInspectOutdatedGuidance(t *testing.T) {
 func TestInspectRelativeOpenSpecFromSubdirectory(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
-	fake, _ := testutil.FakeOpenSpec(t, "1.7.0")
+	fake, _ := testutil.FakeOpenSpec(t, "1.14.0")
 	b, err := os.ReadFile(fake)
 	if err != nil {
 		t.Fatal(err)
@@ -346,14 +346,14 @@ func TestInspectRelativeOpenSpecFromSubdirectory(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &m); err != nil {
 		t.Fatal(err)
 	}
-	if m.Result.OpenSpec.Version == nil || *m.Result.OpenSpec.Version != "1.7.0" || len(rules(m)["openspec-missing"]) != 0 {
+	if m.Result.OpenSpec.Version == nil || *m.Result.OpenSpec.Version != "1.14.0" || len(rules(m)["openspec-missing"]) != 0 {
 		t.Errorf("code=%d %s", code, out)
 	}
 }
 
 func TestInspectStartsOpenSpecOnlyForVersion(t *testing.T) {
 	r := testutil.NewRepo(t)
-	fake, log := testutil.FakeOpenSpec(t, "1.7.0")
+	fake, log := testutil.FakeOpenSpec(t, "1.14.0")
 	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+fake)
 	runIn(t, r.Dir, env, "inspect", "--json")
 	b, _ := os.ReadFile(log)
@@ -367,17 +367,17 @@ func TestInspectText(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
 	ds, _, _ := setup.Decide(r.Dir, shippedFS(), false)
-	code, _, out := inspect(t, r, "1.7.0", true)
+	code, _, out := inspect(t, r, "1.14.0", true)
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if code != 0 || len(lines) != 1+len(ds) || lines[0] != "OpenSpec 1.7.0 (minimum 1.7.0)" || lines[1] != "same  "+ds[0].Path {
+	if code != 0 || len(lines) != 1+len(ds) || lines[0] != "OpenSpec 1.14.0 (minimum 1.14.0)" || lines[1] != "same  "+ds[0].Path {
 		t.Errorf("code=%d %q", code, out)
 	}
 	_, _, out = inspect(t, r, "", true)
-	if !strings.HasPrefix(out, "OpenSpec: not found (minimum 1.7.0)\n") {
+	if !strings.HasPrefix(out, "OpenSpec: not found (minimum 1.14.0)\n") {
 		t.Errorf("%q", out)
 	}
-	_, _, out = inspect(t, r, "1.6.2", true)
-	if !strings.HasPrefix(out, "OpenSpec 1.6.2: unsupported (minimum 1.7.0)\n") {
+	_, _, out = inspect(t, r, "1.13.2", true)
+	if !strings.HasPrefix(out, "OpenSpec 1.13.2: unsupported (minimum 1.14.0)\n") {
 		t.Errorf("%q", out)
 	}
 }
