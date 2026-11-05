@@ -3,9 +3,11 @@ package cli
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/setup"
 	"github.com/wake/docket/internal/testutil"
@@ -48,11 +50,40 @@ func TestRealOpenSpec(t *testing.T) {
 		t.Errorf("files lack openspec/config.yaml (%v) or .claude/skills/openspec-* (%v): %+v", config, skill, m.Result.Files)
 	}
 
+	r.Git("add", "-A") // as a user commits what init created
+	r.Git("commit", "-q", "-m", "set up")
+
+	code, out, errs = runIn(t, r.Dir, env, "new", "add-x", "--json", "--kind", "feature", "--source", "x", "--title", "Add x")
+	if code != 0 {
+		t.Fatalf("new: code=%d out=%q err=%q", code, out, errs)
+	}
+	var nw newOut
+	if err := json.Unmarshal([]byte(out), &nw); err != nil {
+		t.Fatalf("%q: %v", out, err)
+	}
+	if nw.Result.Slug != "add-x" || len(nw.Result.Used) != 0 {
+		t.Errorf("new result = %+v, want slug add-x and no used", nw.Result)
+	}
+	meta, err := os.ReadFile(filepath.Join(r.Dir, "openspec/changes/add-x/.openspec.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains("\n"+string(meta), "\nschema: docket\n") {
+		t.Errorf(".openspec.yaml lacks schema: docket: %q", meta)
+	}
+	prop, err := os.ReadFile(filepath.Join(r.Dir, "openspec/changes/add-x/proposal.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := change.FrontMatter("Add x", "feature", "x"); string(prop) != string(want) {
+		t.Errorf("proposal.md = %q, want %q", prop, want)
+	}
+
 	rn, err := openspec.New(r.Dir, env)
 	if err != nil {
 		t.Fatal(err)
 	}
-	steps := [][]string{{"new", "change", "add-x"}}
+	var steps [][]string
 	for _, a := range []string{"proposal", "specs", "design", "plan"} {
 		steps = append(steps, []string{"instructions", a, "--change", "add-x"})
 	}
