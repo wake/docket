@@ -145,7 +145,13 @@ func decide(root string, t target, force bool) (Decision, *Problem) {
 		return d, &p
 	}
 	abs := filepath.Join(root, filepath.FromSlash(t.rel))
-	got, err := readNoFollow(abs)
+	var got []byte
+	fi, err := os.Lstat(abs)
+	if err == nil && !fi.Mode().IsRegular() { // never open a FIFO or socket
+		err = fmt.Errorf("%s is not a regular file", t.rel)
+	} else if err == nil {
+		got, err = readNoFollow(abs)
+	}
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return d, &Problem{Path: t.rel, Kind: ProblemUnreadable, Err: err}
 	}
@@ -167,7 +173,9 @@ func decide(root string, t target, force bool) (Decision, *Problem) {
 }
 
 // Write carries out the decisions whose Action is create, update or overwrite,
-// never following a link, and returns the first error.
+// never following a link, and returns the first error. The decisions must
+// come from a Decide run just before: Write re-checks nothing beyond not
+// following the final link.
 func Write(root string, ds []Decision) error {
 	for _, d := range ds {
 		if d.Action != ActionCreate && d.Action != ActionUpdate && d.Action != ActionOverwrite {
@@ -206,19 +214,22 @@ var rename = os.Rename
 // permission bits are kept exactly (keepMode); a new file gets perm subject
 // to the umask.
 func install(dst string, data []byte, perm os.FileMode, keepMode bool, rel string) (err error) {
-	tmp := fmt.Sprintf("%s.docket-tmp-%d", dst, os.Getpid())
-	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, perm)
+	f, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".docket-tmp-*")
 	if err != nil {
 		return fmt.Errorf("write %s: %w", rel, err)
 	}
+	tmp := f.Name()
 	defer func() {
 		if err != nil {
 			os.Remove(tmp)
 		}
 	}()
-	if keepMode {
-		err = f.Chmod(perm)
+	if !keepMode {
+		m := syscall.Umask(0)
+		syscall.Umask(m)
+		perm &^= os.FileMode(m)
 	}
+	err = f.Chmod(perm)
 	if err == nil {
 		_, err = f.Write(data)
 	}
