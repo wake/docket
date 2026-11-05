@@ -163,7 +163,8 @@ func checkDeltas(r *state, c *loaded) {
 		}
 		for _, item := range t.Scenarios {
 			capability, slug, ok := strings.Cut(item, "#")
-			if !ok || capability == "" || slug == "" || strings.Contains(slug, "#") {
+			if !ok || capability == "" || slug == "" || strings.Contains(slug, "#") ||
+				!fs.ValidPath(capability) || strings.HasPrefix(capability, "-") {
 				r.add(c, "scenario-ref", planFile, t.ScenariosLine,
 					"Task %d: %q is not `none` or `<capability>#<slug>`", t.Number, item)
 				continue
