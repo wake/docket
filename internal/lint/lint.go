@@ -133,7 +133,12 @@ func Run(in Input) (Report, error) {
 		}
 	}
 	if len(in.Slugs) == 0 {
-		checkSpecTitles(r)
+		fnd, us, n := SpecTitles(in.Root)
+		rep.Findings = append(rep.Findings, fnd...)
+		for _, u := range us {
+			r.unreadable(u.Source, errors.New(u.Reason))
+		}
+		rep.Specs = n
 	}
 	sort.Slice(rep.Changes, func(i, j int) bool { return rep.Changes[i].Slug < rep.Changes[j].Slug })
 	sort.SliceStable(rep.Findings, func(i, j int) bool {
