@@ -20,6 +20,9 @@ func readLog(t *testing.T, log string) [][]string {
 		t.Fatalf("read log: %v", err)
 	}
 	var out [][]string
+	if len(b) == 0 {
+		return out
+	}
 	for _, l := range strings.Split(strings.TrimRight(string(b), "\n"), "\n") {
 		out = append(out, strings.Split(l, "\t"))
 	}
@@ -118,11 +121,12 @@ func TestVersionAcceptance(t *testing.T) {
 		"1.7.0": true, "1.7.1": true, "1.10.0": true, "2.0.0": true, "10.0.0": true,
 		"1.6.9": false, "1.7": false, "abc": false, "v1.7.0": false, "1.7.0-beta": false,
 		"1.7.x": false, "": false,
+		"1.7.0\n": true, "  1.7.0  \n": true, "1.7.0\nupdate available": false,
 	}
 	for v, ok := range cases {
 		r, _ := newRunner(t, v)
 		got, err := r.CheckVersion()
-		if ok && (err != nil || got != v) {
+		if ok && (err != nil || got != strings.TrimSpace(v)) {
 			t.Errorf("%q: got %q, %v", v, got, err)
 		}
 		var ue *openspec.UnsupportedError
@@ -178,8 +182,10 @@ func TestFailureCarriesCommandCodeStderr(t *testing.T) {
 	if got := strings.Join(fe.Command[len(fe.Command)-3:], " "); got != "init --tools nosuch" {
 		t.Errorf("command = %q", fe.Command)
 	}
-	if !strings.Contains(err.Error(), "exited with 1") {
-		t.Errorf("message = %q", err.Error())
+	for _, want := range []string{"init --tools nosuch", "exited with 1", "unknown tool 'nosuch'"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message %q lacks %q", err.Error(), want)
+		}
 	}
 }
 
@@ -196,5 +202,71 @@ func TestFakeInitWritesFiles(t *testing.T) {
 	b, _ := os.ReadFile(filepath.Join(r.Dir, "openspec/config.yaml"))
 	if !strings.HasPrefix(string(b), "schema: spec-driven\n\n# Project context") {
 		t.Errorf("config = %q", b)
+	}
+}
+
+func TestEnvironmentPassesThrough(t *testing.T) {
+	fake, log := testutil.FakeOpenSpec(t, "1.7.0")
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC="+fake, "FOO=bar")
+	r, err := openspec.New(t.TempDir(), env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Run("--help"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(log + ".foo")
+	if err != nil || string(b) != "bar\nbar\n" {
+		t.Fatalf("FOO log = %q, %v", b, err)
+	}
+}
+
+func TestFakeCreatesEmptyLog(t *testing.T) {
+	_, log := testutil.FakeOpenSpec(t, "1.7.0")
+	if got := readLog(t, log); len(got) != 0 {
+		t.Fatalf("log = %q", got)
+	}
+}
+
+func TestRepoOpenspecNotFoundThroughPath(t *testing.T) {
+	fake, _ := testutil.FakeOpenSpec(t, "1.7.0")
+	b, err := os.ReadFile(fake)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{":" + t.TempDir(), ".", "bin"} {
+		repo := t.TempDir()
+		for _, p := range []string{"openspec", "bin/openspec"} {
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, p)), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(repo, p), b, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		_, err := openspec.New(repo, append(testutil.Env(t), "DOCKET_OPENSPEC=", "PATH="+path))
+		var ua *openspec.UnavailableError
+		if !errors.As(err, &ua) {
+			t.Errorf("PATH=%q: err = %v, want UnavailableError", path, err)
+		}
+	}
+}
+
+func TestRelativeOverrideResolvesAgainstDir(t *testing.T) {
+	fake, _ := testutil.FakeOpenSpec(t, "1.7.0")
+	b, _ := os.ReadFile(fake)
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "bin/openspec"), b, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r, err := openspec.New(dir, append(testutil.Env(t), "DOCKET_OPENSPEC=./bin/openspec"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !filepath.IsAbs(r.Cmd[0]) {
+		t.Fatalf("Cmd[0] = %q", r.Cmd[0])
 	}
 }
