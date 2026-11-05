@@ -1,6 +1,8 @@
 package lint
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -107,9 +109,43 @@ func TestNewCapabilities(t *testing.T) {
 			t.Errorf("%v", rep.Findings)
 		}
 	})
-	t.Run("front matter error means no names", func(t *testing.T) {
-		rep := lintX(t, map[string]string{"proposal.md": "---\ntitle: T\ntitle: U\n---\n" + goodSections, "specs/booking/spec.md": spec})
-		if !has(rep, "title-missing", pf, 0, "booking") {
+	t.Run("docket front matter error is the only finding", func(t *testing.T) {
+		rep := lintX(t, map[string]string{"proposal.md": "---\ntitle: T\nkind: feature\n" + goodSections, "specs/booking/spec.md": spec})
+		if len(rep.Findings) != 1 || rep.Findings[0].Rule != "metadata-invalid" {
+			t.Errorf("%v", rep.Findings)
+		}
+	})
+	t.Run("other schema front matter error means no names", func(t *testing.T) {
+		rep := lintX(t, map[string]string{".openspec.yaml": "schema: spec-driven\n", "proposal.md": "---\ntitle: T\ntitle: U\n---\n" + goodSections, "specs/booking/spec.md": spec})
+		if len(rep.Findings) != 1 || !has(rep, "title-missing", pf, 0, "booking") {
+			t.Errorf("%v", rep.Findings)
+		}
+	})
+	t.Run("level three Why is not a section", func(t *testing.T) {
+		rep := lintX(t, map[string]string{"proposal.md": strings.Replace(goodProposal, "## Why", "### Why", 1)})
+		if !has(rep, "proposal-section", pf, 0, "Why") || count(rep, "proposal-section") != 1 {
+			t.Errorf("%v", rep.Findings)
+		}
+	})
+	t.Run("symbolic link in a change is not read", func(t *testing.T) {
+		dir := t.TempDir()
+		for p, c := range map[string]string{
+			pf:           goodProposal,
+			"outside.md": "<!-- Explain the motivation for this change. What problem does this solve? Why now? -->\n",
+		} {
+			if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, p)), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, p), []byte(c), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.Symlink("../../../outside.md", filepath.Join(dir, "openspec/changes/add-x/notes.md")); err != nil {
+			t.Fatal(err)
+		}
+		in, _ := open(t, dir)
+		in.Slugs = []string{"add-x"}
+		if rep := run(t, in); len(rep.Findings) != 0 {
 			t.Errorf("%v", rep.Findings)
 		}
 	})
