@@ -59,7 +59,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Files:** `internal/cli/realopenspec_test.go`
 
 - [x] 5.1 Change `TestRealOpenSpec` to open its change with `dkt new add-x --json --kind feature --source x --title "Add x"`: exit 0, `result.slug` is `add-x`, `.openspec.yaml` names `docket`, `proposal.md` holds the front matter; the `instructions` and `status` calls stay; verify it is skipped without `DOCKET_TEST_OPENSPEC=1` and passes locally with OpenSpec 1.7.0 and the latest
-- [ ] 5.2 Verify the `openspec` CI job passes for both versions on the pull request
+- [x] 5.2 Verify the `openspec` CI job passes for both versions on the pull request
 
 ## 6. Integration
 
