@@ -48,7 +48,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 ## 4. dkt new
 
 **Review:** judgment (error paths, output format)
-**Files:** `internal/cli/cmd_new.go`, `internal/cli/cmd_new_test.go`, `internal/cli/command.go`, `internal/cli/cmd_init.go`, `internal/testutil/openspec.go`
+**Files:** `internal/cli/cmd_new.go`, `internal/cli/cmd_new_test.go`, `internal/cli/runner.go`, `internal/cli/command.go`, `internal/cli/cmd_init.go`, `internal/testutil/openspec.go`
 
 - [ ] 4.1 Extend the fake OpenSpec with `new change` (design.md, Tests), and write failing tests for every scenario of change-creation, the scenarios Kind outside the list, Blank title and Source on two lines (change-metadata), and New outside a repository (cli-output), plus: in the scenario Changes folder is a link, the fake's log is empty (not even `--version` ran); OpenSpec missing and too old exit 4 with nothing created; the fake's log shows `new change <slug> --schema docket`; a `config.yaml` naming another schema still gets `--schema docket`; a stray file `openspec/changes/add-x` in this worktree makes the slug `add-x-2`; a link appearing on the path while OpenSpec runs leaves the folder and gives `symlink-refused`; the text output names the folder and, after a suffix, the used folders with at most three sources; verify they fail
 - [ ] 4.2 Implement `dkt new` (design.md, Order of steps, Lock, OpenSpec failure, Result); verify every test passes
