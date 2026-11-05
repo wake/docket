@@ -66,13 +66,21 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 		cmd.Define(fs)
 	}
 	fs.BoolVar(&ctx.JSON, "json", asJSON, "print one JSON object")
+	// Flags and positionals may interleave: parse, take one positional, parse the rest.
+	var pos []string
 	err := fs.Parse(args)
+	for err == nil && fs.NArg() > 0 {
+		pos = append(pos, fs.Arg(0))
+		err = fs.Parse(fs.Args()[1:])
+	}
 	if errors.Is(err, flag.ErrHelp) {
 		commandHelp(o.Stdout, cmd, fs)
 		return 0
 	}
-	if err == nil && fs.NArg() > 0 {
-		err = fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	if err == nil && len(pos) > cmd.Args {
+		err = fmt.Errorf("unexpected argument %q", pos[cmd.Args])
+	} else if err == nil && len(pos) < cmd.Args {
+		err = fmt.Errorf("missing argument: dkt %s", cmd.Usage)
 	}
 	if err != nil {
 		msg := err.Error()
@@ -83,7 +91,7 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 	var out Outcome
 	ctx.Git = gitx.Git{Dir: o.Dir, Env: o.Env}
 	if ctx.Repo, err = identify(ctx); err == nil {
-		out, err = cmd.Run(ctx, fs.Args())
+		out, err = cmd.Run(ctx, pos)
 	}
 	if err != nil {
 		out.Findings = append(out.Findings, errorFinding(err))
