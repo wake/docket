@@ -148,14 +148,30 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	dir := filepath.Join(root, "openspec/changes", chosen)
 	// The lock is held and the folder did not exist, so what is there now was
 	// made by this run, unless a link appeared on its path.
-	cleanup := func(err error) error {
+	// It removes only what OpenSpec is known to write (and proposal.md when
+	// this run created it), so a file another process added is never deleted.
+	cleanup := func(err error, ownProposal bool) error {
 		if lerr := safepath.Check(root, "openspec/changes/"+chosen); lerr != nil {
 			return errors.Join(err, fmt.Errorf("left in place: %w", lerr))
 		}
-		return errors.Join(err, os.RemoveAll(dir))
+		names := []string{".openspec.yaml", ""}
+		if ownProposal {
+			names = []string{"proposal.md", ".openspec.yaml", ""}
+		}
+		for _, n := range names {
+			rerr := os.Remove(filepath.Join(dir, n))
+			switch {
+			case rerr == nil || errors.Is(rerr, fs.ErrNotExist):
+			case n == "" && errors.Is(rerr, syscall.ENOTEMPTY):
+				return errors.Join(err, errors.New("left in place: openspec/changes/"+chosen+" holds files dkt new did not expect"))
+			default:
+				return errors.Join(err, fmt.Errorf("left in place: %w", rerr))
+			}
+		}
+		return err
 	}
 	if _, err := r.Run("new", "change", chosen, "--schema", "docket"); err != nil {
-		err = cleanup(err)
+		err = cleanup(err, false)
 		var fe *openspec.FailedError
 		if errors.As(err, &fe) {
 			return finding("openspec-failed", err.Error())
@@ -168,14 +184,14 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	}
 	f, err := os.OpenFile(filepath.Join(root, proposal(chosen)), os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
 	if err != nil {
-		return Outcome{}, cleanup(err)
+		return Outcome{}, cleanup(err, false)
 	}
 	_, err = f.Write(change.FrontMatter(title, kind, source))
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
 	if err != nil {
-		return Outcome{}, cleanup(err)
+		return Outcome{}, cleanup(err, true)
 	}
 
 	res := newResult{Slug: chosen, Requested: slug, Path: "openspec/changes/" + chosen, Title: title, Kind: kind, Source: source, Used: used}
