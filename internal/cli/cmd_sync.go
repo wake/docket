@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
@@ -31,6 +32,9 @@ type syncTask struct {
 
 // runSync is the body of dkt sync.
 func runSync(c *Context, slug string, check bool) (Outcome, error) {
+	if slug == "." || slug == ".." || strings.ContainsAny(slug, `/\`) {
+		return Outcome{}, UsageError{Msg: fmt.Sprintf("%q is not a change name", slug)}
+	}
 	root := c.Repo.Root
 	rel := "openspec/changes/" + slug
 	plan := rel + "/plan.md"
@@ -91,14 +95,24 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 				add("trailer-malformed", fmt.Sprintf("commit %s has the trailer Change: %s, whose task list is not positive numbers separated by commas", short, v), 0)
 				continue
 			}
+			var seen []int
 			for _, n := range nums {
-				i := slices.IndexFunc(res.Tasks, func(t syncTask) bool { return t.Number == n })
-				if i < 0 {
-					add("trailer-unknown-task", fmt.Sprintf("commit %s has the trailer Change: %s, but plan.md has no Task %d", short, v, n), 0)
+				if slices.Contains(seen, n) {
 					continue
 				}
-				if !slices.Contains(res.Tasks[i].Commits, cm.SHA) {
-					res.Tasks[i].Commits = append(res.Tasks[i].Commits, cm.SHA)
+				seen = append(seen, n)
+				found := false
+				for i := range res.Tasks {
+					if res.Tasks[i].Number != n {
+						continue
+					}
+					found = true
+					if !slices.Contains(res.Tasks[i].Commits, cm.SHA) {
+						res.Tasks[i].Commits = append(res.Tasks[i].Commits, cm.SHA)
+					}
+				}
+				if !found {
+					add("trailer-unknown-task", fmt.Sprintf("commit %s has the trailer Change: %s, but plan.md has no Task %d", short, v, n), 0)
 				}
 			}
 		}
