@@ -32,7 +32,7 @@ type syncTask struct {
 
 // runSync is the body of dkt sync.
 func runSync(c *Context, slug string, check bool) (Outcome, error) {
-	if slug == "." || slug == ".." || strings.ContainsAny(slug, `/\`) {
+	if slug == "" || slug == "." || slug == ".." || strings.ContainsAny(slug, `/\`) {
 		return Outcome{}, UsageError{Msg: fmt.Sprintf("%q is not a change name", slug)}
 	}
 	root := c.Repo.Root

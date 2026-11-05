@@ -35,7 +35,7 @@ func ParsePlan(b []byte) Plan {
 	mask := markdown.FenceMask(lines)
 	blanked := markdown.BlankComments(lines, mask)
 	var p Plan
-	for _, h := range markdown.Headings(lines, mask) {
+	for _, h := range markdown.Headings(blanked, mask) {
 		m := taskHeadingRe.FindStringSubmatch(h.Text)
 		if h.Level == 3 && m != nil {
 			n, err := strconv.Atoi(m[1])
@@ -43,7 +43,7 @@ func ParsePlan(b []byte) Plan {
 				continue
 			}
 			t := Task{Number: n, Name: strings.TrimSpace(m[2]), Line: h.Index + 1}
-			from, to := markdown.Body(lines, mask, h)
+			from, to := markdown.Body(blanked, mask, h)
 			for i := from; i < to; i++ {
 				if sm := stepRe.FindStringSubmatch(blanked[i]); !mask[i] && sm != nil {
 					t.Steps = append(t.Steps, Step{Line: i + 1, Done: sm[1] != " "})
@@ -51,9 +51,9 @@ func ParsePlan(b []byte) Plan {
 			}
 			p.Tasks = append(p.Tasks, t)
 		} else if h.Level == 2 && strings.EqualFold(h.Text, "Cancelled Tasks") {
-			from, to := markdown.Body(lines, mask, h)
+			from, to := markdown.Body(blanked, mask, h)
 			for i := from; i < to; i++ {
-				if m := cancelledNum.FindStringSubmatch(lines[i]); !mask[i] && m != nil {
+				if m := cancelledNum.FindStringSubmatch(blanked[i]); !mask[i] && m != nil {
 					if n, err := strconv.Atoi(m[1]); err == nil {
 						p.Cancelled = append(p.Cancelled, n)
 					}
