@@ -18,12 +18,33 @@ type Context struct {
 // Command is one dkt subcommand.
 type Command struct {
 	Name, Usage string
+	Args        int // how many positional arguments it takes
 	Define      func(fs *flag.FlagSet)
 	Run         func(c *Context, args []string) (Outcome, error)
 }
 
 // commands is the real command set.
-var commands = []func() Command{initCommand, inspectCommand}
+var commands = []func() Command{initCommand, inspectCommand, newCommand}
+
+func newCommand() Command {
+	var kind, source, title string
+	return Command{
+		Name:  "new",
+		Args:  1,
+		Usage: "new <slug> --kind <feature|change-request|baseline> --source <text> --title <text> [--json]",
+		Define: func(fs *flag.FlagSet) {
+			fs.StringVar(&kind, "kind", "", "kind of change: feature, change-request, baseline")
+			fs.StringVar(&source, "source", "", "where the request came from")
+			fs.StringVar(&title, "title", "", "one-line title of the change")
+		},
+		Run: func(c *Context, args []string) (Outcome, error) {
+			if len(args) == 0 {
+				return Outcome{}, UsageError{Msg: "new needs a slug"}
+			}
+			return runNew(c, args[0], kind, source, title)
+		},
+	}
+}
 
 func initCommand() Command {
 	// The flag variables live in this closure, fresh per call, and Run reads them.
