@@ -41,18 +41,8 @@ func runInit(c *Context, tools string, force bool) (Outcome, error) {
 	if fresh && tools == "" {
 		return Outcome{}, UsageError{Msg: "this project has no openspec/ yet: add --tools <coding agent>, or run openspec init first"}
 	}
-	r, err := openspec.New(root, c.Env)
-	if err == nil {
-		_, err = r.CheckVersion()
-	}
-	var unavail *openspec.UnavailableError
-	var unsup *openspec.UnsupportedError
-	switch {
-	case errors.As(err, &unavail):
-		return Outcome{}, EnvError{Rule: "openspec-missing", Msg: err.Error()}
-	case errors.As(err, &unsup):
-		return Outcome{}, EnvError{Rule: "openspec-unsupported", Msg: err.Error()}
-	case err != nil:
+	r, err := openSpecRunner(c)
+	if err != nil {
 		return Outcome{}, err
 	}
 
