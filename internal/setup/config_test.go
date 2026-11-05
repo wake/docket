@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-const opsKey = "openspec/config.yaml#operations"
-
 const testOps = "operations:\n  archive:\n    guidance:\n      - \"x\"\n"
 
 func plan(t *testing.T, in string) (string, ConfigState, error) {

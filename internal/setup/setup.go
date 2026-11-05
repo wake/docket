@@ -54,6 +54,9 @@ type Decision struct {
 	Status Status
 	Action Action
 
+	// Config is set for the config kind only.
+	Config *ConfigState
+
 	data    []byte
 	existed bool
 }
@@ -104,7 +107,7 @@ func Decide(root string, shipped fs.FS, force bool) ([]Decision, []Problem, erro
 	return ds, problems, nil
 }
 
-// targetsOf lists the schema files sorted by path, then the skill in each skill root.
+// targetsOf lists the schema files sorted by path, then openspec/config.yaml, then the skill in each skill root.
 func targetsOf(shipped fs.FS) ([]target, error) {
 	var out []target
 	err := fs.WalkDir(shipped, "schema", func(p string, d fs.DirEntry, err error) error {
@@ -121,6 +124,11 @@ func targetsOf(shipped fs.FS) ([]target, error) {
 	if err != nil {
 		return nil, err
 	}
+	ops, err := readShippedOps(shipped)
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, target{rel: configPath, want: ops, kind: KindConfig})
 	skill, err := fs.ReadFile(shipped, "skill/SKILL.md")
 	if err != nil {
 		return nil, err
@@ -157,6 +165,9 @@ func decide(root string, t target, force bool) (Decision, *Problem) {
 		return d, &Problem{Path: t.rel, Kind: ProblemUnreadable, Err: err}
 	}
 	d.existed = err == nil
+	if t.kind == KindConfig {
+		return decideConfig(d, got, t.want)
+	}
 	sum := sha256.Sum256(got)
 	switch {
 	case !d.existed:

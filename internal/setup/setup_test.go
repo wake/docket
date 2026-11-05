@@ -85,6 +85,7 @@ func TestDecideEmptyRootIsAllMissingInOrder(t *testing.T) {
 		"openspec/schemas/docket/templates/plan.md",
 		"openspec/schemas/docket/templates/proposal.md",
 		"openspec/schemas/docket/templates/spec.md",
+		"openspec/config.yaml",
 		".claude/skills/docket/SKILL.md",
 		".agents/skills/docket/SKILL.md",
 	}
@@ -201,8 +202,8 @@ func TestDecideSymlinkOneProblemPerLink(t *testing.T) {
 	if len(ps) != 1 || ps[0].Kind != ProblemSymlink || ps[0].Path != "openspec/schemas/docket" {
 		t.Fatalf("%+v", ps)
 	}
-	if len(ds) != 2 {
-		t.Errorf("skill targets should remain: %d", len(ds))
+	if len(ds) != 3 {
+		t.Errorf("config and skill targets should remain: %d", len(ds))
 	}
 	entries, _ := os.ReadDir(other)
 	if len(entries) != 0 {
