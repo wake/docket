@@ -70,8 +70,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks
 **Files:** `internal/lint/plan.go`, `internal/lint/plan_test.go`
 
-- [ ] 6.1 Write failing tests for every scenario of change-lint's Plan rules only with a plan, Task headings, Reuse table and Cancelled and compensating tasks, plus: a Reuse table with the wrong header; a Decision outside reuse, extend and new; a `new` row without Reason; a row without Evidence; Existing in backticks; a `reuse` row whose path is a link out of the repository counts as missing; `**Compensates:** Task 9` with no Task 9; a malformed Compensates line; a task number used by a task and a cancelled bullet; verify they fail
-- [ ] 6.2 Port the plan rules (design.md, Plan rules); verify every test passes
+- [x] 6.1 Write failing tests for every scenario of change-lint's Plan rules only with a plan, Task headings, Reuse table and Cancelled and compensating tasks, plus: a Reuse table with the wrong header; a Decision outside reuse, extend and new; a `new` row without Reason; a row without Evidence; Existing in backticks; a `reuse` row whose path is a link out of the repository counts as missing; `**Compensates:** Task 9` with no Task 9; a malformed Compensates line; a task number used by a task and a cancelled bullet; verify they fail
+- [x] 6.2 Port the plan rules (design.md, Plan rules); verify every test passes
 
 ## 7. Lint: delta rules
 
