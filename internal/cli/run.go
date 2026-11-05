@@ -67,6 +67,7 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 	}
 	fs.BoolVar(&ctx.JSON, "json", asJSON, "print one JSON object")
 	// Flags and positionals may interleave: parse, take one positional, parse the rest.
+	// shortcut: after `--` only the next argument is taken as is; take the rest as positionals if a command ever accepts ones starting with "-".
 	var pos []string
 	err := fs.Parse(args)
 	for err == nil && fs.NArg() > 0 {
