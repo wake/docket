@@ -126,6 +126,9 @@ func (r *Runner) ShowSpec(capability string) ([]Requirement, error) {
 	if err := json.Unmarshal([]byte(out), &w); err != nil {
 		return nil, decodeErr(args, err)
 	}
+	if w.Requirements == nil {
+		return nil, decodeErr(args, errors.New("no requirements"))
+	}
 	return reqs(w.Requirements), nil
 }
 
@@ -137,6 +140,7 @@ func (r *Runner) Validate(slug string) ([]Issue, error) {
 	var w struct {
 		Items []struct {
 			ID     string `json:"id"`
+			Valid  *bool  `json:"valid"`
 			Issues []struct {
 				Level   string `json:"level"`
 				Path    string `json:"path"`
@@ -159,10 +163,25 @@ func (r *Runner) Validate(slug string) ([]Issue, error) {
 		for _, i := range it.Issues {
 			issues = append(issues, Issue{Level: i.Level, Path: i.Path, Message: i.Message, Line: i.Line})
 		}
+		if it.Valid != nil && !*it.Valid && !hasError(issues) {
+			if err == nil {
+				err = fmt.Errorf("openspec %s: the report marks %q invalid but lists no error", strings.Join(args, " "), slug)
+			}
+			return nil, err
+		}
 		return issues, nil
 	}
 	if err == nil {
 		err = fmt.Errorf("openspec %s: the report has no entry for %q", strings.Join(args, " "), slug)
 	}
 	return nil, err
+}
+
+func hasError(issues []Issue) bool {
+	for _, i := range issues {
+		if strings.EqualFold(i.Level, "ERROR") {
+			return true
+		}
+	}
+	return false
 }
