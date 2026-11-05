@@ -86,8 +86,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (output format, public interface)
 **Files:** `internal/cli/cmd_lint.go`, `internal/cli/cmd_lint_test.go`, `internal/cli/command.go`, `internal/cli/run.go`, `internal/cli/command_test.go`
 
-- [ ] 8.1 Write failing tests for change-lint's Lint result and cli-output's Lint outside a repository, plus: `Args: -1` takes zero, one and three positionals while `dkt sync a b` is still a usage error; `dkt lint ""`, `dkt lint a/b`, `dkt lint 'a\b'`, `dkt lint .`, `dkt lint ..` (the inputs of `TestSyncPathInPlaceOfSlug`) are usage errors (exit 2) that read nothing; a `docket` change with no OpenSpec on `PATH` gives `openspec-missing` and exit 4 with no other finding; a repository with only main specs needs no OpenSpec; an unreadable file gives exit 3; the text output's first line `Linted 1 changes and 0 main spec titles.` followed by the findings; the JSON `result` with `changes` an empty array when nothing is linted; verify they fail
-- [ ] 8.2 Implement `dkt lint` (design.md, Command); verify every test passes
+- [x] 8.1 Write failing tests for change-lint's Lint result and cli-output's Lint outside a repository, plus: `Args: -1` takes zero, one and three positionals while `dkt sync a b` is still a usage error; `dkt lint ""`, `dkt lint a/b`, `dkt lint 'a\b'`, `dkt lint .`, `dkt lint ..` (the inputs of `TestSyncPathInPlaceOfSlug`) are usage errors (exit 2) that read nothing; a `docket` change with no OpenSpec on `PATH` gives `openspec-missing` and exit 4 with no other finding; a repository with only main specs needs no OpenSpec; an unreadable file gives exit 3; the text output's first line `Linted 1 changes and 0 main spec titles.` followed by the findings; the JSON `result` with `changes` an empty array when nothing is linted; verify they fail
+- [x] 8.2 Implement `dkt lint` (design.md, Command); verify every test passes
 
 ## 9. Integration
 
