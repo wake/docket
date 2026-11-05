@@ -14,7 +14,7 @@ import (
 )
 
 // TestRealOpenSpec runs dkt init and dkt inspect against the real OpenSpec CLI
-// named by DOCKET_OPENSPEC. CI runs it for OpenSpec 1.7.0 and the latest release.
+// named by DOCKET_OPENSPEC. CI runs it for OpenSpec 1.14.0 and the latest release.
 func TestRealOpenSpec(t *testing.T) {
 	if os.Getenv("DOCKET_TEST_OPENSPEC") != "1" {
 		t.Skip("set DOCKET_TEST_OPENSPEC=1 to run against the real OpenSpec")
