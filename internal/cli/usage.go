@@ -8,11 +8,14 @@ import (
 )
 
 // usage prints the usage text, headed by msg when it is not empty.
-func usage(w io.Writer, msg string) {
+func usage(w io.Writer, cmds []func() Command, msg string) {
 	if msg != "" {
 		fmt.Fprintf(w, "dkt: %s\n", msg)
 	}
 	fmt.Fprintln(w, "usage: dkt <command> [args] [--json]\n       dkt --version [--json]\n       dkt --help")
+	for _, f := range cmds {
+		fmt.Fprintf(w, "  dkt %s\n", f().Usage)
+	}
 }
 
 // jsonRequested reports whether any argument is a --json flag the flag parser

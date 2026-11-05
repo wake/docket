@@ -2,9 +2,29 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
+
+// errorFinding turns a command error into a finding.
+func errorFinding(err error) Finding {
+	rule := "internal"
+	var env EnvError
+	var penv *EnvError
+	switch {
+	case asUsage(err):
+		rule = "usage"
+	case errors.As(err, &env):
+		rule = env.Rule
+	case errors.As(err, &penv):
+		rule = penv.Rule
+	}
+	if rule == "" {
+		rule = "environment"
+	}
+	return Finding{Rule: rule, Message: err.Error()}
+}
 
 func writeJSON(w io.Writer, name string, repo *Repo, o Outcome, code int) error {
 	e := envelope{
