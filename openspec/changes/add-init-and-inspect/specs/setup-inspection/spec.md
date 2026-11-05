@@ -50,6 +50,17 @@ For each file that is not `same`, `dkt inspect` SHALL report a finding named aft
 - **WHEN** `openspec/config.yaml` has `schema: team-flow`
 - **THEN** the finding `config-schema-other` names the file
 
+### Requirement: config.yaml status
+In `result.files`, `openspec/config.yaml` SHALL be `missing` when it does not exist, `differs` when `dkt init` would keep a part of it (another schema, or other guidance), `outdated` when `dkt init` would otherwise change it, and `same` when both parts are as this release ships them.
+
+#### Scenario: Default schema is outdated
+- **WHEN** `openspec/config.yaml` is the one `openspec init` wrote, with `schema: spec-driven` and no `operations`
+- **THEN** `result.files` lists it as `outdated`
+
+#### Scenario: Other schema differs
+- **WHEN** `openspec/config.yaml` has `schema: team-flow` and the shipped `operations` section
+- **THEN** `result.files` lists it as `differs`
+
 ### Requirement: Symbolic links inspected
 `dkt inspect` SHALL report `symlink-refused`, naming the link, for each path `dkt init` writes that passes through a symbolic link inside the repository, and SHALL read nothing through that link.
 
