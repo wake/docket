@@ -31,7 +31,7 @@ They live under `shipped/` at the repository root and are embedded by the root p
 | `shipped/config/operations.yaml` | the `operations` section of `openspec/config.yaml` |
 | `shipped/next-steps/{commit,reload,doctor}.md` | the entries of `result.next_steps`, trimmed |
 
-The `docket` skill and the proposal and plan templates are their edited English versions; the schema is its draft. The spec and design templates, the archive guidance and the next steps are placeholders until their text is edited: each says `Placeholder` and keeps the shape OpenSpec reads (front matter, valid YAML). `AGENTS.md`'s list of prompt files gains `shipped/`.
+The `docket` skill, the proposal and plan templates and the next steps are their edited English versions; the schema is its draft. The spec and design templates and the archive guidance are placeholders until their text is edited: each says `Placeholder` and keeps the shape OpenSpec reads (front matter, valid YAML). `AGENTS.md`'s list of prompt files gains `shipped/`.
 
 ### Earlier releases
 `internal/setup` holds a table from each target (the `operations` section counts as one) to the SHA-256 of the files earlier releases, v0.16.0 and later, shipped there. It is empty in this change; each release adds the hashes of what it ships. Tests replace it through a package variable.
