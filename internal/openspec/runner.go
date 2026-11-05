@@ -106,8 +106,8 @@ func resolve(prog, dir string, env []string) (string, bool) {
 	}
 	path, _ := envValue(env, "PATH")
 	for _, d := range filepath.SplitList(path) {
-		if d == "" {
-			d = "."
+		if !filepath.IsAbs(d) { // like exec.LookPath: never run a program found in the repository
+			continue
 		}
 		if p := abs(filepath.Join(d, prog)); isExecutable(p) {
 			return p, true

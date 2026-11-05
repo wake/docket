@@ -49,6 +49,7 @@ log=@LOG@
 printf 'OPENSPEC_TELEMETRY=%s' "$OPENSPEC_TELEMETRY" >> "$log"
 for a in "$@"; do printf '\t%s' "$a" >> "$log"; done
 printf '\n' >> "$log"
+printf '%s\n' "$FOO" >> "$log.foo" # lets a test see that the environment passes through
 # Skip launcher words such as: -y @scope/pkg@version
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -81,7 +82,7 @@ esac
 `
 
 // FakeOpenSpec writes a fake OpenSpec CLI that reports version and returns its
-// path and the path of its call log (see fakeOpenSpecScript for the format).
+// path and the path of its call log (created empty; `.foo` beside it logs $FOO per call) (see fakeOpenSpecScript for the format).
 func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -90,6 +91,9 @@ func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 	script := strings.NewReplacer("@LOG@", "'"+log+"'", "@VERSION@", "'"+version+"'", "@CONFIG@", openSpecConfig).Replace(fakeOpenSpecScript)
 	if err := os.WriteFile(cmd, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake openspec: %v", err)
+	}
+	if err := os.WriteFile(log, nil, 0o644); err != nil {
+		t.Fatalf("create fake openspec log: %v", err)
 	}
 	return cmd, log
 }
