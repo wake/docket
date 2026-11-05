@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -58,12 +61,21 @@ func installed(t *testing.T, r *testutil.Repo) {
 	}
 }
 
-func rules(m inspectOut) map[string]string {
-	out := map[string]string{}
+// rules lists the files each rule names, once per finding.
+func rules(m inspectOut) map[string][]string {
+	out := map[string][]string{}
 	for _, f := range m.Findings {
-		out[f.Rule] = f.File
+		out[f.Rule] = append(out[f.Rule], f.File)
 	}
 	return out
+}
+
+// one is the file of the only finding with the rule, or "" if there is not exactly one.
+func one(m inspectOut, rule string) string {
+	if fs := rules(m)[rule]; len(fs) == 1 {
+		return fs[0]
+	}
+	return ""
 }
 
 func snapshot(dir string) string {
@@ -119,7 +131,17 @@ func TestInspectBeforeInit(t *testing.T) {
 			t.Errorf("no %s in %v", k, got)
 		}
 	}
-	if got["config-schema-default"] != "openspec/config.yaml" || got["guidance-missing"] != "openspec/config.yaml" || code != 1 {
+	ds, _, _ := setup.Decide(r.Dir, shippedFS(), false)
+	var want []string
+	for _, d := range ds {
+		if d.Kind == setup.KindSchema {
+			want = append(want, d.Path)
+		}
+	}
+	if len(want) < 2 || !slices.Equal(got["schema-missing"], want) {
+		t.Errorf("schema-missing = %v, want %v", got["schema-missing"], want)
+	}
+	if one(m, "config-schema-default") != "openspec/config.yaml" || one(m, "guidance-missing") != "openspec/config.yaml" || code != 1 {
 		t.Errorf("code=%d %v", code, got)
 	}
 }
@@ -129,7 +151,7 @@ func TestInspectEditedSkill(t *testing.T) {
 	installed(t, r)
 	r.Write(".claude/skills/docket/SKILL.md", "mine")
 	_, m, _ := inspect(t, r, "1.7.0", false)
-	if rules(m)["skill-differs"] != ".claude/skills/docket/SKILL.md" {
+	if one(m, "skill-differs") != ".claude/skills/docket/SKILL.md" {
 		t.Errorf("%+v", m.Findings)
 	}
 	for _, f := range m.Result.Files {
@@ -158,7 +180,7 @@ func TestInspectConfigOutdatedAndOther(t *testing.T) {
 	}
 	r.Write("openspec/config.yaml", "schema: team-flow\n")
 	_, m, _ = inspect(t, r, "1.7.0", false)
-	if rules(m)["config-schema-other"] != "openspec/config.yaml" {
+	if one(m, "config-schema-other") != "openspec/config.yaml" {
 		t.Errorf("%+v", m.Findings)
 	}
 }
@@ -187,7 +209,7 @@ func TestInspectSymlinkedSkillFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, m, _ := inspect(t, r, "1.7.0", false)
-	if code != 1 || rules(m)["symlink-refused"] != ".claude/skills/docket" {
+	if code != 1 || one(m, "symlink-refused") != ".claude/skills/docket" {
 		t.Errorf("code=%d %+v", code, m.Findings)
 	}
 }
@@ -255,6 +277,89 @@ func TestInspectUnparsableConfig(t *testing.T) {
 		if code != 3 || a || b || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/config.yaml" {
 			t.Errorf("%q: code=%d %+v %+v", c, code, m.Findings, m.Unreadable)
 		}
+	}
+}
+
+func withEarlier(t *testing.T, key, text string) {
+	t.Helper()
+	saved := setup.Earlier
+	t.Cleanup(func() { setup.Earlier = saved })
+	sum := sha256.Sum256([]byte(text))
+	setup.Earlier = map[string][]string{key: {hex.EncodeToString(sum[:])}}
+}
+
+func TestInspectOutdatedTemplate(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	ds, _, _ := setup.Decide(r.Dir, shippedFS(), false)
+	var path string
+	for _, d := range ds {
+		if d.Kind == setup.KindSchema && strings.Contains(d.Path, "templates/") {
+			path = d.Path
+			break
+		}
+	}
+	r.Write(path, "an earlier release\n")
+	withEarlier(t, path, "an earlier release\n")
+	code, m, _ := inspect(t, r, "1.7.0", false)
+	if code != 1 || one(m, "schema-outdated") != path {
+		t.Fatalf("code=%d %+v", code, m.Findings)
+	}
+	for _, f := range m.Result.Files {
+		if f.Path == path && f.Status != "outdated" {
+			t.Errorf("%+v", f)
+		}
+	}
+}
+
+func TestInspectOutdatedGuidance(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	sec := "operations:\n  apply:\n    guidance:\n      - old\n"
+	r.Write("openspec/config.yaml", "schema: docket\n\n"+sec)
+	withEarlier(t, "openspec/config.yaml#operations", sec)
+	code, m, _ := inspect(t, r, "1.7.0", false)
+	if code != 1 || len(m.Findings) != 1 || one(m, "guidance-outdated") != "openspec/config.yaml" {
+		t.Errorf("code=%d %+v", code, m.Findings)
+	}
+}
+
+func TestInspectRelativeOpenSpecFromSubdirectory(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	fake, _ := testutil.FakeOpenSpec(t, "1.7.0")
+	b, err := os.ReadFile(fake)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.Write("tools/openspec", string(b))
+	if err := os.Chmod(filepath.Join(r.Dir, "tools/openspec"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(r.Dir, "sub/dir")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC=./tools/openspec")
+	code, out, _ := runIn(t, sub, env, "inspect", "--json")
+	var m inspectOut
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatal(err)
+	}
+	if m.Result.OpenSpec.Version == nil || *m.Result.OpenSpec.Version != "1.7.0" || len(rules(m)["openspec-missing"]) != 0 {
+		t.Errorf("code=%d %s", code, out)
+	}
+}
+
+func TestInspectStartsOpenSpecOnlyForVersion(t *testing.T) {
+	r := testutil.NewRepo(t)
+	fake, log := testutil.FakeOpenSpec(t, "1.7.0")
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+fake)
+	runIn(t, r.Dir, env, "inspect", "--json")
+	b, _ := os.ReadFile(log)
+	lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
+	if len(lines) != 1 || lines[0] != "OPENSPEC_TELEMETRY=0\t--version" {
+		t.Errorf("calls = %q", lines)
 	}
 }
 
