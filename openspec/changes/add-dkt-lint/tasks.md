@@ -54,8 +54,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (environment-dependent, error paths)
 **Files:** `internal/openspec/json.go`, `internal/openspec/json_test.go`, `internal/openspec/runner.go`, `internal/testutil/openspec.go`
 
-- [ ] 4.1 Extend the fake OpenSpec to answer `show` and `validate` from `$FAKE_OPENSPEC_JSON` (design.md, OpenSpec JSON). Write failing tests, using the JSON OpenSpec 1.14.0 printed (design.md, Context) as fixtures: `ShowChange` gives the ADDED, MODIFIED and REMOVED requirements with their scenario names and the RENAMED pair; `ShowSpec` gives requirements and scenario names; `Validate` gives the issues (level, path, message, and `line` when OpenSpec gives one, else 0) when OpenSpec exits 1 with `items` on stdout, and none for a valid change; a `show` that exits 1 with a `status` message on stdout gives a `FailedError` whose `Messages` and `Error()` hold that message; stdout that does not decode gives an error naming the command; an unsupported version gives `UnsupportedError` and runs no `show`; unknown fields are ignored; verify they fail
-- [ ] 4.2 Implement them; verify every test passes
+- [x] 4.1 Extend the fake OpenSpec to answer `show` and `validate` from `$FAKE_OPENSPEC_JSON` (design.md, OpenSpec JSON). Write failing tests, using the JSON OpenSpec 1.14.0 printed (design.md, Context) as fixtures: `ShowChange` gives the ADDED, MODIFIED and REMOVED requirements with their scenario names and the RENAMED pair; `ShowSpec` gives requirements and scenario names; `Validate` gives the issues (level, path, message, and `line` when OpenSpec gives one, else 0) when OpenSpec exits 1 with `items` on stdout, and none for a valid change; a `show` that exits 1 with a `status` message on stdout gives a `FailedError` whose `Messages` and `Error()` hold that message; stdout that does not decode gives an error naming the command; an unsupported version gives `UnsupportedError` and runs no `show`; unknown fields are ignored; verify they fail
+- [x] 4.2 Implement them; verify every test passes
 
 ## 5. Lint: scope and document rules
 
