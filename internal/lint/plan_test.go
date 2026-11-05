@@ -143,6 +143,32 @@ func TestReusePathThroughALinkOutIsMissing(t *testing.T) {
 	}
 }
 
+func TestNonTaskCancelledBullets(t *testing.T) {
+	r := lintPlan(t, goodPlan+"\n## Cancelled Tasks\n\n- other\n- more\n")
+	if count(r, "cancelled-task") != 2 || len(r.Findings) != 2 {
+		t.Fatalf("findings = %+v", r.Findings)
+	}
+}
+
+func TestReuseHeaderCaseAndWidth(t *testing.T) {
+	tail := "\n### Task 1: One\n\n**Scenarios:** none\n"
+	lower := "# Plan\n\n## Reuse\n\n| need | existing (path:symbol) | decision | reason | evidence |\n|---|---|---|---|---|\n" + goodRow + tail
+	if r := lintPlan(t, lower); len(r.Findings) != 0 {
+		t.Fatalf("lower case: %+v", r.Findings)
+	}
+	wide := "# Plan\n\n## Reuse\n\n| Need | Existing (path:symbol) | Decision | Reason | Evidence | Extra |\n|---|---|---|---|---|---|\n| Walk | `internal/a.go` | reuse | | rg | x |\n" + tail
+	if r := lintPlan(t, wide); !has(r, "reuse-table", pl, 5, "header") {
+		t.Fatalf("wide: %+v", r.Findings)
+	}
+}
+
+func TestReuseExistingOutsideTheRepository(t *testing.T) {
+	r := lintPlan(t, reusePlan("| Out | `../outside.go:X` | reuse | | rg |\n"))
+	if !has(r, "reuse-table", pl, 7, "must start with a repository path or `external:`") || len(r.Findings) != 1 {
+		t.Fatalf("findings = %+v", r.Findings)
+	}
+}
+
 func TestCancelledAndCompensates(t *testing.T) {
 	doc := goodPlan +
 		"\n### Task 2: B\n\n**Scenarios:** none\n\n**Compensates:** Task 5\n\n**Compensates:** Task 9\n\n**Compensates:** Task 1 please\n\n**Compensates:** Task 1\n" +
