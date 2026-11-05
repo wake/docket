@@ -3,14 +3,21 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"os"
+	"slices"
+	"strings"
 
+	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/lint"
 	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/setup"
 )
 
 type inspectResult struct {
-	OpenSpec inspectOpenSpec `json:"openspec"`
-	Files    []inspectFile   `json:"files"`
+	DefaultBranch *string         `json:"default_branch"`
+	OpenSpec      inspectOpenSpec `json:"openspec"`
+	Files         []inspectFile   `json:"files"`
 }
 
 type inspectOpenSpec struct {
@@ -64,6 +71,70 @@ func decisionFindings(d setup.Decision) []Finding {
 	return nil
 }
 
+// inspectDefaultBranch adds the main spec title check and the trailer check.
+func (c *Context) inspectDefaultBranch(res *inspectResult, out *Outcome) error {
+	root, err := os.OpenRoot(c.Repo.Root)
+	if err != nil {
+		return err
+	}
+	tf, tu, _ := lint.SpecTitles(root.FS())
+	root.Close()
+	for _, f := range tf {
+		out.Findings = append(out.Findings, Finding{Rule: f.Rule, Message: f.Message, Change: f.Change, File: f.File, Line: f.Line})
+	}
+	for _, x := range tu {
+		out.Unreadable = append(out.Unreadable, Unreadable{Source: x.Source, Reason: x.Reason})
+	}
+	g := gitx.Git{Dir: c.Repo.Root, Env: c.Env}
+	db, ok, err := g.DefaultBranch()
+	if err != nil {
+		return err
+	}
+	if !ok {
+		out.Human = append(out.Human, "No default branch found; the trailer check was skipped.")
+		return nil
+	}
+	res.DefaultBranch = &db.Name
+	out.Human = append(out.Human, "Default branch: "+db.Name)
+	dirs, err := g.TreeDirs(db.Commit, "openspec/changes/")
+	if err != nil {
+		return err
+	}
+	dirs = slices.DeleteFunc(dirs, func(d string) bool { return d == "openspec/changes/archive" })
+	var paths []string
+	for _, d := range dirs {
+		paths = append(paths, d+"/.openspec.yaml", d+"/plan.md")
+	}
+	blobs, err := g.ReadBlobs(db.Commit, paths)
+	if err != nil {
+		return err
+	}
+	var slugs []string
+	for _, d := range dirs {
+		plan, has := blobs[d+"/plan.md"]
+		if has && len(change.ParsePlan(plan).Tasks) > 0 && change.SchemaOf(blobs[d+"/.openspec.yaml"]) == "docket" {
+			slugs = append(slugs, strings.TrimPrefix(d, "openspec/changes/"))
+		}
+	}
+	if len(slugs) == 0 {
+		return nil
+	}
+	trs, err := g.ChangeTrailers(db.Commit)
+	if err != nil {
+		return err
+	}
+	for _, slug := range slugs {
+		carried := slices.ContainsFunc(trs, func(t gitx.Trailers) bool {
+			return slices.ContainsFunc(t.Change, func(v string) bool { _, _, mine := change.TaskRefs(v, slug); return mine })
+		})
+		if !carried {
+			out.Findings = append(out.Findings, Finding{Rule: "trailer-missing", Change: slug, File: "openspec/changes/" + slug + "/plan.md",
+				Message: "no commit on " + db.Name + " carries a Change: trailer for " + slug + ", which is what a squash merge leaves; dkt sync cannot tick its plan"})
+		}
+	}
+	return nil
+}
+
 func inspectCommand() Command {
 	return Command{
 		Name:  "inspect",
@@ -109,6 +180,9 @@ func inspectCommand() Command {
 			out.Findings, out.Unreadable = append(out.Findings, f...), append(out.Unreadable, u...)
 			f, u = ignoredFindings(c, paths)
 			out.Findings, out.Unreadable = append(out.Findings, f...), append(out.Unreadable, u...)
+			if err := c.inspectDefaultBranch(&res, &out); err != nil {
+				return Outcome{}, err
+			}
 			out.Result = res
 			return out, nil
 		},

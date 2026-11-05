@@ -142,6 +142,7 @@ func Run(in Input) (Report, error) {
 		rep.Specs = n
 	}
 	for _, p := range in.Added {
+		// Added only holds paths under docs/superpowers/plans or docs/superpowers/specs.
 		dir := "docs/superpowers/specs"
 		if strings.HasPrefix(p, "docs/superpowers/plans/") {
 			dir = "docs/superpowers/plans"
