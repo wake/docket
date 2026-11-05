@@ -131,7 +131,7 @@ func runInit(c *Context, tools string, force bool) (Outcome, error) {
 	var created []string // Docket paths created in this run
 	for _, d := range ds {
 		st := actionStatus[d.Action]
-		if made[d.Path] == "created" {
+		if made[d.Path] == "created" && d.Action != setup.ActionKeep {
 			st = "created"
 		}
 		if st == "created" {
