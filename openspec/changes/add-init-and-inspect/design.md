@@ -44,7 +44,8 @@ It extends `v0.15.0`'s `decideAll`, `decide`, `targetsOf`, `problemForTarget` an
 ### config.yaml
 Edited line by line; the standard library has no YAML, and comments must survive.
 - The `schema` line: `v0.15.0`'s `schemaKey` and `NameDocket` without `crossCheck`, which needs `go.yaml.in/yaml/v3`. A top-level `schema:` with a plain or quoted value and an optional comment; only the value's bytes are replaced, so the comment and the line ending stay. `schema:` with no value on its line, or two `schema:` lines, is unreadable.
-- What `crossCheck` caught, now refused line by line: a line at the first column, not blank and not a comment, that starts with `{`, `[`, `"`, `'`, `?` or `---`, or reads `schema` or `operations` followed by spaces before its colon, makes the file unreadable.
+- What `crossCheck` caught, now refused line by line: a line at the first column, not blank and not a comment, that starts with `{`, `[`, `"`, `'`, `?`, `%`, `---` or is `...`, or reads `schema` or `operations` followed by spaces before its colon, makes the file unreadable; so does a leading byte order mark.
+- A CRLF file's section is compared as its LF text; the section dkt writes uses LF lines.
 - The `operations` section: the top-level `operations:` line and every following line that is blank or starts with whitespace; it ends at the first line starting with anything else, a comment at the first column included. It is compared with the shipped section after trailing blank lines are trimmed. `operations:` with a value on its own line, or two such lines, is unreadable. The section is appended after one blank line, unless the file already ends with one.
 - `--force` touches neither part when it holds another schema or other guidance.
 
