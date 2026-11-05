@@ -80,7 +80,7 @@ func TestDecideNonRegularIsUnreadable(t *testing.T) {
 
 func TestEarlierHashesAreLowercaseHex(t *testing.T) {
 	re := regexp.MustCompile(`^[0-9a-f]{64}$`)
-	for p, hs := range earlier {
+	for p, hs := range Earlier {
 		for _, h := range hs {
 			if !re.MatchString(h) {
 				t.Errorf("%s: bad hash %q", p, h)
@@ -129,8 +129,8 @@ func snapshot(t *testing.T, root string) map[string]string {
 }
 
 func TestDecideChangesNothing(t *testing.T) {
-	old := earlier
-	defer func() { earlier = old }()
+	old := Earlier
+	defer func() { Earlier = old }()
 	root := t.TempDir()
 	ds, _ := decideT(t, root, false)
 	if err := Write(root, ds); err != nil {
@@ -142,7 +142,7 @@ func TestDecideChangesNothing(t *testing.T) {
 	put(t, root, "openspec/schemas/docket/templates/plan.md", "mine") // differs
 	put(t, root, ".claude/skills/docket/SKILL.md", "old")             // outdated
 	sum := sha256.Sum256([]byte("old"))
-	earlier = map[string][]string{".claude/skills/docket/SKILL.md": {hex.EncodeToString(sum[:])}}
+	Earlier = map[string][]string{".claude/skills/docket/SKILL.md": {hex.EncodeToString(sum[:])}}
 	before := snapshot(t, root)
 	ds, _ = decideT(t, root, true)
 	seen := map[Status]bool{}

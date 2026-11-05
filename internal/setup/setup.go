@@ -174,7 +174,7 @@ func decide(root string, t target, force bool) (Decision, *Problem) {
 		d.Status, d.Action = StatusMissing, ActionCreate
 	case bytes.Equal(got, t.want):
 		d.Status, d.Action = StatusSame, ActionNone
-	case slices.Contains(earlier[t.rel], hex.EncodeToString(sum[:])):
+	case slices.Contains(Earlier[t.rel], hex.EncodeToString(sum[:])):
 		d.Status, d.Action = StatusOutdated, ActionUpdate
 	case force:
 		d.Status, d.Action = StatusDiffers, ActionOverwrite

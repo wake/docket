@@ -12,9 +12,9 @@ const oldOps = "operations:\n  archive:\n    guidance:\n      - old\n"
 func injectOld(t *testing.T) {
 	t.Helper()
 	sum := sha256.Sum256([]byte(oldOps))
-	saved := earlier[opsKey]
-	earlier[opsKey] = []string{hex.EncodeToString(sum[:])}
-	t.Cleanup(func() { earlier[opsKey] = saved })
+	saved := Earlier[opsKey]
+	Earlier[opsKey] = []string{hex.EncodeToString(sum[:])}
+	t.Cleanup(func() { Earlier[opsKey] = saved })
 }
 
 func crlf(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }

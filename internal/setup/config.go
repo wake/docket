@@ -192,7 +192,7 @@ func planConfig(got, ops []byte) ([]byte, ConfigState, error) {
 		switch {
 		case sec == string(ops):
 			st.Guidance = "same"
-		case slices.Contains(earlier[opsKey], hex.EncodeToString(sum[:])):
+		case slices.Contains(Earlier[opsKey], hex.EncodeToString(sum[:])):
 			st.Guidance = "outdated"
 			out = append(append(slices.Clone(got[:p.offs[p.opStart]]), ops...), got[p.offs[p.opEnd]:]...)
 		default:

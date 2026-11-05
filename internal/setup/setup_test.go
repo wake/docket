@@ -155,12 +155,12 @@ func TestWriteKeepWritesNothing(t *testing.T) {
 }
 
 func TestDecideOutdated(t *testing.T) {
-	old := earlier
-	defer func() { earlier = old }()
+	old := Earlier
+	defer func() { Earlier = old }()
 	root := t.TempDir()
 	put(t, root, ".claude/skills/docket/SKILL.md", "old release")
 	sum := sha256.Sum256([]byte("old release"))
-	earlier = map[string][]string{".claude/skills/docket/SKILL.md": {hex.EncodeToString(sum[:])}}
+	Earlier = map[string][]string{".claude/skills/docket/SKILL.md": {hex.EncodeToString(sum[:])}}
 	ds, _ := decideT(t, root, false)
 	if d := find(ds, ".claude/skills/docket/SKILL.md"); d.Status != StatusOutdated || d.Action != ActionUpdate {
 		t.Errorf("%+v", d)

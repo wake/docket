@@ -71,9 +71,9 @@ func TestPlanConfigTable(t *testing.T) {
 func TestPlanConfigEarlierSectionReplaced(t *testing.T) {
 	old := "operations:\n  archive:\n    guidance:\n      - old\n"
 	sum := sha256.Sum256([]byte(old))
-	saved := earlier[opsKey]
-	earlier[opsKey] = []string{hex.EncodeToString(sum[:])}
-	defer func() { earlier[opsKey] = saved }()
+	saved := Earlier[opsKey]
+	Earlier[opsKey] = []string{hex.EncodeToString(sum[:])}
+	defer func() { Earlier[opsKey] = saved }()
 	in := "schema: docket\n" + old + "\n# tail\n"
 	out, st, err := plan(t, in)
 	if err != nil {
