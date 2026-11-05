@@ -81,15 +81,15 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (error paths, output format)
 **Files:** `internal/cli/cmd_init.go`, `internal/cli/cmd_init_test.go`, `internal/setup/openspecinit.go`, `internal/setup/openspecinit_test.go`
 
-- [ ] 8.1 Write failing tests for every scenario of project-setup, and for Too old, CLI missing and openspec init fails (openspec-runtime) run through `dkt init`, plus: `openspec/config.yaml` created by `openspec init` is listed once, with kind `config` and status `created`; an untracked file that existed before `openspec init` is not listed; a tracked, clean file the fake `openspec init` changes is listed with kind `openspec` and status `updated`; a file the fake creates whose name holds a space and a quote is listed by its exact path; a run that keeps a file and writes others still writes them; the text output lists the files and the next steps; verify they fail
-- [ ] 8.2 Implement `dkt init`: checks before writing, `openspec init` with the before-and-after listing (design.md, Files openspec init created), writes, the ignore check, the result and the next steps; verify every test from 8.1 passes
+- [x] 8.1 Write failing tests for every scenario of project-setup, and for Too old, CLI missing and openspec init fails (openspec-runtime) run through `dkt init`, plus: `openspec/config.yaml` created by `openspec init` is listed once, with kind `config` and status `created`; an untracked file that existed before `openspec init` is not listed; a tracked, clean file the fake `openspec init` changes is listed with kind `openspec` and status `updated`; a file the fake creates whose name holds a space and a quote is listed by its exact path; a run that keeps a file and writes others still writes them; the text output lists the files and the next steps; verify they fail
+- [x] 8.2 Implement `dkt init`: checks before writing, `openspec init` with the before-and-after listing (design.md, Files openspec init created), writes, the ignore check, the result and the next steps; verify every test from 8.1 passes
 
 ## 9. Real OpenSpec
 
 **Review:** checks (check settings: the review looks for a check that got weaker)
 **Files:** `internal/cli/realopenspec_test.go`, `.github/workflows/ci.yml`
 
-- [ ] 9.1 Write `TestRealOpenSpec` (design.md, Tests); verify it is skipped without `DOCKET_TEST_OPENSPEC=1`, and that it passes locally with `DOCKET_OPENSPEC="npx -y @fission-ai/openspec@1.7.0"` and with `@latest`
+- [x] 9.1 Write `TestRealOpenSpec` (design.md, Tests); verify it is skipped without `DOCKET_TEST_OPENSPEC=1`, and that it passes locally with `DOCKET_OPENSPEC="npx -y @fission-ai/openspec@1.7.0"` and with `@latest`
 - [ ] 9.2 Add the `openspec` job to `.github/workflows/ci.yml`; verify it runs and passes for both versions on the pull request
 
 ## 10. Integration
