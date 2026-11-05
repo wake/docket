@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	docket "github.com/wake/docket"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -388,6 +390,59 @@ func TestInitListsWhatOpenSpecChanged(t *testing.T) {
 	}
 	if status(m, "before.txt") != "" {
 		t.Error("listed a file that existed before")
+	}
+}
+
+func wantDefaultConfig(t *testing.T) string {
+	t.Helper()
+	ops, err := docket.Shipped.ReadFile("shipped/config/operations.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Replace(testutil.OpenSpecConfig, "schema: spec-driven", "schema: docket", 1) + "\n" + string(ops)
+}
+
+func TestInitConfigKeepsOpenSpecText(t *testing.T) {
+	r := testutil.NewRepo(t)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
+	if got := readFile(t, r, "openspec/config.yaml"); code != 0 || got != wantDefaultConfig(t) {
+		t.Errorf("code=%d config:\n%s", code, got)
+	}
+	for _, f := range m.Result.Files {
+		if f.Path == "openspec/config.yaml" && (f.Kind != "config" || f.Status != "created") {
+			t.Errorf("%+v", f)
+		}
+	}
+}
+
+func TestInitDefaultSchemaReplaced(t *testing.T) {
+	r := testutil.NewRepo(t)
+	cmd, log := testutil.FakeOpenSpec(t, "1.7.0")
+	c := exec.Command(cmd, "init", "--tools", "claude")
+	c.Dir = r.Dir
+	if out, err := c.CombinedOutput(); err != nil {
+		t.Fatal(err, string(out))
+	}
+	if err := os.WriteFile(log, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, m, _, calls := doInitCmd(t, r, r.Dir, cmd, log, nil)
+	if got := readFile(t, r, "openspec/config.yaml"); code != 0 || got != wantDefaultConfig(t) || status(m, "openspec/config.yaml") != "updated" || m.Result.OpenspecInit != nil || strings.Contains(calls, "init") {
+		t.Errorf("code=%d status=%q calls=%q config:\n%s", code, status(m, "openspec/config.yaml"), calls, got)
+	}
+}
+
+func TestInitKeptStaysKept(t *testing.T) {
+	r := testutil.NewRepo(t)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", []string{"FAKE_OPENSPEC_CREATE=" + skillPath}, "--tools", "claude")
+	var kind string
+	for _, f := range m.Result.Files {
+		if f.Path == skillPath {
+			kind = f.Kind
+		}
+	}
+	if code != 1 || kind != "skill" || status(m, skillPath) != "kept" || !hasFinding(m, "skill-differs", skillPath) || readFile(t, r, skillPath) != "new\n" {
+		t.Errorf("code=%d kind=%q status=%q %+v", code, kind, status(m, skillPath), m.Findings)
 	}
 }
 

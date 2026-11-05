@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// openSpecConfig is the openspec/config.yaml that OpenSpec 1.7.0 writes.
-const openSpecConfig = `schema: spec-driven
+// OpenSpecConfig is the openspec/config.yaml that the fake OpenSpec writes, as OpenSpec 1.7.0 does.
+const OpenSpecConfig = `schema: spec-driven
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.
@@ -78,7 +78,7 @@ init)
 @CONFIG@CONFIG
   printf 'Explore mode\n' > .claude/skills/openspec-explore/SKILL.md
   if [ -n "$FAKE_OPENSPEC_TOUCH" ]; then printf 'changed\n' >> "$FAKE_OPENSPEC_TOUCH"; fi
-  if [ -n "$FAKE_OPENSPEC_CREATE" ]; then printf 'new\n' > "$FAKE_OPENSPEC_CREATE"; fi
+  if [ -n "$FAKE_OPENSPEC_CREATE" ]; then mkdir -p "$(dirname "$FAKE_OPENSPEC_CREATE")"; printf 'new\n' > "$FAKE_OPENSPEC_CREATE"; fi
   ;;
 esac
 `
@@ -92,7 +92,7 @@ func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 	dir := t.TempDir()
 	cmd = filepath.Join(dir, "openspec")
 	log = filepath.Join(dir, "calls.log")
-	script := strings.NewReplacer("@LOG@", "'"+log+"'", "@VERSION@", "'"+version+"'", "@CONFIG@", openSpecConfig).Replace(fakeOpenSpecScript)
+	script := strings.NewReplacer("@LOG@", "'"+log+"'", "@VERSION@", "'"+version+"'", "@CONFIG@", OpenSpecConfig).Replace(fakeOpenSpecScript)
 	if err := os.WriteFile(cmd, []byte(script), 0o755); err != nil {
 		t.Fatalf("write fake openspec: %v", err)
 	}
