@@ -72,6 +72,7 @@ With the deltas from `ShowChange` and, for each capability they touch whose main
 
 - [Every lint of a `docket` change starts OpenSpec two or more times (`show`, `validate`, one `show` per touched main spec); through `npx` that is seconds] → accepted: lint runs before a pull request and before archiving, not in a loop.
 - [A scenario's line is found by a text search, so a delta OpenSpec reads differently from that search gets line 0] → the finding still names the file and the scenario.
+- [The templates hold generic tags such as `<name>`, `<slug>` and `<N>`, so prose that writes one outside a code span is reported as a placeholder] → as in `v0.15.0` and as the spec words it; the message names the template, and the fix is a code span, which is how such tags are written anyway. HTML comments that are not template text are blanked before the angle-bracket scan, so a note in a comment is never reported.
 - [Placeholders come from the templates this dkt ships, not the ones installed in the project] → as in `v0.15.0`; a project on an older schema may see text it never had flagged, and `dkt init` updates the templates.
 - [This repository's main specs start with `# <capability> Specification`, so `dkt lint` reports `title-missing` for each] → intended; they get titles when the repository switches to Docket's workflow.
 - [A folder or file on a linted path replaced by a link between listing and reading] → the confined handle refuses a link out of the repository at read time; a link inside it is read, which is no more than lint could read anyway.
