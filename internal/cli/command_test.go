@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"strings"
 	"testing"
 
@@ -104,5 +105,53 @@ func TestCommandErrorText(t *testing.T) {
 	code, _, errs := runIn(t, r.Dir, r.Env, "inspect")
 	if code != 1 || !strings.HasPrefix(errs, "dkt inspect: ") {
 		t.Errorf("code=%d err=%q", code, errs)
+	}
+}
+
+func TestUnexpectedArgument(t *testing.T) {
+	code, out, errs := run(t, "inspect", "extra", "--json")
+	var m struct {
+		Command  string
+		Findings []Finding
+	}
+	if err := json.Unmarshal([]byte(out), &m); err != nil || code != 2 || m.Command != "inspect" || len(m.Findings) != 1 || m.Findings[0].Rule != "usage" {
+		t.Errorf("code=%d out=%q", code, out)
+	}
+	if !strings.Contains(errs, `dkt inspect: unexpected argument "extra"`) {
+		t.Errorf("err=%q", errs)
+	}
+	if code, _, _ = run(t, "init", "extra"); code != 2 {
+		t.Errorf("init extra: code=%d", code)
+	}
+}
+
+func TestUsageBeforeRepository(t *testing.T) {
+	if code, _, _ := runIn(t, t.TempDir(), testutil.Env(t), "init", "--nosuch"); code != 2 {
+		t.Errorf("code=%d", code)
+	}
+}
+
+func TestInitHelpFlagLine(t *testing.T) {
+	_, out, _ := run(t, "init", "--help")
+	if !strings.Contains(out, "\n  --tools") {
+		t.Errorf("out=%q", out)
+	}
+}
+
+func TestFlagValueReachesRun(t *testing.T) {
+	var got string
+	cmds := []func() Command{func() Command {
+		var tools string
+		return Command{
+			Name: "x", Usage: "x",
+			Define: func(fs *flag.FlagSet) { fs.StringVar(&tools, "tools", "", "") },
+			Run:    func(*Context, []string) (Outcome, error) { got = tools; return Outcome{}, nil },
+		}
+	}}
+	r := testutil.NewRepo(t)
+	var out, errb bytes.Buffer
+	code := RunWith(Options{Args: []string{"x", "--tools", "claude"}, Dir: r.Dir, Env: r.Env, Stdout: &out, Stderr: &errb}, cmds)
+	if code != 0 || got != "claude" {
+		t.Errorf("code=%d got=%q err=%q", code, got, errb.String())
 	}
 }
