@@ -221,7 +221,7 @@ func TestSyncLinkedPlanRefused(t *testing.T) { // Linked plan refused
 }
 
 func TestSyncUnknownTask(t *testing.T) { // Trailer for an unknown task; cancelled number
-	p := plan4 + "\n## Cancelled Tasks\n\n### Task 7: Gone\n\n- [ ] z\n"
+	p := plan4 + "\n## Cancelled Tasks\n\n- Task 7: Gone\n"
 	r := syncRepo(t, p)
 	sha := trail(r, "add-x/9,1")
 	trail(r, "add-x/7")
