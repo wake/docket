@@ -55,6 +55,21 @@ func TestParsePlan(t *testing.T) {
 	}
 }
 
+func TestParsePlanTaskHeadingLevel(t *testing.T) {
+	p := ParsePlan([]byte("## Task 1: a\n- [ ] x\n#### Task 2: b\n- [ ] y\n### Task 3: c\n- [ ] z\n"))
+	want := []Task{{Number: 3, Name: "c", Line: 5, Steps: []Step{{6, false}}}}
+	if !reflect.DeepEqual(p.Tasks, want) {
+		t.Fatalf("tasks = %+v, want %+v", p.Tasks, want)
+	}
+}
+
+func TestParsePlanCancelledHeadingCase(t *testing.T) {
+	p := ParsePlan([]byte("## cancelled tasks\n\n- Task 4: x - dropped\n"))
+	if !reflect.DeepEqual(p.Cancelled, []int{4}) {
+		t.Fatalf("cancelled = %v", p.Cancelled)
+	}
+}
+
 func TestParsePlanBodyEndsAtLevelThree(t *testing.T) {
 	p := ParsePlan([]byte("### Task 1: A\n- [ ] a\n### Task 2: B\n- [ ] b\n"))
 	if len(p.Tasks) != 2 || len(p.Tasks[0].Steps) != 1 || p.Tasks[0].Steps[0].Line != 2 {
