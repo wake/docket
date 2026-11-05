@@ -504,6 +504,22 @@ func TestInspectDefaultBranchFromOrigin(t *testing.T) {
 	}
 }
 
+func TestInspectShallowCloneSkipsTrailerCheck(t *testing.T) {
+	src := trailerRepo(t, "add change\n\nChange: add-x/1", "add-x")
+	src.Commit("later, no trailer", map[string]string{"b.txt": "b\n"})
+	dir := filepath.Join(t.TempDir(), "clone")
+	src.Git("clone", "-q", "--depth", "1", "file://"+src.Dir, dir)
+	r := &testutil.Repo{T: t, Dir: dir, Env: src.Env}
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "" || m.Result.DefaultBranch != nil {
+		t.Errorf("%v %+v", m.Result.DefaultBranch, m.Findings)
+	}
+	_, _, text := inspect(t, r, "1.14.0", true)
+	if !strings.Contains(text, "The repository is a shallow clone; the trailer check was skipped.") || strings.Contains(text, "Default branch:") {
+		t.Errorf("text: %s", text)
+	}
+}
+
 func TestInspectNoDefaultBranch(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)

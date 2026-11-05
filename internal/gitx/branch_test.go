@@ -25,6 +25,20 @@ func TestDefaultBranchOriginHeadNamesIt(t *testing.T) {
 	}
 }
 
+func TestIsShallow(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("one", map[string]string{"a": "1"})
+	r.Commit("two", map[string]string{"a": "2"})
+	if got, err := (Git{Dir: r.Dir, Env: r.Env}).IsShallow(); err != nil || got {
+		t.Errorf("normal: %v %v", got, err)
+	}
+	dir := t.TempDir() + "/clone"
+	r.Git("clone", "-q", "--depth", "1", "file://"+r.Dir, dir)
+	if got, err := (Git{Dir: dir, Env: r.Env}).IsShallow(); err != nil || !got {
+		t.Errorf("shallow: %v %v", got, err)
+	}
+}
+
 func TestDefaultBranchNoRemote(t *testing.T) {
 	r := testutil.NewRepo(t)
 	c := r.Commit("one", map[string]string{"a": "1"})
