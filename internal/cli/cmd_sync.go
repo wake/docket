@@ -80,7 +80,7 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 	var commits []gitx.Trailers
 	if c.Repo.Head != nil {
 		var err error
-		if commits, err = c.Git.ChangeTrailers(); err != nil {
+		if commits, err = c.Git.ChangeTrailers("HEAD"); err != nil {
 			return Outcome{}, err
 		}
 	}
