@@ -80,6 +80,29 @@ init)
   if [ -n "$FAKE_OPENSPEC_TOUCH" ]; then printf 'changed\n' >> "$FAKE_OPENSPEC_TOUCH"; fi
   if [ -n "$FAKE_OPENSPEC_CREATE" ]; then mkdir -p "$(dirname "$FAKE_OPENSPEC_CREATE")"; printf 'new\n' > "$FAKE_OPENSPEC_CREATE"; fi
   ;;
+new)
+  slug=$3
+  schema=docket
+  if [ "$4" = "--schema" ]; then schema=$5; fi
+  case "$slug" in
+  *[A-Z]*)
+    echo "Error: Change name must be lowercase (use kebab-case)" >&2
+    exit 1
+    ;;
+  esac
+  if [ -e "openspec/changes/$slug" ]; then
+    echo "Error: Change '$slug' already exists" >&2
+    exit 1
+  fi
+  if [ -n "$FAKE_OPENSPEC_NEW_SLEEP" ]; then sleep "$FAKE_OPENSPEC_NEW_SLEEP"; fi
+  mkdir -p "openspec/changes/$slug"
+  printf 'schema: %s\ncreated: 2026-01-01\n' "$schema" > "openspec/changes/$slug/.openspec.yaml"
+  if [ -n "$FAKE_OPENSPEC_NEW_LINK" ]; then ln -s "$FAKE_OPENSPEC_NEW_LINK" "openspec/changes/$slug/proposal.md"; fi
+  if [ "$FAKE_OPENSPEC_NEW_FAIL" = 1 ]; then
+    echo "fake failure" >&2
+    exit 2
+  fi
+  ;;
 esac
 `
 
@@ -87,6 +110,10 @@ esac
 // path and the path of its call log (created empty; `.foo` beside it logs $FOO per call) (see fakeOpenSpecScript for the format).
 // `init` also appends a line to the existing file named by FAKE_OPENSPEC_TOUCH and
 // creates the file named by FAKE_OPENSPEC_CREATE, when the test's environment sets them.
+// `new change <slug> [--schema <s>]` refuses an uppercase slug or an existing folder as OpenSpec does,
+// else creates openspec/changes/<slug>/.openspec.yaml, and honours: FAKE_OPENSPEC_NEW_SLEEP=<seconds>
+// (sleep before creating), FAKE_OPENSPEC_NEW_LINK=<target> (after creating, make proposal.md a link to it)
+// and FAKE_OPENSPEC_NEW_FAIL=1 (after creating, print "fake failure" and exit 2).
 func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 	t.Helper()
 	dir := t.TempDir()
