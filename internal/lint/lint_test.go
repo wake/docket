@@ -15,7 +15,7 @@ import (
 
 type stubOpenSpec struct{}
 
-func (stubOpenSpec) ShowChange(string) ([]openspec.Delta, error)      { return nil, nil }
+func (stubOpenSpec) ShowChange(string) ([]openspec.Delta, error)     { return nil, nil }
 func (stubOpenSpec) ShowSpec(string) ([]openspec.Requirement, error) { return nil, nil }
 func (stubOpenSpec) Validate(string) ([]openspec.Issue, error)       { return nil, nil }
 
