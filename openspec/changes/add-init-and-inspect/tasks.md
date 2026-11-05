@@ -40,8 +40,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks
 **Files:** `shipped/**`, `shipped.go`, `shipped_test.go`, `AGENTS.md`
 
-- [ ] 3.1 Write a failing test that the embedded files are exactly those in design.md's table of shipped files, that `shipped/schema/schema.yaml` names `templates` that all exist, and that `shipped/skill/SKILL.md` and every template start with the front matter or heading their target needs; verify it fails
-- [ ] 3.2 Add `shipped/` with the content design.md names (the edited English docket skill and proposal and plan templates, the schema draft, placeholders for the rest) and `shipped.go`; add `shipped/` to the prompt files in `AGENTS.md`; verify the test from 3.1 passes
+- [x] 3.1 Write a failing test that the embedded files are exactly those in design.md's table of shipped files, that `shipped/schema/schema.yaml` names `templates` that all exist, and that `shipped/skill/SKILL.md` and every template start with the front matter or heading their target needs; verify it fails
+- [x] 3.2 Add `shipped/` with the content design.md names (the edited English docket skill and proposal and plan templates, the schema draft, placeholders for the rest) and `shipped.go`; add `shipped/` to the prompt files in `AGENTS.md`; verify the test from 3.1 passes
 
 ## 4. File statuses
 
