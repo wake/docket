@@ -1,17 +1,44 @@
 // Package change holds what Docket knows about a change: its metadata and slug rules.
 package change
 
+import (
+	"errors"
+	"regexp"
+	"strconv"
+	"strings"
+	"unicode/utf8"
+)
+
 // Kinds lists the allowed change kinds.
 var Kinds = []string{"feature", "change-request", "baseline"}
 
-// ValidLine is the form check for a title or source.
-func ValidLine(s string) bool { return false }
+var datePrefix = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}`)
 
-// CheckSlug refuses the slugs Docket reserves.
-func CheckSlug(slug string) error { return nil }
+// ValidLine is the form check for a title or source: the value is never trimmed.
+func ValidLine(s string) bool {
+	return utf8.ValidString(s) && !strings.ContainsAny(s, "\n\r") && strings.TrimSpace(s) != ""
+}
+
+// CheckSlug refuses the slugs Docket reserves; OpenSpec checks the rest.
+func CheckSlug(slug string) error {
+	if datePrefix.MatchString(slug) {
+		return errors.New("slug must not start with a date (YYYY-MM-DD): archiving adds the date")
+	}
+	if slug == "archive" {
+		return errors.New("slug \"archive\" is the name of OpenSpec's archive folder")
+	}
+	return nil
+}
 
 // Suffixed returns the slug for n <= 1, else slug-n.
-func Suffixed(slug string, n int) string { return "" }
+func Suffixed(slug string, n int) string {
+	if n <= 1 {
+		return slug
+	}
+	return slug + "-" + strconv.Itoa(n)
+}
 
-// FrontMatter renders the front matter of proposal.md.
-func FrontMatter(title, kind, source string) []byte { return nil }
+// FrontMatter renders the front matter of proposal.md; callers validate first.
+func FrontMatter(title, kind, source string) []byte {
+	return []byte("---\ntitle: " + strconv.Quote(title) + "\nkind: " + kind + "\nsource: " + strconv.Quote(source) + "\n---\n")
+}
