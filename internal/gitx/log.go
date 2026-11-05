@@ -12,10 +12,10 @@ type Trailers struct {
 	Change []string
 }
 
-// ChangeTrailers lists every commit reachable from HEAD, oldest first, with
+// ChangeTrailers lists every commit reachable from rev, oldest first, with
 // the values of its Change trailer as git reads trailers.
-func (g Git) ChangeTrailers() ([]Trailers, error) {
-	out, err := g.output("log", "-z", "--reverse", "--format=%H%x00%(trailers:key=Change,valueonly,unfold)", "HEAD")
+func (g Git) ChangeTrailers(rev string) ([]Trailers, error) {
+	out, err := g.output("log", "-z", "--reverse", "--format=%H%x00%(trailers:key=Change,valueonly,unfold)", rev)
 	if err != nil {
 		return nil, err
 	}

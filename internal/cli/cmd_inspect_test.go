@@ -18,7 +18,8 @@ type inspectOut struct {
 	Findings   []Finding
 	Unreadable []Unreadable
 	Result     struct {
-		OpenSpec struct {
+		DefaultBranch *string `json:"default_branch"`
+		OpenSpec      struct {
 			Version   *string
 			Minimum   string
 			Supported bool
@@ -369,7 +370,7 @@ func TestInspectText(t *testing.T) {
 	ds, _, _ := setup.Decide(r.Dir, shippedFS(), false)
 	code, _, out := inspect(t, r, "1.14.0", true)
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if code != 0 || len(lines) != 1+len(ds) || lines[0] != "OpenSpec 1.14.0 (minimum 1.14.0)" || lines[1] != "same  "+ds[0].Path {
+	if code != 0 || len(lines) != 2+len(ds) || lines[0] != "OpenSpec 1.14.0 (minimum 1.14.0)" || lines[1] != "same  "+ds[0].Path || lines[len(lines)-1] != "No default branch found; the trailer check was skipped." {
 		t.Errorf("code=%d %q", code, out)
 	}
 	_, _, out = inspect(t, r, "", true)
@@ -379,5 +380,216 @@ func TestInspectText(t *testing.T) {
 	_, _, out = inspect(t, r, "1.13.2", true)
 	if !strings.HasPrefix(out, "OpenSpec 1.13.2: unsupported (minimum 1.14.0)\n") {
 		t.Errorf("%q", out)
+	}
+}
+
+const planOne = "# Plan\n\n### Task 1: x\n"
+
+// trailerRepo is a repository on main whose first commit holds the given change folders.
+func trailerRepo(t *testing.T, msg string, slugs ...string) *testutil.Repo {
+	t.Helper()
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "main")
+	files := map[string]string{"README.md": "x\n"}
+	for _, s := range slugs {
+		files["openspec/changes/"+s+"/.openspec.yaml"] = "schema: docket\ncreated: 2026-01-01\n"
+		files["openspec/changes/"+s+"/plan.md"] = planOne
+	}
+	r.Commit(msg, files)
+	return r
+}
+
+func trailerFiles(m inspectOut) string {
+	return strings.Join(rules(m)["trailer-missing"], ",")
+}
+
+func TestInspectTrailerMissing(t *testing.T) { // Squash merge dropped the trailer
+	r := trailerRepo(t, "squashed", "add-x")
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if code != 1 || trailerFiles(m) != "openspec/changes/add-x/plan.md" || m.Findings[len(m.Findings)-1].Change != "add-x" {
+		t.Fatalf("%d %+v", code, m.Findings)
+	}
+	if m.Result.DefaultBranch == nil || *m.Result.DefaultBranch != "main" {
+		t.Errorf("default_branch = %v", m.Result.DefaultBranch)
+	}
+}
+
+func TestInspectTrailerText(t *testing.T) {
+	r := trailerRepo(t, "squashed", "add-x")
+	_, _, out := inspect(t, r, "1.14.0", true)
+	for _, w := range []string{"Default branch: main", "trailer-missing", "no commit on main carries a Change: trailer for add-x"} {
+		if !strings.Contains(out, w) {
+			t.Errorf("missing %q in %q", w, out)
+		}
+	}
+}
+
+func TestInspectTrailerCarried(t *testing.T) {
+	r := trailerRepo(t, "work\n\nChange: add-x/1", "add-x")
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "" {
+		t.Errorf("%+v", m.Findings)
+	}
+}
+
+func TestInspectTrailerOnLaterCommitAndSlugAlone(t *testing.T) {
+	r := trailerRepo(t, "plain", "add-x", "add-y")
+	r.Commit("later\n\nChange: add-x", nil)
+	r.Commit("other\n\nChange: add-other/1", nil)
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "openspec/changes/add-y/plan.md" {
+		t.Errorf("%+v", m.Findings)
+	}
+}
+
+func TestInspectTrailerSlugPrefixDoesNotCount(t *testing.T) {
+	r := trailerRepo(t, "work\n\nChange: add-x-2/1", "add-x")
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "openspec/changes/add-x/plan.md" {
+		t.Errorf("%+v", m.Findings)
+	}
+}
+
+func TestInspectTrailerSkips(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "main")
+	r.Commit("c", map[string]string{
+		"openspec/changes/archive/2026-01-01-old/plan.md": planOne,
+		"openspec/changes/other-schema/.openspec.yaml":    "schema: spec-driven\n",
+		"openspec/changes/other-schema/plan.md":           planOne,
+		"openspec/changes/no-plan/.openspec.yaml":         "schema: docket\n",
+		"openspec/changes/no-tasks/plan.md":               "# Plan\n",
+	})
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "" {
+		t.Errorf("%+v", m.Findings)
+	}
+}
+
+func TestInspectTrailerMissingSchemaMeansDocket(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "main")
+	r.Commit("c", map[string]string{"openspec/changes/add-x/plan.md": planOne})
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "openspec/changes/add-x/plan.md" {
+		t.Errorf("%+v", m.Findings)
+	}
+}
+
+func TestInspectTrailerReadsDefaultBranchNotCheckout(t *testing.T) {
+	r := trailerRepo(t, "squashed", "add-x")
+	r.Git("checkout", "-q", "-b", "feat")
+	r.Commit("feat\n\nChange: add-x/1", map[string]string{"f": "1"})
+	r.Git("rm", "-q", "-r", "openspec")
+	r.Git("commit", "-q", "-m", "drop")
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "openspec/changes/add-x/plan.md" {
+		t.Errorf("%+v", m.Findings)
+	}
+}
+
+func TestInspectDefaultBranchFromOrigin(t *testing.T) {
+	bare := testutil.NewBare(t)
+	src := trailerRepo(t, "squashed", "add-x")
+	src.Git("remote", "add", "origin", bare)
+	src.Git("push", "-q", "origin", "main")
+	dir := filepath.Join(t.TempDir(), "clone")
+	cl := &testutil.Repo{T: t, Dir: filepath.Dir(dir), Env: src.Env}
+	cl.Git("clone", "-q", bare, dir)
+	r := &testutil.Repo{T: t, Dir: dir, Env: src.Env}
+	r.Git("checkout", "-q", "-b", "feat")
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if m.Result.DefaultBranch == nil || *m.Result.DefaultBranch != "main" || trailerFiles(m) != "openspec/changes/add-x/plan.md" {
+		t.Errorf("%v %+v", m.Result.DefaultBranch, m.Findings)
+	}
+}
+
+func TestInspectShallowCloneSkipsTrailerCheck(t *testing.T) {
+	src := trailerRepo(t, "add change\n\nChange: add-x/1", "add-x")
+	src.Commit("later, no trailer", map[string]string{"b.txt": "b\n"})
+	dir := filepath.Join(t.TempDir(), "clone")
+	src.Git("clone", "-q", "--depth", "1", "file://"+src.Dir, dir)
+	r := &testutil.Repo{T: t, Dir: dir, Env: src.Env}
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if trailerFiles(m) != "" || m.Result.DefaultBranch != nil {
+		t.Errorf("%v %+v", m.Result.DefaultBranch, m.Findings)
+	}
+	_, _, text := inspect(t, r, "1.14.0", true)
+	if !strings.Contains(text, "The repository is a shallow clone; the trailer check was skipped.") || strings.Contains(text, "Default branch:") {
+		t.Errorf("text: %s", text)
+	}
+}
+
+func TestInspectNoDefaultBranch(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if code != 0 || m.Result.DefaultBranch != nil || len(m.Findings) != 0 {
+		t.Errorf("%d %+v", code, m)
+	}
+}
+
+func TestInspectMainSpecTitles(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	r.Write("openspec/specs/alpha/spec.md", "no title\n")
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if code != 1 || one(m, "title-missing") != "openspec/specs/alpha/spec.md" || m.Findings[0].Line != 1 {
+		t.Errorf("%d %+v", code, m.Findings)
+	}
+	r.Write("openspec/specs/alpha/spec.md", "# beta Specification\n")
+	if code, m, _ = inspect(t, r, "1.14.0", false); code != 0 || len(m.Findings) != 0 {
+		t.Errorf("%d %+v", code, m.Findings)
+	}
+}
+
+func TestInspectMainSpecUnreadable(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	r.Write("openspec/specs/alpha/spec.md", "x\n")
+	p := filepath.Join(r.Dir, "openspec/specs/alpha/spec.md")
+	if err := os.Chmod(p, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(p, 0o644) })
+	if f, err := os.Open(p); err == nil {
+		f.Close()
+		t.Skip("file readable despite mode 0")
+	}
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/specs/alpha/spec.md" {
+		t.Errorf("%+v", m.Unreadable)
+	}
+}
+
+func TestInspectLintFromSubdirectoryRootRelative(t *testing.T) {
+	r := trailerRepo(t, "squashed", "add-x")
+	r.Git("checkout", "-q", "-b", "feat")
+	r.Write("openspec/specs/alpha/spec.md", "no title\n")
+	r.Write("docs/superpowers/plans/p.md", "p\n")
+	sub := filepath.Join(r.Dir, "sub/dir")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.0")
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
+	for name, want := range map[string][]string{
+		"inspect": {"trailer-missing:openspec/changes/add-x/plan.md", "title-missing:openspec/specs/alpha/spec.md"},
+		"lint":    {"title-missing:openspec/specs/alpha/spec.md", "routing:docs/superpowers/plans/p.md"},
+	} {
+		_, out, _ := runIn(t, sub, env, name, "--json")
+		var m inspectOut
+		if err := json.Unmarshal([]byte(out), &m); err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]bool{}
+		for _, f := range m.Findings {
+			got[f.Rule+":"+f.File] = true
+		}
+		for _, w := range want {
+			if !got[w] {
+				t.Errorf("%s: missing %s in %s", name, w, out)
+			}
+		}
 	}
 }

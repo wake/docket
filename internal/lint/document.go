@@ -105,12 +105,16 @@ func checkSections(r *state, c *loaded) {
 	}
 }
 
-// checkSpecTitles reports main specs without a title.
-func checkSpecTitles(r *state) {
-	_ = fs.WalkDir(r.in.Root, specsDir, func(p string, d fs.DirEntry, err error) error {
+// SpecTitles reports main specs without a title, the sources it could not
+// read and the number of main specs it found.
+func SpecTitles(root fs.FS) ([]Finding, []Unreadable, int) {
+	var findings []Finding
+	var bad []Unreadable
+	specs := 0
+	_ = fs.WalkDir(root, specsDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
-				r.unreadable(p, err)
+				bad = append(bad, Unreadable{Source: p, Reason: err.Error()})
 			}
 			if d != nil && d.IsDir() {
 				return fs.SkipDir
@@ -120,10 +124,10 @@ func checkSpecTitles(r *state) {
 		if !d.Type().IsRegular() || d.Name() != "spec.md" {
 			return nil
 		}
-		r.rep.Specs++
-		b, err := fs.ReadFile(r.in.Root, p)
+		specs++
+		b, err := fs.ReadFile(root, p)
 		if err != nil {
-			r.unreadable(p, err)
+			bad = append(bad, Unreadable{Source: p, Reason: err.Error()})
 			return nil
 		}
 		first := ""
@@ -132,11 +136,12 @@ func checkSpecTitles(r *state) {
 		}
 		cp := strings.Trim(strings.TrimSuffix(strings.TrimPrefix(p, specsDir), "spec.md"), "/")
 		if _, ok := change.SpecTitle(first, cp); !ok {
-			r.rep.Findings = append(r.rep.Findings, Finding{Rule: "title-missing", File: p, Line: 1,
+			findings = append(findings, Finding{Rule: "title-missing", File: p, Line: 1,
 				Message: "main spec has no title: its first line must be `# <name> Specification`, the name differing from " + cp})
 		}
 		return nil
 	})
+	return findings, bad, specs
 }
 
 var commentRe = regexp.MustCompile(`(?s)<!--.*?-->`)

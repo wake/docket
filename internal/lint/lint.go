@@ -29,6 +29,7 @@ type Input struct {
 	Templates fs.FS
 	Slugs     []string
 	OpenSpec  func() (OpenSpec, error)
+	Added     []string // files added since the default branch; the routing rule reads them
 }
 
 // Linted is a change that was linted and the schema it names.
@@ -133,7 +134,21 @@ func Run(in Input) (Report, error) {
 		}
 	}
 	if len(in.Slugs) == 0 {
-		checkSpecTitles(r)
+		fnd, us, n := SpecTitles(in.Root)
+		rep.Findings = append(rep.Findings, fnd...)
+		for _, u := range us {
+			r.unreadable(u.Source, errors.New(u.Reason))
+		}
+		rep.Specs = n
+	}
+	for _, p := range in.Added {
+		// Added only holds paths under docs/superpowers/plans or docs/superpowers/specs.
+		dir := "docs/superpowers/specs"
+		if strings.HasPrefix(p, "docs/superpowers/plans/") {
+			dir = "docs/superpowers/plans"
+		}
+		rep.Findings = append(rep.Findings, Finding{Rule: "routing", File: p,
+			Message: "written to " + dir + "; write it into the change folder instead (proposal.md, specs/, design.md or plan.md)"})
 	}
 	sort.Slice(rep.Changes, func(i, j int) bool { return rep.Changes[i].Slug < rep.Changes[j].Slug })
 	sort.SliceStable(rep.Findings, func(i, j int) bool {
