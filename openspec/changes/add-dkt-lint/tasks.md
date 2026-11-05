@@ -30,16 +30,16 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks
 **Files:** `internal/markdown/markdown.go`, `internal/markdown/table.go`, `internal/markdown/markdown_test.go`, `internal/markdown/table_test.go`
 
-- [ ] 1.1 Port the tests of `CodeSpans` and `FindTable` from `v0.15.0` (`internal/markdown/markdown_test.go`, `table_test.go`); verify they fail
-- [ ] 1.2 Port `CodeSpans`, `backtickRun`, `Table`, `Row`, `FindTable`, `splitRow` and `cell` (design.md, Document rules and Plan rules); verify every test passes
+- [x] 1.1 Port the tests of `CodeSpans` and `FindTable` from `v0.15.0` (`internal/markdown/markdown_test.go`, `table_test.go`); verify they fail
+- [x] 1.2 Port `CodeSpans`, `backtickRun`, `Table`, `Row`, `FindTable`, `splitRow` and `cell` (design.md, Document rules and Plan rules); verify every test passes
 
 ## 2. Plan structure
 
 **Review:** checks
 **Files:** `internal/change/plan.go`, `internal/change/plan_test.go`
 
-- [ ] 2.1 Write failing tests for `ParsePlan`: a task's `**Scenarios:**` line (its line, a comma-separated list with backticks dropped, `none` giving no items, an empty value giving one empty item); `**Compensates:** Task 3` (number, line, OK) and a malformed one (not OK); `## Task 3: x`, `#### Task 4: y`, `### Task 0: z` and `### Task 2 - x` as bad headings with level and line (none of them a task), and `### Tasks left` not a bad heading; Cancelled bullets `- Task 5: Name - reason` (OK, number, name, reason) and `- Task 5: Name` (not OK, number 5); the Reuse section's line and table, and no table when the section has none; a heading or bullet inside an HTML comment or a fence counts for nothing; the existing tests still pass with `Cancelled` holding structs; verify they fail
-- [ ] 2.2 Implement them (design.md, Plan rules); verify every test passes
+- [x] 2.1 Write failing tests for `ParsePlan`: a task's `**Scenarios:**` line (its line, a comma-separated list with backticks dropped, `none` giving no items, an empty value giving one empty item); `**Compensates:** Task 3` (number, line, OK) and a malformed one (not OK); `## Task 3: x`, `#### Task 4: y`, `### Task 0: z` and `### Task 2 - x` as bad headings with level and line (none of them a task), and `### Tasks left` not a bad heading; Cancelled bullets `- Task 5: Name - reason` (OK, number, name, reason) and `- Task 5: Name` (not OK, number 5); the Reuse section's line and table, and no table when the section has none; a heading or bullet inside an HTML comment or a fence counts for nothing; the existing tests still pass with `Cancelled` holding structs; verify they fail
+- [x] 2.2 Implement them (design.md, Plan rules); verify every test passes
 
 ## 3. Front matter and titles
 
