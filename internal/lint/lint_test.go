@@ -151,7 +151,7 @@ func TestNamedMissing(t *testing.T) {
 	for _, name := range []string{"add-z", "archive", "linked"} {
 		ok := false
 		for _, f := range rep.Findings {
-			if f.Rule == "change-missing" && f.Change == "" && strings.Contains(f.Message, name) {
+			if f.Rule == "change-missing" && f.Change == name && strings.Contains(f.Message, name) {
 				ok = true
 			}
 		}
