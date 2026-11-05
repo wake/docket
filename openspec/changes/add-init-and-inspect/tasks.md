@@ -48,9 +48,9 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (the rules both commands share)
 **Files:** `internal/setup/setup.go`, `internal/setup/history.go`, `internal/setup/setup_test.go`, `internal/safepath/safepath.go`, `internal/safepath/safepath_test.go`
 
-- [ ] 4.1 Port `internal/safepath` with its tests; verify they pass
-- [ ] 4.2 Write failing tests, at the level of the decision table (design.md, One decision table), for: every target `missing` in an empty repository; every target `same` after writing the shipped files; a file equal to an injected earlier-release hash is `outdated` with action update; an edited file is `differs` with action keep, and overwrite with force; the two skill targets are decided separately; a symbolic link on `.claude/skills/docket` is a refusal naming it; an unreadable `SKILL.md` is a refusal listing it as unreadable; a file the user added under `.claude/skills/docket/` is not a target; verify they fail
-- [ ] 4.3 Implement the decision table for the schema and skill files by extending `v0.15.0`'s `decideAll`, `decide`, `targetsOf`, `problemForTarget` and `write` (design.md, One decision table), with the earlier-release table and the ported `install` and `readNoFollow`; verify every test from 4.2 passes
+- [x] 4.1 Port `internal/safepath` with its tests; verify they pass
+- [x] 4.2 Write failing tests, at the level of the decision table (design.md, One decision table), for: every target `missing` in an empty repository; every target `same` after writing the shipped files; a file equal to an injected earlier-release hash is `outdated` with action update; an edited file is `differs` with action keep, and overwrite with force; the two skill targets are decided separately; a symbolic link on `.claude/skills/docket` is a refusal naming it; an unreadable `SKILL.md` is a refusal listing it as unreadable; a file the user added under `.claude/skills/docket/` is not a target; verify they fail
+- [x] 4.3 Implement the decision table for the schema and skill files by extending `v0.15.0`'s `decideAll`, `decide`, `targetsOf`, `problemForTarget` and `write` (design.md, One decision table), with the earlier-release table and the ported `install` and `readNoFollow`; verify every test from 4.2 passes
 
 ## 5. config.yaml
 
