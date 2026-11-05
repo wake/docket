@@ -124,6 +124,81 @@ func TestLintUnreadable(t *testing.T) {
 	}
 }
 
+const lintProposal = `---
+title: Add x
+kind: feature
+source: test
+specs:
+  x-cap: X capability
+---
+
+# Proposal
+
+## Why
+
+Because.
+
+## What Changes
+
+Things.
+
+## Non-Goals
+
+- Nothing else.
+
+## Capabilities
+
+### New Capabilities
+- ` + "`x-cap`" + `: x
+
+### Modified Capabilities
+
+## Impact
+
+None.
+`
+
+// lintDocket runs dkt lint add-x --json on a docket change with the given proposal and the fake's answers.
+func lintDocket(t *testing.T, proposal string) (int, lintOut, string) {
+	t.Helper()
+	r := lintRepo(t, "docket")
+	r.Write("openspec/changes/add-x/proposal.md", proposal)
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.0")
+	dir := t.TempDir()
+	testutil.OpenSpecAnswer(t, dir, 0, `{"deltas":[{"spec":"x-cap","operation":"ADDED","requirements":[{"text":"The system SHALL x.","scenarios":[]}]}]}`,
+		"show", "add-x", "--type", "change", "--json", "--deltas-only")
+	testutil.OpenSpecAnswer(t, dir, 0, `{"items":[{"id":"add-x","valid":true,"issues":[]}]}`,
+		"validate", "add-x", "--type", "change", "--json")
+	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd, "FAKE_OPENSPEC_JSON="+dir)
+	code, out, errs := runIn(t, r.Dir, env, "lint", "add-x", "--json")
+	var m lintOut
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatalf("%q %q: %v", out, errs, err)
+	}
+	return code, m, out
+}
+
+func TestLintCleanDocketChange(t *testing.T) { // Clean change, docket schema
+	code, m, out := lintDocket(t, lintProposal)
+	if code != 0 || len(m.Findings) != 0 || m.Result == nil || m.Result.Specs != 0 ||
+		len(m.Result.Changes) != 1 || m.Result.Changes[0] != (lintChange{Slug: "add-x", Schema: "docket"}) {
+		t.Fatalf("%d %s", code, out)
+	}
+}
+
+func TestLintFindingFields(t *testing.T) {
+	code, m, out := lintDocket(t, strings.Replace(lintProposal, "kind: feature", "kind: fix", 1))
+	var got *Finding
+	for i, f := range m.Findings {
+		if f.Rule == "metadata-invalid" {
+			got = &m.Findings[i]
+		}
+	}
+	if code != 1 || got == nil || got.Change != "add-x" || got.File != "openspec/changes/add-x/proposal.md" || got.Line != 3 {
+		t.Fatalf("%d %s", code, out)
+	}
+}
+
 func TestLintText(t *testing.T) {
 	r := lintRepo(t, "spec-driven")
 	cmd, _ := testutil.FakeOpenSpec(t, "1.14.0")
