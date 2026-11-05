@@ -38,6 +38,12 @@ func (g Git) DefaultBranch() (DefaultBranch, bool, error) {
 	return DefaultBranch{}, false, nil
 }
 
+// IsShallow reports whether the repository is a shallow clone.
+func (g Git) IsShallow() (bool, error) {
+	out, err := g.Run("rev-parse", "--is-shallow-repository")
+	return strings.TrimSpace(out) == "true", err
+}
+
 // MergeBase returns the best common ancestor of commits a and b; false when
 // their histories are unrelated. A name that does not resolve is an error.
 func (g Git) MergeBase(a, b string) (string, bool, error) {

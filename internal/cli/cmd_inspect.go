@@ -94,6 +94,14 @@ func (c *Context) inspectDefaultBranch(res *inspectResult, out *Outcome) error {
 		out.Human = append(out.Human, "No default branch found; the trailer check was skipped.")
 		return nil
 	}
+	shallow, err := g.IsShallow()
+	if err != nil {
+		return err
+	}
+	if shallow {
+		out.Human = append(out.Human, "The repository is a shallow clone; the trailer check was skipped.")
+		return nil
+	}
 	res.DefaultBranch = &db.Name
 	out.Human = append(out.Human, "Default branch: "+db.Name)
 	dirs, err := g.TreeDirs(db.Commit, "openspec/changes/")
