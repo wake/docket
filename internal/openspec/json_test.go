@@ -145,6 +145,31 @@ func TestShowIgnoresUnknownFields(t *testing.T) {
 	}
 }
 
+func TestShowChangeUndecodable(t *testing.T) {
+	r, _ := jsonRunner(t, 0, "not json", changeArgs)
+	_, err := r.ShowChange("add-x")
+	if err == nil || !strings.Contains(err.Error(), "openspec show add-x") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestFailedErrorText(t *testing.T) {
+	cmd := []string{"openspec", "show"}
+	for _, c := range []struct {
+		e    openspec.FailedError
+		want string
+	}{
+		{openspec.FailedError{Command: cmd, Code: 1, Messages: []string{"m"}}, "openspec show exited with 1: m"},
+		{openspec.FailedError{Command: cmd, Code: 1}, "openspec show exited with 1"},
+		{openspec.FailedError{Command: cmd, Code: 1, Stderr: "bad\n"}, "openspec show exited with 1: bad"},
+		{openspec.FailedError{Command: cmd, Code: 1, Stderr: "bad", Messages: []string{"a", "b"}}, "openspec show exited with 1: bad: a; b"},
+	} {
+		if got := c.e.Error(); got != c.want {
+			t.Errorf("got %q, want %q", got, c.want)
+		}
+	}
+}
+
 func TestJSONUnsupportedVersion(t *testing.T) {
 	r, log := newRunner(t, "1.13.2")
 	var ue *openspec.UnsupportedError
