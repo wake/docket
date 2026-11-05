@@ -31,7 +31,7 @@ They live under `shipped/` at the repository root and are embedded by the root p
 | `shipped/config/operations.yaml` | the `operations` section of `openspec/config.yaml` |
 | `shipped/next-steps/{commit,reload,doctor}.md` | the entries of `result.next_steps`, trimmed |
 
-The `docket` skill, the proposal and plan templates and the next steps are their edited English versions; the schema is its draft. The spec and design templates and the archive guidance are placeholders until their text is edited: each says `Placeholder` and keeps the shape OpenSpec reads (front matter, valid YAML). `AGENTS.md`'s list of prompt files gains `shipped/`.
+Each file is its edited English text, except the schema, which is its draft; its review is deferred. `AGENTS.md`'s list of prompt files gains `shipped/`.
 
 ### Earlier releases
 `internal/setup` holds a table from each target (the `operations` section counts as one) to the SHA-256 of the files earlier releases, v0.16.0 and later, shipped there. It is empty in this change; each release adds the hashes of what it ships. Tests replace it through a package variable.
@@ -78,5 +78,5 @@ Its errors map to findings: missing to `openspec-missing`, unsupported to `opens
 
 - [Line-based editing refuses valid YAML forms, such as a flow mapping or a value on the next line] → the file is listed as unreadable, nothing is written, and the user can rewrite the entry by hand.
 - [The `latest` job fails when a new OpenSpec release breaks something, on a pull request that did not cause it] → intended: it is how Docket learns of the break. Pin the job to the last good version if it blocks unrelated work.
-- [Placeholder text ships in a build of dkt] → no release is made before every shipped file is final; the release step checks for `Placeholder`.
+- [The schema's instructions ship as an unreviewed draft] → its review comes before the first release; replacing the file is a light review.
 - [A file another process creates while `openspec init` runs is reported as created by it] → accepted.

@@ -15,7 +15,7 @@ Step 3 of docket-init runs `dkt init --json --tools <coding agent>` and step 4 r
 - Locate OpenSpec and check its version: the command named by `DOCKET_OPENSPEC`, else `openspec` on `PATH`; at least 1.7.0, with no upper bound; `OPENSPEC_TELEMETRY=0` on every invocation.
 - cli-output gains the two rules held back until a command needed them: unreadable sources (exit 3), and exit 4 for a command that needs a repository outside one; and it states that `--help` always prints text, whatever `--json` says.
 - CI gains a job that runs the tests calling the real OpenSpec once with OpenSpec 1.7.0 and once with the latest.
-- The files written into a project ship with placeholder content for now: the schema, the templates, the archive guidance, the `docket` skill and the wording of `dkt init`'s next steps are all prompt text, replaced by the real content once the user has edited each. The placeholder schema is still one OpenSpec reads.
+- The files written into a project are prompt text: the templates, the archive guidance, the `docket` skill and the wording of `dkt init`'s next steps ship as edited; the schema ships as its draft, whose review is deferred.
 - Not in this change:
   - The other three checks of `dkt inspect`: commit trailers and main spec titles come with `dkt sync` and `dkt lint`, changes made with another schema with docket-doctor.
   - Checking for superpowers: docket-init and docket-doctor have the coding agent check its own skills.
@@ -33,6 +33,6 @@ Step 3 of docket-init runs `dkt init --json --tools <coding agent>` and step 4 r
 
 ## Impact
 
-- Adds `dkt init`, `dkt inspect`, the code that calls OpenSpec and their tests, and the shipped files embedded in dkt (placeholder content for now).
+- Adds `dkt init`, `dkt inspect`, the code that calls OpenSpec and their tests, and the shipped files embedded in dkt.
 - Adds an OpenSpec job under `.github/workflows/`.
 - Dependencies: still only the Go standard library, the system `git` and the OpenSpec CLI.

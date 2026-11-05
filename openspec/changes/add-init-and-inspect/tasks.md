@@ -103,4 +103,4 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 ## Workflow follow-up
 
 - Archive the change with OpenSpec as the last commit of the pull request.
-- Replace each placeholder in `shipped/` once its prompt is edited; each replacement is a light review.
+- Replace `shipped/schema/schema.yaml` once the schema's review is done; that is a light review.
