@@ -55,8 +55,8 @@ func ReadFrontMatter(b []byte) (Front, bool, error) {
 				return fail("expected <capability>: <name>")
 			}
 			name, err := frontValue(rest)
-			if err != nil || name == "" {
-				return fail("%s", valueProblem(err, "capability "+path))
+			if err != nil {
+				return fail("%s", err)
 			}
 			if _, dup := fm.Specs[path]; dup {
 				return fail("capability %s given twice", path)
@@ -80,19 +80,12 @@ func ReadFrontMatter(b []byte) (Front, bool, error) {
 			continue
 		}
 		v, err := frontValue(rest)
-		if err != nil || v == "" {
-			return fail("%s", valueProblem(err, "key "+key))
+		if err != nil {
+			return fail("%s", err)
 		}
 		fm.Fields[key] = Field{Value: v, Line: n}
 	}
 	return Front{}, true, fmt.Errorf("front matter line %d: no closing ---", len(lines))
-}
-
-func valueProblem(err error, what string) string {
-	if err != nil {
-		return err.Error()
-	}
-	return what + " has no value"
 }
 
 // frontValue reads the part after "key:" (it must start with a space or be empty).
