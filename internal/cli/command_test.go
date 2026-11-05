@@ -102,8 +102,8 @@ func TestGitMissingCommand(t *testing.T) {
 func TestCommandErrorText(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("one", map[string]string{"f": "1"})
-	code, _, errs := runIn(t, r.Dir, r.Env, "inspect")
-	if code != 1 || !strings.HasPrefix(errs, "dkt inspect: ") {
+	code, _, errs := runIn(t, r.Dir, r.Env, "init")
+	if code != 1 || !strings.HasPrefix(errs, "dkt init: ") {
 		t.Errorf("code=%d err=%q", code, errs)
 	}
 }

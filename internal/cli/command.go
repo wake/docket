@@ -45,11 +45,3 @@ func initCommand() Command {
 		},
 	}
 }
-
-func inspectCommand() Command {
-	return Command{
-		Name:  "inspect",
-		Usage: "inspect [--json]",
-		Run:   func(*Context, []string) (Outcome, error) { return Outcome{}, errNotImplemented },
-	}
-}
