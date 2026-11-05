@@ -32,6 +32,7 @@ The shipped prompts already describe the behaviour: the plan template and schema
 
 ### Command
 `syncCommand` (`Args: 1`, flag `--check`), in `internal/cli/cmd_sync.go`:
+0. A slug holding `/` or `\`, or equal to `.` or `..`, is a usage error: `safepath.Check` only keeps a path inside the repository, and `../../docs` would still land inside it. (`dkt new` needs no such check: OpenSpec refuses the name before anything is written.)
 1. `safepath.Check` on `openspec/changes/<slug>/plan.md`: a link anywhere on that path gives `symlink-refused` (exit 1), with or without `--check`, so a link is reported the same way in both modes. Then `openspec/changes/<slug>` must be a directory (`change-missing`); `.openspec.yaml`'s schema must be `docket` (`other-schema`); `plan.md` must exist (`plan-missing`) and be readable with `safefile.ReadNoFollow` (unreadable, exit 3).
 2. Read the trailers; for each commit and value: skip values that are not `mine`; `trailer-malformed` for a bad list; `trailer-unknown-task` for a number with no `### Task` heading (a cancelled number included). Findings name the commit's short SHA and the value; their `File` is the plan's path.
 3. For each task, its commits and its unticked steps. Without `--check`, tick and write when any step is due (`symlink-refused` when a link is on the path). With `--check`, findings `task-unticked` (commits and unticked steps) and `task-no-commit` (no commit and an unticked step), each with the task heading's line.

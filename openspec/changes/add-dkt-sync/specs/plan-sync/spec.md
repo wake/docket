@@ -76,11 +76,15 @@ For each task a commit names, `dkt sync <slug>` SHALL tick every unticked step o
 - **THEN** `dkt sync add-x --check` exits with 0
 
 ### Requirement: Change and plan found
-`dkt sync <slug>` SHALL read `openspec/changes/<slug>/plan.md` in the repository. When the folder does not exist it SHALL report `change-missing`; when it has no plan.md, `plan-missing`; in both cases it SHALL write nothing and exit with 1. An unreadable plan.md SHALL be listed as `cli-output` requires.
+`dkt sync <slug>` SHALL read `openspec/changes/<slug>/plan.md` in the repository. A slug that holds `/` or `\`, or is `.` or `..`, names no change: it SHALL be a usage error (exit 2), and nothing is read. When the folder does not exist it SHALL report `change-missing`; when it has no plan.md, `plan-missing`; in both cases it SHALL write nothing and exit with 1. An unreadable plan.md SHALL be listed as `cli-output` requires.
 
 #### Scenario: No such change
 - **WHEN** `openspec/changes/add-y/` does not exist and a user runs `dkt sync add-y`
 - **THEN** the finding `change-missing` names `add-y` and dkt exits with 1
+
+#### Scenario: Path in place of a slug
+- **WHEN** a user runs `dkt sync ../../docs`
+- **THEN** dkt exits with 2 and no file is read or written
 
 ### Requirement: Other schema refused
 `dkt sync <slug>` for a change whose schema, as `change-metadata` defines it, is not `docket` SHALL report `other-schema`, naming the change's `.openspec.yaml` and its schema, change nothing, and exit with 1, with or without `--check`.
