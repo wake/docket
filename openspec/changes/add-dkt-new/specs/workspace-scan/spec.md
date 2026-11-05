@@ -27,11 +27,15 @@ In each source, every directory `openspec/changes/<slug>/` other than `archive` 
 - **THEN** the scan reports no use from that branch and does not list it as unreadable
 
 ### Requirement: Unreadable sources
-A worktree that git lists but whose directory is missing or cannot be read, and a branch whose tree cannot be read, SHALL be reported as unreadable with the reason, and the command SHALL exit as `cli-output` requires for unreadable sources.
+A worktree that git lists but whose directory is missing or cannot be read, a worktree whose `openspec/changes` path passes through a symbolic link, and a branch whose tree cannot be read, SHALL be reported as unreadable with the reason, and the command SHALL exit as `cli-output` requires for unreadable sources.
 
 #### Scenario: Worktree on an unmounted volume
 - **WHEN** a listed worktree's directory is missing because its volume is not mounted
 - **THEN** the scan lists that worktree as unreadable, with a reason that names `git worktree prune` for a worktree that was deleted, and the command exits with 3
+
+#### Scenario: Linked changes folder in another worktree
+- **WHEN** worktree B's `openspec/changes` is a symbolic link to a directory outside it
+- **THEN** the scan lists worktree B as unreadable, naming the link, and reports no use from what the link points to
 
 ### Requirement: No network
 A scan SHALL NOT fetch from or otherwise contact a remote. Remote-tracking branches SHALL be read as they were at the last fetch.
