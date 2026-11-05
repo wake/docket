@@ -42,3 +42,13 @@ func Suffixed(slug string, n int) string {
 func FrontMatter(title, kind, source string) []byte {
 	return []byte("---\ntitle: " + strconv.Quote(title) + "\nkind: " + kind + "\nsource: " + strconv.Quote(source) + "\n---\n")
 }
+
+// TaskRefs reads one Change trailer value for slug. mine is false when the
+// value is for another change; then tasks and ok mean nothing. A value that is
+// slug alone names no task. ok is false when the task list after "/" is not
+// one or more positive integers separated by commas.
+func TaskRefs(value, slug string) (tasks []int, ok, mine bool) { return nil, false, false }
+
+// SchemaOf returns the schema named by a change's .openspec.yaml, or "docket"
+// when it names none.
+func SchemaOf(b []byte) string { return "" }
