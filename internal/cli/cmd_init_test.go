@@ -149,7 +149,7 @@ func TestInitFromSubdirectory(t *testing.T) {
 func TestInitMissingTools(t *testing.T) {
 	r := testutil.NewRepo(t)
 	code, _, out, calls := doInit(t, r, r.Dir, "1.7.0", nil)
-	if code != 2 || calls != "" {
+	if code != 2 || strings.Contains(calls, "init") {
 		t.Errorf("code=%d calls=%q", code, calls)
 	}
 	if !strings.Contains(out, "--tools") || !strings.Contains(out, "openspec init") {
@@ -267,7 +267,7 @@ func TestInitConfigCases(t *testing.T) {
 	r.Write("openspec/config.yaml", "schema:\n  docket\n")
 	before := snapshot(r.Dir)
 	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil)
-	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/config.yaml" || snapshot(r.Dir) != before || calls != "" {
+	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/config.yaml" || snapshot(r.Dir) != before || strings.Contains(calls, "init") {
 		t.Errorf("unreadable: code=%d %+v", code, m.Unreadable)
 	}
 }
@@ -278,7 +278,7 @@ func TestInitUnreadableStopsEverything(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
-	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != skillPath || calls != "" {
+	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != skillPath || strings.Contains(calls, "init") {
 		t.Errorf("code=%d %+v calls=%q", code, m.Unreadable, calls)
 	}
 	if _, err := os.Stat(filepath.Join(r.Dir, "openspec")); err == nil {
@@ -299,7 +299,7 @@ func TestInitSymlinkRefused(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude", "--force")
-	if code != 1 || calls != "" || !hasFinding(m, "symlink-refused", ".claude/skills/docket") {
+	if code != 1 || strings.Contains(calls, "init") || !hasFinding(m, "symlink-refused", ".claude/skills/docket") {
 		t.Fatalf("code=%d calls=%q %+v", code, calls, m.Findings)
 	}
 	if _, err := os.Stat(filepath.Join(r.Dir, "openspec")); err == nil {

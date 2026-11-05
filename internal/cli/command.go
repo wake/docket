@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"flag"
 
 	"github.com/wake/docket/internal/gitx"
@@ -23,8 +22,6 @@ type Command struct {
 	Run         func(c *Context, args []string) (Outcome, error)
 }
 
-var errNotImplemented = errors.New("not implemented")
-
 // commands is the real command set.
 var commands = []func() Command{initCommand, inspectCommand}
 
@@ -39,9 +36,6 @@ func initCommand() Command {
 			fs.StringVar(&tools, "tools", "", "coding agents to set up, as OpenSpec's --tools takes them")
 			fs.BoolVar(&force, "force", false, "overwrite files dkt init would otherwise keep")
 		},
-		Run: func(*Context, []string) (Outcome, error) {
-			_, _ = tools, force // read by group 8
-			return Outcome{}, errNotImplemented
-		},
+		Run: func(c *Context, _ []string) (Outcome, error) { return runInit(c, tools, force) },
 	}
 }
