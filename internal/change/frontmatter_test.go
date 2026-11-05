@@ -28,6 +28,7 @@ func TestReadFrontMatterValues(t *testing.T) {
 		{"hex", `"\x41\u00e9\U0001F600"`, "Aé😀"},
 		{"literal accent", `"é"`, "é"},
 		{"single quoted", `'it''s'`, "it's"},
+		{"single quoted no escapes", `'a\nb'`, `a\nb`},
 		{"single quoted comment", `'x' # note`, "x"},
 		{"double quoted comment", `"x"   # note`, "x"},
 		{"plain", `  plain value  `, "plain value"},
@@ -92,6 +93,10 @@ func TestReadFrontMatterErrors(t *testing.T) {
 		"bad spec line":    "---\nspecs:\n  nocolon\n---\n",
 		"bad hex":          "---\ntitle: \"\\xZZ\"\n---\n",
 		"short unicode":    "---\ntitle: \"\\u12\"\n---\n",
+		"space in path":    "---\nspecs:\n  my cap: X\n---\n",
+		"specs twice":      "---\nspecs:\n  a: A\nspecs:\n---\n",
+		"no space":         "---\ntitle:\"x\"\n---\n",
+		"hash after quote": "---\ntitle: \"x\"#c\n---\n",
 		"bad key":          "---\n1a: x\n---\n",
 	}
 	for name, s := range cases {
@@ -126,6 +131,7 @@ func TestSpecTitle(t *testing.T) {
 		{"# Booking Specification", "booking", "Booking", true},
 		{"# Booking Waitlist Specification", "booking", "Booking Waitlist", true},
 		{"# Booking", "booking", "", false},
+		{"#  Booking  Specification", "booking", "Booking", true},
 		{"", "booking", "", false},
 	}
 	for _, c := range cases {
