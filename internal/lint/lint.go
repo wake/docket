@@ -183,6 +183,7 @@ func (r *state) scope(names []string) []string {
 			} else if err == nil || errors.Is(err, fs.ErrNotExist) {
 				r.rep.Findings = append(r.rep.Findings, Finding{
 					Rule:    "change-missing",
+					Change:  n,
 					Message: fmt.Sprintf("change %q does not exist under %s", n, changesDir),
 				})
 			}
