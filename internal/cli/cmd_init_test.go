@@ -85,7 +85,7 @@ const skillPath = ".claude/skills/docket/SKILL.md"
 
 func TestInitFresh(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
+	code, m, _, calls := doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
 	if code != 0 || len(m.Findings) != 0 || len(m.Unreadable) != 0 {
 		t.Fatalf("code=%d %+v", code, m)
 	}
@@ -135,7 +135,7 @@ func TestInitFromSubdirectory(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Write("src/a.txt", "x")
 	sub := filepath.Join(r.Dir, "src")
-	if code, _, _, _ := doInit(t, r, sub, "1.7.0", nil, "--tools", "claude"); code != 0 {
+	if code, _, _, _ := doInit(t, r, sub, "1.14.0", nil, "--tools", "claude"); code != 0 {
 		t.Fatalf("code %d", code)
 	}
 	if _, err := os.Stat(filepath.Join(r.Dir, skillPath)); err != nil {
@@ -150,7 +150,7 @@ func TestInitFromSubdirectory(t *testing.T) {
 
 func TestInitMissingTools(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, _, out, calls := doInit(t, r, r.Dir, "1.7.0", nil)
+	code, _, out, calls := doInit(t, r, r.Dir, "1.14.0", nil)
 	if code != 2 || strings.Contains(calls, "init") {
 		t.Errorf("code=%d calls=%q", code, calls)
 	}
@@ -166,7 +166,7 @@ func TestInitExistingOpenSpec(t *testing.T) {
 	for _, args := range [][]string{nil, {"--tools", "claude"}} {
 		r := testutil.NewRepo(t)
 		r.Write("openspec/specs/.keep", "")
-		code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil, args...)
+		code, m, _, calls := doInit(t, r, r.Dir, "1.14.0", nil, args...)
 		if code != 0 || strings.Contains(calls, "init") || m.Result.OpenspecInit != nil {
 			t.Errorf("args %v: code=%d calls=%q init=%v", args, code, calls, m.Result.OpenspecInit)
 		}
@@ -182,7 +182,7 @@ func TestInitOtherConfigUnchanged(t *testing.T) {
 	for p, c := range files {
 		r.Write(p, c)
 	}
-	if code, _, _, _ := doInit(t, r, r.Dir, "1.7.0", nil); code != 0 {
+	if code, _, _, _ := doInit(t, r, r.Dir, "1.14.0", nil); code != 0 {
 		t.Fatal(code)
 	}
 	for p, c := range files {
@@ -194,8 +194,8 @@ func TestInitOtherConfigUnchanged(t *testing.T) {
 
 func TestInitRerunSame(t *testing.T) {
 	r := testutil.NewRepo(t)
-	doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
-	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	code, m, _, calls := doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
 	if code != 0 || m.Result.OpenspecInit != nil || strings.Contains(calls, "init") {
 		t.Fatalf("code=%d %+v calls=%q", code, m, calls)
 	}
@@ -211,7 +211,7 @@ func TestInitRerunSame(t *testing.T) {
 
 func TestInitEarlierRelease(t *testing.T) {
 	r := testutil.NewRepo(t)
-	doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
 	const p = "openspec/schemas/docket/templates/plan.md"
 	old := "old plan"
 	sum := sha256.Sum256([]byte(old))
@@ -219,7 +219,7 @@ func TestInitEarlierRelease(t *testing.T) {
 	setup.Earlier = map[string][]string{p: {hex.EncodeToString(sum[:])}}
 	defer func() { setup.Earlier = saved }()
 	r.Write(p, old)
-	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", nil)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
 	if code != 0 || status(m, p) != "updated" || readFile(t, r, p) == old {
 		t.Errorf("code=%d %q", code, status(m, p))
 	}
@@ -229,7 +229,7 @@ func TestInitEditedSkill(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Write("openspec/specs/.keep", "")
 	r.Write(skillPath, "mine")
-	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", nil)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
 	if code != 1 || status(m, skillPath) != "kept" || readFile(t, r, skillPath) != "mine" {
 		t.Fatalf("code=%d %+v", code, m.Result.Files)
 	}
@@ -244,7 +244,7 @@ func TestInitEditedSkill(t *testing.T) {
 	if len(ns) == 0 || !strings.Contains(ns[len(ns)-1], "docket-doctor") {
 		t.Errorf("next_steps %q", ns)
 	}
-	code, m, _, _ = doInit(t, r, r.Dir, "1.7.0", nil, "--force")
+	code, m, _, _ = doInit(t, r, r.Dir, "1.14.0", nil, "--force")
 	if code != 0 || status(m, skillPath) != "overwritten" || readFile(t, r, skillPath) == "mine" {
 		t.Errorf("force: code=%d %+v", code, m.Result.Files)
 	}
@@ -253,14 +253,14 @@ func TestInitEditedSkill(t *testing.T) {
 func TestInitConfigCases(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Write("openspec/config.yaml", "schema: team-flow\n")
-	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", nil, "--force")
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil, "--force")
 	if code != 1 || !hasFinding(m, "config-schema-other", "openspec/config.yaml") || !strings.HasPrefix(readFile(t, r, "openspec/config.yaml"), "schema: team-flow\n") {
 		t.Errorf("other: code=%d %+v", code, m.Findings)
 	}
 
 	r = testutil.NewRepo(t)
 	r.Write("openspec/config.yaml", "schema: docket\noperations:\n  archive:\n    guidance:\n      - mine\n")
-	code, m, _, _ = doInit(t, r, r.Dir, "1.7.0", nil, "--force")
+	code, m, _, _ = doInit(t, r, r.Dir, "1.14.0", nil, "--force")
 	if code != 1 || !hasFinding(m, "guidance-differs", "openspec/config.yaml") || !strings.Contains(readFile(t, r, "openspec/config.yaml"), "- mine") {
 		t.Errorf("guidance: code=%d %+v", code, m.Findings)
 	}
@@ -268,7 +268,7 @@ func TestInitConfigCases(t *testing.T) {
 	r = testutil.NewRepo(t)
 	r.Write("openspec/config.yaml", "schema:\n  docket\n")
 	before := snapshot(r.Dir)
-	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil)
+	code, m, _, calls := doInit(t, r, r.Dir, "1.14.0", nil)
 	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/config.yaml" || snapshot(r.Dir) != before || strings.Contains(calls, "init") {
 		t.Errorf("unreadable: code=%d %+v", code, m.Unreadable)
 	}
@@ -279,7 +279,7 @@ func TestInitUnreadableStopsEverything(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(r.Dir, skillPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
+	code, m, _, calls := doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
 	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != skillPath || strings.Contains(calls, "init") {
 		t.Errorf("code=%d %+v calls=%q", code, m.Unreadable, calls)
 	}
@@ -300,7 +300,7 @@ func TestInitSymlinkRefused(t *testing.T) {
 	if err := os.Symlink(other, filepath.Join(r.Dir, ".claude/skills/docket")); err != nil {
 		t.Fatal(err)
 	}
-	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude", "--force")
+	code, m, _, calls := doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude", "--force")
 	if code != 1 || strings.Contains(calls, "init") || !hasFinding(m, "symlink-refused", ".claude/skills/docket") {
 		t.Fatalf("code=%d calls=%q %+v", code, calls, m.Findings)
 	}
@@ -316,7 +316,7 @@ func TestInitIgnored(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Write(".gitignore", "a\nb\n.claude/\n")
 	ign := readFile(t, r, ".gitignore")
-	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
 	var msg string
 	for _, f := range m.Findings {
 		if f.Rule == "install-ignored" && f.File == skillPath {
@@ -334,7 +334,7 @@ func TestInitIgnored(t *testing.T) {
 func TestInitOpenSpecUnusable(t *testing.T) {
 	for _, missing := range []bool{false, true} {
 		r := testutil.NewRepo(t)
-		cmd, log := testutil.FakeOpenSpec(t, "1.6.2")
+		cmd, log := testutil.FakeOpenSpec(t, "1.13.2")
 		if missing {
 			cmd = filepath.Join(t.TempDir(), "none")
 		}
@@ -354,7 +354,7 @@ func TestInitOpenSpecUnusable(t *testing.T) {
 
 func TestInitOpenSpecFails(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, m, _, calls := doInit(t, r, r.Dir, "1.7.0", []string{"OPENSPEC_TELEMETRY=1"}, "--tools", "nosuch")
+	code, m, _, calls := doInit(t, r, r.Dir, "1.14.0", []string{"OPENSPEC_TELEMETRY=1"}, "--tools", "nosuch")
 	if code != 1 || !strings.Contains(calls, "OPENSPEC_TELEMETRY=0\tinit\t--tools\tnosuch\n") || strings.Contains(calls, "OPENSPEC_TELEMETRY=1") {
 		t.Fatalf("code=%d calls=%q", code, calls)
 	}
@@ -374,7 +374,7 @@ func TestInitListsWhatOpenSpecChanged(t *testing.T) {
 	r.Commit("base", map[string]string{"tracked.txt": "t\n"})
 	r.Write("before.txt", "untracked before")
 	const odd = `we "ird" name.txt`
-	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", []string{"FAKE_OPENSPEC_TOUCH=tracked.txt", "FAKE_OPENSPEC_CREATE=" + odd}, "--tools", "claude")
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", []string{"FAKE_OPENSPEC_TOUCH=tracked.txt", "FAKE_OPENSPEC_CREATE=" + odd}, "--tools", "claude")
 	if code != 0 {
 		t.Fatal(code)
 	}
@@ -404,7 +404,7 @@ func wantDefaultConfig(t *testing.T) string {
 
 func TestInitConfigKeepsOpenSpecText(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", nil, "--tools", "claude")
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
 	if got := readFile(t, r, "openspec/config.yaml"); code != 0 || got != wantDefaultConfig(t) {
 		t.Errorf("code=%d config:\n%s", code, got)
 	}
@@ -417,7 +417,7 @@ func TestInitConfigKeepsOpenSpecText(t *testing.T) {
 
 func TestInitDefaultSchemaReplaced(t *testing.T) {
 	r := testutil.NewRepo(t)
-	cmd, log := testutil.FakeOpenSpec(t, "1.7.0")
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.0")
 	c := exec.Command(cmd, "init", "--tools", "claude")
 	c.Dir = r.Dir
 	if out, err := c.CombinedOutput(); err != nil {
@@ -434,7 +434,7 @@ func TestInitDefaultSchemaReplaced(t *testing.T) {
 
 func TestInitKeptStaysKept(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, m, _, _ := doInit(t, r, r.Dir, "1.7.0", []string{"FAKE_OPENSPEC_CREATE=" + skillPath}, "--tools", "claude")
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", []string{"FAKE_OPENSPEC_CREATE=" + skillPath}, "--tools", "claude")
 	var kind string
 	for _, f := range m.Result.Files {
 		if f.Path == skillPath {
@@ -448,7 +448,7 @@ func TestInitKeptStaysKept(t *testing.T) {
 
 func TestInitText(t *testing.T) {
 	r := testutil.NewRepo(t)
-	code, _, out, _ := doInit(t, r, r.Dir, "1.7.0", nil, "text", "--tools", "claude")
+	code, _, out, _ := doInit(t, r, r.Dir, "1.14.0", nil, "text", "--tools", "claude")
 	if code != 0 {
 		t.Fatal(code)
 	}

@@ -34,7 +34,7 @@ type newEnv struct {
 func newProject(t *testing.T) *newEnv {
 	t.Helper()
 	r := testutil.NewRepo(t)
-	cmd, log := testutil.FakeOpenSpec(t, "1.7.0")
+	cmd, log := testutil.FakeOpenSpec(t, "1.14.0")
 	if code, _, out, _ := doInitCmd(t, r, r.Dir, cmd, log, nil, "--tools", "claude"); code != 0 {
 		t.Fatalf("init: %d %s", code, out)
 	}
@@ -354,7 +354,7 @@ func TestNewOpenSpecUnavailable(t *testing.T) {
 	if code != 4 || !hasRule(m, "openspec-missing") || e.exists("openspec/changes/add-x") {
 		t.Errorf("missing: %d %+v", code, m)
 	}
-	old, log := testutil.FakeOpenSpec(t, "1.6.0")
+	old, log := testutil.FakeOpenSpec(t, "1.13.2")
 	e.log = log
 	code, m, _, calls := e.doNewCmd(t, old, e.r.Dir, nil, okArgs...)
 	if code != 4 || !hasRule(m, "openspec-unsupported") || e.exists("openspec/changes/add-x") || strings.Contains(calls, "new") {
