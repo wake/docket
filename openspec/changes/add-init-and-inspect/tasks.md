@@ -90,7 +90,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Files:** `internal/cli/realopenspec_test.go`, `.github/workflows/ci.yml`
 
 - [x] 9.1 Write `TestRealOpenSpec` (design.md, Tests); verify it is skipped without `DOCKET_TEST_OPENSPEC=1`, and that it passes locally with `DOCKET_OPENSPEC="npx -y @fission-ai/openspec@1.7.0"` and with `@latest`
-- [ ] 9.2 Add the `openspec` job to `.github/workflows/ci.yml`; verify it runs and passes for both versions on the pull request
+- [x] 9.2 Add the `openspec` job to `.github/workflows/ci.yml`; verify it runs and passes for both versions on the pull request
 
 ## 10. Integration
 
