@@ -12,6 +12,7 @@ import (
 	"testing/fstest"
 
 	docket "github.com/wake/docket"
+	"github.com/wake/docket/internal/safefile"
 )
 
 func shipped(t *testing.T) fs.FS {
@@ -280,9 +281,9 @@ func TestWriteFailureKeepsOldFile(t *testing.T) {
 	root := t.TempDir()
 	put(t, root, ".claude/skills/docket/SKILL.md", "mine")
 	ds, _ := decideT(t, root, true)
-	old := rename
-	defer func() { rename = old }()
-	rename = func(string, string) error { return errors.New("boom") }
+	old := safefile.Rename
+	defer func() { safefile.Rename = old }()
+	safefile.Rename = func(string, string) error { return errors.New("boom") }
 	if err := Write(root, ds); err == nil {
 		t.Fatal("want error")
 	}

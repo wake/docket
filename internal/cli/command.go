@@ -24,7 +24,25 @@ type Command struct {
 }
 
 // commands is the real command set.
-var commands = []func() Command{initCommand, inspectCommand, newCommand}
+var commands = []func() Command{initCommand, inspectCommand, newCommand, syncCommand}
+
+func syncCommand() Command {
+	var check bool
+	return Command{
+		Name:  "sync",
+		Args:  1,
+		Usage: "sync <slug> [--check] [--json]",
+		Define: func(fs *flag.FlagSet) {
+			fs.BoolVar(&check, "check", false, "write nothing; report tasks with commits left unticked and unfinished tasks without commits")
+		},
+		Run: func(c *Context, args []string) (Outcome, error) {
+			if len(args) == 0 {
+				return Outcome{}, UsageError{Msg: "sync needs a slug"}
+			}
+			return runSync(c, args[0], check)
+		},
+	}
+}
 
 func newCommand() Command {
 	var kind, source, title string

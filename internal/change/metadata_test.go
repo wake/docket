@@ -1,6 +1,7 @@
 package change
 
 import (
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -56,6 +57,58 @@ func TestSuffixed(t *testing.T) {
 	for n, want := range map[int]string{0: "s", 1: "s", 2: "s-2", 10: "s-10"} {
 		if got := Suffixed("s", n); got != want {
 			t.Errorf("Suffixed(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
+
+func TestTaskRefs(t *testing.T) {
+	cases := []struct {
+		value    string
+		tasks    []int
+		ok, mine bool
+	}{
+		{"add-x", nil, true, true},
+		{"add-x/1", []int{1}, true, true},
+		{"add-x/1,2", []int{1, 2}, true, true},
+		{"add-x/2, 3", []int{2, 3}, true, true},
+		{"add-x/2,2", []int{2, 2}, true, true},
+		{"add-x-2/1", nil, false, false},
+		{"add-x/", nil, false, true},
+		{"add-x/0", nil, false, true},
+		{"add-x/two", nil, false, true},
+		{"add-x/1,,2", nil, false, true},
+	}
+	for _, c := range cases {
+		tasks, ok, mine := TaskRefs(c.value, "add-x")
+		if mine != c.mine {
+			t.Errorf("%q: mine %v", c.value, mine)
+			continue
+		}
+		if mine && c.value != "add-x" && (ok != c.ok || (ok && !reflect.DeepEqual(tasks, c.tasks))) {
+			t.Errorf("%q: got %v %v", c.value, tasks, ok)
+		}
+		if c.value == "add-x" && len(tasks) != 0 {
+			t.Errorf("slug alone names tasks %v", tasks)
+		}
+	}
+}
+
+func TestSchemaOf(t *testing.T) {
+	cases := map[string]string{
+		"schema: spec-driven\ncreated: 2026-01-01\n": "spec-driven",
+		"created: 2026-01-01\n":                      "docket",
+		"":                                           "docket",
+		"schema: \"my-schema\"\n":                    "my-schema",
+		"schema: 'my-schema'\n":                      "my-schema",
+		"schema: my-schema # note\n":                 "my-schema",
+		"  schema: nested\n":                         "docket",
+		"schema:\n":                                  "docket",
+		"schema: \"\"\n":                             "docket",
+		"a: 1\r\nschema: crlf\r\n":                   "crlf",
+	}
+	for in, want := range cases {
+		if got := SchemaOf([]byte(in)); got != want {
+			t.Errorf("%q: got %q want %q", in, got, want)
 		}
 	}
 }

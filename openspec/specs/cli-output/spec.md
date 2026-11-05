@@ -80,7 +80,7 @@ When a command cannot read a source it needs, it SHALL list that source with the
 - **THEN** `unreadable` lists the file with the reason, `result.files` does not list it as `missing`, and dkt exits with 3
 
 ### Requirement: Repository required
-A command that needs a git repository, `dkt init`, `dkt inspect` and `dkt new`, SHALL do nothing outside one, report `no-repository`, and exit with 4. When `git` cannot be run, it SHALL report `git-missing` and exit with 4.
+A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new` and `dkt sync`, SHALL do nothing outside one, report `no-repository`, and exit with 4. When `git` cannot be run, it SHALL report `git-missing` and exit with 4.
 
 #### Scenario: Outside a repository
 - **WHEN** a user runs `dkt init --json --tools claude` outside any git repository
@@ -89,6 +89,10 @@ A command that needs a git repository, `dkt init`, `dkt inspect` and `dkt new`, 
 #### Scenario: New outside a repository
 - **WHEN** a user runs `dkt new add-x --json --kind feature --source x --title X` outside any git repository
 - **THEN** nothing is created, OpenSpec is not run, the findings hold `no-repository`, and dkt exits with 4
+
+#### Scenario: Sync outside a repository
+- **WHEN** a user runs `dkt sync add-x --json` outside any git repository
+- **THEN** nothing is written, the findings hold `no-repository`, and dkt exits with 4
 
 ### Requirement: Help
 `dkt --help` SHALL print dkt's usage, and `dkt <command> --help` SHALL print that command's usage and flags. Both SHALL print text to standard output, whatever `--json` says, and exit with 0.

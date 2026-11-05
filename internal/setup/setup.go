@@ -3,19 +3,17 @@ package setup
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"slices"
-	"syscall"
 
+	"github.com/wake/docket/internal/safefile"
 	"github.com/wake/docket/internal/safepath"
 )
 
@@ -159,7 +157,7 @@ func decide(root string, t target, force bool) (Decision, *Problem) {
 	if err == nil && !fi.Mode().IsRegular() { // never open a FIFO or socket
 		err = fmt.Errorf("%s is not a regular file", t.rel)
 	} else if err == nil {
-		got, err = readNoFollow(abs)
+		got, err = safefile.ReadNoFollow(abs)
 	}
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return d, &Problem{Path: t.rel, Kind: ProblemUnreadable, Err: err}
@@ -213,65 +211,7 @@ func write(root string, d Decision) error {
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("write %s: not a regular file", d.Path)
 		}
-		return install(dst, d.data, info.Mode().Perm(), true, d.Path)
+		return safefile.Install(dst, d.data, info.Mode().Perm(), true, d.Path)
 	}
-	return install(dst, d.data, 0o644, false, d.Path)
-}
-
-// rename is os.Rename; tests replace it to make the last step fail.
-var rename = os.Rename
-
-// install writes data to a temporary file beside dst and renames it over dst,
-// so a failed write leaves dst as it was (or missing). An existing file's
-// permission bits are kept exactly (keepMode); a new file gets perm subject
-// to the umask.
-func install(dst string, data []byte, perm os.FileMode, keepMode bool, rel string) (err error) {
-	var f *os.File
-	var tmp string
-	for try := 0; try < 10; try++ {
-		var rnd [8]byte
-		if _, err = rand.Read(rnd[:]); err != nil {
-			return fmt.Errorf("write %s: %w", rel, err)
-		}
-		tmp = filepath.Join(filepath.Dir(dst), "."+filepath.Base(dst)+".docket-tmp-"+hex.EncodeToString(rnd[:]))
-		// a new file gets perm as is, so the kernel applies the umask
-		f, err = os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, perm)
-		if !errors.Is(err, fs.ErrExist) {
-			break
-		}
-	}
-	if err != nil {
-		return fmt.Errorf("write %s: %w", rel, err)
-	}
-	defer func() {
-		if err != nil {
-			os.Remove(tmp)
-		}
-	}()
-	if keepMode {
-		err = f.Chmod(perm)
-	}
-	if err == nil {
-		_, err = f.Write(data)
-	}
-	if cerr := f.Close(); err == nil {
-		err = cerr
-	}
-	if err == nil {
-		err = rename(tmp, dst)
-	}
-	if err != nil {
-		return fmt.Errorf("write %s: %w", rel, err)
-	}
-	return nil
-}
-
-// readNoFollow reads the file at p without following a link there.
-func readNoFollow(p string) ([]byte, error) {
-	f, err := os.OpenFile(p, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return io.ReadAll(f)
+	return safefile.Install(dst, d.data, 0o644, false, d.Path)
 }
