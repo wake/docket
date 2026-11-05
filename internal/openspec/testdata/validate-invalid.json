@@ -1,0 +1,41 @@
+{
+  "items": [
+    {
+      "id": "add-x",
+      "type": "change",
+      "valid": false,
+      "issues": [
+        {
+          "level": "ERROR",
+          "path": "booking/spec.md",
+          "message": "MODIFIED \"Leave\" omits scenario(s) the current spec still has: \"Success\". The modified block has 1 scenario; the current spec has 1 scenario. It adds 1 scenario not in the current spec: \"Leave anytime\". Copy the omitted scenarios into the MODIFIED block (a MODIFIED requirement replaces the whole block, so archive refuses to drop them)."
+        },
+        {
+          "level": "ERROR",
+          "path": "rooms/spec.md",
+          "message": "ADDED \"No scenario\" must include at least one scenario"
+        }
+      ],
+      "durationMs": 46
+    }
+  ],
+  "summary": {
+    "totals": {
+      "items": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "byType": {
+      "change": {
+        "items": 1,
+        "passed": 0,
+        "failed": 1
+      }
+    }
+  },
+  "version": "1.0",
+  "root": {
+    "path": "/repo",
+    "source": "nearest"
+  }
+}

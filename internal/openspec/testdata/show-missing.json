@@ -1,0 +1,9 @@
+{
+  "status": [
+    {
+      "severity": "error",
+      "code": "show_error",
+      "message": "Change \"add-zz\" not found at /repo/openspec/changes/add-zz/proposal.md"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ package testutil
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -80,6 +81,20 @@ init)
   if [ -n "$FAKE_OPENSPEC_TOUCH" ]; then printf 'changed\n' >> "$FAKE_OPENSPEC_TOUCH"; fi
   if [ -n "$FAKE_OPENSPEC_CREATE" ]; then mkdir -p "$(dirname "$FAKE_OPENSPEC_CREATE")"; printf 'new\n' > "$FAKE_OPENSPEC_CREATE"; fi
   ;;
+show | validate)
+  name=$1
+  shift
+  for a in "$@"; do name="${name}_$a"; done
+  name=$(printf '%s' "$name" | tr / +)
+  if [ -n "$FAKE_OPENSPEC_JSON" ] && [ -f "$FAKE_OPENSPEC_JSON/$name.json" ]; then
+    cat "$FAKE_OPENSPEC_JSON/$name.json"
+    code=0
+    if [ -f "$FAKE_OPENSPEC_JSON/$name.code" ]; then code=$(cat "$FAKE_OPENSPEC_JSON/$name.code"); fi
+    exit "$code"
+  fi
+  printf '{"status":[{"severity":"error","code":"show_error","message":"fake: no answer for %s"}]}\n' "$name"
+  exit 1
+  ;;
 new)
   slug=$3
   schema=docket
@@ -123,6 +138,10 @@ esac
 // FAKE_OPENSPEC_NEW_FAIL=1 (after creating, print "fake failure" and exit 2) and
 // FAKE_OPENSPEC_NEW_DIRLINK=<target> (instead of creating the folder, make it a link to the
 // existing directory <target>, then fail as FAKE_OPENSPEC_NEW_FAIL does).
+//
+// `show` and `validate` print $FAKE_OPENSPEC_JSON/<name>.json and exit with the number in <name>.code (0 when absent),
+// where <name> is the arguments joined with "_" and each "/" replaced by "+" (see OpenSpecAnswer);
+// with no such file they print a status error naming <name> and exit 1.
 func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 	t.Helper()
 	dir := t.TempDir()
@@ -136,4 +155,18 @@ func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 		t.Fatalf("create fake openspec log: %v", err)
 	}
 	return cmd, log
+}
+
+// OpenSpecAnswer writes the files the fake OpenSpec reads in dir (the value of FAKE_OPENSPEC_JSON)
+// to answer the call made with args (for example "show", "add-x", "--type", "change", "--json"):
+// body on stdout and exit code code.
+func OpenSpecAnswer(t *testing.T, dir string, code int, body string, args ...string) {
+	t.Helper()
+	name := strings.ReplaceAll(strings.Join(args, "_"), "/", "+")
+	if err := os.WriteFile(filepath.Join(dir, name+".json"), []byte(body), 0o644); err != nil {
+		t.Fatalf("write fake openspec answer: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name+".code"), []byte(strconv.Itoa(code)+"\n"), 0o644); err != nil {
+		t.Fatalf("write fake openspec code: %v", err)
+	}
 }
