@@ -6,22 +6,22 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 
 | Need | Existing (path:symbol) | Decision | Reason | Evidence |
 |---|---|---|---|---|
-| Read without following a link; write keeping the mode | `internal/setup/setup.go:readNoFollow,install` | extend | Move to `internal/safefile` unchanged, so `dkt sync` writes plan.md the way `dkt init` writes | `rg -n -e "func install" -e "func readNoFollow" internal/setup` |
+| Read without following a link; write keeping the mode | `internal/setup/setup.go:readNoFollow,install,rename` | extend | Move to `internal/safefile` unchanged (with the `rename` test hook), so `dkt sync` writes plan.md the way `dkt init` writes | `rg -n -e "func install" -e "func readNoFollow" -e "rename" internal/setup` |
 | Refuse symbolic links | `internal/safepath/safepath.go:Check,SymlinkError` | reuse | Already refuses a link anywhere on a path under the root | `rg -n "^func Check" internal/safepath` |
 | Command table, positional slug | `internal/cli/command.go:Command` (`Args`) | reuse | `dkt new` already takes a positional | `rg -n "Args +int" internal/cli` |
 | Envelope, findings, exit codes | `internal/cli/envelope.go:Outcome,Finding,Unreadable,ExitCode` | reuse | Shared output of every command | `rg -n -e "^type " -e "^func ExitCode" internal/cli/envelope.go` |
 | Run git | `internal/gitx/git.go:Git.output` | reuse | Isolated environment and error type | `rg -n "func \(g Git\) output" internal/gitx` |
 | Markdown lines, fences, headings, comments | `v0.15.0:internal/markdown/markdown.go:Lines,FenceMask,Headings,Body,BlankComments` | extend | Port only these, with their tests; `dkt lint` adds the rest | `git show v0.15.0:internal/markdown/markdown.go` |
 | Tasks and steps of plan.md | `v0.15.0:internal/change/plan.go:ParsePlan,Task`, `v0.15.0:internal/change/tick.go:Step,Tick,lineStarts` | extend | Port reduced to tasks, steps and cancelled numbers; `Tick` as is | `git show v0.15.0:internal/change/plan.go` |
-| Commit trailers | `v0.15.0:internal/gitx/log.go:Git.Commits,splitValues` | extend | Port reduced to the `Change` trailer over the whole history of HEAD | `git show v0.15.0:internal/gitx/log.go` |
-| Change metadata package | `internal/change/metadata.go` | extend | Add `SchemaOf` and `TaskRefs` beside the existing rules | `rg -n "^func" internal/change` |
+| Commit trailers | `v0.15.0:internal/gitx/log.go:Git.Commits,splitValues`, test pattern `v0.15.0:internal/gitx/log_test.go:TestCommitsPaths` (a `--no-ff` merge) | extend | Port reduced to the `Change` trailer over the whole history of HEAD | `git show v0.15.0:internal/gitx/log.go`, `git show v0.15.0:internal/gitx/log_test.go` |
+| Schema of a change; task references in a trailer | none (`internal/change/metadata.go` holds only `ValidLine`, `CheckSlug`, `Suffixed`, `FrontMatter`) | new | Add `SchemaOf` and `TaskRefs` to `internal/change` | `rg -n -e "Schema" -e "Trailer" -e "openspec.yaml" internal` |
 
 ## 1. Shared file helpers
 
 **Review:** checks (restructuring)
-**Files:** `internal/safefile/safefile.go`, `internal/setup/setup.go`
+**Files:** `internal/safefile/safefile.go`, `internal/safefile/safefile_test.go`, `internal/setup/setup.go`, `internal/setup/setup_test.go`
 
-- [ ] 1.1 Verify `go test ./internal/setup/` passes; move `readNoFollow` and `install` to `internal/safefile` as `ReadNoFollow` and `Install` (design.md, Shared file helpers) and call them from `internal/setup`, changing no test (the existing `internal/setup` tests cover them through `Write` and `Decide`); verify `go test ./...` passes, and that mutating `Install`'s mode keeping and `ReadNoFollow`'s `O_NOFOLLOW` each fails a test
+- [ ] 1.1 Verify `go test ./internal/setup/` passes; move `readNoFollow` and `install` to `internal/safefile` as `ReadNoFollow` and `Install` (design.md, Shared file helpers) and call them from `internal/setup`, changing no test except the one that replaces the `rename` hook; verify `go test ./...` passes and that mutating `Install`'s mode keeping fails a test. Then, in its own commit, add `internal/safefile/safefile_test.go` with a test that `ReadNoFollow` fails on a symbolic link at the file itself, and verify that removing its `O_NOFOLLOW` fails that test
 
 ## 2. Plan parsing
 
@@ -36,7 +36,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks
 **Files:** `internal/gitx/log.go`, `internal/gitx/log_test.go`, `internal/change/metadata.go`, `internal/change/metadata_test.go`
 
-- [ ] 3.1 Write failing tests: `ChangeTrailers` returns oldest first each commit's SHA and its `Change` values, reads a lower-case `change:` key, ignores a `Change:` line outside the last paragraph, unfolds a folded value, and returns nothing for a repository whose HEAD is unborn when called that way; `TaskRefs` for `add-x`, `add-x/1`, `add-x/1,2`, `add-x/2, 3`, `add-x-2/1` (not mine), `add-x/` `add-x/0` `add-x/two` `add-x/1,,2` (malformed); `SchemaOf` for the scenarios Schema read and No schema key (change-metadata), a quoted value, a value with a comment, and an indented `schema:` line (not top-level, gives `docket`); verify they fail
+- [ ] 3.1 Write failing tests: `ChangeTrailers` returns oldest first each commit's SHA and its `Change` values, reads a lower-case `change:` key, ignores a `Change:` line outside the last paragraph, unfolds a folded value, returns nothing for a repository whose HEAD is unborn when called that way, parses a history where a commit with no trailer sits between two with trailers (the alternating NUL framing), and reads the commits of both sides of a `--no-ff` merge; `TaskRefs` for `add-x`, `add-x/1`, `add-x/1,2`, `add-x/2, 3`, `add-x-2/1` (not mine), `add-x/` `add-x/0` `add-x/two` `add-x/1,,2` (malformed); `SchemaOf` for the scenarios Schema read and No schema key (change-metadata), a quoted value, a value with a comment, and an indented `schema:` line (not top-level, gives `docket`); verify they fail
 - [ ] 3.2 Implement them (design.md, Trailers, Change schema); verify every test passes
 
 ## 4. dkt sync
@@ -44,7 +44,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (output format, error paths)
 **Files:** `internal/cli/cmd_sync.go`, `internal/cli/cmd_sync_test.go`, `internal/cli/command.go`
 
-- [ ] 4.1 Write failing tests for every scenario of plan-sync and Sync outside a repository (cli-output), plus: a plan with a BOM keeps it; a plan file mode 0600 keeps its mode; a value `Change: add-x` alone ticks nothing and is no problem; `trailer-unknown-task` for a cancelled task's number; a task named by commits whose steps are all ticked gives no finding with `--check`; an unborn HEAD gives `task-no-commit` for every unfinished task with `--check` and ticks nothing without it; `plan-missing`; the text output; verify they fail
+- [ ] 4.1 Write failing tests for every scenario of plan-sync and Sync outside a repository (cli-output), plus: a plan with a BOM keeps it; a plan file mode 0600 keeps its mode; a value `Change: add-x` alone ticks nothing and is no problem; `trailer-unknown-task` for a cancelled task's number; an unreadable plan.md (mode 000) and an unreadable `.openspec.yaml` are each listed in `unreadable` with exit 3 and nothing written (skip when running as root); a task named by commits whose steps are all ticked gives no finding with `--check`; an unborn HEAD gives `task-no-commit` for every unfinished task with `--check` and ticks nothing without it; `plan-missing`; the text output; verify they fail
 - [ ] 4.2 Implement `dkt sync` (design.md, Command); verify every test passes
 
 ## 5. Integration
