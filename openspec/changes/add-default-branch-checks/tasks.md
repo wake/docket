@@ -45,8 +45,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (reads git objects, output format)
 **Files:** `internal/cli/cmd_inspect.go`, `internal/cli/cmd_inspect_test.go`
 
-- [ ] 4.1 Write failing tests for every scenario of setup-inspection's Commit trailers on the default branch, Default branch in the inspect result and Main spec titles inspected, plus: a change of another schema on the default branch is not checked; a change whose plan.md is missing on the default branch is not checked; a trailer `Change: add-x/two` (malformed) still counts as naming `add-x`; `Change: add-x-2/1` does not name `add-x`; the trailer check reads the default branch's tip, not the worktree (a plan.md with tasks only in the worktree is not checked); the default branch taken from `origin` when it is ahead of the local branch; an unreadable main spec (mode 000; skip as root) is listed in `unreadable`; the existing Clean setup scenario still gives no finding; verify they fail
-- [ ] 4.2 Implement them (design.md, Trailer check, Main spec titles shared); verify every test passes
+- [x] 4.1 Write failing tests for every scenario of setup-inspection's Commit trailers on the default branch, Default branch in the inspect result and Main spec titles inspected, plus: a change of another schema on the default branch is not checked; a change whose plan.md is missing on the default branch is not checked; a trailer `Change: add-x/two` (malformed) still counts as naming `add-x`; `Change: add-x-2/1` does not name `add-x`; the trailer check reads the default branch's tip, not the worktree (a plan.md with tasks only in the worktree is not checked); the default branch taken from `origin` when it is ahead of the local branch; an unreadable main spec (mode 000; skip as root) is listed in `unreadable`; the existing Clean setup scenario still gives no finding; verify they fail
+- [x] 4.2 Implement them (design.md, Trailer check, Main spec titles shared); verify every test passes
 
 ## 5. Integration
 
