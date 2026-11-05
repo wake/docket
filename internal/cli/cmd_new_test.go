@@ -387,6 +387,17 @@ func TestNewTextUsed(t *testing.T) {
 	}
 }
 
+func TestNewOtherFilesKept(t *testing.T) { // Other files kept
+	e := newProject(t)
+	code, m, raw, _ := e.doNew(t, e.r.Dir, []string{"FAKE_OPENSPEC_NEW_EXTRA=notes.txt", "FAKE_OPENSPEC_NEW_FAIL=1"}, okArgs...)
+	if code != 1 || !hasRule(m, "openspec-failed") || !strings.Contains(raw, "left in place") {
+		t.Fatalf("code=%d %s", code, raw)
+	}
+	if got := readFile(t, e.r, "openspec/changes/add-x/notes.txt"); got != "extra\n" {
+		t.Errorf("notes.txt %q", got)
+	}
+}
+
 func TestNewFailureLeavesLinkedFolder(t *testing.T) { // cleanup never removes through a link
 	e := newProject(t)
 	target := t.TempDir()
