@@ -99,6 +99,9 @@ func (r *Runner) ShowChange(slug string) ([]Delta, error) {
 	if err := json.Unmarshal([]byte(out), &w); err != nil {
 		return nil, decodeErr(args, err)
 	}
+	if w.Deltas == nil {
+		return nil, decodeErr(args, errors.New("no deltas"))
+	}
 	var ds []Delta
 	for _, d := range w.Deltas {
 		x := Delta{Spec: d.Spec, Operation: d.Operation, Requirements: reqs(d.Requirements)}
@@ -148,15 +151,18 @@ func (r *Runner) Validate(slug string) ([]Issue, error) {
 		}
 		return nil, err
 	}
-	var issues []Issue
 	for _, it := range w.Items {
 		if it.ID != slug {
 			continue
 		}
+		var issues []Issue
 		for _, i := range it.Issues {
 			issues = append(issues, Issue{Level: i.Level, Path: i.Path, Message: i.Message, Line: i.Line})
 		}
-		break
+		return issues, nil
 	}
-	return issues, nil
+	if err == nil {
+		err = fmt.Errorf("openspec %s: the report has no entry for %q", strings.Join(args, " "), slug)
+	}
+	return nil, err
 }
