@@ -126,7 +126,7 @@ After writing, `dkt init` SHALL report `install-ignored` for each file it wrote 
 - **THEN** `.claude/skills/docket/SKILL.md` is written, the finding `install-ignored` names it with `.gitignore`, line 3 and `.claude/`, `.gitignore` is byte-for-byte unchanged, and dkt exits with 1
 
 ### Requirement: Init result
-The `result` of `dkt init` SHALL hold `files` and `openspec_init`. Each entry of `files` has a `path` relative to the repository root, a `kind` (`schema`, `config`, `skill`, or `openspec` for a file `openspec init` created) and a `status` (`created`, `updated`, `overwritten`, `same` or `kept`). `openspec_init` is the `--tools` value passed to `openspec init`, or null when it did not run. Without `--json`, the output SHALL list each file with its status.
+The `result` of `dkt init` SHALL hold `files` and `openspec_init`. Each entry of `files` has a `path` relative to the repository root, a `kind` (`schema`, `config`, `skill`, or `openspec` for a file `openspec init` created or changed) and a `status` (`created`, `updated`, `overwritten`, `same` or `kept`). `openspec_init` is the `--tools` value passed to `openspec init`, or null when it did not run. Without `--json`, the output SHALL list each file with its status.
 
 #### Scenario: Files listed
 - **WHEN** a user runs `dkt init --json --tools claude` in a repository without `openspec/`
