@@ -103,6 +103,16 @@ func TestDefaultBranchRemoteOnlyMain(t *testing.T) {
 	}
 }
 
+func TestDefaultBranchOriginHeadToLocalBranchIgnored(t *testing.T) {
+	r := testutil.NewRepo(t)
+	c := r.Commit("one", map[string]string{"a": "1"})
+	r.Git("branch", "trunk")
+	r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/heads/trunk")
+	if db, ok := defaultOf(t, r); !ok || db != (DefaultBranch{"main", c}) {
+		t.Errorf("got %v %v", db, ok)
+	}
+}
+
 func TestMergeBase(t *testing.T) {
 	r := testutil.NewRepo(t)
 	base := r.Commit("base", map[string]string{"a": "1"})

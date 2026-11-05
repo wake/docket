@@ -46,6 +46,24 @@ func TestReadBlobsBadCommit(t *testing.T) {
 	}
 }
 
+func TestReadBlobsMissingPathWithSpace(t *testing.T) {
+	r := testutil.NewRepo(t)
+	c := r.Commit("one", map[string]string{"b.txt": "bee\n"})
+	got, err := (Git{Dir: r.Dir, Env: r.Env}).ReadBlobs(c, []string{"docs/my file.md", "b.txt"})
+	if err != nil || !reflect.DeepEqual(got, map[string][]byte{"b.txt": []byte("bee\n")}) {
+		t.Errorf("got %q %v", got, err)
+	}
+}
+
+func TestReadBlobsNewlinePathNotAsked(t *testing.T) {
+	r := testutil.NewRepo(t)
+	c := r.Commit("one", map[string]string{"b.txt": "bee\n"})
+	got, err := (Git{Dir: r.Dir, Env: r.Env}).ReadBlobs(c, []string{"x\nb.txt", "b.txt"})
+	if err != nil || !reflect.DeepEqual(got, map[string][]byte{"b.txt": []byte("bee\n")}) {
+		t.Errorf("got %q %v", got, err)
+	}
+}
+
 func remove(t *testing.T, r *testutil.Repo, rel string) {
 	t.Helper()
 	if err := os.Remove(filepath.Join(r.Dir, rel)); err != nil {

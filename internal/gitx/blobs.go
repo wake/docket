@@ -36,10 +36,10 @@ func (g Git) ReadBlobs(commit string, paths []string) (map[string][]byte, error)
 		if err != nil {
 			return nil, fmt.Errorf("git cat-file: short output at %q: %w", p, err)
 		}
-		f := strings.Fields(line)
-		if len(f) == 2 && f[1] == "missing" {
-			continue
+		if strings.HasSuffix(strings.TrimSuffix(line, "\n"), " missing") {
+			continue // the line echoes the whole name, which may hold spaces
 		}
+		f := strings.Fields(line)
 		if len(f) != 3 {
 			return nil, fmt.Errorf("git cat-file: unexpected header %q", line)
 		}
