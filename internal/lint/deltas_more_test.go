@@ -2,6 +2,8 @@ package lint
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/wake/docket/internal/openspec"
@@ -74,5 +76,44 @@ func TestUnsafeCapabilityNotAskedOfOpenSpec(t *testing.T) {
 	}
 	if len(f.specCalls) != 0 {
 		t.Fatalf("ShowSpec called: %v", f.specCalls)
+	}
+}
+
+func TestUnreadableMainSpecIsSkipped(t *testing.T) {
+	skipRoot(t)
+	f := &fakeOS{deltas: []openspec.Delta{delta("ADDED", "booking", req("A", "Success"), req("B", "Success"))}}
+	dir := t.TempDir()
+	for p, c := range map[string]string{
+		"openspec/changes/add-x/.openspec.yaml": "schema: docket\n",
+		"openspec/changes/add-x/proposal.md":    goodProposal,
+		"internal/a.go":                         "package a\n",
+		pl:                                      planWith("**Scenarios:** booking#join"),
+		dp("booking"):                           doc(req("A", "Success"), req("B", "Success")),
+		mp("booking"):                           doc(),
+	} {
+		full := filepath.Join(dir, filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	locked := filepath.Join(dir, "openspec/specs/booking")
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+	in, _ := open(t, dir)
+	in.OpenSpec = func() (OpenSpec, error) { return f, nil }
+	in.Slugs = []string{"add-x"}
+	rep := run(t, in)
+	found := false
+	for _, u := range rep.Unreadable {
+		found = found || u.Source == mp("booking")
+	}
+	if !found || count(rep, "scenario-ref") != 0 || count(rep, "scenario-duplicate") != 0 ||
+		count(rep, "openspec-failed") != 0 || f.specCalls["booking"] != 0 {
+		t.Fatalf("%+v %+v %v", rep.Findings, rep.Unreadable, f.specCalls)
 	}
 }
