@@ -13,7 +13,7 @@ Defines what `dkt inspect` checks and reports about a project's Docket setup: do
 - **THEN** no file inside or outside the repository is created, changed or removed
 
 #### Scenario: Clean setup
-- **WHEN** the repository was set up by this release's `dkt init` and not changed since, and the OpenSpec CLI reports 1.7.0
+- **WHEN** the repository was set up by this release's `dkt init` and not changed since, and the OpenSpec CLI reports 1.14.0
 - **THEN** `dkt inspect --json` reports no finding and exits with 0
 
 ### Requirement: Installed files inspected
@@ -68,11 +68,11 @@ In `result.files`, `openspec/config.yaml` SHALL be `missing` when it does not ex
 - **THEN** the finding `symlink-refused` names `.claude/skills/docket`, and dkt exits with 1
 
 ### Requirement: OpenSpec CLI inspected
-`dkt inspect` SHALL locate the OpenSpec CLI as openspec-runtime says, read its version, and report in `result.openspec` the `version` (null when the CLI cannot be started), the `minimum` (`1.7.0`) and `supported`. It SHALL report `openspec-missing` when the CLI cannot be started and `openspec-unsupported` when the version is too old or cannot be read; neither SHALL make it exit with 4.
+`dkt inspect` SHALL locate the OpenSpec CLI as openspec-runtime says, read its version, and report in `result.openspec` the `version` (null when the CLI cannot be started), the `minimum` (`1.14.0`) and `supported`. It SHALL report `openspec-missing` when the CLI cannot be started and `openspec-unsupported` when the version is too old or cannot be read; neither SHALL make it exit with 4.
 
 #### Scenario: Old OpenSpec
-- **WHEN** the OpenSpec CLI reports 1.6.2 and a user runs `dkt inspect --json`
-- **THEN** `result.openspec.version` is `1.6.2`, `result.openspec.supported` is false, the findings hold `openspec-unsupported`, and dkt exits with 1
+- **WHEN** the OpenSpec CLI reports 1.13.2 and a user runs `dkt inspect --json`
+- **THEN** `result.openspec.version` is `1.13.2`, `result.openspec.supported` is false, the findings hold `openspec-unsupported`, and dkt exits with 1
 
 #### Scenario: No OpenSpec
 - **WHEN** no OpenSpec CLI can be started
