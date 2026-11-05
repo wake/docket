@@ -83,7 +83,7 @@ func envValue(env []string, key string) string {
 func TestBuildInfoVersion(t *testing.T) {
 	env := testutil.Env(t)
 	src := t.TempDir()
-	copyTree(t, "../..", src, "go.mod", "cmd", "internal")
+	copyTree(t, "../..", src, "go.mod", "shipped.go", "shipped", "cmd", "internal")
 	r := &testutil.Repo{T: t, Dir: src, Env: env}
 	r.Git("init", "-q")
 	r.Git("add", "-A")

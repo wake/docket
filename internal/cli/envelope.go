@@ -8,7 +8,7 @@ type UsageError struct{ Msg string }
 func (e UsageError) Error() string { return e.Msg }
 
 // EnvError reports an unusable environment (exit 4).
-type EnvError struct{ Msg string }
+type EnvError struct{ Rule, Msg string }
 
 func (e EnvError) Error() string { return e.Msg }
 

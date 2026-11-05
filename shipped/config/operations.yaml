@@ -1,0 +1,5 @@
+operations:
+  archive:
+    guidance:
+      - "Before archiving, run `dkt sync <change> --check` and `dkt lint <change>`. If any task has no commit carrying `Change: <change>/<N>`, a task with commits is not ticked, or lint reports a problem, stop and report it; do not archive."
+      - "After archiving, for each capability this change adds: change the first line of `openspec/specs/<capability>/spec.md` to `# <name> Specification`, taking the name from `specs:` in the front matter of `proposal.md`."
