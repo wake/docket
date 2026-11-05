@@ -60,7 +60,10 @@ type FailedError struct {
 }
 
 func (e *FailedError) Error() string {
-	s := fmt.Sprintf("%s exited with %d: %s", strings.Join(e.Command, " "), e.Code, strings.TrimSpace(e.Stderr))
+	s := fmt.Sprintf("%s exited with %d", strings.Join(e.Command, " "), e.Code)
+	if stderr := strings.TrimSpace(e.Stderr); stderr != "" {
+		s += ": " + stderr
+	}
 	if len(e.Messages) > 0 {
 		s += ": " + strings.Join(e.Messages, "; ")
 	}
