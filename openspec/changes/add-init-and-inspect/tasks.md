@@ -65,8 +65,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** checks (ported with their tests)
 **Files:** `internal/gitx/ignore.go`, `internal/gitx/ignore_test.go`, `internal/gitx/added.go`, `internal/gitx/added_test.go`
 
-- [ ] 6.1 Port `gitx.Ignored` with its tests, and add tests that a tracked file is never reported and that a path that does not exist yet is still reported when a rule ignores it; verify they pass
-- [ ] 6.2 Port `Git.status`, `Git.changedPaths` and `splitNUL` with their tests, and add a test that a path holding a space, a quote and a newline comes back whole; verify they pass
+- [x] 6.1 Port `gitx.Ignored` with its tests, and add tests that a tracked file is never reported and that a path that does not exist yet is still reported when a rule ignores it; verify they pass
+- [x] 6.2 Port `Git.status`, `Git.changedPaths` and `splitNUL` with their tests, and add a test that a path holding a space, a quote and a newline comes back whole; verify they pass
 
 ## 7. dkt inspect
 
