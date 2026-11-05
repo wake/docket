@@ -32,8 +32,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (public interface)
 **Files:** `internal/cli/run.go`, `internal/cli/usage.go`, `internal/cli/command.go`, `internal/cli/run_test.go`, `internal/cli/command_test.go`
 
-- [ ] 2.1 Write failing tests for the scenarios Command help, Help ignores --json and Outside a repository (for `dkt init` and `dkt inspect`), plus: `dkt inspect --help` lists `--json`; `dkt init --nosuch` exits with 2 and prints `dkt init`'s usage to standard error; with `git` missing from `PATH`, `dkt inspect --json` reports `git-missing` and exits with 4; `dkt nosuch` still exits with 2; the existing tests in `run_test.go` still pass; verify the new ones fail
-- [ ] 2.2 Add the command table with `init` and `inspect` (flags only; their run functions return an error until groups 7 and 8), per-command help, and the repository check (design.md, Commands and help); verify every test from 2.1 passes
+- [x] 2.1 Write failing tests for the scenarios Command help, Help ignores --json and Outside a repository (for `dkt init` and `dkt inspect`), plus: `dkt inspect --help` lists `--json`; `dkt init --nosuch` exits with 2 and prints `dkt init`'s usage to standard error; with `git` missing from `PATH`, `dkt inspect --json` reports `git-missing` and exits with 4; `dkt nosuch` still exits with 2; the existing tests in `run_test.go` still pass; verify the new ones fail
+- [x] 2.2 Add the command table with `init` and `inspect` (flags only; their run functions return an error until groups 7 and 8), per-command help, and the repository check (design.md, Commands and help); verify every test from 2.1 passes
 
 ## 3. Shipped files
 
