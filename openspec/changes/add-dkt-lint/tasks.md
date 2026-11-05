@@ -46,8 +46,8 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Review:** judgment (error paths)
 **Files:** `internal/change/frontmatter.go`, `internal/change/frontmatter_test.go`
 
-- [ ] 3.1 Write failing tests for every scenario of change-metadata's Front matter read and Main spec title, plus: what `FrontMatter` writes reads back to the same title, kind and source (`Booking: waitlist "v2"`, a backslash, a tab); a single-quoted value with `''`; a plain value with a ` # comment`; the YAML escapes `\/`, `\e`, `\N`, `é`, `\U0001F600`; an unknown escape, a key given twice, a top-level line that is not `key: value`, and an indented line outside `specs:` are errors; no front matter (first line `# Proposal`) reports false; a BOM before `---`; each field's line; `SpecTitle` for `# booking Specification` with capability `booking` (no title), `# identity/user-auth Specification` with capability `identity/user-auth` (no title), `# Booking Specification` (`Booking`) and `# Booking` (no title); verify they fail
-- [ ] 3.2 Implement `ReadFrontMatter` and `SpecTitle` (design.md, Front matter and titles); verify every test passes
+- [x] 3.1 Write failing tests for every scenario of change-metadata's Front matter read and Main spec title, plus: what `FrontMatter` writes reads back to the same title, kind and source (`Booking: waitlist "v2"`, a backslash, a tab); a single-quoted value with `''`; a plain value with a ` # comment`; the YAML escapes `\/`, `\e`, `\N`, `é`, `\U0001F600`; an unknown escape, a key given twice, a top-level line that is not `key: value`, and an indented line outside `specs:` are errors; no front matter (first line `# Proposal`) reports false; a BOM before `---`; each field's line; `SpecTitle` for `# booking Specification` with capability `booking` (no title), `# identity/user-auth Specification` with capability `identity/user-auth` (no title), `# Booking Specification` (`Booking`) and `# Booking` (no title); verify they fail
+- [x] 3.2 Implement `ReadFrontMatter` and `SpecTitle` (design.md, Front matter and titles); verify every test passes
 
 ## 4. OpenSpec JSON
 
