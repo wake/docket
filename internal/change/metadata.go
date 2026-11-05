@@ -47,8 +47,46 @@ func FrontMatter(title, kind, source string) []byte {
 // value is for another change; then tasks and ok mean nothing. A value that is
 // slug alone names no task. ok is false when the task list after "/" is not
 // one or more positive integers separated by commas.
-func TaskRefs(value, slug string) (tasks []int, ok, mine bool) { return nil, false, false }
+func TaskRefs(value, slug string) (tasks []int, ok, mine bool) {
+	if value == slug {
+		return nil, true, true
+	}
+	list, found := strings.CutPrefix(value, slug+"/")
+	if !found {
+		return nil, false, false
+	}
+	for _, p := range strings.Split(list, ",") {
+		p = strings.TrimSpace(p)
+		n, err := strconv.Atoi(p)
+		if err != nil || !taskNumber.MatchString(p) {
+			return nil, false, true
+		}
+		tasks = append(tasks, n)
+	}
+	return tasks, true, true
+}
+
+var taskNumber = regexp.MustCompile(`^[1-9][0-9]*$`)
 
 // SchemaOf returns the schema named by a change's .openspec.yaml, or "docket"
 // when it names none.
-func SchemaOf(b []byte) string { return "" }
+func SchemaOf(b []byte) string {
+	for _, line := range strings.Split(string(b), "\n") {
+		v, found := strings.CutPrefix(strings.TrimSuffix(line, "\r"), "schema:")
+		if !found {
+			continue
+		}
+		v = strings.TrimSpace(v)
+		if i := strings.Index(v, " #"); i >= 0 {
+			v = strings.TrimSpace(v[:i])
+		}
+		if n := len(v); n >= 2 && (v[0] == '"' || v[0] == '\'') && v[n-1] == v[0] {
+			v = v[1 : n-1]
+		}
+		if v == "" {
+			return "docket"
+		}
+		return v
+	}
+	return "docket"
+}
