@@ -209,3 +209,139 @@ func TestLintText(t *testing.T) {
 		t.Fatalf("%d %q", code, out)
 	}
 }
+
+// routingRepo is a repository whose main holds one commit, with a branch feat checked out.
+func routingRepo(t *testing.T, files map[string]string) *testutil.Repo {
+	t.Helper()
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "main")
+	r.Commit("base", files)
+	r.Git("checkout", "-q", "-b", "feat")
+	return r
+}
+
+func routingFiles(m lintOut) string {
+	var s []string
+	for _, f := range m.Findings {
+		if f.Rule == "routing" {
+			s = append(s, f.File)
+		}
+	}
+	return strings.Join(s, ",")
+}
+
+func defaultBranch(m lintOut) string {
+	if m.Result == nil || m.Result.DefaultBranch == nil {
+		return "<null>"
+	}
+	return *m.Result.DefaultBranch
+}
+
+func TestLintRoutingUncommittedPlan(t *testing.T) { // Plan written to superpowers' folder
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write("openspec/changes/add-x/.openspec.yaml", "schema: spec-driven\ncreated: 2026-01-01\n")
+	r.Write("docs/superpowers/plans/2026-11-06-x.md", "p\n")
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, "add-x")
+	if code != 1 || routingFiles(m) != "docs/superpowers/plans/2026-11-06-x.md" || defaultBranch(m) != "main" {
+		t.Fatalf("%d %s", code, raw)
+	}
+	f := m.Findings[0]
+	if f.Change != "" || f.Line != 0 {
+		t.Fatalf("%+v", f)
+	}
+}
+
+func TestLintRoutingCommittedStagedUntracked(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Commit("c", map[string]string{"docs/superpowers/specs/committed.md": "a\n"})
+	r.Write("docs/superpowers/specs/staged.md", "b\n")
+	r.Git("add", "docs/superpowers/specs/staged.md")
+	r.Write("docs/superpowers/plans/untracked.md", "c\n")
+	r.Write("docs/superpowers/other/skipped.md", "d\n")
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	want := "docs/superpowers/plans/untracked.md,docs/superpowers/specs/committed.md,docs/superpowers/specs/staged.md"
+	if code != 1 || routingFiles(m) != want {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRoutingFileOnDefaultBranch(t *testing.T) { // File already on the default branch
+	r := routingRepo(t, map[string]string{"docs/superpowers/specs/old.md": "old\n"})
+	r.Commit("edit", map[string]string{"docs/superpowers/specs/old.md": "new\n"})
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || routingFiles(m) != "" || defaultBranch(m) != "main" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRoutingIgnoredFile(t *testing.T) { // Ignored file
+	r := routingRepo(t, map[string]string{".gitignore": "docs/superpowers/plans/x.md\n"})
+	r.Write("docs/superpowers/plans/x.md", "p\n")
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || routingFiles(m) != "" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRoutingNothingAdded(t *testing.T) { // Clean change: default branch main
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || len(m.Findings) != 0 || defaultBranch(m) != "main" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRoutingNoDefaultBranch(t *testing.T) { // Routing without a default branch
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "work")
+	r.Commit("c", map[string]string{"docs/superpowers/plans/x.md": "p\n"})
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || routingFiles(m) != "" || defaultBranch(m) != "<null>" || !strings.Contains(raw, `"default_branch":null`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRoutingUnrelatedHistories(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Git("checkout", "-q", "--orphan", "other")
+	r.Commit("other", map[string]string{"docs/superpowers/plans/x.md": "p\n"})
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || routingFiles(m) != "" || defaultBranch(m) != "<null>" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRoutingUnbornHead(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Git("update-ref", "refs/remotes/origin/main", r.Git("rev-parse", "main"))
+	r.Git("checkout", "-q", "--orphan", "fresh")
+	r.Git("branch", "-D", "main", "feat")
+	r.Write("docs/superpowers/plans/x.md", "p\n")
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || routingFiles(m) != "" || defaultBranch(m) != "<null>" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRoutingText(t *testing.T) {
+	cmd, _ := testutil.FakeOpenSpec(t, "1.14.0")
+	text := func(r *testutil.Repo) string {
+		env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
+		_, out, _ := runIn(t, r.Dir, env, "lint")
+		return out
+	}
+	none := testutil.NewRepo(t)
+	if out := text(none); !strings.Contains(out, "Linted 0 changes and 0 main spec titles.\nNo default branch found; the routing rule was skipped.\n") {
+		t.Fatalf("%q", out)
+	}
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Git("checkout", "-q", "--orphan", "other")
+	r.Commit("other", nil)
+	if out := text(r); !strings.Contains(out, "Linted 0 changes and 0 main spec titles.\nNo merge base with main; the routing rule was skipped.\n") {
+		t.Fatalf("%q", out)
+	}
+	ok := routingRepo(t, map[string]string{"README.md": "x\n"})
+	if out := text(ok); strings.Contains(out, "skipped") {
+		t.Fatalf("%q", out)
+	}
+}
