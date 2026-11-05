@@ -86,7 +86,6 @@ func TestReadFrontMatterErrors(t *testing.T) {
 		"duplicate key":    "---\ntitle: A\ntitle: B\n---\n",
 		"duplicate spec":   "---\nspecs:\n  a: A\n  a: B\n---\n",
 		"not key value":    "---\njust text\n---\n",
-		"empty value":      "---\ntitle:\n---\n",
 		"specs with value": "---\nspecs: x\n---\n",
 		"indent outside":   "---\ntitle: A\n  booking: B\n---\n",
 		"indent after key": "---\nspecs:\n  a: A\nkind: x\n  b: B\n---\n",
@@ -133,6 +132,21 @@ func TestSpecTitle(t *testing.T) {
 		got, ok := SpecTitle(c.first, c.cap)
 		if got != c.want || ok != c.ok {
 			t.Errorf("SpecTitle(%q, %q) = %q, %v", c.first, c.cap, got, ok)
+		}
+	}
+}
+
+func TestReadFrontMatterEmptyValues(t *testing.T) {
+	for _, v := range []string{"title:", "title: # note", `title: ""`, "title: ''"} {
+		fm := read(t, "---\n"+v+"\n---\n")
+		if f, ok := fm.Fields["title"]; !ok || f.Value != "" || f.Line != 2 {
+			t.Errorf("%q read as %+v, %v", v, f, ok)
+		}
+	}
+	for _, v := range []string{"  booking:", `  booking: ""`} {
+		fm := read(t, "---\nspecs:\n"+v+"\n---\n")
+		if name, ok := fm.Specs["booking"]; !ok || name != "" {
+			t.Errorf("%q read as %q, %v", v, name, ok)
 		}
 	}
 }
