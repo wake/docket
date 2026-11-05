@@ -77,12 +77,16 @@ init)
   cat > openspec/config.yaml <<'CONFIG'
 @CONFIG@CONFIG
   printf 'Explore mode\n' > .claude/skills/openspec-explore/SKILL.md
+  if [ -n "$FAKE_OPENSPEC_TOUCH" ]; then printf 'changed\n' >> "$FAKE_OPENSPEC_TOUCH"; fi
+  if [ -n "$FAKE_OPENSPEC_CREATE" ]; then printf 'new\n' > "$FAKE_OPENSPEC_CREATE"; fi
   ;;
 esac
 `
 
 // FakeOpenSpec writes a fake OpenSpec CLI that reports version and returns its
 // path and the path of its call log (created empty; `.foo` beside it logs $FOO per call) (see fakeOpenSpecScript for the format).
+// `init` also appends a line to the existing file named by FAKE_OPENSPEC_TOUCH and
+// creates the file named by FAKE_OPENSPEC_CREATE, when the test's environment sets them.
 func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 	t.Helper()
 	dir := t.TempDir()
