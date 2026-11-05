@@ -96,7 +96,13 @@ func (r *state) add(c *loaded, rule, file string, line int, format string, args 
 }
 
 func (r *state) unreadable(source string, err error) {
-	r.rep.Unreadable = append(r.rep.Unreadable, Unreadable{Source: source, Reason: err.Error()})
+	u := Unreadable{Source: source, Reason: err.Error()}
+	for _, x := range r.rep.Unreadable {
+		if x == u {
+			return // already reported by another rule
+		}
+	}
+	r.rep.Unreadable = append(r.rep.Unreadable, u)
 }
 
 // Run lints the named changes, or every active change and the main specs'

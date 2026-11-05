@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"errors"
 	"io/fs"
 	"path"
 	"sort"
@@ -15,6 +16,7 @@ import (
 // mainSpec is what one capability's main spec gave, read once per run.
 type mainSpec struct {
 	reqs []openspec.Requirement
+	skip bool   // the spec exists but cannot be read
 	err  error  // ShowSpec failed
 	src  []byte // the spec.md, nil when unreadable
 }
@@ -30,7 +32,11 @@ func (r *state) mainSpec(capability string) *mainSpec {
 	r.mains[capability] = m
 	p := path.Join(specsDir, capability, "spec.md")
 	if _, err := fs.Stat(r.in.Root, p); err != nil {
-		return m // no main spec: no main requirements
+		if !errors.Is(err, fs.ErrNotExist) {
+			r.unreadable(p, err)
+			m.skip = true
+		}
+		return m // otherwise no main spec: no main requirements
 	}
 	if m.reqs, m.err = r.os.ShowSpec(capability); m.err != nil {
 		return m
@@ -114,6 +120,10 @@ func checkDeltas(r *state, c *loaded) {
 		d := &capData{known: map[string]bool{}}
 		data[capability] = d
 		ms := r.mainSpec(capability)
+		if ms.skip {
+			d.skip = true
+			return d
+		}
 		if ms.err != nil {
 			r.add(c, "openspec-failed", "", 0, "%s", ms.err)
 			d.skip = true
