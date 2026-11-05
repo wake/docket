@@ -26,4 +26,4 @@ Once `dkt init`, `dkt new`, `dkt sync` and `dkt lint` exist, run `dkt init` on t
 
 ## Prompt files
 
-Text agents act on: `AGENTS.md`, `CLAUDE.md`, `skills/`. When you add, move or remove such a file, update this list in the same pull request.
+Text agents act on: `AGENTS.md`, `CLAUDE.md`, `skills/`, `shipped/`. When you add, move or remove such a file, update this list in the same pull request.
