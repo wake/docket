@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -112,6 +113,78 @@ func TestSyncTwoTasksOneCommit(t *testing.T) { // Two tasks in one commit
 		if c := m.Result.Tasks[i].Commits; len(c) != 1 || c[0] != sha {
 			t.Errorf("task %d commits %v", i+1, c)
 		}
+	}
+	want := strings.NewReplacer("- [ ] a", "- [x] a", "- [ ] b", "- [x] b", "- [ ] c", "- [x] c").Replace(plan4)
+	if readPlan(t, r) != want {
+		t.Fatal(readPlan(t, r))
+	}
+}
+
+func TestSyncCommitListedOnce(t *testing.T) {
+	r := syncRepo(t, plan4)
+	a := trail(r, "add-x/1,1")
+	b := trail(r, "add-x/1", "add-x/1")
+	_, m, raw := doSync(t, r, "add-x")
+	if c := m.Result.Tasks[0].Commits; len(c) != 2 || c[0] != a || c[1] != b {
+		t.Fatal(raw)
+	}
+}
+
+func TestSyncUnknownTaskOncePerCommit(t *testing.T) {
+	r := syncRepo(t, plan4)
+	trail(r, "add-x/9,9")
+	_, m, raw := doSync(t, r, "add-x")
+	if ruleList(m.Findings) != "trailer-unknown-task" {
+		t.Fatal(raw)
+	}
+}
+
+func TestSyncDuplicateTaskHeadings(t *testing.T) {
+	p := "### Task 2: A\n\n- [ ] a\n\n### Task 2: B\n\n- [ ] b\n"
+	r := syncRepo(t, p)
+	sha := trail(r, "add-x/2")
+	_, m, raw := doSync(t, r, "add-x")
+	if readPlan(t, r) != "### Task 2: A\n\n- [x] a\n\n### Task 2: B\n\n- [x] b\n" ||
+		len(m.Result.Tasks[0].Commits) != 1 || len(m.Result.Tasks[1].Commits) != 1 || m.Result.Tasks[1].Commits[0] != sha {
+		t.Fatal(raw)
+	}
+}
+
+func TestSyncPathInPlaceOfSlug(t *testing.T) { // Path in place of a slug
+	r := syncRepo(t, plan4)
+	r.Write("docs/plan.md", "### Task 1: One\n\n- [ ] a\n")
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "docs")
+	trail(r, "../../docs/1")
+	for _, slug := range []string{"../../docs", "a/b", `a\b`, ".", ".."} {
+		code, _, raw := doSync(t, r, slug)
+		if code != 2 || !strings.Contains(raw, "not a change name") {
+			t.Fatalf("%q: %d %s", slug, code, raw)
+		}
+	}
+	b, _ := os.ReadFile(filepath.Join(r.Dir, "docs/plan.md"))
+	if string(b) != "### Task 1: One\n\n- [ ] a\n" {
+		t.Fatal(string(b))
+	}
+}
+
+func TestSyncEmptyPlan(t *testing.T) {
+	r := syncRepo(t, "# Plan\n")
+	code, m, raw := doSync(t, r, "add-x")
+	if code != 0 || m.Result == nil || !strings.Contains(raw, `"tasks":[]`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+	if _, out, _ := runIn(t, r.Dir, r.Env, "sync", "add-x"); strings.TrimSpace(out) != "" {
+		t.Fatalf("%q", out)
+	}
+}
+
+func TestSyncCheckWithTrailerProblem(t *testing.T) {
+	r := syncRepo(t, plan4)
+	trail(r, "add-x/9", "add-x/2")
+	code, m, raw := doSync(t, r, "add-x", "--check")
+	if code != 1 || readPlan(t, r) != plan4 || ruleList(m.Findings) != "trailer-unknown-task,task-no-commit,task-unticked,task-no-commit,task-no-commit,task-no-commit" {
+		t.Fatalf("%d %s", code, raw)
 	}
 }
 
@@ -251,8 +324,10 @@ func TestSyncMalformed(t *testing.T) { // Malformed task list
 func TestSyncSlugAlone(t *testing.T) { // value naming no task
 	r := syncRepo(t, plan4)
 	trail(r, "add-x")
-	code, _, raw := doSync(t, r, "add-x")
-	if code != 0 || readPlan(t, r) != plan4 {
+	trail(r, "add-x/1")
+	code, m, raw := doSync(t, r, "add-x")
+	want := strings.NewReplacer("- [ ] a", "- [x] a", "- [ ] b", "- [x] b").Replace(plan4)
+	if code != 0 || readPlan(t, r) != want || len(m.Findings) != 0 || len(m.Result.Tasks[1].Commits) != 0 {
 		t.Fatal(raw)
 	}
 }
@@ -272,12 +347,15 @@ func TestSyncCheck(t *testing.T) { // Check finds unticked work / task without c
 		}
 	}
 	joined := strings.Join(got, "\n")
+	if len(got) != 5 { // Tasks 1, 3, 4, 5 have no commit; Task 2 is unticked
+		t.Errorf("findings: %s", joined)
+	}
 	for _, w := range []string{
 		"task-unticked:Task 2 has commits and 1 unticked steps; run dkt sync add-x",
 		"task-no-commit:Task 5 has no commit carrying Change: add-x/5 and 1 unticked steps",
-		"task-no-commit:Task 1 has no commit",
+		"task-no-commit:Task 1 has no commit carrying Change: add-x/1 and 2 unticked steps",
 	} {
-		if !strings.Contains(joined, w) {
+		if !slices.Contains(got, w) {
 			t.Errorf("missing %q in %s", w, joined)
 		}
 	}
