@@ -277,3 +277,49 @@ func TestFindingsSorted(t *testing.T) {
 		}
 	}
 }
+
+func TestNoOpenSpecForUnreadableFolder(t *testing.T) {
+	skipRoot(t)
+	dir := t.TempDir()
+	locked := filepath.Join(dir, "openspec/changes/a")
+	if err := os.MkdirAll(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+	in, calls := open(t, dir)
+	rep := run(t, in)
+	if *calls != 0 || len(rep.Changes) != 1 {
+		t.Errorf("calls = %d, changes = %v", *calls, rep.Changes)
+	}
+}
+
+func TestNamedPlainFileIsMissing(t *testing.T) {
+	in, _ := repo(t, map[string]string{"openspec/changes/notes": "a file"})
+	in.Slugs = []string{"notes"}
+	rep := run(t, in)
+	if count(rep, "change-missing") != 1 || len(rep.Changes) != 0 {
+		t.Errorf("%+v", rep)
+	}
+}
+
+func TestUnreadableChangesDirectory(t *testing.T) {
+	skipRoot(t)
+	dir := t.TempDir()
+	d := filepath.Join(dir, "openspec/changes")
+	if err := os.MkdirAll(d, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(d, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(d, 0o755) })
+	in, _ := open(t, dir)
+	in.Slugs = []string{"a"}
+	rep := run(t, in)
+	if len(rep.Unreadable) != 1 || count(rep, "change-missing") != 0 {
+		t.Errorf("%+v", rep)
+	}
+}

@@ -210,6 +210,12 @@ func TestPlaceholders(t *testing.T) {
 			t.Errorf("%v", rep.Findings)
 		}
 	})
+	t.Run("angle tag inside a foreign comment", func(t *testing.T) {
+		rep := lintX(t, map[string]string{"proposal.md": goodProposal, "design.md": "<!-- see <capability-path> -->\n" + comment + "\n"})
+		if count(rep, "placeholder") != 1 || !has(rep, "placeholder", "openspec/changes/add-x/design.md", 2, "Explain") {
+			t.Errorf("%v", rep.Findings)
+		}
+	})
 	t.Run("templates unreadable once", func(t *testing.T) {
 		in, _ := repo(t, map[string]string{"openspec/changes/a/proposal.md": goodProposal, "openspec/changes/b/proposal.md": goodProposal})
 		in.Templates = nil
