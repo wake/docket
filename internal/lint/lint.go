@@ -228,7 +228,8 @@ func lintChange(r *state, c *loaded) {
 	if docket && c.Has(proposalFile) {
 		checkFront(r, c, fm, hasFront, fmErr)
 	}
-	if !c.Skipped(proposalFile) {
+	// A docket front matter error is the one finding; no names are read from it.
+	if !c.Skipped(proposalFile) && !(docket && fmErr != nil) {
 		checkNewCapabilities(r, c, fm, hasFront && fmErr == nil)
 	}
 	if !docket {
