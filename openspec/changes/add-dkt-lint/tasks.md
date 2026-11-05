@@ -95,7 +95,7 @@ Each group is one slice an implementer finishes test-first. Scenario names refer
 **Files:** `internal/cli/realopenspec_test.go`
 
 - [ ] 9.1 Extend `TestRealOpenSpec`: after `dkt init`, `dkt new add-x`, write a complete proposal (front matter kept, the five sections, `specs:` naming the new capability), a delta with one requirement and scenario, and a plan.md that breaks no plan rule and whose task claims that scenario; `dkt lint add-x --json` exits 0 with `result.changes` `[{"slug":"add-x","schema":"docket"}]`; with the claim removed it reports `scenario-unclaimed`; with the scenario removed it reports `openspec-invalid`. Run it locally with `DOCKET_OPENSPEC="npx -y @fission-ai/openspec@1.14.0"` and with `@latest`; verify both pass, and that the CI job passes on the pull request
-- [ ] 9.2 Run `gofmt -l .`, `go vet ./...` and `go test ./...`; verify they are clean
+- [x] 9.2 Run `gofmt -l .`, `go vet ./...` and `go test ./...`; verify they are clean
 
 ## Workflow follow-up
 
