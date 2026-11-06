@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/safefile"
 	"github.com/wake/docket/internal/safepath"
 )
@@ -36,6 +38,9 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 		return Outcome{}, UsageError{Msg: fmt.Sprintf("%q is not a change name", slug)}
 	}
 	root := c.Repo.Root
+	if change.HasDate(slug) {
+		return syncRecord(c, slug, check)
+	}
 	rel := "openspec/changes/" + slug
 	plan := rel + "/plan.md"
 	if err := safepath.Check(root, plan); err != nil {
@@ -66,33 +71,71 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 	case err != nil:
 		return Outcome{Unreadable: []Unreadable{{Source: plan, Reason: err.Error()}}}, nil
 	}
-	p := change.ParsePlan(src)
+	var commits []gitx.Trailers
+	if c.Repo.Head != nil {
+		if commits, err = c.Git.ChangeTrailers("HEAD"); err != nil {
+			return Outcome{}, err
+		}
+	}
+	return syncFile(syncFileArgs{Slug: slug, File: plan, Path: planPath, Src: src, Plan: change.ParsePlan(src),
+		Key: "Change", Commits: commits, Finding: slug, Check: check})
+}
 
+// syncRecord is dkt sync for a record: its tasks and the Record trailer.
+func syncRecord(c *Context, slug string, check bool) (Outcome, error) {
+	rel := record.Path(slug)
+	if err := safepath.Check(c.Repo.Root, rel); err != nil {
+		return refuse(err)
+	}
+	file := filepath.Join(c.Repo.Root, rel)
+	src, err := safefile.ReadNoFollow(file)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return finding("record-missing", rel+" does not exist")
+	case err != nil:
+		return Outcome{Unreadable: []Unreadable{{Source: rel, Reason: err.Error()}}}, nil
+	}
+	var commits []gitx.Trailers
+	if c.Repo.Head != nil {
+		if commits, err = c.Git.RecordTrailers("HEAD"); err != nil {
+			return Outcome{}, err
+		}
+	}
+	return syncFile(syncFileArgs{Slug: slug, File: rel, Path: file, Src: src, Plan: record.Parse(src).Tasks,
+		Key: "Record", Commits: commits, Check: check})
+}
+
+type syncFileArgs struct {
+	Slug, File, Path string // File is the repository-relative path, Path the one on disk
+	Src              []byte
+	Plan             change.Plan
+	Key              string // the trailer key: Change or Record
+	Commits          []gitx.Trailers
+	Finding          string // the Change of each finding; empty for a record
+	Check            bool
+}
+
+// syncFile ticks the tasks that the commits' trailers name and reports.
+func syncFile(a syncFileArgs) (Outcome, error) {
+	slug, plan, planPath, src, p, check := a.Slug, a.File, a.Path, a.Src, a.Plan, a.Check
 	res := syncResult{Slug: slug, Check: check, Tasks: []syncTask{}}
 	for _, t := range p.Tasks {
 		res.Tasks = append(res.Tasks, syncTask{Number: t.Number, Name: t.Name, Commits: []string{}, Steps: len(t.Steps)})
 	}
 	var out Outcome
 	add := func(rule, msg string, line int) {
-		out.Findings = append(out.Findings, Finding{Rule: rule, Message: msg, Change: slug, File: plan, Line: line})
+		out.Findings = append(out.Findings, Finding{Rule: rule, Message: msg, Change: a.Finding, File: plan, Line: line})
 	}
 
-	var commits []gitx.Trailers
-	if c.Repo.Head != nil {
-		var err error
-		if commits, err = c.Git.ChangeTrailers("HEAD"); err != nil {
-			return Outcome{}, err
-		}
-	}
-	for _, cm := range commits {
+	for _, cm := range a.Commits {
 		short := cm.SHA[:min(7, len(cm.SHA))]
-		for _, v := range cm.Change {
+		for _, v := range cm.Values {
 			nums, ok, mine := change.TaskRefs(v, slug)
 			if !mine {
 				continue
 			}
 			if !ok {
-				add("trailer-malformed", fmt.Sprintf("commit %s has the trailer Change: %s, whose task list is not positive numbers separated by commas", short, v), 0)
+				add("trailer-malformed", fmt.Sprintf("commit %s has the trailer %s: %s, whose task list is not positive numbers separated by commas", short, a.Key, v), 0)
 				continue
 			}
 			var seen []int
@@ -112,7 +155,7 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 					}
 				}
 				if !found {
-					add("trailer-unknown-task", fmt.Sprintf("commit %s has the trailer Change: %s, but plan.md has no Task %d", short, v, n), 0)
+					add("trailer-unknown-task", fmt.Sprintf("commit %s has the trailer %s: %s, but %s has no Task %d", short, a.Key, v, path.Base(plan), n), 0)
 				}
 			}
 		}
@@ -139,7 +182,7 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 				st.Done += len(open)
 			}
 		case len(open) > 0 && check:
-			add("task-no-commit", fmt.Sprintf("Task %d has no commit carrying Change: %s/%d and %d unticked steps", t.Number, slug, t.Number, len(open)), t.Line)
+			add("task-no-commit", fmt.Sprintf("Task %d has no commit carrying %s: %s/%d and %d unticked steps", t.Number, a.Key, slug, t.Number, len(open)), t.Line)
 		}
 	}
 	if !check && len(due) > 0 {

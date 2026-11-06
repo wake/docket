@@ -267,8 +267,8 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
 - Consumes: `record.Parse`, `record.Path`, `change.HasDate`, `change.TaskRefs`, `change.Tick`.
 - Produces: `gitx.Trailers{SHA string; Values []string}`; `func (g Git) RecordTrailers(rev string) ([]Trailers, error)`; `lint.RecordTrailer{Commit, Value string}` and `lint.Input.RecordTrailers []lint.RecordTrailer`.
 
-- [ ] **Step 1: Rename `Trailers.Change` to `Values`, and make the log reader take the key**, with `ChangeTrailers` keeping its signature. Move `runSync`'s body after reading the file into a function taking the file, the parsed tasks, the trailer key, the commits and the finding's `Change`, with no change in behavior. Commit this alone with `go test ./...` green.
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 1: Rename `Trailers.Change` to `Values`, and make the log reader take the key**, with `ChangeTrailers` keeping its signature. Move `runSync`'s body after reading the file into a function taking the file, the parsed tasks, the trailer key, the commits and the finding's `Change`, with no change in behavior. Commit this alone with `go test ./...` green.
+- [x] **Step 2: Write the failing tests**
   - `TestRecordTrailers`: a commit with `Record: a/1` in its last paragraph is read, and `Change: b` on it is not.
   - `TestSyncRecordTicks`: the scenario; a diff of the file shows only the two boxes; `result.slug` is the slug; findings have `Change` empty.
   - `TestSyncRecordCRLF`: a record with a BOM and CRLF keeps every other byte.
@@ -281,19 +281,19 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
   - `TestSyncRecordNoCommits`: in a repository with no commit, an untracked record: exit 0, nothing ticked.
   - `TestLintRecordTrailer` (lint package): a `RecordTrailer` naming no file reports `record-trailer` with the commit's short SHA and the value; `2026-11-01-fix-x` and `2026-11-01-fix-x/2` report none when the file exists, also when the file is not in `Input.Records`; `2026-11-01-fix-x/x`, `2026-11-01-fix-x/` and `2026-11-01-fix-x/1/2` report it although the file exists; a value holding `..` reports it; a link at that path reports it.
   - CLI: `TestLintTrailerNamesNoRecord`, `TestLintTrailerNamesEarlierRecord` and `TestLintMergedTrailerIgnored`, as the scenarios; `TestLintNamedSkipsTrailers`: with a name, no `record-trailer`.
-- [ ] **Step 3: Run them and see them fail**
+- [x] **Step 3: Run them and see them fail**
 
 Run: `go test ./internal/gitx ./internal/lint ./internal/cli`. Expected: undefined names, `change-missing` for a date slug.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `runSync` branches on `change.HasDate(slug)`: `safepath.Check`, `safefile.ReadNoFollow`, `record-missing` on `fs.ErrNotExist`, `record.Parse(src).Tasks`, the key `Record`, and `Change` empty in findings. Messages say the key in place of `Change`, and `<file> has no Task N` from the file's base name, so a change's messages stay as they are. In `runLint`, with no names and a merge base, pass `g.RecordTrailers(base + "..HEAD")`, one `RecordTrailer` per value. In lint, the check uses the whole listing from Task 4: the slug is the value before the first `/`, and a value that `change.TaskRefs(value, slug)` does not accept is reported too.
 
-- [ ] **Step 5: Run the tests and see them pass**
+- [x] **Step 5: Run the tests and see them pass**
 
 Run: `go vet ./... && go test ./...`. Expected: all pass.
 
-- [ ] **Step 6: Commit** with `Change: add-dkt-record/5`.
+- [x] **Step 6: Commit** with `Change: add-dkt-record/5`.
 
 ### Task 6: Skill text and this repository's instructions
 
@@ -304,20 +304,20 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
 **Files:**
 - Modify: `shipped/skill/SKILL.md`, `.claude/skills/docket/SKILL.md`, `.agents/skills/docket/SKILL.md`, `AGENTS.md`
 
-- [ ] **Step 1: Edit `shipped/skill/SKILL.md`**
+- [x] **Step 1: Edit `shipped/skill/SKILL.md`**
 
 Replace `in a few sentences each,` with `keeping them short,`. Replace `and fill its sections.` with `and fill its sections, then run `dkt lint` and fix what it reports.` Change nothing else: this text was settled by the maintainer.
 
-- [ ] **Step 2: Update the installed copies**
+- [x] **Step 2: Update the installed copies**
 
 Run: `go run ./cmd/dkt init --force`. The `dkt` on PATH is built from `main` and embeds the old text, so it must be this tree's. Expected: `git status --short` lists only the two copies besides the shipped file, and `diff shipped/skill/SKILL.md .claude/skills/docket/SKILL.md` and the same for `.agents` print nothing.
 
-- [ ] **Step 3: Edit `AGENTS.md`**
+- [x] **Step 3: Edit `AGENTS.md`**
 
 Remove `dkt record` from the list of commands that do not exist yet, and remove the bullet that begins `Light review opens no record`.
 
-- [ ] **Step 4: Check it mechanically**
+- [x] **Step 4: Check it mechanically**
 
 Run: `rg -n 'few sentences each' shipped .claude/skills .agents/skills` (expected: nothing), `go test ./...` (expected: all pass) and `go run ./cmd/dkt lint add-dkt-record` (expected: no finding).
 
-- [ ] **Step 5: Commit** with `Change: add-dkt-record/6`.
+- [x] **Step 5: Commit** with `Change: add-dkt-record/6`.

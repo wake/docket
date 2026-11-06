@@ -242,3 +242,45 @@ func TestLintOnlyRecordsNamedSkipsChanges(t *testing.T) {
 		t.Fatalf("%+v calls=%d", rep, *calls)
 	}
 }
+
+func TestLintRecordTrailer(t *testing.T) {
+	const slug = "2026-11-01-fix-x"
+	in, _ := repo(t, map[string]string{"docket/records/" + slug + ".md": "x\n"})
+	check := func(value string) Report {
+		in := in
+		in.RecordTrailers = []RecordTrailer{{Commit: "0123456789abcdef", Value: value}}
+		rep := run(t, in)
+		for _, f := range rep.Findings {
+			if f.Rule != "record-trailer" || f.Change != "" || f.File != "" {
+				t.Errorf("%q: %+v", value, f)
+			}
+		}
+		return rep
+	}
+	for _, v := range []string{slug, slug + "/2", slug + "/1, 2"} {
+		if rep := check(v); len(rep.Findings) != 0 {
+			t.Errorf("%q: %+v", v, rep.Findings)
+		}
+	}
+	for _, v := range []string{"2026-11-01-fix-y/1", slug + "/x", slug + "/", slug + "/1/2", slug + "/../x", "../x", slug + "x"} {
+		rep := check(v)
+		if len(rep.Findings) != 1 || !strings.Contains(rep.Findings[0].Message, "0123456 ") || !strings.Contains(rep.Findings[0].Message, v) {
+			t.Errorf("%q: %+v", v, rep.Findings)
+		}
+	}
+}
+
+func TestLintRecordTrailerNotARegularFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "docket/records"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("elsewhere.md", filepath.Join(dir, "docket/records/2026-11-01-fix-x.md")); err != nil {
+		t.Fatal(err)
+	}
+	in, _ := open(t, dir)
+	in.RecordTrailers = []RecordTrailer{{Commit: "0123456789", Value: "2026-11-01-fix-x"}}
+	if rep := run(t, in); count(rep, "record-trailer") != 1 {
+		t.Errorf("%+v", rep.Findings)
+	}
+}

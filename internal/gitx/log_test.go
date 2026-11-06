@@ -44,7 +44,7 @@ func TestChangeTrailersMerge(t *testing.T) {
 	}
 	seen := map[string][]string{}
 	for _, tr := range got {
-		seen[tr.SHA] = tr.Change
+		seen[tr.SHA] = tr.Values
 	}
 	if len(got) != 4 || !reflect.DeepEqual(seen[side], []string{"add-x/1"}) || !reflect.DeepEqual(seen[main], []string{"add-x/2"}) {
 		t.Errorf("got %+v", got)
@@ -55,5 +55,19 @@ func TestChangeTrailersUnbornHead(t *testing.T) {
 	r := testutil.NewRepo(t)
 	if _, err := (Git{Dir: r.Dir, Env: r.Env}).ChangeTrailers("HEAD"); err == nil {
 		t.Error("want git's error for an unborn HEAD")
+	}
+}
+
+func TestRecordTrailers(t *testing.T) {
+	r := testutil.NewRepo(t)
+	a := r.Commit("a\n\nRecord: 2026-11-01-fix-x/1\nChange: b", map[string]string{"f": "1"})
+	b := r.Commit("b\n\nChange: b", map[string]string{"f": "2"})
+	got, err := Git{Dir: r.Dir, Env: r.Env}.RecordTrailers("HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Trailers{{a, []string{"2026-11-01-fix-x/1"}}, {b, nil}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
 	}
 }

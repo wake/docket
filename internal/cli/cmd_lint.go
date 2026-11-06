@@ -51,6 +51,7 @@ func runLint(c *Context, names []string) (Outcome, error) {
 		return Outcome{}, err
 	}
 	var added, records []string
+	var recordTrailers []lint.RecordTrailer
 	var branch *string
 	skip := "No default branch found; the routing rule and record checks were skipped."
 	db, ok, err := c.Git.DefaultBranch()
@@ -77,6 +78,15 @@ func runLint(c *Context, names []string) (Outcome, error) {
 					if records, err = g.AddedSince(base, record.Dir); err != nil {
 						return Outcome{}, err
 					}
+					trs, err := g.RecordTrailers(base + "..HEAD")
+					if err != nil {
+						return Outcome{}, err
+					}
+					for _, t := range trs {
+						for _, v := range t.Values {
+							recordTrailers = append(recordTrailers, lint.RecordTrailer{Commit: t.SHA, Value: v})
+						}
+					}
 				}
 				branch, skip = &db.Name, ""
 			}
@@ -88,7 +98,7 @@ func runLint(c *Context, names []string) (Outcome, error) {
 	}
 	rep, err := lint.Run(lint.Input{
 		Root: root.FS(), Templates: templates, Slugs: names, Added: added,
-		Records: records, RecordTemplate: recordTemplate,
+		Records: records, RecordTemplate: recordTemplate, RecordTrailers: recordTrailers,
 		OpenSpec: func() (lint.OpenSpec, error) {
 			r, err := openSpecRunner(c)
 			if err != nil {

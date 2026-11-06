@@ -512,3 +512,66 @@ func TestRecordRoundTrip(t *testing.T) { // dkt record, then dkt lint
 		t.Fatalf("%d %s", code, raw)
 	}
 }
+
+// lintTrailerRepo is a repository whose main holds onMain, with a branch feat whose one commit carries the Record trailer value.
+func lintTrailerRepo(t *testing.T, onMain map[string]string, value string) *testutil.Repo {
+	t.Helper()
+	r := routingRepo(t, onMain)
+	trailRec(r, "Record", value)
+	return r
+}
+
+func TestLintTrailerNamesNoRecord(t *testing.T) { // Trailer names no record
+	r := lintTrailerRepo(t, map[string]string{lintRecPath: lintRecGood}, "fix-x")
+	sha := r.Git("rev-parse", "HEAD")
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 1 || ruleList(m.Findings) != "record-trailer" || m.Findings[0].Change != "" || m.Findings[0].File != "" ||
+		!strings.Contains(m.Findings[0].Message, sha[:7]) || !strings.Contains(m.Findings[0].Message, "fix-x") {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintTrailerWithUnreadableFolder(t *testing.T) {
+	r := lintTrailerRepo(t, map[string]string{"README.md": "y\n"}, "fix-x")
+	lockRecordsFolder(t, r.Dir)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 3 || ruleList(m.Findings) != "" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintTrailerNamesARecord(t *testing.T) { // Trailer names a record
+	r := lintTrailerRepo(t, map[string]string{lintRecPath: lintRecGood}, lintRecSlug)
+	trailRec(r, "Record", lintRecSlug+"/2")
+	if code, _, raw, _ := doLint(t, r.Dir, r.Env); code != 0 {
+		t.Fatal(raw)
+	}
+	trailRec(r, "Record", lintRecSlug+"/x") // Trailer with a bad task list
+	if code, m, raw, _ := doLint(t, r.Dir, r.Env); code != 1 || ruleList(m.Findings) != "record-trailer" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintTrailerNamesEarlierRecord(t *testing.T) {
+	r := lintTrailerRepo(t, map[string]string{"docket/records/2026-10-01-fix-a.md": lintRecGood}, "2026-10-01-fix-a")
+	if code, m, raw, _ := doLint(t, r.Dir, r.Env); code != 0 || len(m.Findings) != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintMergedTrailerIgnored(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Git("checkout", "-q", "-b", "main")
+	r.Commit("base\n\nRecord: gone", map[string]string{"README.md": "x\n"})
+	r.Git("checkout", "-q", "-b", "feat")
+	if code, m, raw, _ := doLint(t, r.Dir, r.Env); code != 0 || len(m.Findings) != 0 {
+		t.Fatalf("%d %s %v", code, raw, m.Findings)
+	}
+}
+
+func TestLintNamedSkipsTrailers(t *testing.T) {
+	r := lintTrailerRepo(t, map[string]string{lintRecPath: lintRecGood}, "fix-x")
+	if code, m, raw, _ := doLint(t, r.Dir, r.Env, lintRecSlug); code != 0 || len(m.Findings) != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
