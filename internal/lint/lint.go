@@ -98,8 +98,14 @@ type state struct {
 	known     map[string]string
 	knownDone bool
 
-	recordSlugs       map[string]bool // every regular .md file under docket/records, linted or not
-	recordsUnreadable bool
+	listings map[string]*listing // by folder
+}
+
+// listing is every regular .md file directly under a dated folder, linted or
+// not, and whether the folder could not be read.
+type listing struct {
+	slugs      map[string]bool
+	unreadable bool
 }
 
 func (r *state) add(c *loaded, rule, file string, line int, format string, args ...any) {
@@ -163,16 +169,16 @@ func Run(in Input) (Report, error) {
 			lintChange(r, c)
 		}
 	}
-	if slugs := r.recordScope(recordNames); len(slugs) > 0 {
+	if slugs := r.datedScope(recordKind, in.Records, recordNames); len(slugs) > 0 {
 		known := map[string]string{}
 		if len(in.RecordTemplate) == 0 {
-			r.unreadable(recordTemplateName, errors.New("no template given"))
+			r.unreadable(recordKind.template, errors.New("no template given"))
 		} else {
-			addPlaceholders(known, recordTemplateName, in.RecordTemplate)
+			addPlaceholders(known, recordKind.template, in.RecordTemplate)
 		}
 		rep.Records = slugs
 		for _, slug := range slugs {
-			lintRecord(r, slug, known)
+			lintDated(r, recordKind, slug, known)
 		}
 	}
 	r.checkRecordTrailers()

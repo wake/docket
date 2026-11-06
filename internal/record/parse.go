@@ -77,10 +77,13 @@ func Parse(b []byte) Parsed {
 var BodySections = []string{"What", "Why", "Verification", "Review"}
 
 // BodySize is the sum of change.Size over the four named sections.
-func (p Parsed) BodySize() int {
+func (p Parsed) BodySize() int { return p.Size(BodySections) }
+
+// Size is the sum of change.Size over the named sections.
+func (p Parsed) Size(sections []string) int {
 	n := 0
 	for _, s := range p.Sections {
-		for _, name := range BodySections {
+		for _, name := range sections {
 			if strings.EqualFold(s.Name, name) {
 				n += change.Size(s.Text)
 			}

@@ -18,12 +18,12 @@ func TestCheckName(t *testing.T) {
 		strings.Repeat("a", 201): "200",
 	}
 	for _, n := range ok {
-		if err := CheckName(n); err != nil {
+		if err := CheckName(n, "dkt record"); err != nil {
 			t.Errorf("%q: %v", n, err)
 		}
 	}
 	for n, want := range bad {
-		if err := CheckName(n); err == nil || !strings.Contains(err.Error(), want) {
+		if err := CheckName(n, "dkt record"); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%q: %v, want %q", n, err, want)
 		}
 	}
