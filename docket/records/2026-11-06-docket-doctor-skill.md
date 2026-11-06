@@ -15,8 +15,8 @@ The docket skill, docket-init and `dkt init` send agents to docket-doctor, and u
 ## Verification
 
 - `cmp` of `SKILL.md` and `convert.md` against the drafts: identical. Front matter `name` is `docket-doctor`.
-- Every rule name `SKILL.md` mentions exists under `internal/`: literal in `cmd_inspect.go`, `cmd_init.go` or `runner.go` for install-ignored, title-missing, trailer-missing, workflow-missing, workflow-outdated, workflow-template-unknown, workflow-section-missing, config-schema-default, config-schema-other, guidance-differs, symlink-refused, openspec-missing, openspec-unsupported. Built from kind and status in `cmd_inspect.go` for schema-/skill-missing, -outdated, -differs, and from `"guidance-" + state` for guidance-missing, guidance-outdated.
-- Result fields `files` (with `kind`, `status`), `openspec` (`version`, `minimum`, `supported`) and `default_branch` exist in `cmd_inspect.go`; `result.changes[].schema` in `cmd_lint.go`.
+- Every rule name `SKILL.md` mentions exists under `internal/`: literal in `cmd_inspect.go`, `cmd_init.go` or `runner.go` (install-ignored, title-missing, trailer-missing, workflow-*, config-schema-*, guidance-differs, symlink-refused, openspec-*); built as kind-status for schema-/skill-missing, -outdated, -differs, and as guidance-state for guidance-missing, -outdated.
+- Result fields `files`, `openspec`, `default_branch` (`cmd_inspect.go`) and `result.changes[].schema` (`cmd_lint.go`) exist.
 - `go vet ./...` and `go test ./...` pass.
 - Not verified: the exit codes 2 and 4 the skill names.
 
