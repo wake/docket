@@ -11,17 +11,17 @@ die() {
 }
 
 main() {
-	repo=https://github.com/wake/docket/releases
+	releases=https://github.com/wake/docket/releases
 
 	case $(uname -s) in
 	Darwin) os=darwin ;;
 	Linux) os=linux ;;
-	*) die "unsupported system $(uname -s); see $repo" ;;
+	*) die "unsupported system $(uname -s); see $releases" ;;
 	esac
 	case $(uname -m) in
 	arm64 | aarch64) arch=arm64 ;;
 	x86_64 | amd64) arch=amd64 ;;
-	*) die "unsupported architecture $(uname -m); see $repo" ;;
+	*) die "unsupported architecture $(uname -m); see $releases" ;;
 	esac
 	name=dkt-$os-$arch
 
@@ -34,9 +34,9 @@ main() {
 	fi
 
 	case ${DKT_VERSION:-} in
-	'') base=$repo/latest/download ;;
-	v*) base=$repo/download/$DKT_VERSION ;;
-	*) base=$repo/download/v$DKT_VERSION ;;
+	'') base=$releases/latest/download ;;
+	v*) base=$releases/download/$DKT_VERSION ;;
+	*) base=$releases/download/v$DKT_VERSION ;;
 	esac
 
 	dir=$HOME/.local/bin
@@ -57,7 +57,7 @@ main() {
 	want=$(awk -v f="$name" '$2 == f { print $1 }' "$tmp/checksums.txt")
 	[ -n "$want" ] || die "checksums.txt has no entry for $name"
 	# shellcheck disable=SC2086
-	got=$($digest "$tmp/$name" | awk '{ print $1 }')
+	got=$($digest <"$tmp/$name" | awk '{ print $1 }')
 	[ "$got" = "$want" ] || die "SHA-256 of $name does not match checksums.txt"
 
 	chmod 755 "$tmp/$name"

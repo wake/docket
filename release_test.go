@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -420,30 +419,47 @@ func TestInstallCutShort(t *testing.T) {
 	if !bytes.HasSuffix(script, []byte("\nmain\n")) {
 		t.Fatal("the last line of install.sh must be main")
 	}
-	// One environment per worker, because a run per byte is slow on its own.
-	const workers = 8
-	var wg sync.WaitGroup
-	for w := 0; w < workers; w++ {
-		e := newInstallEnv(t)
-		e.publish(t, "latest/download", "dkt-linux-amd64", fakeDkt)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			// len-1 is the end of the last command, where the script is whole.
-			for n := 1 + w; n < len(script)-1; n += workers {
-				e.runInput(script[:n])
-				if got := e.requests(t); got != nil {
-					t.Errorf("cut at byte %d downloaded %v", n, got)
-					return
-				}
-				if got := listDir(t, e.home); len(got) != 0 {
-					t.Errorf("cut at byte %d left %v in the home directory", n, got)
-					return
-				}
-			}
-		}()
+	e := newInstallEnv(t)
+	e.publish(t, "latest/download", "dkt-linux-amd64", fakeDkt)
+	// Not every byte: a cut inside a line inside a function is a syntax error
+	// whichever line it is, so a command that acts at the top level fails at
+	// the line boundary after it.
+	var cuts []int
+	for i, b := range script {
+		if b == '\n' && i+1 < len(script) {
+			cuts = append(cuts, i+1)
+		}
 	}
-	wg.Wait()
+	cuts = append(cuts, len(script)-4, len(script)-3, len(script)-2) // m, ma, mai
+	for _, n := range cuts {
+		e.runInput(script[:n])
+		if got := e.requests(t); got != nil {
+			t.Errorf("cut at byte %d (after %q) downloaded %v", n, tail(script[:n]), got)
+		}
+		if got := listDir(t, e.home); len(got) != 0 {
+			t.Errorf("cut at byte %d (after %q) left %v in the home directory", n, tail(script[:n]), got)
+		}
+	}
+}
+
+func tail(b []byte) string {
+	if len(b) > 30 {
+		b = b[len(b)-30:]
+	}
+	return string(b)
+}
+
+func TestInstallHomeWithBackslash(t *testing.T) {
+	e := newInstallEnv(t)
+	e.home = filepath.Join(t.TempDir(), `home\dir`)
+	if err := os.MkdirAll(e.home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	e.publish(t, "latest/download", "dkt-linux-amd64", fakeDkt)
+	if _, stderr, err := e.run(t); err != nil {
+		t.Fatalf("%v\nstderr: %s", err, stderr)
+	}
+	e.wantFile(t, "dkt", fakeDkt)
 }
 
 func TestInstallPathHint(t *testing.T) {
