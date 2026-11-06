@@ -1,0 +1,5 @@
+interface:
+  display_name: "Docket doctor"
+  short_description: "Check and fix this project's Docket setup"
+policy:
+  allow_implicit_invocation: false
