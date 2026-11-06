@@ -44,6 +44,10 @@
 
 ---
 
+## Revision 1 (2026-11-06): README lists dkt issue
+
+The lead, in this session: the README rewrite (PR #98) lists only the commands on main, so this change adds `dkt issue` to it. Task 6 also edits `README.md`.
+
 ### Task 1: Make the record code take its folder, sections and command as parameters
 
 **Scenarios:** none
@@ -162,7 +166,7 @@
 - [ ] **Step 3: Implement** with the descriptor; `cmd_lint.go` fills `Issues` with `g.AddedSince(base, issue.Dir)` where it fills `Records`, and reads the issue template.
 - [ ] **Step 4: Run** `go vet ./...` and `go test ./...`; expect PASS. Commit.
 
-### Task 6: AGENTS.md
+### Task 6: AGENTS.md and README
 
 **Scenarios:** none
 
@@ -170,6 +174,7 @@
 
 **Files:**
 - Modify: `AGENTS.md`
+- Modify: `README.md`
 
-- [ ] **Step 1: Edit** the bullet on what does not exist yet: remove `dkt issue` from it and remove its sub-bullet "To record an issue, tell the user instead; it is recorded once `dkt issue` exists." Keep everything else.
+- [ ] **Step 1: Edit** the bullet on what does not exist yet: remove `dkt issue` from it and remove its sub-bullet "To record an issue, tell the user instead; it is recorded once `dkt issue` exists." Keep everything else. In `README.md`, add `dkt issue` and `dkt issue template` to the list of commands, in the list's own style, after rebasing on main once the README rewrite has merged.
 - [ ] **Step 2: Run** `go run ./cmd/dkt issue template` and `go run ./cmd/dkt lint` at the worktree root; both exit 0. Commit.
