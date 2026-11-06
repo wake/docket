@@ -18,8 +18,9 @@ into `docket/workflow.md` again, follow step 6.
 Run `dkt inspect --json` before anything else; it is a read-only command.
 Its `result` holds:
 
-- `files`: every file `dkt init` writes, as `same`, `missing`, `outdated`
-  or `differs`. Of these, `docket/workflow.md` (kind `workflow`) belongs to
+- `files`: every Docket file `dkt init` writes (not the files
+  `openspec init` generates), as `same`, `missing`, `outdated` or
+  `differs`. Of these, `docket/workflow.md` (kind `workflow`) belongs to
   the project: `dkt init` writes it only when it is missing, and never
   changes it after that, with or without `--force`;
 - `openspec`: the OpenSpec CLI's `version` (null when it cannot start) and
@@ -40,6 +41,8 @@ what it said and stop.
 Then run `dkt lint --json` and look only at `result.changes`: those whose
 `schema` is not `docket` are active changes made with another schema. Its
 other findings belong to each change's own work and are not handled here.
+When it exits with 4 (for example, when OpenSpec cannot be used), skip
+this and go on.
 
 ## 2. Check what needs judgment
 
