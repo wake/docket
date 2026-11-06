@@ -2,6 +2,8 @@ package domain
 
 import (
 	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -129,5 +131,33 @@ func TestLoadLinkedTree(t *testing.T) {
 	got := Load(fstest.MapFS{"docket/domains.md": {Data: []byte("- A\n"), Mode: fs.ModeSymlink}})
 	if !got.Stopped || len(got.Unreadable) != 1 || got.Unreadable[0].Source != File || !strings.Contains(got.Unreadable[0].Reason, "symbolic link") {
 		t.Errorf("%+v", got)
+	}
+}
+
+func TestLoadLinkedProposal(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, data string) {
+		p := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("openspec/changes/add-x/specs/refund/spec.md", "x")
+	write("notes.md", "---\ntitle: X\nspecs:\n  refund: Refund\n---\n")
+	if err := os.Symlink("../../../notes.md", filepath.Join(dir, "openspec/changes/add-x/proposal.md")); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	got := Load(root.FS())
+	want := &Capability{Path: "refund", Changes: []string{"add-x"}}
+	if len(got.Unreadable) != 0 || !reflect.DeepEqual(got.Capabilities["refund"], want) {
+		t.Errorf("%+v %+v", got.Unreadable, got.Capabilities["refund"])
 	}
 }

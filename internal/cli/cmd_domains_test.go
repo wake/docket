@@ -172,6 +172,9 @@ func TestDomainsUnreadableSpec(t *testing.T) {
 	if code != 3 || len(m.Findings) != 0 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/specs/refund/spec.md" || m.Result == nil || len(m.Result.Nodes) != 1 {
 		t.Errorf("%d %s", code, raw)
 	}
+	if want := []domainCapability{{Path: "refund", Main: true, Changes: []string{}}}; !reflect.DeepEqual(m.Result.Unclassified, want) {
+		t.Errorf("%+v", m.Result.Unclassified)
+	}
 }
 
 func TestDomainsUnreadableProposal(t *testing.T) {

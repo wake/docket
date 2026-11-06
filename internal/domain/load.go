@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -68,13 +69,13 @@ func Load(root fs.FS) Loaded {
 	}
 
 	walkSpecs(root, specsDir, unreadable, func(p, cp string) {
+		c := get(cp)
+		c.Main = true
 		b, err := fs.ReadFile(root, p)
 		if err != nil {
 			unreadable(p, err)
 			return
 		}
-		c := get(cp)
-		c.Main = true
 		if lines := markdown.Lines(b); len(lines) > 0 {
 			c.Title, _ = change.SpecTitle(lines[0], cp)
 		}
@@ -95,13 +96,16 @@ func Load(root fs.FS) Loaded {
 			c := get(cp)
 			c.Changes = append(c.Changes, slug)
 		})
-		prop := dir + "/proposal.md"
-		if info, err := fs.Stat(root, prop); err != nil || !info.Mode().IsRegular() {
-			if err != nil && !errors.Is(err, fs.ErrNotExist) {
-				unreadable(prop, err)
-			}
+		files, err := fs.ReadDir(root, dir)
+		if err != nil {
+			unreadable(dir, err)
 			continue
 		}
+		// Found through the listing, so a linked proposal is skipped, never read through.
+		if !slices.ContainsFunc(files, func(f fs.DirEntry) bool { return f.Name() == "proposal.md" && f.Type().IsRegular() }) {
+			continue
+		}
+		prop := dir + "/proposal.md"
 		b, err := fs.ReadFile(root, prop)
 		if err != nil {
 			unreadable(prop, err)
