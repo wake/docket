@@ -1,6 +1,8 @@
 package gitx
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -54,5 +56,34 @@ func TestTreeDirsOnlyTrees(t *testing.T) {
 	}
 	if _, err := g.TreeDirs("0000000000000000000000000000000000000000", "openspec/"); err == nil {
 		t.Error("bad commit: want error")
+	}
+}
+
+func TestTreeFiles(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Write("d/a/spec.md", "a")
+	r.Write("d/b/x.md", "b")
+	if err := os.MkdirAll(filepath.Join(r.Dir, "d/c"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../a/spec.md", filepath.Join(r.Dir, "d/c/spec.md")); err != nil {
+		t.Fatal(err)
+	}
+	r.Write("other/y.md", "y")
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "one")
+	c := r.Git("rev-parse", "HEAD")
+	g := Git{Dir: r.Dir, Env: r.Env}
+	got, err := g.TreeFiles(c, "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []TreeFile{{"d/a/spec.md", false}, {"d/b/x.md", false}, {"d/c/spec.md", true}}
+	if !slices.Equal(got, want) {
+		t.Errorf("TreeFiles = %v, want %v", got, want)
+	}
+	none, err := g.TreeFiles(c, "missing")
+	if err != nil || len(none) != 0 {
+		t.Errorf("missing dir: %v, %v", none, err)
 	}
 }

@@ -50,3 +50,34 @@ func (g Git) TreeDirs(commit string, paths ...string) ([]string, error) {
 	}
 	return dirs, nil
 }
+
+// TreeFile is a file in a commit's tree; Link is true for a symbolic link.
+type TreeFile struct {
+	Path string
+	Link bool
+}
+
+// TreeFiles lists every blob under dir in commit's tree, recursively, with
+// full-tree paths in git's order. Submodules are left out; a missing dir gives
+// an empty slice.
+func (g Git) TreeFiles(commit, dir string) ([]TreeFile, error) {
+	out, err := g.output("ls-tree", "-r", "-z", "--full-tree", commit, "--", dir+"/")
+	if err != nil {
+		return nil, err
+	}
+	files := []TreeFile{}
+	for _, rec := range strings.Split(string(out), "\x00") {
+		if rec == "" {
+			continue
+		}
+		meta, path, ok := strings.Cut(rec, "\t")
+		f := strings.Fields(meta)
+		if !ok || len(f) != 3 {
+			return nil, fmt.Errorf("git ls-tree: unexpected record %q", rec)
+		}
+		if f[1] == "blob" {
+			files = append(files, TreeFile{Path: path, Link: f[0] == "120000"})
+		}
+	}
+	return files, nil
+}

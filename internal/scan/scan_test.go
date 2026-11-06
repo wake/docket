@@ -52,6 +52,35 @@ func commitRef(r *testutil.Repo, ref string, files map[string]string) string {
 	return c
 }
 
+func TestChangesRecordsCommit(t *testing.T) {
+	r := newRepo(t)
+	c := r.Commit("c", map[string]string{"openspec/changes/add-x/proposal.md": "x"})
+	wt := addWorktree(t, r, "wtb")
+	write(t, wt, "openspec/changes/add-w/proposal.md")
+	inv, err := Changes(gitOf(r))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := 0
+	for _, u := range inv.Uses {
+		switch {
+		case u.Source == "refs/heads/main" && u.Slug == "add-x":
+			seen++
+			if u.Commit != c {
+				t.Errorf("branch Commit = %q, want %q", u.Commit, c)
+			}
+		case u.Source == wt && u.Slug == "add-w":
+			seen++
+			if u.Commit != "" {
+				t.Errorf("worktree Commit = %q", u.Commit)
+			}
+		}
+	}
+	if seen != 2 {
+		t.Errorf("uses = %v", inv.Uses)
+	}
+}
+
 func newRepo(t *testing.T) *testutil.Repo {
 	r := testutil.NewRepo(t)
 	r.Commit("init", map[string]string{"README.md": "x"})
@@ -82,9 +111,9 @@ func TestChangeOnlyInAnotherWorktree(t *testing.T) {
 // Scenario: Change only on a remote-tracking branch
 func TestChangeOnlyOnRemoteTrackingBranch(t *testing.T) {
 	r := newRepo(t)
-	commitRef(r, "refs/remotes/origin/feature-y", map[string]string{"openspec/changes/add-y/p.md": "x"})
+	c := commitRef(r, "refs/remotes/origin/feature-y", map[string]string{"openspec/changes/add-y/p.md": "x"})
 	inv := scanOK(t, r)
-	want := []Use{{Slug: "add-y", Path: "openspec/changes/add-y", Source: "refs/remotes/origin/feature-y"}}
+	want := []Use{{Slug: "add-y", Path: "openspec/changes/add-y", Source: "refs/remotes/origin/feature-y", Commit: c}}
 	if !slices.Equal(inv.Uses, want) {
 		t.Errorf("got %+v", inv.Uses)
 	}
@@ -93,9 +122,9 @@ func TestChangeOnlyOnRemoteTrackingBranch(t *testing.T) {
 // Scenario: Archived slug found
 func TestArchivedSlugFound(t *testing.T) {
 	r := newRepo(t)
-	commitRef(r, "refs/heads/old", map[string]string{"openspec/changes/archive/2026-10-24-add-x/p.md": "x"})
+	c := commitRef(r, "refs/heads/old", map[string]string{"openspec/changes/archive/2026-10-24-add-x/p.md": "x"})
 	inv := scanOK(t, r)
-	want := []Use{{Slug: "add-x", Archived: true, Path: "openspec/changes/archive/2026-10-24-add-x", Source: "refs/heads/old"}}
+	want := []Use{{Slug: "add-x", Archived: true, Path: "openspec/changes/archive/2026-10-24-add-x", Source: "refs/heads/old", Commit: c}}
 	if !slices.Equal(inv.Uses, want) {
 		t.Errorf("got %+v", inv.Uses)
 	}
@@ -276,13 +305,13 @@ func TestOrderWorktreesThenRefsSortedByPath(t *testing.T) {
 
 func TestChangesFromSubdirectory(t *testing.T) {
 	r := newRepo(t)
-	commitRef(r, "refs/heads/f", map[string]string{"openspec/changes/add-x/p.md": "x"})
+	c := commitRef(r, "refs/heads/f", map[string]string{"openspec/changes/add-x/p.md": "x"})
 	write(t, r.Dir, "sub/dir/keep")
 	inv, err := Changes(gitx.Git{Dir: filepath.Join(r.Dir, "sub/dir"), Env: r.Env})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Use{Slug: "add-x", Path: "openspec/changes/add-x", Source: "refs/heads/f"}
+	want := Use{Slug: "add-x", Path: "openspec/changes/add-x", Source: "refs/heads/f", Commit: c}
 	if !slices.Contains(inv.Uses, want) {
 		t.Errorf("got %+v", inv)
 	}

@@ -22,6 +22,7 @@ type Use struct {
 	Archived bool   `json:"archived"`
 	Path     string `json:"path"`   // the folder, relative to the repository root, slash-separated
 	Source   string `json:"source"` // a worktree's path, or a ref's full name
+	Commit   string `json:"-"`      // the commit of a ref use; empty for a worktree use
 }
 
 // Unreadable is a source the scan could not read.
@@ -108,7 +109,11 @@ func Changes(g gitx.Git) (Inventory, error) {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: r.Name, Reason: res.err.Error()})
 			continue
 		}
-		inv.Uses = append(inv.Uses, sortedUses(res.paths, r.Name)...)
+		uses := sortedUses(res.paths, r.Name)
+		for i := range uses {
+			uses[i].Commit = r.Commit
+		}
+		inv.Uses = append(inv.Uses, uses...)
 	}
 	return inv, nil
 }
