@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -14,6 +15,15 @@ type lintOut struct {
 	Findings   []Finding
 	Unreadable []Unreadable
 	Result     *lintResult
+}
+
+// TestLintCleanChangeNoRecords: a clean change has an empty, not null, records list.
+func TestLintCleanChangeNoRecords(t *testing.T) {
+	r := lintRepo(t, "spec-driven")
+	_, _, raw, _ := doLint(t, r.Dir, r.Env, "add-x")
+	if !strings.Contains(raw, `"records":[]`) {
+		t.Fatalf("%s", raw)
+	}
 }
 
 // lintRepo is a repository with a change add-x of the given schema.
@@ -205,7 +215,7 @@ func TestLintText(t *testing.T) {
 	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
 	code, out, _ := runIn(t, r.Dir, env, "lint", "add-x", "add-z")
 	lines := strings.Split(out, "\n")
-	if code != 1 || lines[0] != "Linted 1 changes and 0 main spec titles." || !strings.Contains(out, "change-missing") {
+	if code != 1 || lines[0] != "Linted 1 changes, 0 records and 0 main spec titles." || !strings.Contains(out, "change-missing") {
 		t.Fatalf("%d %q", code, out)
 	}
 }
@@ -331,17 +341,174 @@ func TestLintRoutingText(t *testing.T) {
 		return out
 	}
 	none := testutil.NewRepo(t)
-	if out := text(none); !strings.Contains(out, "Linted 0 changes and 0 main spec titles.\nNo default branch found; the routing rule was skipped.\n") {
+	if out := text(none); !strings.Contains(out, "Linted 0 changes, 0 records and 0 main spec titles.\nNo default branch found; the routing rule and record checks were skipped.\n") {
 		t.Fatalf("%q", out)
 	}
 	r := routingRepo(t, map[string]string{"README.md": "x\n"})
 	r.Git("checkout", "-q", "--orphan", "other")
 	r.Commit("other", nil)
-	if out := text(r); !strings.Contains(out, "Linted 0 changes and 0 main spec titles.\nNo merge base with main; the routing rule was skipped.\n") {
+	if out := text(r); !strings.Contains(out, "Linted 0 changes, 0 records and 0 main spec titles.\nNo merge base with main; the routing rule and record checks were skipped.\n") {
 		t.Fatalf("%q", out)
 	}
 	ok := routingRepo(t, map[string]string{"README.md": "x\n"})
 	if out := text(ok); strings.Contains(out, "skipped") {
 		t.Fatalf("%q", out)
+	}
+}
+
+const (
+	lintRecSlug = "2026-11-06-fix-x"
+	lintRecPath = "docket/records/" + lintRecSlug + ".md"
+	lintRecBody = "## What\nw\n\n## Why\ny\n\n## Verification\nv\n\n## Review\nr\n"
+	lintRecGood = "---\ntitle: T\nkind: fix\nsource: s\n---\n\n" + lintRecBody
+	lintRecBad  = "---\ntitle: T\nkind: chore\nsource: s\n---\n\n" + lintRecBody
+)
+
+func lintRecords(m lintOut) string {
+	if m.Result == nil {
+		return "<nil>"
+	}
+	return strings.Join(m.Result.Records, ",")
+}
+
+func recordFindings(m lintOut) int {
+	n := 0
+	for _, f := range m.Findings {
+		if strings.HasPrefix(f.File, "docket/records/") {
+			n++
+		}
+	}
+	return n
+}
+
+func TestLintRecordTheBranchAdds(t *testing.T) { // Record the branch adds
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write(lintRecPath, lintRecBad)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "record-kind" || m.Findings[0].File != lintRecPath ||
+		m.Findings[0].Change != "" || lintRecords(m) != lintRecSlug {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintMergedRecordLeftAlone(t *testing.T) {
+	r := routingRepo(t, map[string]string{lintRecPath: lintRecBad})
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || len(m.Findings) != 0 || lintRecords(m) != "" || !strings.Contains(raw, `"records":[]`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRecordsNoDefaultBranch(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Write(lintRecPath, lintRecBad)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || recordFindings(m) != 0 || !strings.Contains(raw, `"records":[]`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintNamedChangeSkipsRecords(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write("openspec/changes/add-x/.openspec.yaml", "schema: spec-driven\ncreated: 2026-01-01\n")
+	r.Write(lintRecPath, lintRecBad)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, "add-x")
+	if code != 0 || recordFindings(m) != 0 || !strings.Contains(raw, `"records":[]`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+// lockRecordsFolder makes docket/records unreadable until the test ends.
+func lockRecordsFolder(t *testing.T, dir string) {
+	t.Helper()
+	folder := filepath.Join(dir, "docket/records")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(folder, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(folder, 0o755) })
+}
+
+func TestLintNamedChangeIgnoresRecordsFolder(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write("openspec/changes/add-x/.openspec.yaml", "schema: spec-driven\ncreated: 2026-01-01\n")
+	lockRecordsFolder(t, r.Dir)
+	if code, _, raw, _ := doLint(t, r.Dir, r.Env, "add-x"); code != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintUnreadableRecordsFolder(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	lockRecordsFolder(t, r.Dir)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, lintRecSlug)
+	if code != 3 || len(m.Findings) != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRecordsFolderIsFile(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write("docket/records", "a file where the folder would be\n")
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, lintRecSlug)
+	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "record-missing" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintResultRecords(t *testing.T) { // Records in the result
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write(lintRecPath, lintRecGood)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || len(m.Findings) != 0 || !strings.Contains(raw, `"records":["`+lintRecSlug+`"]`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintNamedRecord(t *testing.T) {
+	r := routingRepo(t, map[string]string{lintRecPath: lintRecBad})
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, lintRecSlug)
+	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "record-kind" || len(m.Result.Changes) != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	code, m, raw, _ = doLint(t, r.Dir, r.Env, "2026-11-06-fix-q")
+	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "record-missing" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestRecordRoundTrip(t *testing.T) { // dkt record, then dkt lint
+	r := recordRepo(t)
+	if code, _, raw := doRecord(t, r, r.Dir, recArgs...); code != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	const slug = "2026-10-30-fix-x"
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, slug)
+	if code != 1 || !hasRuleIn(m.Findings, "placeholder") || !hasRuleIn(m.Findings, "record-section") {
+		t.Fatalf("%d %s", code, raw)
+	}
+	path := filepath.Join(r.Dir, "docket", "records", slug+".md")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The first comment is the template's note above the sections: drop it, fill the rest.
+	comment := regexp.MustCompile(`(?s)<!--.*?-->`)
+	first := true
+	filled := comment.ReplaceAllStringFunc(string(b), func(string) string {
+		if first {
+			first = false
+			return ""
+		}
+		return "A sentence."
+	})
+	if err := os.WriteFile(path, []byte(filled), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, m, raw, _ = doLint(t, r.Dir, r.Env, slug)
+	if code != 0 || len(m.Findings) != 0 {
+		t.Fatalf("%d %s", code, raw)
 	}
 }

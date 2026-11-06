@@ -227,8 +227,8 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
 - Consumes: `change.HasDate`, `change.Size`, `change.TitleTooLong`, `record.Dir`, `record.Kinds`, `record.BodyLimit`.
 - Produces: `record.Parse(b []byte) record.Parsed`, with `Parsed{Front change.Front; HasFront bool; FrontErr error; Sections []record.Section; Outside []int; Tasks change.Plan}`; `Section{Name string; Line int; Text string}`, the text with comments blanked; `Outside` the 1-based lines with text outside any section; `Tasks` parsed from the lines after `## Tasks`, the others blanked so that line numbers hold. `Parsed.BodySize() int`, the sum of `change.Size` over the four named sections. `lint.Input` gains `Records []string` (paths the branch adds; nil when skipped) and `RecordTemplate []byte`. `lint.Report` gains `Records []string`, sorted. `checkTaskHeadings(r *state, c *loaded, file string, p change.Plan)`, moved out of `checkPlan`. `lintResult.Records []string`, never null.
 
-- [ ] **Step 1: Make the plan's task heading rules and the placeholder reader take a file and a template**, with no change in behavior, and commit it alone with `go test ./internal/lint` green.
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 1: Make the plan's task heading rules and the placeholder reader take a file and a template**, with no change in behavior, and commit it alone with `go test ./internal/lint` green.
+- [x] **Step 2: Write the failing tests**
   - `TestParse`: sections, lines and text; a `## x` inside a fence is not a section; a `# comment` line in the front matter is not a heading; `Outside` holds a paragraph before `## What` and text under a `# Title`; a comment before `## What` is not outside.
   - `TestParseTasks`: `### Task 1: Move` under `## What` is not in `Tasks`; one under `## Tasks` is, with its true line number.
   - `TestParseCRLFAndBOM`: a record with a BOM and CRLF endings parses to the same sections.
@@ -239,19 +239,19 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
   - CLI, in `cmd_lint_test.go`: `TestLintRecordTheBranchAdds` (uncommitted, unknown kind, exit 1); `TestLintMergedRecordLeftAlone`; `TestLintRecordsNoDefaultBranch` (`result.records` is `[]`, no finding); `TestLintNamedChangeSkipsRecords`; `TestLintResultRecords` (`["2026-11-06-fix-x"]`) and `result.records` as `[]` for the clean change.
   - `TestRecordRoundTrip`: `dkt record`, then `dkt lint` reports `placeholder` and `record-section`; with every comment replaced by a sentence, `dkt lint` reports nothing and exits 0.
   - Update the expected human lines in `cmd_lint_test.go` to `Linted 1 changes, 0 records and 0 main spec titles.` and the skip notes.
-- [ ] **Step 3: Run them and see them fail**
+- [x] **Step 3: Run them and see them fail**
 
 Run: `go test ./internal/record ./internal/lint ./internal/cli`. Expected: undefined names and failing assertions.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 In `lint.Run`, split `in.Slugs` by `change.HasDate`; with names and none for changes, lint no change. `lintRecord(r, slug, b)` builds `&loaded{Dir: record.Dir, Files: {slug + ".md": b}}`, so `r.add`, `checkPlaceholderFile` and `checkTaskHeadings` work with an empty `Change`. The list of records comes from one `fs.ReadDir(in.Root, record.Dir)`, keeping every regular `.md` file on `state`; `Input.Records` and the names only decide which of them are linted. A missing folder is empty, and any other error goes to `r.unreadable`, with no `record-missing` then. In `runLint`, with no names and a merge base, call `g.AddedSince(base, record.Dir)` separately from the routing call. Read `shipped/record/template.md` from `docket.Shipped`. The skip notes become `No default branch found; the routing rule and record checks were skipped.` and `No merge base with <name>; the routing rule and record checks were skipped.`
 
-- [ ] **Step 5: Run the tests and see them pass**
+- [x] **Step 5: Run the tests and see them pass**
 
 Run: `go vet ./... && go test ./...`. Expected: all pass.
 
-- [ ] **Step 6: Commit** with `Change: add-dkt-record/4`.
+- [x] **Step 6: Commit** with `Change: add-dkt-record/4`.
 
 ### Task 5: `dkt sync` on records, and the trailer check
 
