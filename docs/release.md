@@ -4,7 +4,7 @@ A release is a `vX.Y.Z` tag on `main`. Pushing the tag runs the `release` workfl
 
 ## Current state
 
-No release has been made with this process yet. The latest release, v0.15.0, has no executables, so `install.sh` fails until the first release made this way.
+v0.16.0 was the first release made with this process, and the checks below passed for it. Releases up to v0.15.0 have no executables, so `install.sh` cannot install them.
 
 ## Steps
 
@@ -16,8 +16,6 @@ No release has been made with this process yet. The latest release, v0.15.0, has
    git push origin vX.Y.Z
    ```
 
-Both files already hold the next version, 0.16.0, so the first release needs only the tag.
-
 Release versions in ascending order: GitHub marks each new release as the latest, and that is what `install.sh` installs by default.
 
 ## What the workflow does
@@ -28,9 +26,9 @@ Release versions in ascending order: GitHub marks each new release as the latest
 
 Pull requests and pushes to `main` run a snapshot build with the same configuration. The release workflow itself runs only on a tag.
 
-## After the first release
+## After a release
 
-Only a real release exercises the tag filter, the publish step and the install paths. After the first one, look at:
+Only a real release exercises the tag filter, the publish step and the install paths. After each one, look at:
 
 - The workflow ran for the tag, and both checks passed.
 - The release holds the four executables and `checksums.txt`.
