@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/wake/docket/internal/gitx"
 )
@@ -20,6 +21,7 @@ type Options struct {
 	Dir            string
 	Env            []string
 	Stdout, Stderr io.Writer
+	Now            func() time.Time // nil means time.Now
 }
 
 // Run executes dkt with the real command set and returns the process exit code.
@@ -59,7 +61,10 @@ func RunWith(o Options, cmds []func() Command) int {
 
 // runCommand parses the command's flags, resolves the repository and runs it.
 func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
-	ctx := &Context{Dir: o.Dir, Env: o.Env}
+	ctx := &Context{Dir: o.Dir, Env: o.Env, Now: o.Now}
+	if ctx.Now == nil {
+		ctx.Now = time.Now
+	}
 	fs := flag.NewFlagSet(cmd.Name, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	if cmd.Define != nil {

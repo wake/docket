@@ -2,8 +2,11 @@ package cli
 
 import (
 	"flag"
+	"strings"
+	"time"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/record"
 )
 
 // Context is what a command receives.
@@ -13,6 +16,7 @@ type Context struct {
 	JSON bool
 	Git  gitx.Git
 	Repo *Repo
+	Now  func() time.Time // never nil
 }
 
 // Command is one dkt subcommand.
@@ -24,7 +28,7 @@ type Command struct {
 }
 
 // commands is the real command set.
-var commands = []func() Command{initCommand, inspectCommand, newCommand, syncCommand, lintCommand, conflictsCommand}
+var commands = []func() Command{initCommand, inspectCommand, newCommand, recordCommand, syncCommand, lintCommand, conflictsCommand}
 
 func syncCommand() Command {
 	var check bool
@@ -60,6 +64,26 @@ func newCommand() Command {
 				return Outcome{}, UsageError{Msg: "new needs a slug"}
 			}
 			return runNew(c, args[0], kind, source, title)
+		},
+	}
+}
+
+func recordCommand() Command {
+	var kind, source, title string
+	return Command{
+		Name:  "record",
+		Args:  1,
+		Usage: "record <name> --kind <" + strings.Join(record.Kinds, "|") + "> --source <text> --title <text> [--json]",
+		Define: func(fs *flag.FlagSet) {
+			fs.StringVar(&kind, "kind", "", "kind of record: "+strings.Join(record.Kinds, ", "))
+			fs.StringVar(&source, "source", "", "where the work came from")
+			fs.StringVar(&title, "title", "", "one-line title of the record")
+		},
+		Run: func(c *Context, args []string) (Outcome, error) {
+			if len(args) == 0 {
+				return Outcome{}, UsageError{Msg: "record needs a name"}
+			}
+			return runRecord(c, args[0], kind, source, title)
 		},
 	}
 }

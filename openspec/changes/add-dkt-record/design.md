@@ -62,7 +62,7 @@ Tasks are parsed by `change.ParsePlan` on the record with every line before `## 
 
 ### `dkt record`
 
-- It checks flags (exit 2), then the name (`slug-invalid`, exit 1), then links (`safepath.Check`, `symlink-refused`, exit 1), then scans (unreadable, exit 3). Then it creates the folder and writes with `O_CREATE|O_EXCL|O_NOFOLLOW`, moving to the next suffix when the file exists, so two runs in a worktree end with two records and need no lock.
+- It checks flags (exit 2), then the name (`slug-invalid`, exit 1), then links (`safepath.Check`, `symlink-refused`, exit 1), then scans (unreadable, exit 3). Then it creates the folder and writes with `O_CREATE|O_EXCL|O_NOFOLLOW` through an `os.Root`, moving to the next suffix when the file exists, so two runs in a worktree end with two records and need no lock. The `os.Root` keeps a folder swapped for a link after the checks from taking the write out of the repository; `safepath.Check` still refuses a link that stays inside it. Cleanup removes by path, and a file another process swaps in at that path just after a failed write goes with it: the review judged that low and not worth more code.
 - The name's form is checked by `dkt record` itself, as OpenSpec checks a change's: `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 200 characters. A record does not go through OpenSpec.
 - The date comes from a new `Options.Now`, which `cmd/dkt` leaves nil for `time.Now`, in local time, so a record belongs to the user's day. Tests give a fixed time.
 - The result has the same fields as `dkt new`'s, by reusing its type and its code for the `used` list. That code moves to a helper in a separate structural commit.

@@ -149,8 +149,8 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
 - Consumes: `change.HasDate`, `change.TitleTooLong`, `scan.Records`.
 - Produces: `record.Dir = "docket/records"`; `record.Kinds`; `record.BodyLimit = 1440`; `record.CheckName(name string) error`; `record.Slug(now time.Time, name string) string`, with the date as `2006-01-02` in `now`'s location; `record.Path(slug string) string`. `Options.Now func() time.Time` and `Context.Now`, nil meaning `time.Now`. In `cmd_new.go`: `usedPlaces(uses []scan.Use, slug string) []newUse` and `usedLines(slug string, used []newUse) []string`.
 
-- [ ] **Step 1: Move the used list and its human lines out of `runNew`** into `usedPlaces` and `usedLines`, and commit it alone with `go test ./internal/cli` green.
-- [ ] **Step 2: Write the failing tests**, all with `Options.Now` fixed at 2026-10-30:
+- [x] **Step 1: Move the used list and its human lines out of `runNew`** into `usedPlaces` and `usedLines`, and commit it alone with `go test ./internal/cli` green.
+- [x] **Step 2: Write the failing tests**, all with `Options.Now` fixed at 2026-10-30:
   - `TestRecordWritten`: the scenario's command; the file reads `---\ntitle: "Lint timeout"\nkind: fix\nsource: "review of #40"\n---\n\n` followed by the template byte for byte; `result` has `slug`, `requested`, `path`, `title`, `kind`, `source`, and `used` as `[]`.
   - `TestRecordQuotedTitle`: `--title 'Fix: "x"'` is read back by `change.ReadFrontMatter` as `Fix: "x"`.
   - `TestRecordFlags`, table-driven: unknown kind exits 2 and lists the five; missing kind, source or title, and a two-line title, exit 2; a 121-byte title exits 2 with `121` and `120`. Each leaves no `docket/`.
@@ -165,11 +165,11 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
   - `TestRecordNoCommits`: in a repository with no commit, `dkt record` exits 0 and writes the file.
   - `TestRecordOutsideRepo`: `no-repository`, exit 4, nothing written.
   - `TestShippedFileSet` gains `shipped/record/template.md`.
-- [ ] **Step 3: Run them and see them fail**
+- [x] **Step 3: Run them and see them fail**
 
 Run: `go test . ./internal/record ./internal/cli`. Expected: undefined names, unknown command `record`.
 
-- [ ] **Step 4: Create `shipped/record/template.md`** with exactly this text:
+- [x] **Step 4: Create `shipped/record/template.md`** with exactly this text:
 
 ```markdown
 <!-- Keep the title to one line and the rest short; `dkt lint` checks the
@@ -202,15 +202,15 @@ pull request's own check run. Say what was not verified, too. -->
 and how each finding was handled. -->
 ```
 
-- [ ] **Step 5: Implement `internal/record/record.go`, `runRecord` and the command**
+- [x] **Step 5: Implement `internal/record/record.go`, `runRecord` and the command**
 
 `recordCommand` follows `newCommand`, with the usage `record <name> --kind <fix|refactor|test|prompt|checks> --source <text> --title <text> [--json]`, and joins the `commands` list. Order in `runRecord`: flags (`UsageError`), `record.CheckName` (`slug-invalid`), `safepath.Check` on the requested path (`refuse`), `scan.Records` (unreadable), then the candidates: skip one any use names; `safepath.Check`; make each missing folder with `os.Mkdir`, remembering those this run made; open with `O_WRONLY|O_CREATE|O_EXCL|syscall.O_NOFOLLOW`, going to the next suffix on `fs.ErrExist`. Write through the package variable `writeRecordFile`. On failure remove the file and the folders this run made, joining an error that names anything left. `cmd/dkt/main.go` needs no change: a nil `Now` means `time.Now()`.
 
-- [ ] **Step 6: Run the tests and see them pass**
+- [x] **Step 6: Run the tests and see them pass**
 
 Run: `go vet ./... && go test ./...`. Expected: all pass.
 
-- [ ] **Step 7: Commit** with `Change: add-dkt-record/3`.
+- [x] **Step 7: Commit** with `Change: add-dkt-record/3`.
 
 ### Task 4: `dkt lint` checks records
 
