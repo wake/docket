@@ -22,4 +22,6 @@ The docket skill, docket-init and `dkt init` send agents to docket-doctor, and u
 
 ## Review
 
-One adversarial review by codex on the whole diff; see the pull request.
+One adversarial review by codex on the whole diff. Two findings, both about the approved prompt text, so left for the maintainer:
+- high: when `dkt inspect` reports `openspec-missing` or `openspec-unsupported`, step 1 still runs `dkt lint --json`, which exits 4 with no usable `result`.
+- medium: step 1 says `files` holds every file `dkt init` writes, but inspect omits the files `openspec init` generates.
