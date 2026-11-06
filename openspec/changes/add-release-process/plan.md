@@ -61,7 +61,7 @@
 **Interfaces:**
 - Produces, in `release_test.go`, package `docket`: `type installEnv struct { home, fake, releases string }`, `newInstallEnv(t *testing.T) installEnv` and `(e installEnv) run(t *testing.T, env ...string) (stdout, stderr string, err error)`, reused by Task 2. `run` pipes `install.sh` to `sh` on standard input with `HOME`, `PATH` (the fake directory first), `FAKE_RELEASES`, `FAKE_OS=Linux`, `FAKE_ARCH=x86_64` and then `env`, whose values win; nothing else from the test's environment reaches it, so `DKT_VERSION` is unset unless a test sets it.
 
-- [ ] **Step 1: Write the failing tests** in `release_test.go`, skipping on Windows as `TestDevWrapper` does. Every test's home is `<t.TempDir()>/home dir`.
+- [x] **Step 1: Write the failing tests** in `release_test.go`, skipping on Windows as `TestDevWrapper` does. Every test's home is `<t.TempDir()>/home dir`.
 
   The fake `curl`, written into the fake directory, takes the URL and `-o <file>` from its arguments, appends the URL to `$FAKE_RELEASES/requests`, strips `https://github.com/wake/docket/releases/` and copies that path under `$FAKE_RELEASES` to the output; a missing file prints an error to stderr and exits 22. The fake `uname` prints `$FAKE_OS` for `-s` and `$FAKE_ARCH` for `-m`, and `-m`/`-s` only. A published fake executable is a shell script printing `dkt v9.9.9`; a helper publishes it with a correct `checksums.txt` in the `<hash>  <name>` format under a given directory, such as `latest/download`.
 
@@ -85,9 +85,9 @@
   - `TestInstallCutShort`: the file's last line is `main`. Cut `install.sh` at every line boundary and at every byte of the last line short of the complete `main`, and feed each cut to `sh`; afterwards `requests` is absent and the home directory is empty. Every byte of the file would take about 40 seconds, and a cut inside a line inside a function is a syntax error whichever line it is: a command that acts at the top level already fails at the line boundary after it.
   - `TestInstallPathHint`: with `PATH` not holding `~/.local/bin`, stdout holds `is not on your PATH`; with it, stdout does not hold `PATH`.
 
-- [ ] **Step 2: Run** `go test -run TestInstall .`; expect FAIL: `install.sh` does not exist.
+- [x] **Step 2: Run** `go test -run TestInstall .`; expect FAIL: `install.sh` does not exist.
 
-- [ ] **Step 3: Write `install.sh`**, mode 0755, starting `#!/bin/sh` and `set -eu`, with a comment saying what it does and why everything is in `main`. A `die` function prints `install.sh: <message>` to stderr and exits 1. In `main`, in this order:
+- [x] **Step 3: Write `install.sh`**, mode 0755, starting `#!/bin/sh` and `set -eu`, with a comment saying what it does and why everything is in `main`. A `die` function prints `install.sh: <message>` to stderr and exits 1. In `main`, in this order:
   1. Map `uname -s` and `uname -m` as the scenarios say; anything else dies naming the value and `https://github.com/wake/docket/releases`.
   2. Pick the digest command, `sha256sum` then `shasum -a 256`; neither dies naming both.
   3. Pick the base URL from `${DKT_VERSION:-}`: empty is latest, `v*` as is, otherwise with `v` added.
@@ -101,13 +101,13 @@
 
   The last line of the file is `main`, with no arguments: `main` takes none.
 
-- [ ] **Step 4: Run** `go test -run TestInstall .`; expect PASS. If `shellcheck` is available, run `shellcheck install.sh`; the unquoted digest command is intended and takes a `# shellcheck disable=SC2086` comment.
+- [x] **Step 4: Run** `go test -run TestInstall .`; expect PASS. If `shellcheck` is available, run `shellcheck install.sh`; the unquoted digest command is intended and takes a `# shellcheck disable=SC2086` comment.
 
-- [ ] **Step 5: Mutate** and see a test fail for each, then restore: remove the `main` wrapper; skip the digest comparison; drop the `v` normalization; run the version check after `mv`; remove the signal trap.
+- [x] **Step 5: Mutate** and see a test fail for each, then restore: remove the `main` wrapper; skip the digest comparison; drop the `v` normalization; run the version check after `mv`; remove the signal trap.
 
-- [ ] **Step 6: Run** `go vet ./...` and `go test ./...`; expect PASS.
+- [x] **Step 6: Run** `go vet ./...` and `go test ./...`; expect PASS.
 
-- [ ] **Step 7: Commit** `install.sh` and `release_test.go` with the trailer `Change: add-release-process/1`.
+- [x] **Step 7: Commit** `install.sh` and `release_test.go` with the trailer `Change: add-release-process/1`.
 
 ### Task 2: Snapshot build in CI
 
@@ -124,21 +124,21 @@
 **Interfaces:**
 - Consumes: `newInstallEnv` and `(installEnv).run` from Task 1, with no fake `uname` on `PATH` for this test.
 
-- [ ] **Step 1: Write the failing test** `TestInstallSnapshot` in `release_test.go`: skip unless `DOCKET_TEST_DIST` is set. Read `<dist>/artifacts.json` (fields `name`, `path`; `path` is relative to the repository root) and `<dist>/metadata.json` (field `tag`). The artifacts named `dkt-*` are exactly the four target names. Copy those and `checksums.txt` into `<releases>/latest/download/`, run `install.sh` with the real `uname`, expect exit 0, and require the installed `dkt --version` to print `dkt <tag>`.
+- [x] **Step 1: Write the failing test** `TestInstallSnapshot` in `release_test.go`: skip unless `DOCKET_TEST_DIST` is set. Read `<dist>/artifacts.json` (fields `name`, `path`; `path` is relative to the repository root) and `<dist>/metadata.json` (field `tag`). The artifacts named `dkt-*` are exactly the four target names. Copy those and `checksums.txt` into `<releases>/latest/download/`, run `install.sh` with the real `uname`, expect exit 0, and require the installed `dkt --version` to print `dkt <tag>`.
 
-- [ ] **Step 2: Run** `go test -run TestInstallSnapshot .`; expect SKIP. Run it with `DOCKET_TEST_DIST=dist`; expect FAIL: no `artifacts.json`.
+- [x] **Step 2: Run** `go test -run TestInstallSnapshot .`; expect SKIP. Run it with `DOCKET_TEST_DIST=dist`; expect FAIL: no `artifacts.json`.
 
-- [ ] **Step 3: Write `.goreleaser.yaml`**: `version: 2`; one build with `main: ./cmd/dkt`, `binary: dkt`, `env: [CGO_ENABLED=0]`, `goos: [darwin, linux]`, `goarch: [amd64, arm64]`, `flags: [-trimpath]`, `ldflags: [-s -w -X github.com/wake/docket/internal/cli.Version={{ .Tag }}]`; `archives: [{ formats: [binary], name_template: dkt-{{ .Os }}-{{ .Arch }} }]`, with a comment saying why the names hold no version; `checksum: { name_template: checksums.txt }`. Add `/dist/` to `.gitignore` under a comment naming GoReleaser.
+- [x] **Step 3: Write `.goreleaser.yaml`**: `version: 2`; one build with `main: ./cmd/dkt`, `binary: dkt`, `env: [CGO_ENABLED=0]`, `goos: [darwin, linux]`, `goarch: [amd64, arm64]`, `flags: [-trimpath]`, `ldflags: [-s -w -X github.com/wake/docket/internal/cli.Version={{ .Tag }}]`; `archives: [{ formats: [binary], name_template: dkt-{{ .Os }}-{{ .Arch }} }]`, with a comment saying why the names hold no version; `checksum: { name_template: checksums.txt }`. Add `/dist/` to `.gitignore` under a comment naming GoReleaser.
 
-- [ ] **Step 4: Build the snapshot** with GoReleaser v2 (the task's brief gives the path of a verified binary; do not install it system-wide): `goreleaser check`, then `goreleaser release --snapshot --clean`, with no `*_TOKEN` variable in its environment. Expect success and the four names in `dist/checksums.txt`.
+- [x] **Step 4: Build the snapshot** with GoReleaser v2 (the task's brief gives the path of a verified binary; do not install it system-wide): `goreleaser check`, then `goreleaser release --snapshot --clean`, with no `*_TOKEN` variable in its environment. Expect success and the four names in `dist/checksums.txt`.
 
-- [ ] **Step 5: Run** `DOCKET_TEST_DIST=dist go test -run TestInstallSnapshot -v .`; expect PASS, not SKIP. Change `name_template` to `dkt_{{ .Os }}_{{ .Arch }}`, rebuild and see it fail, then change the stamp to `{{ .Version }}`, rebuild and see it fail; restore both.
+- [x] **Step 5: Run** `DOCKET_TEST_DIST=dist go test -run TestInstallSnapshot -v .`; expect PASS, not SKIP. Change `name_template` to `dkt_{{ .Os }}_{{ .Arch }}`, rebuild and see it fail, then change the stamp to `{{ .Version }}`, rebuild and see it fail; restore both.
 
-- [ ] **Step 6: Add the job** `release-snapshot` to `.github/workflows/ci.yml`, on `ubuntu-latest`: `actions/checkout@v7` with `fetch-depth: 0` and a comment that GoReleaser reads the history and tags; `actions/setup-go@v7` with `go-version: stable`; `goreleaser/goreleaser-action@v7` with `version: '~> v2'` and `args: check`; the same action with `args: release --snapshot --clean`; a step `TestInstallSnapshot` running `go test -run TestInstallSnapshot -v .` with `DOCKET_TEST_DIST: dist`. It passes no token, and the workflow's `permissions: contents: read` stays. Lint the workflow with `actionlint` (the task's brief gives the path).
+- [x] **Step 6: Add the job** `release-snapshot` to `.github/workflows/ci.yml`, on `ubuntu-latest`: `actions/checkout@v7` with `fetch-depth: 0` and a comment that GoReleaser reads the history and tags; `actions/setup-go@v7` with `go-version: stable`; `goreleaser/goreleaser-action@v7` with `version: '~> v2'` and `args: check`; the same action with `args: release --snapshot --clean`; a step `TestInstallSnapshot` running `go test -run TestInstallSnapshot -v .` with `DOCKET_TEST_DIST: dist`. It passes no token, and the workflow's `permissions: contents: read` stays. Lint the workflow with `actionlint` (the task's brief gives the path).
 
-- [ ] **Step 7: Run** `go vet ./...` and `go test ./...`; expect PASS. `git status --short` must not list `dist/`.
+- [x] **Step 7: Run** `go vet ./...` and `go test ./...`; expect PASS. `git status --short` must not list `dist/`.
 
-- [ ] **Step 8: Commit** `.goreleaser.yaml`, `.github/workflows/ci.yml`, `.gitignore` and `release_test.go` with the trailer `Change: add-release-process/2`.
+- [x] **Step 8: Commit** `.goreleaser.yaml`, `.github/workflows/ci.yml`, `.gitignore` and `release_test.go` with the trailer `Change: add-release-process/2`.
 
 ### Task 3: Release workflow, plugin version and marketplace
 
@@ -153,18 +153,18 @@
 - Modify: `.claude-plugin/plugin.json`
 - Modify: `release_test.go`
 
-- [ ] **Step 1: Write the failing test** `TestPluginVersion` in `release_test.go`. Read both JSON files. `plugin.json`'s `version` matches `^\d+\.\d+\.\d+$`. `marketplace.json` has exactly one plugin, named `docket`, whose `source` has `source: github`, `repo: wake/docket` and `ref` equal to `v` plus the version. When `DOCKET_RELEASE_TAG` is not empty, it equals `v` plus the version; the failure message names the tag and the file. A comment says the release workflow passes the tag.
+- [x] **Step 1: Write the failing test** `TestPluginVersion` in `release_test.go`. Read both JSON files. `plugin.json`'s `version` matches `^\d+\.\d+\.\d+$`. `marketplace.json` has exactly one plugin, named `docket`, whose `source` has `source: github`, `repo: wake/docket` and `ref` equal to `v` plus the version. When `DOCKET_RELEASE_TAG` is not empty, it equals `v` plus the version; the failure message names the tag and the file. A comment says the release workflow passes the tag.
 
-- [ ] **Step 2: Run** `go test -run TestPluginVersion .`; expect FAIL: no version, no marketplace.
+- [x] **Step 2: Run** `go test -run TestPluginVersion .`; expect FAIL: no version, no marketplace.
 
-- [ ] **Step 3: Add** `"version": "0.16.0"` to `.claude-plugin/plugin.json` after `name`. Create `.claude-plugin/marketplace.json`: `name: docket`, `owner: { name: wake }`, and `plugins` with one entry: `name: docket`, the same `description` as `plugin.json`, and `source: { source: github, repo: wake/docket, ref: v0.16.0 }`. Do not repeat `version` in the entry: the docs warn when both are set.
+- [x] **Step 3: Add** `"version": "0.16.0"` to `.claude-plugin/plugin.json` after `name`. Create `.claude-plugin/marketplace.json`: `name: docket`, `owner: { name: wake }`, and `plugins` with one entry: `name: docket`, the same `description` as `plugin.json`, and `source: { source: github, repo: wake/docket, ref: v0.16.0 }`. Do not repeat `version` in the entry: the docs warn when both are set.
 
-- [ ] **Step 4: Run** `go test -run TestPluginVersion .`; expect PASS. Run it with `DOCKET_RELEASE_TAG=v0.16.0`; expect PASS. With `DOCKET_RELEASE_TAG=v0.17.0` and with `DOCKET_RELEASE_TAG=v0.16.0-rc.1`; expect FAIL for each. Set the marketplace's `ref` to `v0.17.0`; expect FAIL; restore. Run `claude plugin validate .` and `claude plugin validate . --strict` at the repository root; expect exit 0.
+- [x] **Step 4: Run** `go test -run TestPluginVersion .`; expect PASS. Run it with `DOCKET_RELEASE_TAG=v0.16.0`; expect PASS. With `DOCKET_RELEASE_TAG=v0.17.0` and with `DOCKET_RELEASE_TAG=v0.16.0-rc.1`; expect FAIL for each. Set the marketplace's `ref` to `v0.17.0`; expect FAIL; restore. Run `claude plugin validate .` at the repository root; expect exit 0. `--strict` also fails on optional metadata this change does not add (a marketplace description, a plugin author) and on the repository's own `CLAUDE.md`, so it is not the check here.
 
-- [ ] **Step 5: Write `.github/workflows/release.yml`**: `name: release`; `on: push: tags: ['v[0-9]+.[0-9]+.[0-9]+']`; `permissions: contents: write`; one job on `ubuntu-latest`: `actions/checkout@v7` with `fetch-depth: 0`; `actions/setup-go@v7` with `go-version: stable`; a step named for the check, running `go test -run TestPluginVersion .` with `DOCKET_RELEASE_TAG: ${{ github.ref_name }}`; `goreleaser/goreleaser-action@v7` with `version: '~> v2'`, `args: release --clean` and `GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. Lint with `actionlint` (the task's brief gives the path). This workflow cannot run in a pull request; its first real run is the first release, and the tag filter is backed by the check in the step before GoReleaser.
+- [x] **Step 5: Write `.github/workflows/release.yml`**: `name: release`; `on: push: tags: ['v[0-9]+.[0-9]+.[0-9]+']`; `permissions: contents: write`; one job on `ubuntu-latest`: `actions/checkout@v7` with `fetch-depth: 0`; `actions/setup-go@v7` with `go-version: stable`; a step named for the check, running `go test -run TestPluginVersion .` with `DOCKET_RELEASE_TAG: ${{ github.ref_name }}`; `goreleaser/goreleaser-action@v7` with `version: '~> v2'`, `args: release --clean` and `GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`. Lint with `actionlint` (the task's brief gives the path). This workflow cannot run in a pull request; its first real run is the first release, and the tag filter is backed by the check in the step before GoReleaser.
 
-- [ ] **Step 6: Write `docs/release.md`**, in English, for maintainers: what a release is; the steps (in a pull request, set `version` in `.claude-plugin/plugin.json` to `X.Y.Z` and `ref` in `.claude-plugin/marketplace.json` to `vX.Y.Z`; merge; tag that merge commit on `main` and push the tag); that both files already hold the next version, so a first release needs only the tag; what the workflow publishes; that a mismatch fails the workflow before anything is published; how to install a chosen version with `DKT_VERSION`. Keep it under 40 lines, with no host-specific details.
+- [x] **Step 6: Write `docs/release.md`**, in English, for maintainers: what a release is; the steps (in a pull request, set `version` in `.claude-plugin/plugin.json` to `X.Y.Z` and `ref` in `.claude-plugin/marketplace.json` to `vX.Y.Z`; merge; tag that merge commit on `main` and push the tag); that both files already hold the next version, so a first release needs only the tag; what the workflow publishes; that a mismatch fails the workflow before anything is published; how to install a chosen version with `DKT_VERSION`. Keep it under 40 lines, with no host-specific details.
 
-- [ ] **Step 7: Run** `go vet ./...` and `go test ./...`; expect PASS.
+- [x] **Step 7: Run** `go vet ./...` and `go test ./...`; expect PASS.
 
-- [ ] **Step 8: Commit** the five files with the trailer `Change: add-release-process/3`.
+- [x] **Step 8: Commit** the five files with the trailer `Change: add-release-process/3`.
