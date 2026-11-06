@@ -128,6 +128,75 @@ func TestCopiesLinkedSpecOnBranch(t *testing.T) {
 	}
 }
 
+func TestCopiesLinkedSpecsDirOnBranch(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{"other/booking/spec.md": "s", "openspec/changes/add-z/proposal.md": "p"})
+	r.Git("checkout", "-q", "-b", "lnk")
+	if err := os.Symlink("../../../other", filepath.Join(r.Dir, "openspec/changes/add-z/specs")); err != nil {
+		t.Fatal(err)
+	}
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "link")
+	r.Git("checkout", "-q", "main")
+	cs, un := run(t, r)
+	for _, c := range cs {
+		if slices.Contains(c.Sources, "refs/heads/lnk") {
+			t.Errorf("copy for linked branch: %+v", c)
+		}
+	}
+	if !slices.ContainsFunc(un, func(u scan.Unreadable) bool {
+		return u.Source == "refs/heads/lnk:openspec/changes/add-z" && strings.Contains(u.Reason, "openspec/changes/add-z/specs") && strings.Contains(u.Reason, "link")
+	}) {
+		t.Errorf("unreadable = %v", un)
+	}
+}
+
+func TestCopiesOnlySpecMd(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{"README.md": "x"})
+	wt := addWorktree(t, r, "wtb")
+	writeFile(t, wt, "openspec/changes/add-y/specs/booking/spec.md", "s")
+	writeFile(t, wt, "openspec/changes/add-y/specs/booking/notes.md", "n")
+	cs, un := run(t, r)
+	if len(un) != 0 || len(cs) != 1 || len(cs[0].Files) != 1 || string(cs[0].Files["booking/spec.md"]) != "s" {
+		t.Errorf("copies = %+v, unreadable = %v", cs, un)
+	}
+}
+
+func TestCopiesDistinctSlugsNeverMerge(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{
+		"openspec/changes/add-x/specs/booking/spec.md": "same",
+		"openspec/changes/add-y/specs/booking/spec.md": "same",
+		"openspec/changes/add-p/proposal.md":           "p",
+		"openspec/changes/add-q/proposal.md":           "p",
+	})
+	cs, un := run(t, r)
+	slugs := map[string]int{}
+	for _, c := range cs {
+		slugs[c.Slug]++
+	}
+	if len(un) != 0 || len(cs) != 4 || slugs["add-x"] != 1 || slugs["add-y"] != 1 || slugs["add-p"] != 1 || slugs["add-q"] != 1 {
+		t.Errorf("copies = %+v, unreadable = %v", cs, un)
+	}
+}
+
+func TestCopiesMissingCommit(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{"README.md": "x"})
+	inv := scan.Inventory{Uses: []scan.Use{{
+		Slug: "add-x", Path: "openspec/changes/add-x", Source: "refs/heads/gone",
+		Commit: "0000000000000000000000000000000000000000",
+	}}}
+	cs, un, err := Copies(gitOf(r), inv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cs) != 0 || len(un) != 1 || un[0].Source != "refs/heads/gone:openspec/changes/add-x" {
+		t.Errorf("copies = %+v, unreadable = %v", cs, un)
+	}
+}
+
 func TestCopiesNoSpecs(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("init", map[string]string{"openspec/changes/add-x/proposal.md": "p"})

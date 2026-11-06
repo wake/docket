@@ -61,7 +61,7 @@ type TreeFile struct {
 // full-tree paths in git's order. Submodules are left out; a missing dir gives
 // an empty slice.
 func (g Git) TreeFiles(commit, dir string) ([]TreeFile, error) {
-	out, err := g.output("ls-tree", "-r", "-z", "--full-tree", commit, "--", dir+"/")
+	out, err := g.output("ls-tree", "-r", "-z", "--full-tree", commit, "--", dir) // no trailing slash: dir itself may be a link
 	if err != nil {
 		return nil, err
 	}
