@@ -498,7 +498,8 @@ func TestInitText(t *testing.T) {
 	}
 }
 
-func lastStep(t *testing.T, m initOut) string {
+// lastStep fails unless the last next step is the doctor step.
+func lastStep(t *testing.T, m initOut) {
 	t.Helper()
 	b, err := fs.ReadFile(shippedFS(), "next-steps/doctor.md")
 	if err != nil {
@@ -507,7 +508,6 @@ func lastStep(t *testing.T, m initOut) string {
 	if n := len(m.Result.NextSteps); n == 0 || m.Result.NextSteps[n-1] != strings.TrimSpace(string(b)) {
 		t.Fatalf("next_steps = %q", m.Result.NextSteps)
 	}
-	return ""
 }
 
 func TestInitWorkflowSectionMissing(t *testing.T) {
