@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/testutil"
 )
 
@@ -78,7 +79,35 @@ func TestRecordsLinkedFolder(t *testing.T) {
 	}
 	inv := recordsOK(t, r)
 	if len(inv.Uses) != 0 || len(inv.Unreadable) != 1 || inv.Unreadable[0].Source != b ||
-		!strings.Contains(inv.Unreadable[0].Reason, "docket/records is a symbolic link") {
+		!strings.Contains(inv.Unreadable[0].Reason, "docket/records is a symbolic link; Docket does not read through it") {
+		t.Errorf("got %+v", inv)
+	}
+}
+
+func TestRecordsBareEntry(t *testing.T) {
+	r := newRepo(t)
+	commitRef(r, "refs/heads/f", map[string]string{recordPath: "x"})
+	bare := filepath.Join(t.TempDir(), "bare.git")
+	r.Git("clone", "-q", "--bare", r.Dir, bare)
+	write(t, bare, "docket/records/2026-11-06-on-disk.md")
+	inv, err := Records(gitx.Git{Dir: bare, Env: r.Env})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inv.Unreadable) != 0 || len(inv.Uses) != 1 || inv.Uses[0].Source != "refs/heads/f" {
+		t.Errorf("got %+v", inv)
+	}
+}
+
+func TestRecordsUnreadableBranch(t *testing.T) {
+	r := newRepo(t)
+	commit := commitRef(r, "refs/heads/f", map[string]string{recordPath: "x"})
+	tree := r.Git("rev-parse", commit+"^{tree}")
+	if err := os.Remove(filepath.Join(r.Dir, ".git/objects", tree[:2], tree[2:])); err != nil {
+		t.Fatal(err)
+	}
+	inv := recordsOK(t, r)
+	if len(inv.Uses) != 0 || len(inv.Unreadable) != 1 || inv.Unreadable[0].Source != "refs/heads/f" {
 		t.Errorf("got %+v", inv)
 	}
 }
