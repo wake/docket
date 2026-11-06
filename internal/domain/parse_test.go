@@ -58,6 +58,20 @@ func TestParseChineseWhitespace(t *testing.T) {
 	}
 }
 
+func TestParseBlankLines(t *testing.T) {
+	nodes, probs := Parse([]byte("- A\n   \n　\n- B\n"))
+	if len(probs) != 0 || dump(nodes) != "A\nB\n" {
+		t.Fatalf("probs=%v\n%s", probs, dump(nodes))
+	}
+}
+
+func TestParseUnderCapabilityMessage(t *testing.T) {
+	_, probs := Parse([]byte("- A\n  - `refund`\n    - B\n"))
+	if len(probs) != 1 || !strings.Contains(probs[0].Message, "under a capability") {
+		t.Fatalf("got %+v", probs)
+	}
+}
+
 func TestParseFormat(t *testing.T) {
 	tests := []struct {
 		name, in string
@@ -66,6 +80,7 @@ func TestParseFormat(t *testing.T) {
 		{"not an item", "Users\n", []int{1}},
 		{"other bullet", "* Users\n", []int{1}},
 		{"no text", "- \n", []int{1}},
+		{"only spaces after the dash", "-   \n", []int{1}},
 		{"fence", "- A\n```\n```\n", []int{2, 3}},
 		{"tab indent", "- A\n\t- B\n", []int{2}},
 		{"odd indent", "- A\n   - B\n", []int{2}},
@@ -78,6 +93,7 @@ func TestParseFormat(t *testing.T) {
 		{"outside the specs", "- A\n  - `../refund`\n", []int{2}},
 		{"absolute path", "- A\n  - `/refund`\n", []int{2}},
 		{"leading dash", "- A\n  - `-x`\n", []int{2}},
+		{"current folder", "- A\n  - `.`\n", []int{2}},
 		{"invalid UTF-8", "- A\n- \xff\n", []int{2}},
 		{"two bad lines", "Users\n- A\nBilling\n", []int{1, 3}},
 		{"child of a bad item", "- A `x`\n  - B\n", []int{1}},
@@ -103,6 +119,7 @@ func TestParseDuplicate(t *testing.T) {
 		line, first int
 	}{
 		{"sibling nodes", "- A\n- A\n", 2, 1},
+		{"siblings apart", "- A\n- B\n- A\n", 3, 1},
 		{"nested siblings", "- A\n  - B\n  - B\n", 3, 2},
 		{"whitespace only", "- A\n-   A \n", 2, 1},
 		{"capability twice", "- A\n  - `x`\n- B\n  - `x`\n", 4, 2},

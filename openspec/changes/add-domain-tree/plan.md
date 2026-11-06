@@ -64,7 +64,7 @@
   - `const RuleFormat = "domain-format"`, `RuleDuplicate = "domain-duplicate"`, `RuleUnknown = "domain-unknown"`
   - `type Problem struct { Rule string; Line int; Message string }`: `Line` is 1-based.
   - `type Entry struct { Path string; Line int }`: one capability listed in the tree.
-  - `type Node struct { Name string; Line int; Capabilities []Entry; Children []*Node }`
+  - `type Node struct { Name string; Capabilities []Entry; Children []*Node }`
   - `func Parse(b []byte) ([]*Node, []Problem)`: every problem in the file; the nodes must not be used when there is one.
 
 - [ ] **Step 1: Write the failing tests**

@@ -37,7 +37,6 @@ type Entry struct {
 // Node is one named node of the tree.
 type Node struct {
 	Name         string
-	Line         int
 	Capabilities []Entry
 	Children     []*Node
 }
@@ -107,7 +106,7 @@ func Parse(b []byte) ([]*Node, []Problem) {
 				path = s[1]
 			}
 			switch {
-			case path == "" || !fs.ValidPath(path) || path == "." || strings.HasPrefix(path, "-"):
+			case !fs.ValidPath(path) || path == "." || strings.HasPrefix(path, "-"):
 				ok = false
 				bad("a capability must be one code span holding a path under openspec/specs/")
 			case level == 0:
@@ -131,7 +130,7 @@ func Parse(b []byte) ([]*Node, []Problem) {
 			ok = false
 			bad("a name cannot hold a backtick; a capability is the whole item in a code span")
 		}
-		n := &Node{Name: text, Line: no}
+		n := &Node{Name: text}
 		stack = append(stack, open{n})
 		if !ok {
 			continue
