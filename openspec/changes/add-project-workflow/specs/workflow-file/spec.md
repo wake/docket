@@ -32,7 +32,7 @@ The shipped template SHALL start with front matter whose `template` is a positiv
 - **THEN** the file has no template version, and `dkt inspect` reports `workflow-template-unknown` naming it
 
 ### Requirement: Workflow sections
-Each level-3 heading of the shipped template SHALL name a section the workflow file must have: a Markdown heading of any level, outside fenced code blocks, with the same text. Only the headings are compared, not what the sections hold.
+Each level-3 heading of the shipped template SHALL name a section the workflow file must have: a Markdown heading of any level, outside fenced code blocks and HTML comments, with the same text. Only the headings are compared, not what the sections hold.
 
 #### Scenario: Section at another heading level
 - **WHEN** `docket/workflow.md` has the shipped template version and every section, with `## Plan review` where the template has `### Plan review`
@@ -40,6 +40,10 @@ Each level-3 heading of the shipped template SHALL name a section the workflow f
 
 #### Scenario: Heading only inside a code block
 - **WHEN** the only `### Plan review` line in `docket/workflow.md` is inside a fenced code block
+- **THEN** `workflow-section-missing` names "Plan review"
+
+#### Scenario: Heading only inside an HTML comment
+- **WHEN** the only `### Plan review` line in `docket/workflow.md` is inside an HTML comment
 - **THEN** `workflow-section-missing` names "Plan review"
 
 ### Requirement: Workflow file status

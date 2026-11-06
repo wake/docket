@@ -48,6 +48,10 @@
 
 ---
 
+## Revision 1 (2026-11-06): HTML comments, docket-doctor, two end-to-end tests
+
+Asked for by the pre-merge review in this session (the attacker on a different model, and the fresh spec check): a heading inside an HTML comment counted as a section; the skill sends agents to docket-doctor, which this repository does not have yet; `workflow-template-unknown` had no end-to-end test for `template: one` in `dkt inspect` or for `dkt init`. Task 6 compensates Task 2 for the first.
+
 ### Task 1: Ship the workflow template and pin its version
 
 **Scenarios:** workflow-file#shipped-template-versioned
@@ -172,3 +176,24 @@
 - [x] **Step 3: Edit** `AGENTS.md`: remove the bullet starting "Review, verify and merge by the docket skill's "Default steps"" and the bullet starting "Until the release process exists, archive each change"; add `docket/workflow.md` to the list under "Prompt files", after `shipped/`.
 - [x] **Step 4: Run** `go run ./cmd/dkt inspect --json`; expect `docket/workflow.md` listed as `same` and no `workflow-` finding. Run `go test ./...`.
 - [x] **Step 5: Commit** the four files.
+
+### Task 6: Fixes from the pre-merge review
+
+**Compensates:** Task 2
+
+**Scenarios:** workflow-file#heading-only-inside-an-html-comment, workflow-file#version-that-is-not-a-number
+
+**Review:** checks
+
+**Files:**
+- Modify: `internal/setup/workflow.go`
+- Modify: `internal/setup/workflow_test.go`
+- Modify: `internal/cli/cmd_inspect_test.go`
+- Modify: `internal/cli/cmd_init_test.go`
+- Modify: `AGENTS.md`
+
+- [ ] **Step 1: Write the tests.** `internal/setup/workflow_test.go`: `TestWorkflowHeadingInComment`, the template with the `### Plan review` line moved inside `<!--` and `-->` lines → `StatusDiffers`, `Missing == []string{"Plan review"}`. `internal/cli/cmd_inspect_test.go`: `TestInspectWorkflowNotANumber`, after `dkt init`, the file with `template: one` → `differs` and `workflow-template-unknown` naming it. `internal/cli/cmd_init_test.go`: `TestInitWorkflowTemplateUnknown`, after `dkt init`, the file with `template: 99`, then `dkt init --json` → unchanged and `kept`, `workflow-template-unknown` naming it, exit 1.
+- [ ] **Step 2: Run** `go test ./internal/setup/ -run TestWorkflowHeadingInComment`; expect FAIL (`Missing` is nil). The two cli tests cover code that already exists and pass from the start.
+- [ ] **Step 3: Implement** in `headingTexts`: blank HTML comments with `markdown.BlankComments(lines, mask)` before `markdown.Headings`, `mask` being `markdown.FenceMask` of the original lines.
+- [ ] **Step 4: Edit** `AGENTS.md`: the bullet on what does not exist yet also names docket-doctor, with a sub-bullet: when the docket skill, docket-init or `dkt init` says to run docket-doctor, tell the user what was reported instead, and copy a missing section of `docket/workflow.md` back from `shipped/workflow/workflow.md`.
+- [ ] **Step 5: Run** `go vet ./...` and `go test ./...`; expect PASS. Commit the five files.
