@@ -121,3 +121,30 @@ func TestWorkflowTemplatePinned(t *testing.T) {
 		t.Errorf("shipped/workflow/workflow.md changed: raise its template version and add the new hash to workflowTemplates")
 	}
 }
+
+func TestSkillSectionsInTemplate(t *testing.T) {
+	skill := strings.Join(strings.Fields(readShipped(t, "shipped/skill/SKILL.md")), " ")
+	var names []string
+	for _, m := range regexp.MustCompile(`"([^"]+)"(?: and "([^"]+)")? in `+"`docket/workflow.md`").FindAllStringSubmatch(skill, -1) {
+		for _, n := range m[1:] {
+			if n != "" {
+				names = append(names, n)
+			}
+		}
+	}
+	if len(names) == 0 {
+		t.Fatal("shipped/skill/SKILL.md names no section of docket/workflow.md")
+	}
+	headings := map[string]bool{}
+	for _, l := range strings.Split(readShipped(t, "shipped/workflow/workflow.md"), "\n") {
+		if h, ok := strings.CutPrefix(strings.TrimRight(l, "\r"), "### "); ok {
+			headings[strings.TrimSpace(h)] = true
+		}
+	}
+	for _, n := range names {
+		if !headings[n] {
+			t.Errorf("skill names section %q, which is not a ### heading of the shipped template", n)
+		}
+	}
+	t.Logf("collected %d names: %q", len(names), names)
+}
