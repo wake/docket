@@ -35,6 +35,8 @@ func TestShippedFileSet(t *testing.T) {
 	}
 	want := []string{
 		"shipped/config/operations.yaml",
+		"shipped/issue/external.md",
+		"shipped/issue/template.md",
 		"shipped/next-steps/commit.md",
 		"shipped/next-steps/doctor.md",
 		"shipped/next-steps/reload.md",

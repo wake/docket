@@ -21,7 +21,7 @@ type lintOut struct {
 func TestLintCleanChangeNoRecords(t *testing.T) {
 	r := lintRepo(t, "spec-driven")
 	_, _, raw, _ := doLint(t, r.Dir, r.Env, "add-x")
-	if !strings.Contains(raw, `"records":[]`) {
+	if !strings.Contains(raw, `"records":[]`) || !strings.Contains(raw, `"issues":[]`) {
 		t.Fatalf("%s", raw)
 	}
 }
@@ -215,7 +215,7 @@ func TestLintText(t *testing.T) {
 	env := append(append([]string{}, r.Env...), "DOCKET_OPENSPEC="+cmd)
 	code, out, _ := runIn(t, r.Dir, env, "lint", "add-x", "add-z")
 	lines := strings.Split(out, "\n")
-	if code != 1 || lines[0] != "Linted 1 changes, 0 records and 0 main spec titles." || !strings.Contains(out, "change-missing") {
+	if code != 1 || lines[0] != "Linted 1 changes, 0 records, 0 issues and 0 main spec titles." || !strings.Contains(out, "change-missing") {
 		t.Fatalf("%d %q", code, out)
 	}
 }
@@ -341,13 +341,13 @@ func TestLintRoutingText(t *testing.T) {
 		return out
 	}
 	none := testutil.NewRepo(t)
-	if out := text(none); !strings.Contains(out, "Linted 0 changes, 0 records and 0 main spec titles.\nNo default branch found; the routing rule and record checks were skipped.\n") {
+	if out := text(none); !strings.Contains(out, "Linted 0 changes, 0 records, 0 issues and 0 main spec titles.\nNo default branch found; the routing rule and the record and issue checks were skipped.\n") {
 		t.Fatalf("%q", out)
 	}
 	r := routingRepo(t, map[string]string{"README.md": "x\n"})
 	r.Git("checkout", "-q", "--orphan", "other")
 	r.Commit("other", nil)
-	if out := text(r); !strings.Contains(out, "Linted 0 changes, 0 records and 0 main spec titles.\nNo merge base with main; the routing rule and record checks were skipped.\n") {
+	if out := text(r); !strings.Contains(out, "Linted 0 changes, 0 records, 0 issues and 0 main spec titles.\nNo merge base with main; the routing rule and the record and issue checks were skipped.\n") {
 		t.Fatalf("%q", out)
 	}
 	ok := routingRepo(t, map[string]string{"README.md": "x\n"})
@@ -572,6 +572,78 @@ func TestLintMergedTrailerIgnored(t *testing.T) {
 func TestLintNamedSkipsTrailers(t *testing.T) {
 	r := lintTrailerRepo(t, map[string]string{lintRecPath: lintRecGood}, "fix-x")
 	if code, m, raw, _ := doLint(t, r.Dir, r.Env, lintRecSlug); code != 0 || len(m.Findings) != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+const (
+	lintIssSlug = "2026-11-06-lint-timeout"
+	lintIssPath = "docket/issues/" + lintIssSlug + ".md"
+	lintIssBody = "## Current\nc\n\n## Expected\ne\n\n## Unchanged\nu\n\n## Evidence\nv\n"
+	lintIssBad  = "---\ntitle: T\n---\n\n" + lintIssBody
+)
+
+func TestLintIssueTheBranchAdds(t *testing.T) { // Issue the branch adds
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write(lintIssPath, lintIssBad)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 1 || ruleList(m.Findings) != "issue-front-matter" || m.Findings[0].File != lintIssPath ||
+		strings.Join(m.Result.Issues, ",") != lintIssSlug || len(m.Result.Records) != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintMergedIssueLeftAlone(t *testing.T) {
+	r := routingRepo(t, map[string]string{lintIssPath: lintIssBad})
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || len(m.Findings) != 0 || !strings.Contains(raw, `"issues":[]`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintResultIssues(t *testing.T) { // Issues in the result
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write(lintIssPath, "---\ntitle: T\nsource: s\n---\n\n"+lintIssBody)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 0 || len(m.Findings) != 0 || !strings.Contains(raw, `"issues":["`+lintIssSlug+`"]`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintNamedIssue(t *testing.T) {
+	r := routingRepo(t, map[string]string{lintIssPath: lintIssBad})
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, lintIssSlug)
+	if code != 1 || ruleList(m.Findings) != "issue-front-matter" || len(m.Result.Changes) != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestIssueRoundTripQuoting(t *testing.T) { // dkt issue with quoted text, then dkt lint
+	r := recordRepo(t)
+	const text = `a "q" \ é 日本`
+	if code, _, raw := doIssue(t, r, r.Dir, "lint-timeout", "--title", text, "--source", text); code != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	const slug = "2026-10-30-lint-timeout"
+	path := filepath.Join(r.Dir, "docket", "issues", slug+".md")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	comment := regexp.MustCompile(`(?s)<!--.*?-->`)
+	first := true
+	filled := comment.ReplaceAllStringFunc(string(b), func(string) string {
+		if first {
+			first = false
+			return ""
+		}
+		return "A sentence."
+	})
+	if err := os.WriteFile(path, []byte(filled), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, slug)
+	if code != 0 || len(m.Findings) != 0 {
 		t.Fatalf("%d %s", code, raw)
 	}
 }

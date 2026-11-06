@@ -15,6 +15,14 @@ func TestFrontMatter(t *testing.T) {
 	}
 }
 
+func TestFrontMatterWithoutKind(t *testing.T) {
+	got := string(FrontMatter("Lint times out", "", "review of #40"))
+	want := "---\ntitle: \"Lint times out\"\nsource: \"review of #40\"\n---\n"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}
+
 func TestValidLine(t *testing.T) {
 	cases := map[string]bool{
 		"ok": true, " padded ": true, "中文": true,

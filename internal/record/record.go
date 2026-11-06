@@ -23,11 +23,11 @@ var Kinds = []string{"fix", "refactor", "test", "prompt", "checks"}
 var kebab = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 // CheckName refuses a name that is not lowercase kebab case of at most 200
-// characters, or that starts with a date.
-func CheckName(name string) error {
+// characters, or that starts with a date; command is the one that adds the date.
+func CheckName(name, command string) error {
 	switch {
 	case change.HasDate(name):
-		return errors.New("name must not start with a date (YYYY-MM-DD): dkt record adds the date")
+		return fmt.Errorf("name must not start with a date (YYYY-MM-DD): %s adds the date", command)
 	case len(name) > 200:
 		return fmt.Errorf("name is %d characters; the limit is 200", len(name))
 	case !kebab.MatchString(name):

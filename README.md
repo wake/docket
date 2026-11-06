@@ -49,8 +49,10 @@ Once a project is set up, the agent loads the docket skill when development work
 | `dkt inspect` | Reports on the project's Docket setup and writes nothing |
 | `dkt new` | Opens a change on the full review path |
 | `dkt record` | Opens a record on the light review path |
+| `dkt issue` | Writes an issue file for work whose expected behavior is settled but put off |
+| `dkt issue template` | Prints an issue's sections, for a project that keeps issues in another tool |
 | `dkt sync` | Ticks the tasks of a plan or a record from commit trailers |
-| `dkt lint` | Checks the structure of changes, records and main spec titles |
+| `dkt lint` | Checks the structure of changes, records, issues and main spec titles |
 | `dkt conflicts` | Finds active changes that touch the same requirement |
 
 Run `dkt --help` for the arguments. Every command takes `--json`.

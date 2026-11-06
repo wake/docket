@@ -11,14 +11,21 @@ import (
 	"syscall"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/safepath"
 )
 
-// Records scans every worktree, local branch and remote-tracking branch for
-// record files; each use is one docket/records/<slug>.md file and its Slug has
+// Records scans for record files: see Dated.
+func Records(g gitx.Git) (Inventory, error) { return Dated(g, record.Dir) }
+
+// Issues scans for issue files: see Dated.
+func Issues(g gitx.Git) (Inventory, error) { return Dated(g, issue.Dir) }
+
+// Dated scans every worktree, local branch and remote-tracking branch for
+// files directly in dir; each use is one <dir>/<slug>.md file and its Slug has
 // the .md removed.
-func Records(g gitx.Git) (Inventory, error) {
+func Dated(g gitx.Git, dir string) (Inventory, error) {
 	var inv Inventory
 	wts, err := g.Worktrees()
 	if err != nil {
@@ -32,7 +39,7 @@ func Records(g gitx.Git) (Inventory, error) {
 		if w.Bare {
 			continue
 		}
-		paths, reason := worktreeRecords(w.Path)
+		paths, reason := worktreeRecords(w.Path, dir)
 		if reason != "" {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: w.Path, Reason: reason})
 			continue
@@ -47,7 +54,7 @@ func Records(g gitx.Git) (Inventory, error) {
 	for _, r := range refs {
 		res, ok := byCommit[r.Commit]
 		if !ok {
-			res.paths, res.err = treeRecords(g, r.Commit)
+			res.paths, res.err = treeRecords(g, r.Commit, dir)
 			byCommit[r.Commit] = res
 		}
 		if res.err != nil {
@@ -59,15 +66,15 @@ func Records(g gitx.Git) (Inventory, error) {
 	return inv, nil
 }
 
-// treeRecords lists the files directly in the records folder of commit's tree.
-func treeRecords(g gitx.Git, commit string) ([]string, error) {
-	files, err := g.TreeFiles(commit, record.Dir)
+// treeRecords lists the files directly in dir of commit's tree.
+func treeRecords(g gitx.Git, commit, dir string) ([]string, error) {
+	files, err := g.TreeFiles(commit, dir)
 	if err != nil {
 		return nil, err
 	}
 	var paths []string
 	for _, f := range files {
-		if path.Dir(f.Path) == record.Dir {
+		if path.Dir(f.Path) == dir {
 			paths = append(paths, f.Path)
 		}
 	}
@@ -85,13 +92,13 @@ func recordUses(paths []string, source string) []Use {
 	return uses
 }
 
-// worktreeRecords lists the files on disk in root's records folder as
+// worktreeRecords lists the files on disk in root's dir folder as
 // repository paths; a non-empty reason means the worktree is unreadable.
-func worktreeRecords(root string) (paths []string, reason string) {
+func worktreeRecords(root, dir string) (paths []string, reason string) {
 	if reason := worktreeMissing(root); reason != "" {
 		return nil, reason
 	}
-	if err := safepath.Check(root, record.Dir); err != nil {
+	if err := safepath.Check(root, dir); err != nil {
 		var se *safepath.SymlinkError
 		if errors.As(err, &se) {
 			return nil, se.Path + " is a symbolic link; Docket does not read through it"
@@ -101,7 +108,7 @@ func worktreeRecords(root string) (paths []string, reason string) {
 		}
 		return nil, err.Error()
 	}
-	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(record.Dir)))
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(dir)))
 	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
 		return nil, ""
 	}
@@ -110,7 +117,7 @@ func worktreeRecords(root string) (paths []string, reason string) {
 	}
 	for _, e := range entries {
 		if !e.IsDir() {
-			paths = append(paths, record.Dir+"/"+e.Name())
+			paths = append(paths, dir+"/"+e.Name())
 		}
 	}
 	return paths, ""

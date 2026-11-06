@@ -60,9 +60,13 @@ func Suffixed(slug string, n int) string {
 	return slug + "-" + strconv.Itoa(n)
 }
 
-// FrontMatter renders the front matter of proposal.md; callers validate first.
+// FrontMatter renders the front matter of a proposal, record or issue; an
+// empty kind (an issue's) leaves the kind line out. Callers validate first.
 func FrontMatter(title, kind, source string) []byte {
-	return []byte("---\ntitle: " + strconv.Quote(title) + "\nkind: " + kind + "\nsource: " + strconv.Quote(source) + "\n---\n")
+	if kind != "" {
+		kind = "\nkind: " + kind
+	}
+	return []byte("---\ntitle: " + strconv.Quote(title) + kind + "\nsource: " + strconv.Quote(source) + "\n---\n")
 }
 
 // TaskRefs reads one Change trailer value for slug. mine is false when the
