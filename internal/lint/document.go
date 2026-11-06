@@ -178,19 +178,24 @@ func (r *state) placeholders() map[string]string {
 			r.unreadable("schema "+name, err)
 			continue
 		}
-		text := strings.Join(markdown.Lines(b), "\n")
-		for _, m := range commentRe.FindAllString(text, -1) {
-			if _, ok := r.known[m]; !ok {
-				r.known[m] = name
-			}
-		}
-		for _, m := range angleRe.FindAllString(commentRe.ReplaceAllString(text, ""), -1) {
-			if _, ok := r.known[m]; !ok {
-				r.known[m] = name
-			}
-		}
+		addPlaceholders(r.known, name, b)
 	}
 	return r.known
+}
+
+// addPlaceholders adds the placeholder texts of one template to known, keeping the first template that holds each.
+func addPlaceholders(known map[string]string, name string, b []byte) {
+	text := strings.Join(markdown.Lines(b), "\n")
+	for _, m := range commentRe.FindAllString(text, -1) {
+		if _, ok := known[m]; !ok {
+			known[m] = name
+		}
+	}
+	for _, m := range angleRe.FindAllString(commentRe.ReplaceAllString(text, ""), -1) {
+		if _, ok := known[m]; !ok {
+			known[m] = name
+		}
+	}
 }
 
 // checkPlaceholders reports template text left in any Markdown file of the change.

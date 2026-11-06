@@ -16,11 +16,7 @@ var reuseHeader = []string{"Need", "Existing (path:symbol)", "Decision", "Reason
 // checkPlan applies the plan rules to a change that has a readable plan.md.
 func checkPlan(r *state, c *loaded) {
 	p := change.ParsePlan(c.Files[planFile])
-	for _, h := range p.BadHeadings {
-		r.add(c, "task-heading", planFile, h.Line,
-			"%q at heading level %d is not a task heading; use `### Task <N>: <name>`", h.Text, h.Level)
-	}
-	checkTaskNumbers(r, c, p)
+	checkTaskHeadings(r, c, planFile, p)
 	checkReuse(r, c, p)
 	cancelled := map[int]bool{}
 	for _, x := range p.Cancelled {
@@ -53,9 +49,18 @@ func checkPlan(r *state, c *loaded) {
 	}
 }
 
+// checkTaskHeadings applies the task heading rules to p, read from file.
+func checkTaskHeadings(r *state, c *loaded, file string, p change.Plan) {
+	for _, h := range p.BadHeadings {
+		r.add(c, "task-heading", file, h.Line,
+			"%q at heading level %d is not a task heading; use `### Task <N>: <name>`", h.Text, h.Level)
+	}
+	checkTaskNumbers(r, c, file, p)
+}
+
 // checkTaskNumbers reports each task number used more than once across the
 // tasks and the cancelled bullets, on the latest line.
-func checkTaskNumbers(r *state, c *loaded, p change.Plan) {
+func checkTaskNumbers(r *state, c *loaded, file string, p change.Plan) {
 	lines := map[int][]int{}
 	for _, t := range p.Tasks {
 		lines[t.Number] = append(lines[t.Number], t.Line)
@@ -79,7 +84,7 @@ func checkTaskNumbers(r *state, c *loaded, p change.Plan) {
 		for i, l := range ls {
 			parts[i] = strconv.Itoa(l)
 		}
-		r.add(c, "task-heading", planFile, ls[len(ls)-1],
+		r.add(c, "task-heading", file, ls[len(ls)-1],
 			"task number %d is used more than once (lines %s)", n, strings.Join(parts, ", "))
 	}
 }
