@@ -233,6 +233,8 @@ func TestIssueTemplate(t *testing.T) { // Template for another tool
 func TestIssueTemplateWithFlag(t *testing.T) { // Template with a flag
 	for name, args := range map[string][]string{
 		"flags":  {"template", "--title", "X", "--source", "x"},
+		"title":  {"template", "--title", "X"},
+		"source": {"template", "--source", "x"},
 		"second": {"template", "extra"},
 	} {
 		r := recordRepo(t)

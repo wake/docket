@@ -2,7 +2,6 @@ package cli
 
 import (
 	"flag"
-	"strconv"
 	"strings"
 
 	docket "github.com/wake/docket"
@@ -80,8 +79,7 @@ func runIssue(c *Context, name, source, title string) (Outcome, error) {
 		return out, nil
 	}
 
-	// An issue has no kind, so its front matter is not change.FrontMatter's.
-	content := []byte("---\ntitle: " + strconv.Quote(title) + "\nsource: " + strconv.Quote(source) + "\n---\n\n")
+	content := append(change.FrontMatter(title, "", source), '\n')
 	content = append(content, tpl...)
 	res, out, err := writeDated(root, issue.Dir, slug, content, inv.Uses)
 	if res.Slug == "" {
