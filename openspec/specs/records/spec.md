@@ -83,7 +83,7 @@ When `dkt record` fails to write the record after it began, it SHALL remove the 
 - **THEN** no finding is about that record and `result.records` is empty
 
 ### Requirement: Records named
-A name given to `dkt lint` that starts with a date of the form `YYYY-MM-DD` SHALL name a record, `docket/records/<name>.md`. When no regular file is there, `dkt lint` SHALL report `record-missing` naming it. Naming only records SHALL lint no change and no main spec title.
+A name given to `dkt lint` that starts with a date of the form `YYYY-MM-DD` SHALL name a record, `docket/records/<name>.md`, or an issue, `docket/issues/<name>.md`, and `dkt lint` SHALL lint each of the two that is a regular file. When neither is, it SHALL report `record-missing` naming it. Naming only records and issues SHALL lint no change and no main spec title.
 
 #### Scenario: Named record linted
 - **WHEN** the default branch holds `docket/records/2026-10-30-fix-a.md` with an unknown kind and a user runs `dkt lint 2026-10-30-fix-a`
@@ -92,6 +92,10 @@ A name given to `dkt lint` that starts with a date of the form `YYYY-MM-DD` SHAL
 #### Scenario: Named record missing
 - **WHEN** no such file exists and a user runs `dkt lint 2026-11-06-fix-q`
 - **THEN** the finding `record-missing` names `2026-11-06-fix-q` and dkt exits with 1
+
+#### Scenario: Named issue linted
+- **WHEN** the default branch holds `docket/issues/2026-10-30-lint-timeout.md` without a source, no record has that slug, and a user runs `dkt lint 2026-10-30-lint-timeout`
+- **THEN** the finding `issue-front-matter` names that file, no `record-missing` is reported, and dkt exits with 1
 
 ### Requirement: Record front matter checked
 `dkt lint` SHALL report `record-front-matter` for a record whose front matter is missing or cannot be read, or whose `title` or `source` is missing or not of the form `change-metadata` defines, `record-kind` for a `kind` that is missing or not one of the five, and `title-too-long` for a title over the limit.

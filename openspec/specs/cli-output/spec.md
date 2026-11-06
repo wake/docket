@@ -80,7 +80,7 @@ When a command cannot read a source it needs, it SHALL list that source with the
 - **THEN** `unreadable` lists the file with the reason, `result.files` does not list it as `missing`, and dkt exits with 3
 
 ### Requirement: Repository required
-A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new`, `dkt record`, `dkt sync`, `dkt lint` and `dkt conflicts`, SHALL do nothing outside one, report `no-repository`, and exit with 4. When `git` cannot be run, it SHALL report `git-missing` and exit with 4.
+A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new`, `dkt record`, `dkt issue`, `dkt sync`, `dkt lint` and `dkt conflicts`, SHALL do nothing outside one, report `no-repository`, and exit with 4. When `git` cannot be run, it SHALL report `git-missing` and exit with 4.
 
 #### Scenario: Init outside a repository
 - **WHEN** a user runs `dkt init --json --tools claude` outside any git repository
@@ -92,6 +92,10 @@ A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new`, `dk
 
 #### Scenario: Record outside a repository
 - **WHEN** a user runs `dkt record fix-x --json --kind fix --source x --title X` outside any git repository
+- **THEN** nothing is written, the findings hold `no-repository`, and dkt exits with 4
+
+#### Scenario: Issue outside a repository
+- **WHEN** a user runs `dkt issue lint-timeout --json --source x --title X` outside any git repository
 - **THEN** nothing is written, the findings hold `no-repository`, and dkt exits with 4
 
 #### Scenario: Sync outside a repository

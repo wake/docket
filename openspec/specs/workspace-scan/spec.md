@@ -63,3 +63,14 @@ A scan for records SHALL read the sources a scan for changes reads. In each, eve
 #### Scenario: Linked records folder in another worktree
 - **WHEN** worktree B's `docket/records` is a symbolic link to a directory outside it
 - **THEN** the scan lists worktree B as unreadable, naming the link, and reports no record from what the link points to
+
+### Requirement: Issue files found
+A scan for issues SHALL read the sources a scan for records reads and find the uses of `docket/issues/<slug>.md` in each as it finds the uses of `docket/records/<slug>.md`, reporting a linked `docket/issues` in a worktree, and a source that cannot be read, as unreadable.
+
+#### Scenario: Issue only on a branch
+- **WHEN** `refs/remotes/origin/fix-y` holds `docket/issues/2026-11-06-lint-timeout.md` and no worktree or local branch does
+- **THEN** the scan for issues reports `2026-11-06-lint-timeout` with `refs/remotes/origin/fix-y` as its source
+
+#### Scenario: Records are not issues
+- **WHEN** a branch holds `docket/records/2026-11-06-fix-x.md` and no issue file
+- **THEN** the scan for issues reports no use from that branch
