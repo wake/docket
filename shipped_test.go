@@ -1,11 +1,14 @@
 package docket
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io/fs"
 	"os"
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -42,6 +45,7 @@ func TestShippedFileSet(t *testing.T) {
 		"shipped/schema/templates/proposal.md",
 		"shipped/schema/templates/spec.md",
 		"shipped/skill/SKILL.md",
+		"shipped/workflow/workflow.md",
 	}
 	sort.Strings(got)
 	if !reflect.DeepEqual(got, want) {
@@ -74,6 +78,7 @@ func TestShippedStarts(t *testing.T) {
 		"shipped/schema/templates/proposal.md": "---\n",
 		"shipped/schema/templates/plan.md":     "# Implementation Plan\n",
 		"shipped/config/operations.yaml":       "operations:\n",
+		"shipped/workflow/workflow.md":         "---\ntemplate: ",
 	} {
 		if !strings.HasPrefix(readShipped(t, path), prefix) {
 			t.Errorf("%s does not start with %q", path, prefix)
@@ -87,5 +92,32 @@ func TestShippedNextStepsAreOneLine(t *testing.T) {
 		if strings.TrimSpace(s) == "" || strings.Count(s, "\n") != 1 || !strings.HasSuffix(s, "\n") {
 			t.Errorf("%s: want one non-empty line, got %q", n, s)
 		}
+	}
+}
+
+// workflowTemplates maps each template version to the SHA-256 of the template as shipped at that version.
+var workflowTemplates = map[int]string{
+	1: "6642708242c599fe3930bce7873c8feca7234f3ea84e3c5a48f3870fa2453be6",
+}
+
+func TestWorkflowTemplatePinned(t *testing.T) {
+	body := readShipped(t, "shipped/workflow/workflow.md")
+	m := regexp.MustCompile(`(?m)\A---\n(?:.*\n)*?template: (\d+)\n`).FindStringSubmatch(body)
+	if m == nil {
+		t.Fatal("shipped/workflow/workflow.md has no template version")
+	}
+	version, _ := strconv.Atoi(m[1])
+	largest := 0
+	for v := range workflowTemplates {
+		if v > largest {
+			largest = v
+		}
+	}
+	if version < 1 || version != largest {
+		t.Fatalf("template version = %d, want the largest pinned version %d", version, largest)
+	}
+	sum := sha256.Sum256([]byte(body))
+	if hex.EncodeToString(sum[:]) != workflowTemplates[version] {
+		t.Errorf("shipped/workflow/workflow.md changed: raise its template version and add the new hash to workflowTemplates")
 	}
 }
