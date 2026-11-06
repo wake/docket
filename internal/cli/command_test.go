@@ -22,6 +22,7 @@ func TestCommandHelp(t *testing.T) {
 		"init":    {"--tools", "--force", "--json"},
 		"inspect": {"--json"},
 		"issue":   {"--source", "--title", "--json"},
+		"status":  {"--json"},
 	}
 	for name, flags := range cases {
 		for _, h := range []string{"--help", "-h"} {
