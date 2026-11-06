@@ -118,13 +118,21 @@ func Changes(g gitx.Git) (Inventory, error) {
 	return inv, nil
 }
 
+// worktreeMissing says why root cannot be read at all, or "" if it can.
+func worktreeMissing(root string) string {
+	if _, err := os.Lstat(root); errors.Is(err, fs.ErrNotExist) {
+		return "directory missing; if the worktree was deleted, run git worktree prune"
+	} else if err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
 // worktreeDirs lists the change folders on disk under root as repository
 // paths; a non-empty reason means the worktree is unreadable.
 func worktreeDirs(root string) (paths []string, reason string) {
-	if _, err := os.Lstat(root); errors.Is(err, fs.ErrNotExist) {
-		return nil, "directory missing; if the worktree was deleted, run git worktree prune"
-	} else if err != nil {
-		return nil, err.Error()
+	if reason := worktreeMissing(root); reason != "" {
+		return nil, reason
 	}
 	if err := safepath.Check(root, archiveDir); err != nil {
 		var se *safepath.SymlinkError
