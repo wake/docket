@@ -306,6 +306,86 @@ func TestRecordWriteFailsKeepsFolder(t *testing.T) {
 	}
 }
 
+func TestRecordOpenMovesToNextSuffix(t *testing.T) {
+	r := recordRepo(t)
+	// A directory is no use the scan sees, but the exclusive open finds the path taken.
+	if err := os.MkdirAll(filepath.Join(r.Dir, "docket/records/2026-10-30-fix-x.md"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	code, m, raw := doRecord(t, r, r.Dir, recArgs...)
+	if code != 0 || m.Result.Slug != "2026-10-30-fix-x-2" || m.Result.Requested != "2026-10-30-fix-x" {
+		t.Fatalf("%d %s", code, raw)
+	}
+	if len(m.Result.Used) != 1 || m.Result.Used[0].Path != "docket/records/2026-10-30-fix-x.md" {
+		t.Errorf("used: %+v", m.Result.Used)
+	}
+}
+
+// replaceWrite makes the write fail after running before.
+func replaceWrite(t *testing.T, before func()) {
+	t.Helper()
+	real := writeRecordFile
+	t.Cleanup(func() { writeRecordFile = real })
+	writeRecordFile = func(*os.File, []byte) error {
+		before()
+		return errors.New("disk full")
+	}
+}
+
+func TestRecordFailedWriteKeepsAnothersFile(t *testing.T) {
+	r := recordRepo(t)
+	other := filepath.Join(r.Dir, "docket/records/other.md")
+	replaceWrite(t, func() {
+		if err := os.WriteFile(other, []byte("x"), 0o644); err != nil {
+			t.Error(err)
+		}
+	})
+	code, _, raw := doRecord(t, r, r.Dir, recArgs...)
+	if code != 1 || !strings.Contains(raw, "left in place: docket/records") {
+		t.Errorf("%d %s", code, raw)
+	}
+	gone(t, r, "docket/records/2026-10-30-fix-x.md")
+	if _, err := os.Stat(other); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestRecordCleanupDoesNotFollowALink(t *testing.T) {
+	r := recordRepo(t)
+	outside := t.TempDir()
+	kept := filepath.Join(outside, "2026-10-30-fix-x.md")
+	if err := os.WriteFile(kept, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(r.Dir, "docket/records")
+	replaceWrite(t, func() {
+		if err := os.Rename(folder, folder+"-moved"); err != nil {
+			t.Error(err)
+		}
+		if err := os.Symlink(outside, folder); err != nil {
+			t.Error(err)
+		}
+	})
+	code, _, raw := doRecord(t, r, r.Dir, recArgs...)
+	if code != 1 || !strings.Contains(raw, "left in place") {
+		t.Errorf("%d %s", code, raw)
+	}
+	if b, err := os.ReadFile(kept); err != nil || string(b) != "keep" {
+		t.Errorf("%q %v", b, err)
+	}
+}
+
+func TestRecordDefaultClock(t *testing.T) {
+	r := recordRepo(t)
+	before := time.Now().Format("2006-01-02")
+	var out, errb bytes.Buffer
+	code := Run(Options{Args: append([]string{"record"}, recArgs...), Dir: r.Dir, Env: r.Env, Stdout: &out, Stderr: &errb})
+	after := time.Now().Format("2006-01-02")
+	if code != 0 || (!strings.Contains(out.String(), before+"-fix-x") && !strings.Contains(out.String(), after+"-fix-x")) {
+		t.Errorf("%d %s %s", code, out.String(), errb.String())
+	}
+}
+
 func TestRecordNoCommits(t *testing.T) {
 	r := testutil.NewRepo(t)
 	if code, _, raw := doRecord(t, r, r.Dir, recArgs...); code != 0 {
