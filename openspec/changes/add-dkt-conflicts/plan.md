@@ -63,7 +63,7 @@
 - Produces: `conflicts.Copy{Slug, Folder string; Sources []string; Files map[string][]byte}`; `Folder` is the change folder (`openspec/changes/<slug>`), `Files` maps paths under `specs/` (such as `booking/spec.md`) to contents, only files named `spec.md`.
 - Produces: `func Copies(g gitx.Git, inv scan.Inventory) ([]Copy, []scan.Unreadable, error)`: one Copy per distinct content of each active slug, in scan order, with every source holding that content; slugs with any archived use are left out. An unreadable copy gives a `scan.Unreadable{Source: "<source>:<folder>", Reason}` and no Copy.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `TestChangesRecordsCommit` (scan): a branch use's `Commit` equals `git rev-parse <branch>`; a worktree use's is "".
   - `TestTreeFiles` (gitx): a commit with `d/a/spec.md`, `d/b/x.md` and a link `d/c/spec.md` gives three entries, the link with `Link: true`; `TreeFiles(commit, "missing")` gives an empty slice and no error.
   - `TestCopiesMergesIdentical`: `add-x` on `main` and `refs/heads/feat` with the same `specs/booking/spec.md` gives one Copy with both sources; editing the file in a worktree adds a second Copy for that worktree.
@@ -72,10 +72,10 @@
   - `TestCopiesNoSpecs`: an active change without `specs/` gives a Copy with no files.
   - `TestCopiesFolderGone`: an Inventory taken from a scan, then the worktree's `openspec/changes/add-y/` removed before `Copies` runs → an Unreadable for that copy (Reason says the folder is gone since the scan), not an empty Copy.
   - `TestCopiesLinkedSpecsDir`: a worktree whose `openspec/changes/add-y/specs` (the folder itself) is a link → Unreadable naming it.
-- [ ] **Step 2: Run them and see them fail** — `go test ./internal/scan/ ./internal/gitx/ ./internal/conflicts/`: compile errors for the missing names.
-- [ ] **Step 3: Implement** `Use.Commit` (set from the ref in `Changes`), `TreeFiles` (`ls-tree -r -z --full-tree <commit> -- <dir>/`), and `Copies`: a worktree copy first checks that the change folder still exists (`os.Lstat`; gone → Unreadable), then `safepath.Check(root, folder+"/specs")` (a link → Unreadable; missing → no files), then opens `specs/` with `os.OpenRoot` and walks `root.FS()`, where any entry of type link makes the copy Unreadable and `spec.md` files are read through the Root; any read error is the copy's Unreadable. Ref copies use `TreeFiles` (a `Link` entry → Unreadable) and one `ReadBlobs` per commit. Copies are keyed by their sorted (path, content) pairs.
-- [ ] **Step 4: Run the tests and see them pass**, then `go vet ./...`.
-- [ ] **Step 5: Commit** with the trailer `Change: add-dkt-conflicts/1`.
+- [x] **Step 2: Run them and see them fail** — `go test ./internal/scan/ ./internal/gitx/ ./internal/conflicts/`: compile errors for the missing names.
+- [x] **Step 3: Implement** `Use.Commit` (set from the ref in `Changes`), `TreeFiles` (`ls-tree -r -z --full-tree <commit> -- <dir>/`), and `Copies`: a worktree copy first checks that the change folder still exists (`os.Lstat`; gone → Unreadable), then `safepath.Check(root, folder+"/specs")` (a link → Unreadable; missing → no files), then opens `specs/` with `os.OpenRoot` and walks `root.FS()`, where any entry of type link makes the copy Unreadable and `spec.md` files are read through the Root; any read error is the copy's Unreadable. Ref copies use `TreeFiles` (a `Link` entry → Unreadable) and one `ReadBlobs` per commit. Copies are keyed by their sorted (path, content) pairs.
+- [x] **Step 4: Run the tests and see them pass**, then `go vet ./...`.
+- [x] **Step 5: Commit** with the trailer `Change: add-dkt-conflicts/1`.
 
 ### Task 2: Parse copies with OpenSpec
 
@@ -92,16 +92,16 @@
 - Produces: `type Show func(dir, slug string) ([]openspec.Delta, error)` and `func Parse(copies []Copy, show Show) ([]Parsed, []scan.Unreadable, error)`: results in the order of `copies`; a copy whose `show` fails gives one Unreadable per source, `Source: "<source>:<folder>"`, `Reason`: the error text.
 - Produces: `const Proposal`: the scratch `proposal.md`, with a `## Why` and a `## What Changes` section.
 
-- [ ] **Step 1: Write the failing tests** with a fake `Show` that reads the scratch directory:
+- [x] **Step 1: Write the failing tests** with a fake `Show` that reads the scratch directory:
   - `TestParseScratchCopy`: the fake sees `<dir>/openspec/changes/<slug>/proposal.md` equal to `Proposal` and `specs/booking/spec.md` equal to the copy's file, and no other file; the change's own `proposal.md` is never written.
   - `TestParseTouches`: deltas ADDED "A", MODIFIED "B", REMOVED "C" and RENAMED from "D" to "E" in `booking` give the touches `ADDED A`, `MODIFIED B`, `REMOVED C`, `RENAMED-FROM D`, `RENAMED-TO E`.
   - `TestParseFailure`: the fake fails for one copy with two sources; Parse returns the other copies, two Unreadables with the error text, and a nil error.
   - `TestParseRunsFour`: with eight copies and a fake that counts concurrent calls, the peak is at most 4 and above 1.
   - `TestParseRemovesScratch`: every scratch directory is gone after Parse returns.
-- [ ] **Step 2: Run them and see them fail** — `go test ./internal/conflicts/`.
-- [ ] **Step 3: Implement** `Parse`: each copy in its own `os.MkdirTemp` directory, removed after its call; four workers; RENAMED maps `Rename.From` and `Rename.To`; the other operations map each of `Requirements`.
-- [ ] **Step 4: Run the tests and see them pass**, then `go vet ./...`.
-- [ ] **Step 5: Commit** with the trailer `Change: add-dkt-conflicts/2`.
+- [x] **Step 2: Run them and see them fail** — `go test ./internal/conflicts/`.
+- [x] **Step 3: Implement** `Parse`: each copy in its own `os.MkdirTemp` directory, removed after its call; four workers; RENAMED maps `Rename.From` and `Rename.To`; the other operations map each of `Requirements`.
+- [x] **Step 4: Run the tests and see them pass**, then `go vet ./...`.
+- [x] **Step 5: Commit** with the trailer `Change: add-dkt-conflicts/2`.
 
 ### Task 3: Find overlaps
 
@@ -117,7 +117,7 @@
 - Produces: `conflicts.Entry{Slug string; Operations, Sources []string}` and `conflicts.Overlap{Capability, Requirement string; Changes []Entry}`, with JSON tags `capability`, `requirement`, `changes`, `slug`, `operations`, `sources`.
 - Produces: `func Find(parsed []Parsed) []Overlap` (never nil; sorted by capability, folded requirement, then slug; operations in the global order; sources in first-seen order, without repeats) and `func Involving(overlaps []Overlap, slug string) []Overlap` (never nil).
 
-- [ ] **Step 1: Write the failing table test** `TestFind`, one case per scenario above, with `Parsed` values built in the test:
+- [x] **Step 1: Write the failing table test** `TestFind`, one case per scenario above, with `Parsed` values built in the test:
   - two slugs MODIFIED `booking`/"Cancel booking" → one overlap, entries `add-x [MODIFIED]`, `add-y [MODIFIED]`;
   - `add-x` RENAMED-FROM "Cancel booking" (and RENAMED-TO "Cancel a booking"), `add-y` MODIFIED "Cancel booking" → one overlap on "Cancel booking";
   - MODIFIED "Cancel booking" against ADDED "Refund points" → no overlap;
@@ -129,10 +129,10 @@
   - `TestFindOrder`: input given as `add-z`, `add-y`, `add-x` (reverse), touching `booking` and `accounts`, where `add-y` spells "cancel BOOKING" and `add-x` "Cancel booking" → overlaps sorted `accounts` before `booking`, entries sorted by slug, and the requirement spelled "Cancel booking" (from `add-x`, the first slug), not the first one in the input.
   - `TestFindMergesOperations`: `add-x` copy 1 MODIFIED "R" and RENAMED-TO "R", copy 2 REMOVED "R" and MODIFIED "R" → its entry's Operations is `[MODIFIED REMOVED RENAMED-TO]`, each once, in the global order.
   - `TestInvolving`: keeps the overlaps naming the slug.
-- [ ] **Step 2: Run it and see it fail** — `go test ./internal/conflicts/`.
-- [ ] **Step 3: Implement** `Find` and `Involving`, keyed by capability and folded name.
-- [ ] **Step 4: Run the tests and see them pass**, then `go vet ./...`.
-- [ ] **Step 5: Commit** with the trailer `Change: add-dkt-conflicts/3`.
+- [x] **Step 2: Run it and see it fail** — `go test ./internal/conflicts/`.
+- [x] **Step 3: Implement** `Find` and `Involving`, keyed by capability and folded name.
+- [x] **Step 4: Run the tests and see them pass**, then `go vet ./...`.
+- [x] **Step 5: Commit** with the trailer `Change: add-dkt-conflicts/3`.
 
 ### Task 4: The dkt conflicts command
 
@@ -150,7 +150,7 @@
 - Consumes: `scan.Changes`, `conflicts.Copies`, `conflicts.Parse`, `conflicts.Find`, `conflicts.Involving`, `openSpecRunner`.
 - Produces: `dkt conflicts [<slug>] [--json]` with `result` `{"changes": [...], "overlaps": [...]}` (both never null; `changes` is every active slug, archived-anywhere ones excluded, sorted and without repeats, whether or not a slug is given), findings `requirement-overlap` (one per overlap, message `<capability> / "<requirement>": add-x (MODIFIED), add-y (RENAMED-FROM)`) and `change-missing` (with `change` set).
 
-- [ ] **Step 1: Write the failing tests** in `cmd_conflicts_test.go`, using `testutil.NewRepo`, worktrees and `FakeOpenSpec` with `OpenSpecAnswer` per slug:
+- [x] **Step 1: Write the failing tests** in `cmd_conflicts_test.go`, using `testutil.NewRepo`, worktrees and `FakeOpenSpec` with `OpenSpecAnswer` per slug:
   - `TestConflictsOtherWorktree`: `add-y` uncommitted in worktree B, both modify one requirement; run in A → exit 1, the overlap's `add-y` entry lists B's path.
   - `TestConflictsOneChange`: OpenSpec not on PATH (`DOCKET_OPENSPEC` pointing to a missing file) and, in turn: only `add-x`; `add-x` with two different copies (worktree and branch); `add-x` active plus `add-q` archived; no active change and one removed worktree → no `openspec-missing`, `result.overlaps` is `[]`, and the exit code is 0 (3 for the removed worktree).
   - `TestConflictsChangesList`: `add-y` in a worktree and on a branch, `add-x` in the current worktree, `add-q` archived on `main` and active on branch `old` → `result.changes` is exactly `["add-x", "add-y"]`, also with `dkt conflicts add-x`.
@@ -163,7 +163,7 @@
   - `TestConflictsOpenSpecMissing`: two changes, no OpenSpec → `openspec-missing`, exit 4.
   - `TestConflictsOutsideRepository`: outside a repository → `no-repository`, exit 4, the fake log empty. The other commands' scenarios in the same requirement are already tested (`TestOutsideRepository` in `command_test.go` for init, `TestNewOutsideRepository`, `TestSyncOutsideRepository`, `TestLintOutsideRepository`); they must still pass.
   - `TestRealOpenSpecConflicts` (skipped unless `DOCKET_TEST_OPENSPEC=1`, like the other real tests): `add-x`'s proposal has only front matter; `add-x` renames "Cancel booking" and `add-y` modifies "Cancel  Booking" → one overlap with `RENAMED-FROM` and `MODIFIED`.
-- [ ] **Step 2: Run them and see them fail** — `go test ./internal/cli/ -run 'TestConflicts'`.
-- [ ] **Step 3: Implement** `cmd_conflicts.go`: `Args: -1` (the dispatcher treats a positive `Args` as an exact count), and a `UsageError` for more than one positional; scan, `Copies`; with two or more distinct active slugs (counted from the active, not-archived uses, not from copies), `openSpecRunner` and a `Show` that runs `ShowChange` with a copy of the Runner whose `Dir` is the scratch directory; `Find`; with a slug, `Involving`, or `change-missing` when the slug is not active, unless a whole source is unreadable and the slug is archived nowhere. Human lines per the design. Add the command to `commands`, and update AGENTS.md.
-- [ ] **Step 4: Run the tests and see them pass**, then `go vet ./...`, `go test ./...`, and `DOCKET_TEST_OPENSPEC=1 go test ./internal/cli/ -run TestRealOpenSpecConflicts`.
-- [ ] **Step 5: Commit** with the trailer `Change: add-dkt-conflicts/4`.
+- [x] **Step 2: Run them and see them fail** — `go test ./internal/cli/ -run 'TestConflicts'`.
+- [x] **Step 3: Implement** `cmd_conflicts.go`: `Args: -1` (the dispatcher treats a positive `Args` as an exact count), and a `UsageError` for more than one positional; scan, `Copies`; with two or more distinct active slugs (counted from the active, not-archived uses, not from copies), `openSpecRunner` and a `Show` that runs `ShowChange` with a copy of the Runner whose `Dir` is the scratch directory; `Find`; with a slug, `Involving`, or `change-missing` when the slug is not active, unless a whole source is unreadable and the slug is archived nowhere. Human lines per the design. Add the command to `commands`, and update AGENTS.md.
+- [x] **Step 4: Run the tests and see them pass**, then `go vet ./...`, `go test ./...`, and `DOCKET_TEST_OPENSPEC=1 go test ./internal/cli/ -run TestRealOpenSpecConflicts`.
+- [x] **Step 5: Commit** with the trailer `Change: add-dkt-conflicts/4`.
