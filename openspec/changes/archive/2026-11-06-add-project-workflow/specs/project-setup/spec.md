@@ -15,8 +15,8 @@
 
 ### Requirement: Existing files
 For each shipped file that already exists, apart from `openspec/config.yaml` and `docket/workflow.md`, `dkt init` SHALL:
-- leave it alone and list it as `same` when it equals the file this release ships;
-- replace it with this release's file and list it as `updated` when it equals the file an earlier release, v0.16.0 or later, shipped;
+- leave it alone and list it as `same` when it equals this release's file;
+- replace it with this release's file and list it as `updated` when it equals what an earlier release, v0.16.0 or later, shipped;
 - otherwise keep it, list it as `kept`, report `schema-differs` or `skill-differs`, and exit with 1; with `--force`, replace it instead and list it as `overwritten`.
 
 #### Scenario: Re-run with nothing changed
