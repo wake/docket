@@ -375,6 +375,32 @@ func TestRecordCleanupDoesNotFollowALink(t *testing.T) {
 	}
 }
 
+func TestRecordFolderSwappedAfterTheChecks(t *testing.T) {
+	r := recordRepo(t)
+	folder := filepath.Join(r.Dir, "docket/records")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	real := openRecordFile
+	t.Cleanup(func() { openRecordFile = real })
+	openRecordFile = func(root *os.Root, rel string) (*os.File, error) {
+		if err := os.Rename(folder, folder+"-moved"); err != nil {
+			t.Error(err)
+		}
+		if err := os.Symlink(outside, folder); err != nil {
+			t.Error(err)
+		}
+		return real(root, rel)
+	}
+	if code, _, raw := doRecord(t, r, r.Dir, recArgs...); code == 0 {
+		t.Errorf("wrote through the link: %s", raw)
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Errorf("outside the repository: %v %v", entries, err)
+	}
+}
+
 func TestRecordDefaultClock(t *testing.T) {
 	r := recordRepo(t)
 	before := time.Now().Format("2006-01-02")

@@ -23,6 +23,13 @@ var writeRecordFile = func(f *os.File, b []byte) error {
 	return err
 }
 
+// openRecordFile creates the record through root, which does not leave the
+// repository even when a folder on the path became a link after the checks;
+// tests replace it to make that happen.
+var openRecordFile = func(root *os.Root, rel string) (*os.File, error) {
+	return root.OpenFile(rel, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+}
+
 // runRecord is the body of dkt record.
 func runRecord(c *Context, name, kind, source, title string) (Outcome, error) {
 	root := c.Repo.Root
@@ -63,6 +70,11 @@ func runRecord(c *Context, name, kind, source, title string) (Outcome, error) {
 		return out, nil
 	}
 
+	dir, err := os.OpenRoot(root)
+	if err != nil {
+		return Outcome{}, err
+	}
+	defer dir.Close()
 	content := append(change.FrontMatter(title, kind, source), '\n')
 	content = append(content, tpl...)
 	var made []string // folders this run created, outermost first
@@ -76,26 +88,26 @@ func runRecord(c *Context, name, kind, source, title string) (Outcome, error) {
 			return refuse(err)
 		}
 		for _, d := range []string{"docket", record.Dir} {
-			err := os.Mkdir(filepath.Join(root, filepath.FromSlash(d)), 0o755)
+			err := dir.Mkdir(filepath.FromSlash(d), 0o755)
 			if err == nil {
 				made = append(made, d)
 			} else if !errors.Is(err, fs.ErrExist) {
-				return Outcome{}, cleanupRecord(root, "", made, err)
+				return Outcome{}, cleanupRecord(root, dir, "", made, err)
 			}
 		}
-		f, err := os.OpenFile(filepath.Join(root, filepath.FromSlash(rel)), os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+		f, err := openRecordFile(dir, filepath.FromSlash(rel))
 		if errors.Is(err, fs.ErrExist) {
 			continue // another run or a file the scan could not see took this slug
 		}
 		if err != nil {
-			return Outcome{}, cleanupRecord(root, "", made, err)
+			return Outcome{}, cleanupRecord(root, dir, "", made, err)
 		}
 		err = writeRecordFile(f, content)
 		if cerr := f.Close(); err == nil {
 			err = cerr
 		}
 		if err != nil {
-			return Outcome{}, cleanupRecord(root, rel, made, err)
+			return Outcome{}, cleanupRecord(root, dir, rel, made, err)
 		}
 
 		used := usedPlaces(inv.Uses, slug)
@@ -109,7 +121,8 @@ func runRecord(c *Context, name, kind, source, title string) (Outcome, error) {
 
 // cleanupRecord removes the partial file and the folders this run made, and
 // returns err, joined with what it could not remove.
-func cleanupRecord(root, file string, made []string, err error) error {
+// shortcut: it removes by path, so a file another process swapped in at that path just after a failed write goes too; compare file identity if untrusted concurrent processes ever matter.
+func cleanupRecord(root string, dir *os.Root, file string, made []string, err error) error {
 	if lerr := safepath.Check(root, record.Dir+"/x"); lerr != nil {
 		return errors.Join(err, fmt.Errorf("left in place: %w", lerr))
 	}
@@ -121,7 +134,7 @@ func cleanupRecord(root, file string, made []string, err error) error {
 		paths = append(paths, d)
 	}
 	for _, p := range paths {
-		if rerr := os.Remove(filepath.Join(root, filepath.FromSlash(p))); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
+		if rerr := dir.Remove(filepath.FromSlash(p)); rerr != nil && !errors.Is(rerr, fs.ErrNotExist) {
 			err = errors.Join(err, fmt.Errorf("left in place: %s: %w", p, rerr))
 		}
 	}
