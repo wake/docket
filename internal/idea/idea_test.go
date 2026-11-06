@@ -45,6 +45,7 @@ func TestParseRefuses(t *testing.T) {
 		"nested path":     {"---\ntitle: One\nneeds: [docket/ideas/x/a.md]\n---\n", true},
 		"lines under":     {"---\ntitle: One\nneeds:\n  - docket/ideas/a.md\n---\n", true},
 		"specs":           {"---\ntitle: One\nspecs:\n---\n", false},
+		"needs an issue":  {"---\ntitle: One\nneeds: [docket/issues/x.md]\n---\n", true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := Parse([]byte(tc.in))
@@ -69,7 +70,7 @@ func TestParseOrder(t *testing.T) {
 			t.Fatalf("got %v %v", lines, bad)
 		}
 	}
-	for _, l := range []string{"1. docket/ideas/a.md", "- docket/ideas/a.md: note", "- docket/x.md", "* docket/ideas/a.md"} {
+	for _, l := range []string{"1. docket/ideas/a.md", "- docket/ideas/a.md: note", "- docket/x.md", "- https://example.com/issues/7", "* docket/ideas/a.md"} {
 		lines, bad := ParseOrder([]byte("# Order\n" + l + "\n"))
 		if len(lines) != 0 || !reflect.DeepEqual(bad, []int{2}) {
 			t.Fatalf("%q: got %v %v", l, lines, bad)
@@ -77,6 +78,33 @@ func TestParseOrder(t *testing.T) {
 	}
 	if lines, bad := ParseOrder(nil); len(lines) != 0 || len(bad) != 0 {
 		t.Fatalf("empty: got %v %v", lines, bad)
+	}
+}
+
+func TestParseOrderIssue(t *testing.T) {
+	lines, bad := ParseOrder([]byte("# Order\n- docket/issues/2026-11-01-fix-x.md\n"))
+	if !reflect.DeepEqual(lines, []Line{{2, "docket/issues/2026-11-01-fix-x.md"}}) || len(bad) != 0 {
+		t.Fatalf("got %v %v", lines, bad)
+	}
+}
+
+func TestParseItem(t *testing.T) {
+	const is = "docket/issues/x.md"
+	got, err := ParseItem(is, []byte("---\ntitle: Fix X\nsource: s\ndropped: true\nneeds: [docket/ideas/a.md]\n---\n"))
+	if err != nil || !reflect.DeepEqual(got, Idea{Title: "Fix X"}) {
+		t.Fatalf("got %+v %v", got, err)
+	}
+	for _, in := range []string{"title: One\n", "---\ndropped: true\n---\n"} {
+		if _, err := ParseItem(is, []byte(in)); err == nil {
+			t.Fatalf("%q: want an error", in)
+		}
+	}
+	got, err = ParseItem("docket/ideas/a.md", []byte("---\ntitle: A\ndropped: true\n---\n"))
+	if err != nil || !got.Dropped {
+		t.Fatalf("idea: got %+v %v", got, err)
+	}
+	if _, err := ParseItem("docket/ideas/a.md", []byte("---\ntitle: A\ndropped: maybe\n---\n")); err == nil {
+		t.Fatal("idea: want an error")
 	}
 }
 

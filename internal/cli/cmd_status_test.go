@@ -236,7 +236,7 @@ func TestStatusOrderNamesMissingIdea(t *testing.T) {
 	r := stRepo(t, stOrder("none"), nil)
 	code, m, raw := stRun(t, r, r.Dir)
 	stNext(t, code, m, raw, 1, "", "order-invalid")
-	if !stHas(m, "order-idea", "docket/order.md", 3) {
+	if !stHas(m, "order-item", "docket/order.md", 3) {
 		t.Errorf("%s", raw)
 	}
 }
@@ -245,7 +245,7 @@ func TestStatusLaterLineBroken(t *testing.T) {
 	r := stRepo(t, stOrder("a", "none"), map[string]string{"a": stIdea("A")})
 	code, m, raw := stRun(t, r, r.Dir)
 	stNext(t, code, m, raw, 1, "", "order-invalid")
-	if !stHas(m, "order-idea", "docket/order.md", 4) {
+	if !stHas(m, "order-item", "docket/order.md", 4) {
 		t.Errorf("%s", raw)
 	}
 }
@@ -375,7 +375,7 @@ func TestStatusProblemAndBrokenProposal(t *testing.T) {
 	stPut(t, stWorktree(t, r, "other"), propX, "---\nbad line\n---\n")
 	code, m, raw := stRun(t, r, r.Dir)
 	stNext(t, code, m, raw, 1, "", "order-invalid")
-	if !stHas(m, "order-idea", "docket/order.md", 3) || len(m.Unreadable) != 0 {
+	if !stHas(m, "order-item", "docket/order.md", 3) || len(m.Unreadable) != 0 {
 		t.Errorf("%s", raw)
 	}
 }
@@ -471,5 +471,81 @@ func TestStatusArgumentGiven(t *testing.T) {
 	code, _, raw := stRun(t, r, r.Dir, "add-x")
 	if code != 2 {
 		t.Errorf("%d %s", code, raw)
+	}
+}
+
+const (
+	issX  = "docket/issues/2026-11-01-fix-x.md"
+	issNo = "docket/issues/none.md"
+)
+
+func stIssueRepo(t *testing.T, order string, extra map[string]string) *testutil.Repo {
+	t.Helper()
+	files := map[string]string{"docket/issues/2026-11-01-fix-x.md": stIdea("Fix X"), "docket/ideas/a.md": stIdea("A")}
+	for k, v := range extra {
+		files[k] = v
+	}
+	r := testutil.NewRepo(t)
+	files["README.md"] = "x"
+	files["docket/order.md"] = order
+	r.Commit("base", files)
+	return r
+}
+
+func TestStatusIssueInTheOrder(t *testing.T) {
+	r := stIssueRepo(t, "# Order\n\n- "+issX+"\n- "+ideaA+"\n", nil)
+	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 0, issX, "")
+	if m.Result.Next.Title != "Fix X" {
+		t.Errorf("%s", raw)
+	}
+}
+
+func TestStatusIssueTaken(t *testing.T) {
+	r := stIssueRepo(t, "# Order\n\n- "+issX+"\n- "+ideaA+"\n", map[string]string{recDir + "r.md": stRecord(issX)})
+	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 0, ideaA, "")
+}
+
+func TestStatusIssueWithDroppedOrNeeds(t *testing.T) {
+	r := stIssueRepo(t, "# Order\n\n- "+issX+"\n", map[string]string{
+		"docket/issues/2026-11-01-fix-x.md": stIdea("Fix X", "dropped: true\n", "needs: [docket/ideas/a.md]\n")})
+	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 0, issX, "")
+}
+
+func TestStatusNeedNamesAnIssue(t *testing.T) {
+	r := stIssueRepo(t, stOrder("a"), map[string]string{"docket/ideas/a.md": stIdea("A", "needs: ["+issX+"]\n")})
+	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 1, "", "order-invalid")
+	if !stHas(m, "idea-front-matter", ideaA, 0) {
+		t.Errorf("%s", raw)
+	}
+}
+
+func TestStatusExternalIssueAddress(t *testing.T) {
+	r := stIssueRepo(t, "# Order\n\n- https://example.com/issues/7\n", nil)
+	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 1, "", "order-invalid")
+	if !stHas(m, "order-format", "docket/order.md", 3) {
+		t.Errorf("%s", raw)
+	}
+}
+
+func TestStatusOrderNamesMissingIssue(t *testing.T) {
+	r := stIssueRepo(t, "# Order\n\n- "+issNo+"\n", nil)
+	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 1, "", "order-invalid")
+	if !stHas(m, "order-item", "docket/order.md", 3) {
+		t.Errorf("%s", raw)
+	}
+}
+
+func TestStatusIssueWithoutATitle(t *testing.T) {
+	r := stIssueRepo(t, "# Order\n\n- "+issX+"\n", map[string]string{"docket/issues/2026-11-01-fix-x.md": "---\nsource: s\n---\n"})
+	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 1, "", "order-invalid")
+	if !stHas(m, "issue-front-matter", issX, 0) {
+		t.Errorf("%s", raw)
 	}
 }

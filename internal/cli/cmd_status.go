@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/idea"
+	"github.com/wake/docket/internal/issue"
 )
 
 type statusNext struct {
@@ -23,9 +24,9 @@ func statusCommand() Command {
 }
 
 var statusText = map[string]string{
-	"no-order":      "No next idea: there is no order.",
-	"order-invalid": "No next idea: fix the problems found.",
-	"none-left":     "No next idea: every idea in the order is dropped or taken.",
+	"no-order":      "No next item: there is no order.",
+	"order-invalid": "No next item: fix the problems found.",
+	"none-left":     "No next item: every item in the order is dropped or taken.",
 }
 
 // runStatus is the body of dkt status. It reads the tip of the default branch only.
@@ -36,7 +37,7 @@ func runStatus(c *Context, _ []string) (Outcome, error) {
 		if res.Next != nil {
 			out.Human = []string{fmt.Sprintf("Next: %s (%s)", res.Next.Path, res.Next.Title)}
 		} else if res.Reason == "waiting" {
-			out.Human = []string{"No next idea: the ideas left wait on " + strings.Join(res.WaitingOn, ", ") + "."}
+			out.Human = []string{"No next item: the items left wait on " + strings.Join(res.WaitingOn, ", ") + "."}
 		} else {
 			out.Human = []string{statusText[res.Reason]}
 		}
@@ -88,9 +89,13 @@ func runStatus(c *Context, _ []string) (Outcome, error) {
 				continue
 			}
 			held[p] = true
-			id, perr := idea.Parse(data)
+			id, perr := idea.ParseItem(p, data)
 			if perr != nil {
-				out.Findings = append(out.Findings, Finding{Rule: "idea-front-matter", File: p,
+				rule := "idea-front-matter"
+				if strings.HasPrefix(p, issue.Dir+"/") {
+					rule = "issue-front-matter"
+				}
+				out.Findings = append(out.Findings, Finding{Rule: rule, File: p,
 					Message: fmt.Sprintf("%s: %s.", p, perr)})
 				continue
 			}
@@ -107,7 +112,7 @@ func runStatus(c *Context, _ []string) (Outcome, error) {
 	}
 	for _, l := range lines {
 		if !held[l.Path] {
-			out.Findings = append(out.Findings, Finding{Rule: "order-idea", File: idea.OrderFile, Line: l.N,
+			out.Findings = append(out.Findings, Finding{Rule: "order-item", File: idea.OrderFile, Line: l.N,
 				Message: fmt.Sprintf("%s line %d names %s, which the default branch does not hold.", idea.OrderFile, l.N, l.Path)})
 		}
 	}

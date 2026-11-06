@@ -7,16 +7,18 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/markdown"
 )
 
 const (
 	OrderFile = "docket/order.md"
-	LineForm  = "- docket/ideas/<name>.md"
+	LineForm  = "- docket/ideas/<name>.md or - docket/issues/<slug>.md"
 	NeedsForm = "needs: [<path>, <path>]"
 )
 
-// Idea is the front matter of an idea file.
+// Idea is the front matter of an idea file. An issue in the order is an Idea
+// with only Title set, so Next treats it as never dropped and needing nothing.
 type Idea struct {
 	Title   string
 	Dropped bool
@@ -25,7 +27,7 @@ type Idea struct {
 
 var (
 	needPath  = regexp.MustCompile(`^docket/ideas/[^/\s]+\.md$`)
-	orderLine = regexp.MustCompile(`^- (docket/ideas/[^/\s]+\.md)$`)
+	orderLine = regexp.MustCompile(`^- (docket/(?:ideas|issues)/[^/\s]+\.md)$`)
 )
 
 // Parse reads an idea file. Keys it does not know are ignored.
@@ -71,6 +73,26 @@ func Parse(b []byte) (Idea, error) {
 		}
 	}
 	return id, nil
+}
+
+// ParseItem reads an item of the order. An issue's title is all it reads: the
+// rest of an issue is dkt lint's.
+func ParseItem(path string, b []byte) (Idea, error) {
+	if !strings.HasPrefix(path, issue.Dir+"/") {
+		return Parse(b)
+	}
+	fm, ok, err := change.ReadFrontMatter(b)
+	if err != nil {
+		return Idea{}, err
+	}
+	if !ok {
+		return Idea{}, fmt.Errorf("no front matter (form: title: <title>)")
+	}
+	if f, found := fm.Fields["title"]; !found || !change.ValidLine(f.Value) {
+		return Idea{}, fmt.Errorf("title is missing or empty")
+	} else {
+		return Idea{Title: f.Value}, nil
+	}
 }
 
 // Line is one entry of the order and its 1-based line number.
