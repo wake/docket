@@ -30,6 +30,12 @@ type Input struct {
 	Slugs     []string
 	OpenSpec  func() (OpenSpec, error)
 	Added     []string // files added since the default branch; the routing rule reads them
+	// Records are the paths the branch adds under docket/records, nil when
+	// skipped; only regular .md files directly in that folder are linted.
+	Records []string
+	// RecordTemplate is the shipped record template; its comments are the
+	// placeholders a record must not keep.
+	RecordTemplate []byte
 }
 
 // Linted is a change that was linted and the schema it names.
@@ -47,9 +53,11 @@ type Finding struct {
 type Unreadable struct{ Source, Reason string }
 
 // Report is the outcome of Run: the changes linted (sorted by slug), the
-// number of main specs whose titles were checked, and the findings (sorted).
+// slugs of the records linted (sorted), the number of main specs whose titles
+// were checked, and the findings (sorted).
 type Report struct {
 	Changes    []Linted
+	Records    []string
 	Specs      int
 	Findings   []Finding
 	Unreadable []Unreadable
@@ -86,6 +94,9 @@ type state struct {
 
 	known     map[string]string
 	knownDone bool
+
+	recordSlugs       map[string]bool // every regular .md file under docket/records, linted or not
+	recordsUnreadable bool
 }
 
 func (r *state) add(c *loaded, rule, file string, line int, format string, args ...any) {
@@ -106,14 +117,27 @@ func (r *state) unreadable(source string, err error) {
 	r.rep.Unreadable = append(r.rep.Unreadable, u)
 }
 
-// Run lints the named changes, or every active change and the main specs'
-// titles when none is named.
+// Run lints the named changes and records, or every active change, the main
+// specs' titles and the records in Input.Records when none is named. A name
+// starting with a date is a record.
 func Run(in Input) (Report, error) {
 	rep := Report{}
 	r := &state{in: in, rep: &rep}
 	var changes []*loaded
 	needOpenSpec := false
-	for _, slug := range r.scope(in.Slugs) {
+	var changeNames, recordNames []string
+	for _, n := range in.Slugs {
+		if change.HasDate(n) {
+			recordNames = append(recordNames, n)
+		} else {
+			changeNames = append(changeNames, n)
+		}
+	}
+	var changeSlugs []string
+	if len(in.Slugs) == 0 || len(changeNames) > 0 {
+		changeSlugs = r.scope(changeNames)
+	}
+	for _, slug := range changeSlugs {
 		c := r.load(slug)
 		changes = append(changes, c)
 		if c.Schema == docketSchema && !c.failed {
@@ -131,6 +155,18 @@ func Run(in Input) (Report, error) {
 		rep.Changes = append(rep.Changes, Linted{Slug: c.Slug, Schema: c.Schema})
 		if !c.failed {
 			lintChange(r, c)
+		}
+	}
+	if slugs := r.recordScope(recordNames); len(slugs) > 0 {
+		known := map[string]string{}
+		if len(in.RecordTemplate) == 0 {
+			r.unreadable(recordTemplateName, errors.New("no template given"))
+		} else {
+			addPlaceholders(known, recordTemplateName, in.RecordTemplate)
+		}
+		rep.Records = slugs
+		for _, slug := range slugs {
+			lintRecord(r, slug, known)
 		}
 	}
 	if len(in.Slugs) == 0 {
