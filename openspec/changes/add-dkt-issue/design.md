@@ -29,4 +29,3 @@ Records already have everything an issue needs: a dated slug that is never reuse
 ## Risks / Trade-offs
 
 - [The structural task touches every record path at once] → It changes no behavior and the existing record tests, which cover links, suffixes, concurrency and cleanup, must pass untouched; mutating the changed lines must make one fail.
-- [The external template waits for the maintainer's edit] → It is the last behavior task; everything else can merge without waiting on it only if the plan is split, so it stays in this change and the change waits.
