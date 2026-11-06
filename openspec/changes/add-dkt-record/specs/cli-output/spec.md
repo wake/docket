@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Repository required
-A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new`, `dkt record`, `dkt sync` and `dkt lint`, SHALL do nothing outside one, report `no-repository`, and exit with 4. When `git` cannot be run, it SHALL report `git-missing` and exit with 4.
+A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new`, `dkt record`, `dkt sync`, `dkt lint` and `dkt conflicts`, SHALL do nothing outside one, report `no-repository`, and exit with 4. When `git` cannot be run, it SHALL report `git-missing` and exit with 4.
 
 #### Scenario: Init outside a repository
 - **WHEN** a user runs `dkt init --json --tools claude` outside any git repository
@@ -24,3 +24,7 @@ A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new`, `dk
 #### Scenario: Lint outside a repository
 - **WHEN** a user runs `dkt lint --json` outside any git repository
 - **THEN** the findings hold `no-repository` and dkt exits with 4
+
+#### Scenario: Conflicts outside a repository
+- **WHEN** a user runs `dkt conflicts --json` outside any git repository
+- **THEN** OpenSpec is not run, the findings hold `no-repository`, and dkt exits with 4

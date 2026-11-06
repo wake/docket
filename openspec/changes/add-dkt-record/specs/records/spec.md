@@ -132,7 +132,7 @@ A name given to `dkt lint` that starts with a date of the form `YYYY-MM-DD` SHAL
 - **THEN** `dkt lint` reports `placeholder` on that line
 
 ### Requirement: Record length
-The sections `## What`, `## Why`, `## Verification` and `## Review` of a record SHALL together hold at most 1,440 bytes, measured as `change-metadata` defines, outside HTML comments and without their headings. `## Tasks` SHALL NOT count. `dkt lint` SHALL report `record-too-long` giving the length and the limit.
+The sections `## What`, `## Why`, `## Verification` and `## Review` of a record SHALL together hold at most 1,440 bytes: each is measured as `change-metadata` defines, outside HTML comments and without its heading, and the lengths are added. `## Tasks` SHALL NOT count. `dkt lint` SHALL report `record-too-long` giving the length and the limit.
 
 #### Scenario: Record over the limit
 - **WHEN** the four sections of a record the branch adds hold 1,441 bytes
@@ -188,7 +188,7 @@ The tasks of a record SHALL be the `### Task N: <name>` sections under its `## T
 - **THEN** nothing is written on either side of the link, the finding `symlink-refused` names `docket/records`, and dkt exits with 1
 
 ### Requirement: Record trailers checked
-`dkt lint` with no name SHALL report `record-trailer` for each commit between the merge base of HEAD and the default branch's tip, and HEAD, whose `Record` trailer names no regular file under `docket/records/` in the worktree, naming the commit and the value. A value is `<slug>` or `<slug>/<tasks>`. Without a default branch or a merge base it SHALL skip this rule.
+`dkt lint` with no name SHALL report `record-trailer` for each commit between the merge base of HEAD and the default branch's tip, and HEAD, whose `Record` trailer names no regular file under `docket/records/` in the worktree, naming the commit and the value, and for a value that is not `<slug>` or `<slug>/<tasks>`, with the tasks positive numbers separated by commas. A record need not be one the branch adds. Without a default branch or a merge base it SHALL skip this rule.
 
 #### Scenario: Trailer names no record
 - **WHEN** the record is `2026-11-01-fix-x` and a commit the branch adds carries `Record: fix-x`
@@ -196,6 +196,14 @@ The tasks of a record SHALL be the `### Task N: <name>` sections under its `## T
 
 #### Scenario: Trailer names a record
 - **WHEN** the commits the branch adds carry `Record: 2026-11-01-fix-x` and `Record: 2026-11-01-fix-x/2`, and the worktree holds that record
+- **THEN** `dkt lint` reports no `record-trailer`
+
+#### Scenario: Trailer with a bad task list
+- **WHEN** the worktree holds the record `2026-11-01-fix-x` and a commit the branch adds carries `Record: 2026-11-01-fix-x/x`
+- **THEN** `dkt lint` reports `record-trailer` naming that commit and the value
+
+#### Scenario: Trailer names an earlier record
+- **WHEN** a commit the branch adds carries `Record: 2026-10-01-fix-a`, and that record exists at the merge base
 - **THEN** `dkt lint` reports no `record-trailer`
 
 #### Scenario: Merged trailer ignored

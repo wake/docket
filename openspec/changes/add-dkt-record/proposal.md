@@ -45,6 +45,6 @@ The docket skill tells an agent on the light review path to open a record with `
 ## Impact
 
 - New: `internal/record`, `internal/scan/records.go`, `internal/lint/record.go`, `internal/cli/cmd_record.go`, `shipped/record/template.md`.
-- Changed: `internal/change/metadata.go`, `internal/gitx` (trailers by key, files in a tree), `internal/cli` (`dkt new`, `dkt lint`, `dkt sync`, the command list, `Options.Now`), `internal/lint`, `shipped/skill/SKILL.md` and its installed copies, `AGENTS.md`.
+- Changed: `internal/change/metadata.go`, `internal/gitx` (trailers by key), `internal/cli` (`dkt new`, `dkt lint`, `dkt sync`, the command list, `Options.Now`), `internal/lint`, `shipped/skill/SKILL.md` and its installed copies, `AGENTS.md`.
 - `dkt new` and `dkt lint` become stricter for change titles over 120 bytes. No archived or active change has one.
 - No new dependency.

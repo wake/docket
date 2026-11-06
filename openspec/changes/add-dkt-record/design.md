@@ -58,7 +58,7 @@ Tasks are parsed by `change.ParsePlan` on the record with every line before `## 
 
 ### The scan
 
-`scan.Records(g)` is a function of its own beside `scan.Changes`, in its own file, with `gitx.TreeFiles` for the branches. The two loops over sources look alike, and that is accepted (my call): `add-dkt-conflicts` is editing the loop in `Changes` at the same time, `dkt new` needs no records, and `dkt record` needs no changes, because a change slug cannot start with a date and a record slug always does.
+`scan.Records(g)` is a function of its own beside `scan.Changes`, in its own file, with `gitx.TreeFiles`, from `add-dkt-conflicts`, for the branches. The two loops over sources look alike, and that is accepted (my call): `add-dkt-conflicts` is editing the loop in `Changes` at the same time, `dkt new` needs no records, and `dkt record` needs no changes, because a change slug cannot start with a date and a record slug always does.
 
 ### `dkt record`
 

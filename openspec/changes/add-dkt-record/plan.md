@@ -51,10 +51,18 @@
 | Reading without a link | internal/safefile/safefile.go:ReadNoFollow | reuse | | `rg -n "ReadNoFollow" internal/` |
 | Unreadable worktree reason | internal/scan/scan.go:worktreeDirs | extend | move the "directory missing" check to a helper | `rg -n "worktree prune" internal/` |
 | Scan for records | none | new | `Changes` builds change uses from directories and is being edited by `add-dkt-conflicts` | `rg -n "func Changes" internal/scan/` |
-| Files in a tree | none | new | `TreeDirs` keeps directories only | `rg -n "ls-tree" internal/gitx/` |
+| Files in a tree | internal/gitx/refs.go:TreeFiles | reuse | `add-dkt-conflicts` added it; `scan.Records` keeps the files directly in the folder | `rg -n "func .*TreeFiles" internal/gitx/` |
 | Text length | none | new | no length helper exists; `quote` only truncates | `rg -n "strings.Fields" internal/` |
 | Record parsing | none | new | a record has its own sections | `rg -n "record" internal/change internal/lint` |
 | Clock | none | new | no command reads the time | `rg -n "time\." internal/cli cmd/` |
+
+## Revision 1 (2026-11-06): the tree reader of add-dkt-conflicts, and four pull requests
+
+Asked by the lead on rebasing onto `add-dkt-conflicts` (PR #86), and by the maintainer's instructions, which split a pull request past about 800 lines.
+
+- `add-dkt-conflicts` added `gitx.Git.TreeFiles`, recursive and with a link flag. Task 2 uses it through `scan.treeRecords`, which keeps the files directly in the folder; it does not create `internal/gitx/tree.go`.
+- The requirement Repository required takes its text from the main spec after PR #86.
+- This change merges as four pull requests, in task order, each on the default branch once the one before has merged: Tasks 1 and 2, then Task 3, then Task 4, then Tasks 5 and 6 and the archive.
 
 ---
 
@@ -129,7 +137,7 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
 
 ### Task 3: `dkt record`
 
-**Scenarios:** records#record-written, records#unknown-record-kind, records#missing-record-source, records#record-title-over-the-limit, records#name-with-a-date, records#name-that-is-not-kebab-case, records#same-name-same-day, records#unreadable-source-blocks-the-record, records#concurrent-records, records#linked-records-folder-refused, records#failed-write-leaves-nothing, cli-output#init-outside-a-repository, cli-output#new-outside-a-repository, cli-output#record-outside-a-repository, cli-output#sync-outside-a-repository, cli-output#lint-outside-a-repository
+**Scenarios:** records#record-written, records#unknown-record-kind, records#missing-record-source, records#record-title-over-the-limit, records#name-with-a-date, records#name-that-is-not-kebab-case, records#same-name-same-day, records#unreadable-source-blocks-the-record, records#concurrent-records, records#linked-records-folder-refused, records#failed-write-leaves-nothing, cli-output#init-outside-a-repository, cli-output#new-outside-a-repository, cli-output#record-outside-a-repository, cli-output#sync-outside-a-repository, cli-output#lint-outside-a-repository, cli-output#conflicts-outside-a-repository
 
 **Review:** judgment
 
@@ -237,7 +245,7 @@ Run: `go test ./internal/record ./internal/lint ./internal/cli`. Expected: undef
 
 - [ ] **Step 4: Implement**
 
-In `lint.Run`, split `in.Slugs` by `change.HasDate`; with names and none for changes, lint no change. `lintRecord(r, slug, b)` builds `&loaded{Dir: record.Dir, Files: {slug + ".md": b}}`, so `r.add`, `checkPlaceholderFile` and `checkTaskHeadings` work with an empty `Change`. The list of records comes from one `fs.ReadDir(in.Root, record.Dir)`, keeping regular `.md` files; a missing folder is empty, and any other error goes to `r.unreadable`, with no `record-missing` then. In `runLint`, with no names and a merge base, call `g.AddedSince(base, record.Dir)` separately from the routing call. Read `shipped/record/template.md` from `docket.Shipped`. The skip notes become `No default branch found; the routing rule and record checks were skipped.` and `No merge base with <name>; the routing rule and record checks were skipped.`
+In `lint.Run`, split `in.Slugs` by `change.HasDate`; with names and none for changes, lint no change. `lintRecord(r, slug, b)` builds `&loaded{Dir: record.Dir, Files: {slug + ".md": b}}`, so `r.add`, `checkPlaceholderFile` and `checkTaskHeadings` work with an empty `Change`. The list of records comes from one `fs.ReadDir(in.Root, record.Dir)`, keeping every regular `.md` file on `state`; `Input.Records` and the names only decide which of them are linted. A missing folder is empty, and any other error goes to `r.unreadable`, with no `record-missing` then. In `runLint`, with no names and a merge base, call `g.AddedSince(base, record.Dir)` separately from the routing call. Read `shipped/record/template.md` from `docket.Shipped`. The skip notes become `No default branch found; the routing rule and record checks were skipped.` and `No merge base with <name>; the routing rule and record checks were skipped.`
 
 - [ ] **Step 5: Run the tests and see them pass**
 
@@ -247,7 +255,7 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
 
 ### Task 5: `dkt sync` on records, and the trailer check
 
-**Scenarios:** records#record-tasks-ticked, records#bare-record-trailer-names-no-task, records#record-sync-check, records#record-sync-missing, records#record-sync-through-a-link, records#trailer-names-no-record, records#trailer-names-a-record, records#merged-trailer-ignored
+**Scenarios:** records#record-tasks-ticked, records#bare-record-trailer-names-no-task, records#record-sync-check, records#record-sync-missing, records#record-sync-through-a-link, records#trailer-names-no-record, records#trailer-names-a-record, records#trailer-with-a-bad-task-list, records#trailer-names-an-earlier-record, records#merged-trailer-ignored
 
 **Review:** judgment
 
@@ -271,15 +279,15 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
   - `TestSyncRecordHeadingOutsideTasks`: a commit for Task 1, with a `### Task 1` under `## What` and none under `## Tasks`, reports `trailer-unknown-task` and leaves the boxes under `## What`.
   - `TestSyncRecordMissing`, `TestSyncRecordLinked`: as the scenarios, the second with and without `--check`.
   - `TestSyncRecordNoCommits`: in a repository with no commit, an untracked record: exit 0, nothing ticked.
-  - `TestLintRecordTrailer` (lint package): a `RecordTrailer` naming no file reports `record-trailer` with the commit's short SHA and the value; `2026-11-01-fix-x` and `2026-11-01-fix-x/2` report none when the file exists; a value holding `..` reports it; a link at that path reports it.
-  - CLI: `TestLintTrailerNamesNoRecord` and `TestLintMergedTrailerIgnored`, as the scenarios; `TestLintNamedSkipsTrailers`: with a name, no `record-trailer`.
+  - `TestLintRecordTrailer` (lint package): a `RecordTrailer` naming no file reports `record-trailer` with the commit's short SHA and the value; `2026-11-01-fix-x` and `2026-11-01-fix-x/2` report none when the file exists, also when the file is not in `Input.Records`; `2026-11-01-fix-x/x`, `2026-11-01-fix-x/` and `2026-11-01-fix-x/1/2` report it although the file exists; a value holding `..` reports it; a link at that path reports it.
+  - CLI: `TestLintTrailerNamesNoRecord`, `TestLintTrailerNamesEarlierRecord` and `TestLintMergedTrailerIgnored`, as the scenarios; `TestLintNamedSkipsTrailers`: with a name, no `record-trailer`.
 - [ ] **Step 3: Run them and see them fail**
 
 Run: `go test ./internal/gitx ./internal/lint ./internal/cli`. Expected: undefined names, `change-missing` for a date slug.
 
 - [ ] **Step 4: Implement**
 
-`runSync` branches on `change.HasDate(slug)`: `safepath.Check`, `safefile.ReadNoFollow`, `record-missing` on `fs.ErrNotExist`, `record.Parse(src).Tasks`, the key `Record`, and `Change` empty in findings. Messages say the key in place of `Change`, and `<file> has no Task N` from the file's base name, so a change's messages stay as they are. In `runLint`, with no names and a merge base, pass `g.RecordTrailers(base + "..HEAD")`, one `RecordTrailer` per value. In lint, the check uses the listing from Task 4, taking the value before the first `/`.
+`runSync` branches on `change.HasDate(slug)`: `safepath.Check`, `safefile.ReadNoFollow`, `record-missing` on `fs.ErrNotExist`, `record.Parse(src).Tasks`, the key `Record`, and `Change` empty in findings. Messages say the key in place of `Change`, and `<file> has no Task N` from the file's base name, so a change's messages stay as they are. In `runLint`, with no names and a merge base, pass `g.RecordTrailers(base + "..HEAD")`, one `RecordTrailer` per value. In lint, the check uses the whole listing from Task 4: the slug is the value before the first `/`, and a value that `change.TaskRefs(value, slug)` does not accept is reported too.
 
 - [ ] **Step 5: Run the tests and see them pass**
 
