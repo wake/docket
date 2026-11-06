@@ -52,3 +52,26 @@ jobs:
         env:
           DOCKET_TEST_OPENSPEC: '1'
           DOCKET_OPENSPEC: npx -y @fission-ai/openspec@${{ matrix.openspec }}
+
+  release-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # GoReleaser reads the history and the tags.
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: '~> v2'
+          args: check
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: '~> v2'
+          args: release --snapshot --clean
+      - name: TestInstallSnapshot
+        run: go test -run TestInstallSnapshot -v .
+        env:
+          DOCKET_TEST_DIST: dist

@@ -1,0 +1,22 @@
+version: 2
+
+builds:
+  - main: ./cmd/dkt
+    binary: dkt
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/wake/docket/internal/cli.Version={{ .Tag }}
+
+archives:
+  - formats: [binary]
+    # The names hold no version, so that install.sh finds them under
+    # releases/latest/download without knowing which release is the latest.
+    name_template: dkt-{{ .Os }}-{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
