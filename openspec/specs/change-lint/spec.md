@@ -6,7 +6,7 @@ Defines the rules `dkt lint` checks in a change and in the main specs' titles, s
 ## Requirements
 
 ### Requirement: What is linted
-`dkt lint` SHALL lint each change named on the command line, or, when none is named, every active change in the worktree's `openspec/changes/` and then the title of every main spec under `openspec/specs/`. It SHALL read the worktree's files as they are, uncommitted edits included, and SHALL report `change-missing` for a named change that does not exist. A name that is empty, holds `/` or `\`, or is `.` or `..` SHALL be a usage error.
+`dkt lint` SHALL lint each change named on the command line, or, when none is named, every active change in the worktree's `openspec/changes/` and then the title of every main spec under `openspec/specs/`. It SHALL also lint records, as `records` defines. It SHALL read the worktree's files as they are, uncommitted edits included, and SHALL report `change-missing` for a named change that does not exist. A name that is empty, holds `/` or `\`, or is `.` or `..` SHALL be a usage error.
 
 #### Scenario: Lint every active change
 - **WHEN** the worktree has the active changes `add-x` and `add-y` and a user runs `dkt lint`
@@ -20,8 +20,12 @@ Defines the rules `dkt lint` checks in a change and in the main specs' titles, s
 - **WHEN** a main spec has no title and a user runs `dkt lint add-x`
 - **THEN** no finding is about that main spec
 
+#### Scenario: Named change skips records
+- **WHEN** the branch adds a record that breaks a rule and a user runs `dkt lint add-x`
+- **THEN** no finding is about that record
+
 ### Requirement: Front matter checked
-For a change of the `docket` schema, `dkt lint` SHALL report `title-missing` when `proposal.md` has no front matter or no valid `title`, and `metadata-invalid` for a front matter it cannot read and for a `kind` or `source` that is missing or not of the form `change-metadata` defines.
+For a change of the `docket` schema, `dkt lint` SHALL report `title-missing` when `proposal.md` has no front matter or no title that is one line of text, `title-too-long` giving the length and the limit for a title over the limit `change-metadata` defines, and `metadata-invalid` for a front matter it cannot read and for a `kind` or `source` that is missing or not of the form `change-metadata` defines.
 
 #### Scenario: Proposal without front matter
 - **WHEN** `openspec/changes/add-x/proposal.md` starts with `# Proposal`
@@ -30,6 +34,10 @@ For a change of the `docket` schema, `dkt lint` SHALL report `title-missing` whe
 #### Scenario: Unknown kind
 - **WHEN** the front matter of `add-x`'s proposal has `kind: fix`
 - **THEN** `dkt lint add-x` reports `metadata-invalid` naming `kind` on that line
+
+#### Scenario: Change title too long
+- **WHEN** the front matter of `add-x`'s proposal has a title of 121 bytes
+- **THEN** `dkt lint add-x` reports `title-too-long` on that line, giving 121 and 120, and no `title-missing`
 
 ### Requirement: New capabilities named
 For each capability the change has a delta for and the worktree has no main spec for, `dkt lint` SHALL report `title-missing` naming the capability when the proposal's front matter gives it no name under `specs:`. This holds for a change of any schema.
@@ -157,11 +165,15 @@ A main spec's title SHALL be read as `change-metadata` defines. When no change i
 - **THEN** lint reports nothing about its title
 
 ### Requirement: Lint result
-The `result` of `dkt lint` SHALL hold `changes`, the slugs linted with their schema (`{"slug", "schema"}`), `specs`, the number of main specs whose titles were checked (0 when a change was named), and `default_branch`, the name of the default branch the routing rule used or null when it was skipped. Every finding SHALL name its change in `change` when it is about one, and its file and line when it has them. Without `--json`, the output SHALL list the findings.
+The `result` of `dkt lint` SHALL hold `changes`, the slugs linted with their schema (`{"slug", "schema"}`), `records`, the record slugs linted, `specs`, the number of main specs whose titles were checked (0 when a name was given), and `default_branch`, the name of the default branch the routing rule used or null when it was skipped. Every finding SHALL name its change in `change` when it is about one, and its file and line when it has them. Without `--json`, the output SHALL list the findings.
 
 #### Scenario: Clean change
 - **WHEN** `add-x` breaks no rule, the default branch is `main`, and a user runs `dkt lint add-x --json`
-- **THEN** `result.changes` is `[{"slug": "add-x", "schema": "docket"}]`, `result.specs` is 0, `result.default_branch` is `main`, there is no finding, and dkt exits with 0
+- **THEN** `result.changes` is `[{"slug": "add-x", "schema": "docket"}]`, `result.records` is `[]`, `result.specs` is 0, `result.default_branch` is `main`, there is no finding, and dkt exits with 0
+
+#### Scenario: Records in the result
+- **WHEN** the branch adds the clean record `2026-11-06-fix-x` and a user runs `dkt lint --json`
+- **THEN** `result.records` is `["2026-11-06-fix-x"]`
 
 ### Requirement: Design and plan routing
 `dkt lint` SHALL report `routing` for each file under `docs/superpowers/specs/` or `docs/superpowers/plans/` that is in the worktree but not at the merge base of HEAD and the default branch's tip, whether committed on the branch, staged, or untracked and not ignored, naming the file. It SHALL do so whether or not changes are named. When there is no default branch or no merge base, it SHALL skip this rule.

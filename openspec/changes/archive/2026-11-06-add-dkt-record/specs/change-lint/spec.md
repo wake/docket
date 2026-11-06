@@ -37,7 +37,7 @@ For a change of the `docket` schema, `dkt lint` SHALL report `title-missing` whe
 - **THEN** `dkt lint add-x` reports `title-too-long` on that line, giving 121 and 120, and no `title-missing`
 
 ### Requirement: Lint result
-The `result` of `dkt lint` SHALL hold `changes`, the slugs linted with their schema (`{"slug", "schema"}`), `records`, the slugs of the records linted, `specs`, the number of main specs whose titles were checked (0 when a change was named), and `default_branch`, the name of the default branch the routing rule used or null when it was skipped. Every finding SHALL name its change in `change` when it is about one, and its file and line when it has them. Without `--json`, the output SHALL list the findings.
+The `result` of `dkt lint` SHALL hold `changes`, the slugs linted with their schema (`{"slug", "schema"}`), `records`, the record slugs linted, `specs`, the number of main specs whose titles were checked (0 when a name was given), and `default_branch`, the name of the default branch the routing rule used or null when it was skipped. Every finding SHALL name its change in `change` when it is about one, and its file and line when it has them. Without `--json`, the output SHALL list the findings.
 
 #### Scenario: Clean change
 - **WHEN** `add-x` breaks no rule, the default branch is `main`, and a user runs `dkt lint add-x --json`
