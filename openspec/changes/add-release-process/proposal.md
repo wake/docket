@@ -14,7 +14,7 @@ The docket-init skill installs dkt with `curl -fsSL https://raw.githubuserconten
 
 ## What Changes
 
-- Pushing a tag `vX.Y.Z` runs a GitHub Actions workflow that builds dkt with GoReleaser for macOS and Linux, on Intel and ARM, and publishes the executables and `checksums.txt` as a GitHub release. The file names hold no version. The executables print the tag as their version.
+- Pushing a tag `vX.Y.Z` on `main` runs a GitHub Actions workflow that builds dkt with GoReleaser for macOS and Linux, on Intel and ARM, and publishes the executables and `checksums.txt` as a GitHub release. The file names hold no version. The executables print the tag as their version.
 - New `install.sh`: downloads the executable for the machine and `checksums.txt` from the latest release, or the one `DKT_VERSION` names, verifies the SHA-256, and installs to `~/.local/bin/dkt`.
 - New `.claude-plugin/marketplace.json`: this repository is the plugin's marketplace, and its source points at the tag of the current version. `.claude-plugin/plugin.json` gets the same version, starting at `0.16.0`, the next version after v0.15.0.
 - A test fails when the plugin's version and the marketplace's source disagree. The release workflow runs it with the tag, so a tag that disagrees publishes nothing.

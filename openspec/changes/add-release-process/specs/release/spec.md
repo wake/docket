@@ -7,7 +7,7 @@ Defines how a version of dkt is published as a GitHub release, how the Claude Co
 ## ADDED Requirements
 
 ### Requirement: Publishing a version tag
-Pushing a tag of the form `vX.Y.Z` SHALL publish a GitHub release of that tag with one executable per target, macOS and Linux each on Intel and ARM, named `dkt-<os>-<arch>` with no version in the name, and `checksums.txt` holding their SHA-256 digests. Any other tag SHALL publish nothing.
+Pushing a tag of the form `vX.Y.Z` on a commit of the default branch SHALL publish a GitHub release of that tag with one executable per target, macOS and Linux each on Intel and ARM, named `dkt-<os>-<arch>` with no version in the name, and `checksums.txt` holding their SHA-256 digests. Any other tag SHALL publish nothing.
 
 #### Scenario: Version tag pushed
 - **WHEN** a maintainer pushes the tag `v0.16.0` on a commit whose plugin files name that version
@@ -16,6 +16,14 @@ Pushing a tag of the form `vX.Y.Z` SHALL publish a GitHub release of that tag wi
 #### Scenario: Another tag pushed
 - **WHEN** a maintainer pushes the tag `v0.16.0-rc.1`
 - **THEN** nothing is published, whether or not the workflow's tag filter lets it through
+
+#### Scenario: Tag outside the default branch
+- **WHEN** a maintainer pushes the tag `v0.17.0` on a commit that is not on `main`, whose plugin files name that version
+- **THEN** the release workflow fails and nothing is published
+
+#### Scenario: Two tags on one commit
+- **WHEN** a commit whose plugin files name `0.16.0` holds the tags `v0.16.0` and `v0.17.0`
+- **THEN** the run for `v0.16.0` publishes only that tag, with executables that report it, and the run for `v0.17.0` fails
 
 #### Scenario: Executable reports the tag
 - **WHEN** a user runs `dkt --version` with the executable from the release `v0.16.0`
@@ -97,7 +105,11 @@ When `DKT_VERSION` is set and not empty, `install.sh` SHALL download from the re
 - **THEN** the script verifies the download with that tool and installs it
 
 ### Requirement: Failing without installing
-`install.sh` SHALL exit non-zero, say why on standard error, leave `~/.local/bin/dkt` as it was and leave no temporary file in `~/.local/bin` when the machine has no published executable, a download fails, or the executable cannot be run. It SHALL run the executable before putting it in place.
+`install.sh` SHALL exit non-zero, say why on standard error, leave `~/.local/bin/dkt` as it was and leave no temporary file in `~/.local/bin` when the machine has no published executable, `HOME` is not an absolute path, a download fails, or the executable cannot be run. It SHALL run the executable before putting it in place.
+
+#### Scenario: Home is not an absolute path
+- **WHEN** `HOME` is empty or a relative path
+- **THEN** the script exits non-zero before downloading anything, its message names `HOME`, and it writes nothing
 
 #### Scenario: Unsupported system
 - **WHEN** `uname -s` reports `FreeBSD`, or a Windows shell such as `MINGW64_NT-10.0`

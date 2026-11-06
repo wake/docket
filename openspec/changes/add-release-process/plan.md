@@ -29,7 +29,11 @@
 - `curl | sh` feeds the script on standard input. Pinned in Task 1: every test runs the script that way.
 - A failure must never cost the user a working dkt, including an executable that verifies but does not run. Pinned in Task 1 (`TestInstallRefuses`): every case starts with an earlier `dkt` and requires it unchanged.
 - `~/.local/bin/dkt` as a symbolic link: the script must replace the link and leave its target alone. Pinned in Task 1 (`TestInstallReplacesLink`).
-- A home directory with a space in its path. Pinned in Task 1: every test's home is `<tmp>/home dir`.
+- A home directory with a space in its path. Pinned in Task 1: every test's home is `<tmp>/home dir`. `TestInstallHomeWithBackslash` pins the other name a digest tool might escape, on machines with GNU `sha256sum`.
+
+## Revision 1 (2026-11-06): what the pre-merge review found
+
+The agent running this change added Task 4 from the pre-merge review, through its findings: a commit outside `main` could publish, several tags on one commit could publish the wrong one, `HOME` could send the install to an unintended place, and what only a real release exercises was not written down.
 
 ## Reuse
 
@@ -168,3 +172,31 @@
 - [x] **Step 7: Run** `go vet ./...` and `go test ./...`; expect PASS.
 
 - [x] **Step 8: Commit** the five files with the trailer `Change: add-release-process/3`.
+
+### Task 4: Fixes from the pre-merge review
+
+**Scenarios:** release#tag-outside-the-default-branch, release#two-tags-on-one-commit, release#home-is-not-an-absolute-path
+
+**Review:** checks
+
+**Files:**
+- Modify: `install.sh`
+- Modify: `.github/workflows/release.yml`
+- Modify: `docs/release.md`
+- Modify: `release_test.go`
+
+- [ ] **Step 1: Write the failing test** `TestInstallHomeNotAbsolute` in `release_test.go`, one subtest each for `HOME=` and `HOME=relative`: run the script with the working directory set to an empty `t.TempDir()`, so that a failure cannot write into the repository. Exit non-zero; stderr holds `HOME`; `requests` is absent; the working directory stays empty.
+
+- [ ] **Step 2: Run** `go test -run TestInstallHomeNotAbsolute .`; expect FAIL.
+
+- [ ] **Step 3: In `install.sh`**, before the first use of `$HOME`, die with a message naming `HOME` unless it starts with `/`.
+
+- [ ] **Step 4: Run** `go test -run TestInstall .`; expect PASS.
+
+- [ ] **Step 5: In `.github/workflows/release.yml`**, add a first check step, `Tag is on main`, running `git merge-base --is-ancestor HEAD origin/main`, and add `GORELEASER_CURRENT_TAG: ${{ github.ref_name }}` to GoReleaser's `env`, with a one-line comment that a commit may hold several tags. Check with `actionlint`. Check by hand that the command exits non-zero on this branch and zero for `origin/main`. Check `GORELEASER_CURRENT_TAG=v9.9.9` with a snapshot build: the built dkt prints `dkt v9.9.9`.
+
+- [ ] **Step 6: In `docs/release.md`**: the workflow first checks that the tag is on `main`; snapshot builds also run on pushes to `main`; GitHub marks each release as the latest, which is what `install.sh` installs by default, so release versions in ascending order; and a new section says what only a real release exercises, with what to look at after the first one: the tag filter and both checks ran, the release holds the four executables and `checksums.txt`, `install.sh` installs it and `dkt --version` prints the tag, and `claude plugin marketplace add wake/docket` with `claude plugin install docket@docket` installs the plugin. Keep the file under 50 lines.
+
+- [ ] **Step 7: Run** `go vet ./...` and `go test .`; expect PASS.
+
+- [ ] **Step 8: Commit** the four files with the trailer `Change: add-release-process/4`.

@@ -18,7 +18,11 @@ See proposal.md for the motivation. `dkt --version` already prints a version sta
 
 **One version check, in a test.** `TestPluginVersion` requires `plugin.json`'s version to match `marketplace.json`'s ref, and to match `DOCKET_RELEASE_TAG` when set. It runs with every `go test ./...`, which catches a half-done bump in its pull request, and the release workflow runs it with the tag before GoReleaser. Alternative: `jq` in the workflow, which no pull request would ever exercise.
 
-**The source is `github` at a tag, not a relative path.** A relative path has no ref, so the plugin would follow whatever the marketplace's commit holds. The Claude Code docs do not mention a `github` source that points at the marketplace's own repository, so this is checked by hand in this change as far as it can be without a tag, and fully at the first release.
+**The tag that was pushed is the tag released.** With several tags on one commit GoReleaser chooses by its own sort order, which could publish a tag the version check never saw. The workflow names the tag in `GORELEASER_CURRENT_TAG`.
+
+**A commit outside `main` publishes nothing.** The workflow runs `git merge-base --is-ancestor HEAD origin/main` first, which also fails, safely, if `origin/main` were ever missing. It does not check that CI passed on the commit: CI runs on every push to `main`, and the check would be more machinery than the one maintainer needs.
+
+**The source is `github` at a tag, not a relative path.** A relative path has no ref, so the plugin would follow whatever the marketplace's commit holds. The Claude Code docs do not mention a `github` source that points at the marketplace's own repository, so it was tried, with an isolated configuration: adding `wake/docket` at this change's branch reads its `marketplace.json`; installing then fails with `Remote branch v0.16.0 not found`, as expected before the first release; and a `github` source at that branch installs the plugin under `0.16.0`, with `docket-init` in it. Only the tag itself waits for the first release.
 
 **`plugin.json` and `marketplace.json` hold the next version on `main` from now on.** With the files already at `0.16.0`, the first release is only a tag push. Until then the marketplace's ref does not exist, so `plugin install` fails; nobody can install Docket before the first release anyway.
 
@@ -34,7 +38,10 @@ See proposal.md for the motivation. `dkt --version` already prints a version sta
 
 ## Risks / Trade-offs
 
-- [The `github` source pointing at its own repository is undocumented] → Check it by hand before the first release; a relative path is the fallback, at the cost of the pin.
+- [The `github` source pointing at its own repository is undocumented] → Tried as far as it can go without the tag (see Decisions); a relative path is the fallback, at the cost of the pin.
 - [`.claude-plugin/marketplace.json` names a tag that does not exist until the first release] → `install` fails with a clear error until then, and the first release is planned.
-- [A tag pushed on a commit that is not on `main`, or that failed CI, still publishes] → Only maintainers can push tags, and `docs/release.md` says to tag the merge commit.
+- [A commit on `main` that failed CI still publishes when tagged] → Only maintainers can push tags, and `docs/release.md` says to tag the merge commit.
+- [GitHub marks every release as the latest, so a release below the current latest would downgrade the default install] → `docs/release.md` says to release in ascending order; nobody maintains an older line.
+- [The workflow, its tag filter and its checks cannot run before a real tag] → They are checked by `actionlint`, by `TestPluginVersion` with the tag set and by running the commands by hand; `docs/release.md` lists what to look at after the first release.
+- [After `mv`, a failing write of the final message makes the script exit non-zero though dkt was replaced] → Accepted: the new dkt is verified and has run, so nothing is lost, and a rollback would add more ways to fail.
 - [Between a release's upload and the end of a mirror's propagation, `latest/download` could serve an executable and a `checksums.txt` of two releases] → The digests then differ and the script fails, installing nothing; running it again works.
