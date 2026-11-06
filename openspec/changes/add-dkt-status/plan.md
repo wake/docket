@@ -176,17 +176,17 @@ Start this task only after `add-dkt-issue` has merged, on a branch rebased on it
 **Interfaces:**
 - Produces, in package `idea`: `func ParseItem(path string, b []byte) (Idea, error)`: under `issue.Dir` it reads only the title, into an `Idea` with no `Dropped` and no `Needs`, whatever else the front matter holds; otherwise it is `Parse`. `LineForm` becomes `- docket/ideas/<name>.md or - docket/issues/<slug>.md`. `needPath` stays ideas only.
 
-- [ ] **Step 1: Write the failing tests.** In `idea_test.go`: `TestParseOrder` takes `- docket/issues/2026-11-01-fix-x.md` as a line, and `- https://example.com/issues/7` as bad; `TestParseRefuses` refuses `needs: [docket/issues/x.md]`; `TestParseItem` reads an issue with `title`, `source`, `dropped: true` and `needs: [docket/ideas/a.md]` as only its title, refuses an issue with no front matter or no title, and treats a path under `docket/ideas/` as `Parse` does. In `cmd_status_test.go`, one test per scenario in this task's line, with the spec's values, and rename the rule in the existing tests to `order-item`.
+- [x] **Step 1: Write the failing tests.** In `idea_test.go`: `TestParseOrder` takes `- docket/issues/2026-11-01-fix-x.md` as a line, and `- https://example.com/issues/7` as bad; `TestParseRefuses` refuses `needs: [docket/issues/x.md]`; `TestParseItem` reads an issue with `title`, `source`, `dropped: true` and `needs: [docket/ideas/a.md]` as only its title, refuses an issue with no front matter or no title, and treats a path under `docket/ideas/` as `Parse` does. In `cmd_status_test.go`, one test per scenario in this task's line, with the spec's values, and rename the rule in the existing tests to `order-item`.
 
-- [ ] **Step 2: Run** `go test ./internal/idea/` and `go test -run TestStatus ./internal/cli/`; expect FAIL.
+- [x] **Step 2: Run** `go test ./internal/idea/` and `go test -run TestStatus ./internal/cli/`; expect FAIL.
 
-- [ ] **Step 3: Change the code.** `orderLine` takes either folder. `runStatus` uses `ParseItem`, reports `issue-front-matter` for a path under `issue.Dir` and `idea-front-matter` otherwise, and `order-item` for a missing item, with a message that says item rather than idea. The text for `none-left` says "every item" and the one for `waiting` "the items left".
+- [x] **Step 3: Change the code.** `orderLine` takes either folder. `runStatus` uses `ParseItem`, reports `issue-front-matter` for a path under `issue.Dir` and `idea-front-matter` otherwise, and `order-item` for a missing item, with a message that says item rather than idea. The text for `none-left` says "every item" and the one for `waiting` "the items left".
 
-- [ ] **Step 4: Run** the same tests; expect PASS. Mutate and see a test fail for each, then restore: let `orderLine` take any path under `docket/`; read `Dropped` for an issue; let a need name an issue.
+- [x] **Step 4: Run** the same tests; expect PASS. Mutate and see a test fail for each, then restore: let `orderLine` take any path under `docket/`; read `Dropped` for an issue; let a need name an issue.
 
-- [ ] **Step 5: Run** `go vet ./...` and `go test ./internal/idea/ ./internal/cli/`; expect PASS.
+- [x] **Step 5: Run** `go vet ./...` and `go test ./internal/idea/ ./internal/cli/`; expect PASS.
 
-- [ ] **Step 6: Commit** the four files with the trailer `Change: add-dkt-status/4`.
+- [x] **Step 6: Commit** the four files with the trailer `Change: add-dkt-status/4`.
 
 ### Task 5: Findings from the earlier review
 
@@ -200,12 +200,12 @@ Start this task only after `add-dkt-issue` has merged, on a branch rebased on it
 - Modify: `internal/idea/idea_test.go`
 - Modify: `README.md`
 
-- [ ] **Step 1: In `internal/idea/work.go`**, read each path once per commit: several refs at one commit list the same files. Every source still gets its result, so that a file that cannot be read is listed for each ref holding it and `OnTip` still depends only on the commit. No new test: the existing `TestStatus` tests cover the behavior, so see them pass and say which ones reach this path.
+- [x] **Step 1: In `internal/idea/work.go`**, read each path once per commit: several refs at one commit list the same files. Every source still gets its result, so that a file that cannot be read is listed for each ref holding it and `OnTip` still depends only on the commit. No new test: the existing `TestStatus` tests cover the behavior, so see them pass and say which ones reach this path.
 
-- [ ] **Step 2: In `internal/idea/idea.go`**, remove the refusal of a `specs` key, which the spec does not name, and its test row. Run `go test ./internal/idea/`; expect PASS.
+- [x] **Step 2: In `internal/idea/idea.go`**, remove the refusal of a `specs` key, which the spec does not name, and its test row. Run `go test ./internal/idea/`; expect PASS.
 
-- [ ] **Step 3: In `README.md`**, make the `dkt status` row say: Names the next idea or issue to work on from `docket/order.md`.
+- [x] **Step 3: In `README.md`**, make the `dkt status` row say: Names the next idea or issue to work on from `docket/order.md`.
 
-- [ ] **Step 4: Run** `go vet ./...` and `go test ./...`; expect PASS.
+- [x] **Step 4: Run** `go vet ./...` and `go test ./...`; expect PASS.
 
-- [ ] **Step 5: Commit** the four files with the trailer `Change: add-dkt-status/5`.
+- [x] **Step 5: Commit** the four files with the trailer `Change: add-dkt-status/5`.
