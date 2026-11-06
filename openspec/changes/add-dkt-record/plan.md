@@ -79,26 +79,26 @@ Asked by the lead on rebasing onto `add-dkt-conflicts` (PR #86), and by the main
 **Interfaces:**
 - Produces: `change.TitleLimit = 120`; `change.Size(text string) int`; `change.TitleTooLong(title string) (msg string, tooLong bool)`, whose message reads `title is 121 bytes; the limit is 120`; `change.HasDate(s string) bool`, used by `CheckSlug`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `TestSize`: `Size("  a   b \n")` is 3; `Size(strings.Repeat("字", 40))` is 120; `Size("")` is 0.
   - `TestTitleTooLong`: 120 bytes gives `false`; 121 gives `true` and a message holding `121` and `120`; 40 Chinese characters give `false`; 120 bytes once three spaces count as one give `false`.
   - `TestHasDate`: `2026-10-30-x` true, `2026-10-30` true, `add-x` false.
   - `TestNewTitleTooLong`: `dkt new add-x --kind feature --source x --title <121 bytes>` exits 2, the message holds `121` and `120`, no folder exists, and the fake OpenSpec was not run.
   - `TestNewTitleAtLimit`: a `--title` of 40 Chinese characters creates the change. `TestNewLongSource`: a `--source` of 500 bytes creates the change.
   - `TestLintTitleTooLong`: a proposal title of 121 bytes reports `title-too-long` on the title's line, with `121` and `120`, and no `title-missing`.
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/change ./internal/cli ./internal/lint`. Expected: compile errors or failures on the new names.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `Size` is `len(strings.Join(strings.Fields(text), " "))`, with the comment `shortcut: Cyrillic, Arabic, Indic and Thai text reach the limit up to three times sooner than English; weigh Chinese, Japanese and Korean characters as 3 and others as 1 if that is reported.` In `runNew`, a new case after the title's `ValidLine` case returns `UsageError{Msg: "new needs --title: " + msg}`. In `checkFront`, the title's `else` adds `title-too-long` at `f.Line`. Do not change `ValidLine`.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `go vet ./... && go test ./...`. Expected: all pass.
 
-- [ ] **Step 5: Commit** with `Change: add-dkt-record/1`.
+- [x] **Step 5: Commit** with `Change: add-dkt-record/1`.
 
 ### Task 2: The scan finds record files
 
@@ -113,27 +113,27 @@ Run: `go vet ./... && go test ./...`. Expected: all pass.
 **Interfaces:**
 - Produces: `func (g Git) TreeFiles(commit, dir string) ([]string, error)`: the repository paths of the blobs directly under `dir` in `commit`'s tree, links included, in git's order; a tree with no such `dir` gives none. `func Records(g gitx.Git) (Inventory, error)`: `Inventory.Uses` has one `Use{Slug, Path, Source}` per record file and source, `Archived` false; sources and the unreadable reasons as in `Changes`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
   - `TestTreeFiles`: a commit with `d/a.md`, `d/sub/b.md` and a link `d/l.md` gives `d/a.md` and `d/l.md`; `TreeFiles(commit, "none")` gives none and no error.
   - `TestRecordsOtherWorktree`, `TestRecordsOnBranch`: as the scenarios; the use's `Slug` is `2026-11-06-fix-x` and its `Path` is `docket/records/2026-11-06-fix-x.md`.
   - `TestRecordsNoFolder`: no `docket/` gives no use and no unreadable. `TestRecordsDocketIsFile`: a file at `docket` gives the same.
   - `TestRecordsLinkedFolder`: worktree B's linked `docket/records` is unreadable with a reason naming it, and no use.
   - `TestRecordsMissingWorktree`: a deleted worktree is unreadable, with `git worktree prune` in the reason.
   - `TestRecordsOnlyMarkdownFiles`: in a worktree, `docket/records/notes.txt` and a directory `docket/records/x.md/` give no use.
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/gitx ./internal/scan`. Expected: undefined `TreeFiles` and `Records`.
 
-- [ ] **Step 3: Move the "directory missing" check out of `worktreeDirs`** into `worktreeMissing(root string) string` in `scan.go`, and commit it alone with `go test ./internal/scan` green.
-- [ ] **Step 4: Implement `TreeFiles` and `Records`**
+- [x] **Step 3: Move the "directory missing" check out of `worktreeDirs`** into `worktreeMissing(root string) string` in `scan.go`, and commit it alone with `go test ./internal/scan` green.
+- [x] **Step 4: Implement `TreeFiles` and `Records`**
 
 `TreeFiles` runs `ls-tree -z --full-tree <commit> -- <dir>/` and keeps type `blob`. `Records` loops over `g.Worktrees()` and `g.Refs()` as `Changes` does, caching by commit. It treats `ENOTDIR` and a missing folder as no records and keeps names ending in `.md`, with the suffix removed for the slug.
 
-- [ ] **Step 5: Run the tests and see them pass**
+- [x] **Step 5: Run the tests and see them pass**
 
 Run: `go vet ./... && go test ./...`. Expected: all pass.
 
-- [ ] **Step 6: Commit** with `Change: add-dkt-record/2`.
+- [x] **Step 6: Commit** with `Change: add-dkt-record/2`.
 
 ### Task 3: `dkt record`
 
