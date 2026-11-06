@@ -11,12 +11,16 @@ import (
 	"syscall"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/safepath"
 )
 
 // Records scans for record files: see Dated.
 func Records(g gitx.Git) (Inventory, error) { return Dated(g, record.Dir) }
+
+// Issues scans for issue files: see Dated.
+func Issues(g gitx.Git) (Inventory, error) { return Dated(g, issue.Dir) }
 
 // Dated scans every worktree, local branch and remote-tracking branch for
 // files directly in dir; each use is one <dir>/<slug>.md file and its Slug has
