@@ -3,5 +3,8 @@
 # dkt built from main by tools/dev-bin/dkt.
 /bin/
 
+# GoReleaser output.
+/dist/
+
 # Local pages; the repository is public, never commit these.
 docs/pages/

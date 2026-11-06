@@ -3,12 +3,15 @@ package docket
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"sort"
 	"strings"
 	"syscall"
 	"testing"
@@ -472,5 +475,62 @@ func TestInstallPathHint(t *testing.T) {
 	stdout, stderr, err = e.run(t, "PATH="+e.bin()+":"+e.fake+":/usr/bin:/bin")
 	if err != nil || strings.Contains(stdout, "PATH") {
 		t.Errorf("with the directory: err = %v, stdout = %q, stderr = %q", err, stdout, stderr)
+	}
+}
+
+// TestInstallSnapshot installs a snapshot that GoReleaser built, which ties the
+// names, checksums and version stamp of .goreleaser.yaml to install.sh.
+func TestInstallSnapshot(t *testing.T) {
+	dist := os.Getenv("DOCKET_TEST_DIST")
+	if dist == "" {
+		t.Skip("DOCKET_TEST_DIST is not set")
+	}
+	var artifacts []struct{ Name, Path string }
+	var meta struct{ Tag string }
+	for name, v := range map[string]any{"artifacts.json": &artifacts, "metadata.json": &meta} {
+		b, err := os.ReadFile(filepath.Join(dist, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(b, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e := newInstallEnv(t)
+	// This test wants the real uname.
+	if err := os.Remove(filepath.Join(e.fake, "uname")); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(e.releases, "latest", "download")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, a := range artifacts {
+		if !strings.HasPrefix(a.Name, "dkt-") && a.Name != "checksums.txt" {
+			continue
+		}
+		b, err := os.ReadFile(a.Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, a.Name), b, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		names = append(names, a.Name)
+	}
+	want := []string{"checksums.txt", "dkt-darwin-amd64", "dkt-darwin-arm64", "dkt-linux-amd64", "dkt-linux-arm64"}
+	if sort.Strings(names); !slices.Equal(names, want) {
+		t.Fatalf("artifacts = %v, want %v", names, want)
+	}
+	if _, stderr, err := e.run(t); err != nil {
+		t.Fatalf("%v\nstderr: %s", err, stderr)
+	}
+	out, err := exec.Command(filepath.Join(e.bin(), "dkt"), "--version").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.TrimSpace(string(out)), "dkt "+meta.Tag; got != want {
+		t.Errorf("dkt --version = %q, want %q", got, want)
 	}
 }
