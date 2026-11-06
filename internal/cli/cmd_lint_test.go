@@ -531,6 +531,15 @@ func TestLintTrailerNamesNoRecord(t *testing.T) { // Trailer names no record
 	}
 }
 
+func TestLintTrailerWithUnreadableFolder(t *testing.T) {
+	r := lintTrailerRepo(t, map[string]string{"README.md": "y\n"}, "fix-x")
+	lockRecordsFolder(t, r.Dir)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env)
+	if code != 3 || ruleList(m.Findings) != "" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
 func TestLintTrailerNamesARecord(t *testing.T) { // Trailer names a record
 	r := lintTrailerRepo(t, map[string]string{lintRecPath: lintRecGood}, lintRecSlug)
 	trailRec(r, "Record", lintRecSlug+"/2")
