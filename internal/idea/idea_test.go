@@ -44,7 +44,6 @@ func TestParseRefuses(t *testing.T) {
 		"bad path":        {"---\ntitle: One\nneeds: [a.md]\n---\n", true},
 		"nested path":     {"---\ntitle: One\nneeds: [docket/ideas/x/a.md]\n---\n", true},
 		"lines under":     {"---\ntitle: One\nneeds:\n  - docket/ideas/a.md\n---\n", true},
-		"specs":           {"---\ntitle: One\nspecs:\n---\n", false},
 		"needs an issue":  {"---\ntitle: One\nneeds: [docket/issues/x.md]\n---\n", true},
 	} {
 		t.Run(name, func(t *testing.T) {

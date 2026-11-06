@@ -82,6 +82,8 @@ func FindWork(g gitx.Git, tip string) (map[string]Work, []scan.Unreadable, error
 		for i, f := range files {
 			paths[i] = f.path
 		}
+		slices.Sort(paths)
+		paths = slices.Compact(paths)
 		blobs, err := g.ReadBlobs(c, paths)
 		if err != nil {
 			return nil, nil, err

@@ -39,9 +39,6 @@ func Parse(b []byte) (Idea, error) {
 	if !ok {
 		return Idea{}, fmt.Errorf("no front matter (form: title: <title>, dropped: true, %s)", NeedsForm)
 	}
-	if fm.SpecsLine != 0 {
-		return Idea{}, fmt.Errorf("line %d: an idea has no specs", fm.SpecsLine)
-	}
 	var id Idea
 	if f, found := fm.Fields["title"]; !found || !change.ValidLine(f.Value) {
 		return Idea{}, fmt.Errorf("title is missing or empty")
