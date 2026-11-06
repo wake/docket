@@ -13,15 +13,21 @@ func openSpecRunner(c *Context) (*openspec.Runner, error) {
 	if err == nil {
 		_, err = r.CheckVersion()
 	}
+	if err != nil {
+		return nil, openSpecEnvError(err)
+	}
+	return r, nil
+}
+
+// openSpecEnvError turns a missing or too old OpenSpec into an EnvError and returns any other err as is.
+func openSpecEnvError(err error) error {
 	var unavail *openspec.UnavailableError
 	var unsup *openspec.UnsupportedError
 	switch {
 	case errors.As(err, &unavail):
-		return nil, EnvError{Rule: "openspec-missing", Msg: err.Error()}
+		return EnvError{Rule: "openspec-missing", Msg: err.Error()}
 	case errors.As(err, &unsup):
-		return nil, EnvError{Rule: "openspec-unsupported", Msg: err.Error()}
-	case err != nil:
-		return nil, err
+		return EnvError{Rule: "openspec-unsupported", Msg: err.Error()}
 	}
-	return r, nil
+	return err
 }

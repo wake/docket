@@ -1,6 +1,7 @@
 package conflicts
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sync"
@@ -110,6 +111,10 @@ func parseOne(c Copy, show Show) (touches []Touch, copyErr, fatal error) {
 		}
 	}
 	deltas, err := show(dir, c.Slug)
+	var unavail *openspec.UnavailableError
+	if errors.As(err, &unavail) {
+		return nil, nil, err // OpenSpec cannot start: not about this copy
+	}
 	if err != nil {
 		return nil, err, nil
 	}

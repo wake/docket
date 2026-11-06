@@ -85,7 +85,7 @@ func runConflicts(c *Context, names []string) (Outcome, error) {
 		}
 		var parsed []conflicts.Parsed
 		if parsed, parseBad, err = conflicts.Parse(copies, show); err != nil {
-			return Outcome{}, err
+			return Outcome{}, openSpecEnvError(err)
 		}
 		res.Overlaps = conflicts.Find(parsed)
 		if slug != "" {

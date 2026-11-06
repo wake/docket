@@ -165,7 +165,7 @@ func lintDocket(t *testing.T, proposal string) (int, lintOut, string) {
 	r.Write("openspec/changes/add-x/proposal.md", proposal)
 	cmd, _ := testutil.FakeOpenSpec(t, "1.14.0")
 	dir := t.TempDir()
-	testutil.OpenSpecAnswer(t, dir, 0, `{"deltas":[{"spec":"x-cap","operation":"ADDED","requirements":[{"text":"The system SHALL x.","scenarios":[]}]}]}`,
+	testutil.OpenSpecAnswer(t, dir, 0, `{"deltas":[{"spec":"x-cap","operation":"ADDED","requirements":[{"name":"X","text":"The system SHALL x.","scenarios":[]}]}]}`,
 		"show", "add-x", "--type", "change", "--json", "--deltas-only")
 	testutil.OpenSpecAnswer(t, dir, 0, `{"items":[{"id":"add-x","valid":true,"issues":[]}]}`,
 		"validate", "add-x", "--type", "change", "--json")
