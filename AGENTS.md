@@ -14,8 +14,7 @@ This repository is developed with Docket's own workflow: follow the docket skill
 - The changes in `openspec/changes/archive/` from the rebuild were made with OpenSpec's default spec-driven schema; leave them as they are.
 - A pull request that changes `shipped/` also runs `dkt init --force`, so that the copies installed in this repository follow.
 - Until the release process exists, archive each change in its own pull request, as its last commit, instead of at release time.
-- `dkt record`, `dkt issue` and `dkt status`, which the docket skill names, do not exist yet. Until they do:
-  - Light review opens no record: commits carry no trailer, and the pull request description says what changed and how it was verified.
+- `dkt issue` and `dkt status`, which the docket skill names, do not exist yet. Until they do:
   - To record an issue, tell the user instead; it is recorded once `dkt issue` exists.
   - Before working in parallel, compare the plans' `**Files:**` yourself.
   - The user decides the next piece of work.

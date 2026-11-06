@@ -72,7 +72,7 @@ off (such as `//nolint`) is a check setting.
   in the tool it names, with the sections from `dkt issue template`, and file
   it only once the user agrees. Otherwise run
   `dkt issue <name> --title "<one line>" --source "<where it was found>"`
-  and fill its sections.
+  and fill its sections, then run `dkt lint` and fix what it reports.
   When you cannot find where the expected behavior is settled, the request
   is an idea.
 - **Order**: `docket/order.md` lists the ideas to work on next, in order. To
@@ -167,7 +167,7 @@ In a git worktree:
    - The record's slug is the one `dkt record` reports (the date, the name,
      and a suffix when the name is taken), not the name you passed.
 2. Make the edit and verify it by the light review in "Default steps". Fill
-   the record's sections as the work goes, in a few sentences each,
+   the record's sections as the work goes, keeping them short,
    replacing the template's guidance comments.
 3. Larger work may list tasks under the record's `## Tasks` in the plan's
    format; their commits carry `Record: <slug>/<N>`.
