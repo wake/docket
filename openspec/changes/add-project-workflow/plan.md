@@ -61,14 +61,14 @@
 **Interfaces:**
 - Produces: the embedded file `workflow/workflow.md` in the `shipped/` tree, starting with `---\ntemplate: 1\n---\n`.
 
-- [ ] **Step 1: Write the failing tests** in `shipped_test.go`:
+- [x] **Step 1: Write the failing tests** in `shipped_test.go`:
   - add `"shipped/workflow/workflow.md"` to the `want` list of `TestShippedFileSet`, keeping it sorted;
   - add `"shipped/workflow/workflow.md": "---\ntemplate: "` to `TestShippedStarts`;
   - add `var workflowTemplates = map[int]string{}` (version to lowercase hex SHA-256 of the template as shipped at that version) and `TestWorkflowTemplatePinned`: read the template, take the version from the front matter with `(?m)\A---\n(?:.*\n)*?template: (\d+)\n`, require it to be a positive integer equal to the largest key of `workflowTemplates`, and require the file's SHA-256 to equal `workflowTemplates[version]`; on a mismatch fail with "shipped/workflow/workflow.md changed: raise its template version and add the new hash to workflowTemplates".
-- [ ] **Step 2: Run** `go test . -run 'TestShipped|TestWorkflowTemplate'`; expect FAIL: the file does not exist.
-- [ ] **Step 3: Create `shipped/workflow/workflow.md`** as a byte-for-byte copy of the approved draft, the file `docs/pages/prompts/tpl-workflow.en.md` in the main worktree (the lead gives its absolute path), and put its SHA-256 in `workflowTemplates` under key 1.
-- [ ] **Step 4: Run** `go test .` and `go vet ./...`; expect PASS.
-- [ ] **Step 5: Commit** `shipped/workflow/workflow.md` and `shipped_test.go`.
+- [x] **Step 2: Run** `go test . -run 'TestShipped|TestWorkflowTemplate'`; expect FAIL: the file does not exist.
+- [x] **Step 3: Create `shipped/workflow/workflow.md`** as a byte-for-byte copy of the approved draft, the file `docs/pages/prompts/tpl-workflow.en.md` in the main worktree (the lead gives its absolute path), and put its SHA-256 in `workflowTemplates` under key 1.
+- [x] **Step 4: Run** `go test .` and `go vet ./...`; expect PASS.
+- [x] **Step 5: Commit** `shipped/workflow/workflow.md` and `shipped_test.go`.
 
 ### Task 2: dkt init writes the workflow file when missing and keeps it otherwise
 
@@ -92,7 +92,7 @@
   - Decision for `docket/workflow.md`, the last target: missing → `StatusMissing`, `ActionCreate`; otherwise `ActionKeep` whatever `force` is, with `StatusOutdated` when `0 < Version < Shipped`, `StatusDiffers` when `Version == 0`, `Version > Shipped` or `Missing` is not empty, and `StatusSame` otherwise.
   - `Decide` returns an error when the shipped template has no template version.
 
-- [ ] **Step 1: Write the failing tests** in `internal/setup/workflow_test.go`, using `shipped(t)`, `put`, `get`, `find` and `decideT` from `setup_test.go`. Build each file from the shipped template's text; for a different shipped version, wrap `shipped(t)` in an `fstest.MapFS` copy whose `workflow/workflow.md` has `template: 2`.
+- [x] **Step 1: Write the failing tests** in `internal/setup/workflow_test.go`, using `shipped(t)`, `put`, `get`, `find` and `decideT` from `setup_test.go`. Build each file from the shipped template's text; for a different shipped version, wrap `shipped(t)` in an `fstest.MapFS` copy whose `workflow/workflow.md` has `template: 2`.
   - `TestWorkflowCreatedWhenMissing`: empty root → `Kind == KindWorkflow`, `StatusMissing`, `ActionCreate`; after `Write`, the file equals the shipped bytes and `docket/` was created.
   - `TestWorkflowKeptWithForce`: the template with every section's text replaced, `force` true → `StatusSame`, `ActionKeep`, `Workflow == &WorkflowState{1, 1, nil}`; after `Write`, the bytes are unchanged.
   - `TestWorkflowVersionNotANumber` (`template: one`), `TestWorkflowNoFrontMatter` (no front matter, no headings), `TestWorkflowUnclosedFrontMatter` (`---\ntemplate: 1\n` and no closing line) → `Version == 0`, `StatusDiffers`, `Missing == nil`.
@@ -101,11 +101,11 @@
   - `TestWorkflowHigherVersion` (`template: 2`, shipped 1) → `StatusDiffers`, `Missing == nil`; `TestWorkflowLowerVersion` (file 1, shipped 2) → `StatusOutdated`, `Missing == nil`.
   - `TestWorkflowDocketIsAFile`: `docket` is a regular file → `Decide` returns no decision for `docket/workflow.md` and one problem naming it, no panic.
   - `TestWorkflowShippedWithoutVersion`: a shipped copy whose template has no front matter → `Decide` returns an error.
-- [ ] **Step 2: Run** `go test ./internal/setup/ -run Workflow`; expect FAIL to compile (no `KindWorkflow`).
-- [ ] **Step 3: Implement** `targetsOf` appending `{rel: "docket/workflow.md", kind: KindWorkflow}` with the shipped bytes, and `decideWorkflow(d Decision, got, want []byte, shipped int) Decision` in `internal/setup/workflow.go`, called from `decide` after the read, the way `decideConfig` is. Read versions with `change.ReadFrontMatter` and `strconv.Atoi` on `Fields["template"].Value` (positive values only); read headings with `markdown.Headings(lines, markdown.FenceMask(lines))` over `markdown.Lines`. Parse the shipped version once in `targetsOf`.
-- [ ] **Step 4: Update** the tests in `internal/setup/setup_test.go` that list every target: `TestDecideEmptyRootIsAllMissingInOrder` ends with `docket/workflow.md`, and `TestDecideSameAfterWrite` expects the workflow decision to be `StatusSame` with `ActionKeep` while every other target is `ActionNone`. Run `go test ./internal/setup/`; expect PASS. Then `go test ./...`: update the tests in `internal/cli/cmd_init_test.go` that the new target changes, to what the delta specs say: `TestInitFresh` also finds `docket/workflow.md` with kind `workflow`, status `created` and the shipped bytes; `TestInitRerunSame` expects every file `same` except `docket/workflow.md`, `kept`, with no finding and exit 0. Add `TestInitWorkflowKeptWithForce`: a customized current file and `dkt init --force` → unchanged bytes, `kept`, no finding naming it, exit 0. The existing tests for an earlier release's file and for an edited skill, kept and forced, must pass unchanged: the rules for existing files still apply to every target but `openspec/config.yaml` and `docket/workflow.md`.
-- [ ] **Step 5: Run** `go vet ./...` and `go test ./...`; expect PASS.
-- [ ] **Step 6: Commit** the five files.
+- [x] **Step 2: Run** `go test ./internal/setup/ -run Workflow`; expect FAIL to compile (no `KindWorkflow`).
+- [x] **Step 3: Implement** `targetsOf` appending `{rel: "docket/workflow.md", kind: KindWorkflow}` with the shipped bytes, and `decideWorkflow(d Decision, got, want []byte, shipped int) Decision` in `internal/setup/workflow.go`, called from `decide` after the read, the way `decideConfig` is. Read versions with `change.ReadFrontMatter` and `strconv.Atoi` on `Fields["template"].Value` (positive values only); read headings with `markdown.Headings(lines, markdown.FenceMask(lines))` over `markdown.Lines`. Parse the shipped version once in `targetsOf`.
+- [x] **Step 4: Update** the tests in `internal/setup/setup_test.go` that list every target: `TestDecideEmptyRootIsAllMissingInOrder` ends with `docket/workflow.md`, and `TestDecideSameAfterWrite` expects the workflow decision to be `StatusSame` with `ActionKeep` while every other target is `ActionNone`. Run `go test ./internal/setup/`; expect PASS. Then `go test ./...`: update the tests in `internal/cli/cmd_init_test.go` that the new target changes, to what the delta specs say: `TestInitFresh` also finds `docket/workflow.md` with kind `workflow`, status `created` and the shipped bytes; `TestInitRerunSame` expects every file `same` except `docket/workflow.md`, `kept`, with no finding and exit 0. Add `TestInitWorkflowKeptWithForce`: a customized current file and `dkt init --force` → unchanged bytes, `kept`, no finding naming it, exit 0. The existing tests for an earlier release's file and for an edited skill, kept and forced, must pass unchanged: the rules for existing files still apply to every target but `openspec/config.yaml` and `docket/workflow.md`.
+- [x] **Step 5: Run** `go vet ./...` and `go test ./...`; expect PASS.
+- [x] **Step 6: Commit** the five files.
 
 ### Task 3: Report the workflow file's state in dkt init and dkt inspect
 
@@ -129,14 +129,14 @@
   - `workflow-section-missing`, one per heading: `docket/workflow.md has no "<heading>" section; the template has it`
   - `workflow-missing` (inspect only): `docket/workflow.md is missing; dkt init writes it`
 
-- [ ] **Step 1: Write the failing tests.**
+- [x] **Step 1: Write the failing tests.**
   - `cmd_inspect_test.go`: `TestInspectWorkflowMissing` (before init: `workflow-missing` names the file, status `missing`, exit 1); `TestInspectWorkflowCustomized` (current version, every section reworded: `same`, no finding names it); `TestInspectWorkflowHigherVersion` (`template: 99`: `differs`, `workflow-template-unknown`); `TestInspectWorkflowNoFrontMatter` (no front matter or headings: `workflow-template-unknown`, no `workflow-section-missing`).
   - `TestWorkflowFindings`, a table test calling `workflowFindings` with constructed decisions: `{Status: outdated, Workflow: {1, 2, nil}}` → one `workflow-outdated` whose message holds `template 1` and `template 2`; `{differs, {0, 1, nil}}` → one `workflow-template-unknown`; `{differs, {1, 1, ["Plan review", "Reviewers"]}}` → two `workflow-section-missing`, in that order; `{same, {1, 1, nil}}` → none.
   - `cmd_init_test.go`: `TestInitWorkflowSectionMissing` (the shipped template without `### Plan review`, then `dkt init --json`: unchanged and `kept`, exactly one `workflow-section-missing` naming the file with "Plan review" in its message, exit 1, last `next_steps` entry equal to `shipped/next-steps/doctor.md` trimmed); `TestInitWorkflowOutdated`, end to end: set the repository up with `dkt init`, then replace `shippedFS` (restored in `t.Cleanup`) with an `fstest.MapFS` copy of the shipped tree whose `workflow/workflow.md` says `template: 2`, and run `dkt init --json`: `docket/workflow.md` is unchanged and `kept`, `workflow-outdated` names it with `template 1` and `template 2` in its message, exit 1, and the last `next_steps` entry is the doctor step. `TestInspectWorkflowOutdated`, the same setup with `dkt inspect --json`: the file is `outdated`.
-- [ ] **Step 2: Run** `go test ./internal/cli/ -run Workflow`; expect FAIL.
-- [ ] **Step 3: Implement** a `setup.KindWorkflow` case in `decisionFindings` (`workflow-missing` when `StatusMissing`, else `workflowFindings`) and in `initFindings` (`workflowFindings`). `result.files` already carries `string(d.Status)` and the init status from `actionStatus`.
-- [ ] **Step 4: Run** `go vet ./...` and `go test ./...`; expect PASS.
-- [ ] **Step 5: Commit** the five files.
+- [x] **Step 2: Run** `go test ./internal/cli/ -run Workflow`; expect FAIL.
+- [x] **Step 3: Implement** a `setup.KindWorkflow` case in `decisionFindings` (`workflow-missing` when `StatusMissing`, else `workflowFindings`) and in `initFindings` (`workflowFindings`). `result.files` already carries `string(d.Status)` and the init status from `actionStatus`.
+- [x] **Step 4: Run** `go vet ./...` and `go test ./...`; expect PASS.
+- [x] **Step 5: Commit** the five files.
 
 ### Task 4: Replace the docket skill and docket-init with the approved texts
 
@@ -149,11 +149,11 @@
 - Modify: `skills/docket-init/SKILL.md`
 - Modify: `shipped_test.go`
 
-- [ ] **Step 1: Write the failing test** `TestSkillSectionsInTemplate` in `shipped_test.go`: collapse each run of whitespace in `shipped/skill/SKILL.md` to one space, collect every name matched by `"([^"]+)"(?: and "([^"]+)")? in ` + "`docket/workflow.md`" (both groups), and require at least one name and each name to be a `### ` heading of `shipped/workflow/workflow.md`.
-- [ ] **Step 2: Run** `go test . -run TestSkillSectionsInTemplate`; expect FAIL: no reference found.
-- [ ] **Step 3: Replace** `shipped/skill/SKILL.md` with `docs/pages/prompts/docket-skill.en.md` and `skills/docket-init/SKILL.md` with `docs/pages/prompts/docket-init.en.md`, both byte for byte from the main worktree (the lead gives the absolute paths).
-- [ ] **Step 4: Run** `go test ./...` and `go vet ./...`; expect PASS. Check mechanically that each file is byte for byte its draft (`cmp`), that both still start with their front matter (`name: docket`, `name: docket-init`), and that `shipped/skill/SKILL.md` no longer contains "Default steps" or "(required)". docket-init's behavior is prompt text and gets no test of its own.
-- [ ] **Step 5: Commit** the three files.
+- [x] **Step 1: Write the failing test** `TestSkillSectionsInTemplate` in `shipped_test.go`: collapse each run of whitespace in `shipped/skill/SKILL.md` to one space, collect every name matched by `"([^"]+)"(?: and "([^"]+)")? in ` + "`docket/workflow.md`" (both groups), and require at least one name and each name to be a `### ` heading of `shipped/workflow/workflow.md`.
+- [x] **Step 2: Run** `go test . -run TestSkillSectionsInTemplate`; expect FAIL: no reference found.
+- [x] **Step 3: Replace** `shipped/skill/SKILL.md` with `docs/pages/prompts/docket-skill.en.md` and `skills/docket-init/SKILL.md` with `docs/pages/prompts/docket-init.en.md`, both byte for byte from the main worktree (the lead gives the absolute paths).
+- [x] **Step 4: Run** `go test ./...` and `go vet ./...`; expect PASS. Check mechanically that each file is byte for byte its draft (`cmp`), that both still start with their front matter (`name: docket`, `name: docket-init`), and that `shipped/skill/SKILL.md` no longer contains "Default steps" or "(required)". docket-init's behavior is prompt text and gets no test of its own.
+- [x] **Step 5: Commit** the three files.
 
 ### Task 5: Use docket/workflow.md in this repository
 
@@ -167,8 +167,8 @@
 - Modify: `.agents/skills/docket/SKILL.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: Run** `go run ./cmd/dkt init --force --json` at the worktree root. Expect `docket/workflow.md` `created`, both `SKILL.md` copies `overwritten`, every other file `same`, and no finding.
-- [ ] **Step 2: Edit** `docket/workflow.md`: under `### When to archive`, replace the text with "Until this repository has a release process, archive each change in its own pull request, as its last commit." Leave every heading and the front matter as they are.
-- [ ] **Step 3: Edit** `AGENTS.md`: remove the bullet starting "Review, verify and merge by the docket skill's "Default steps"" and the bullet starting "Until the release process exists, archive each change"; add `docket/workflow.md` to the list under "Prompt files", after `shipped/`.
-- [ ] **Step 4: Run** `go run ./cmd/dkt inspect --json`; expect `docket/workflow.md` listed as `same` and no `workflow-` finding. Run `go test ./...`.
-- [ ] **Step 5: Commit** the four files.
+- [x] **Step 1: Run** `go run ./cmd/dkt init --force --json` at the worktree root. Expect `docket/workflow.md` `created`, both `SKILL.md` copies `overwritten`, every other file `same`, and no finding.
+- [x] **Step 2: Edit** `docket/workflow.md`: under `### When to archive`, replace the text with "Until this repository has a release process, archive each change in its own pull request, as its last commit." Leave every heading and the front matter as they are.
+- [x] **Step 3: Edit** `AGENTS.md`: remove the bullet starting "Review, verify and merge by the docket skill's "Default steps"" and the bullet starting "Until the release process exists, archive each change"; add `docket/workflow.md` to the list under "Prompt files", after `shipped/`.
+- [x] **Step 4: Run** `go run ./cmd/dkt inspect --json`; expect `docket/workflow.md` listed as `same` and no `workflow-` finding. Run `go test ./...`.
+- [x] **Step 5: Commit** the four files.
