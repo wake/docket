@@ -67,6 +67,10 @@ A capability SHALL be a main spec under `openspec/specs/` or a delta spec under 
 - **WHEN** the only delta for `refund` is in a folder under `openspec/changes/archive/`, and there is no main spec
 - **THEN** `refund` is not a capability
 
+#### Scenario: Front matter that cannot be parsed
+- **WHEN** the proposal of the active change `add-x`, the only one holding a delta for `refund`, has front matter that cannot be parsed
+- **THEN** `refund` has an empty title, `dkt domains` reports no finding and nothing unreadable about the proposal, and `dkt lint` reports `metadata-invalid` as `change-lint` defines
+
 ### Requirement: Unclassified capabilities
 `result.unclassified` SHALL hold every capability no node holds, sorted by path. A capability being unclassified SHALL NOT be a finding.
 
@@ -85,8 +89,12 @@ When `docket/domains.md` does not exist, `result.found` SHALL be false and `resu
 - **WHEN** `docket/domains.md` holds only the line `# Areas`
 - **THEN** `result.found` is true and `result.nodes` is empty
 
+#### Scenario: File in place of the docket folder
+- **WHEN** `docket` is a regular file
+- **THEN** `docket/domains.md` does not exist, `result.found` is false, and dkt exits with 0
+
 ### Requirement: Format problems
-`dkt domains` SHALL report `domain-format`, naming `docket/domains.md` and the line, for each line that is not an item of the form above, or that breaks its rules: an indent that is not two spaces per level, a level skipped, a capability at the top level, an item under a capability, a text mixing a code span with other text, or a capability path that is not a valid relative path. `result` SHALL be null, and dkt SHALL exit with 1.
+`dkt domains` SHALL report `domain-format`, naming `docket/domains.md` and the line, for each line that is not an item of the form above, or that breaks its rules: an indent that is not two spaces per level, a level skipped, a capability at the top level, an item under a capability, a backtick anywhere but around one whole code span, or a capability path that is not a valid relative path. `result` SHALL be null, and dkt SHALL exit with 1.
 
 #### Scenario: Line that is not an item
 - **WHEN** a line of `docket/domains.md` is `Users`
@@ -114,6 +122,10 @@ When `docket/domains.md` does not exist, `result.found` SHALL be false and `resu
 
 #### Scenario: Code span mixed with text
 - **WHEN** an item's text is ``Payments `refund` ``
+- **THEN** the finding `domain-format` names that line
+
+#### Scenario: Stray backtick
+- **WHEN** an item's text is a name holding one backtick
 - **THEN** the finding `domain-format` names that line
 
 #### Scenario: Capability path outside the specs
@@ -160,6 +172,10 @@ When `docket/domains.md` is a symbolic link, is not a regular file or cannot be 
 #### Scenario: Unreadable spec
 - **WHEN** a node lists `refund`, and a file named `spec.md` under `openspec/specs/` cannot be read
 - **THEN** `unreadable` lists that file, there is no `domain-unknown` finding, `result.nodes` is reported, and dkt exits with 3
+
+#### Scenario: Unreadable proposal
+- **WHEN** the proposal of the active change `add-x`, which holds a delta for `refund`, cannot be read, and a node lists a capability that does not exist
+- **THEN** `unreadable` lists the proposal, there is no `domain-unknown` finding, `refund` is still reported with `changes` `["add-x"]` and an empty title, and dkt exits with 3
 
 ### Requirement: Result
 `dkt domains` SHALL take no positional argument. With `--json`, `result` SHALL hold `found`, `nodes` and `unclassified`; each node `name`, `capabilities` and `children`; each capability `path`, `title`, `main` and `changes`. Arrays SHALL never be null.

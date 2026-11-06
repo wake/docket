@@ -38,19 +38,19 @@
 | Valid relative path | external: io/fs.ValidPath | reuse | the check `internal/lint/deltas.go` applies to a capability in a task's Scenarios line | `rg -n "ValidPath" internal/` |
 | Names under `specs:` | internal/change/frontmatter.go:ReadFrontMatter | reuse | the one reader of `proposal.md` front matter | `rg -n "func ReadFrontMatter" internal/` |
 | Main spec title | internal/change/frontmatter.go:SpecTitle | reuse | the rule `change-metadata` defines | `rg -n "func SpecTitle" internal/` |
-| A source not read | internal/scan/scan.go:Unreadable | reuse | `internal/idea` and `internal/conflicts` report it the same way | `rg -n "scan.Unreadable" internal/` |
+| A source not read | internal/lint/lint.go:Unreadable | new | one line of the same shape: `lint`, which also reads only an `fs.FS`, has its own, and `scan.Unreadable` would make this package depend on `gitx`; `lint` cannot share its own, since it imports this package | `rg -n "type Unreadable\|scan\\.Unreadable" internal/` |
 | Result and findings | internal/cli/envelope.go:Outcome, Finding, Unreadable | reuse | every command's shape | `rg -n "type Outcome" internal/cli/` |
 | Reading the repository | external: os.OpenRoot | reuse | as `runLint` reads the worktree | `rg -n "OpenRoot" internal/cli/` |
 | Registering a command | internal/cli/command.go:commands | extend | one more entry | `rg -n "var commands" internal/cli/` |
 | The lint run with no change named | internal/lint/lint.go:Run | extend | main spec titles are checked at that point | `rg -n "SpecTitles\(in.Root\)" internal/lint/` |
-| Change folders in the worktree | internal/scan/scan.go:Changes | new | it scans every worktree and ref for folders and takes a `gitx.Git`; here one worktree is read through an `fs.FS`, for the capabilities inside its changes | `rg -n "func Changes" internal/scan/` |
+| Change folders in the worktree | internal/lint/lint.go:scope | new | `scan.Changes` scans every worktree and ref and takes a `gitx.Git`. `scope` lists one worktree, but it is a method on lint's state that also reports named changes, and `lint` imports this package, so this cannot call it. Its rule, a directory other than `archive`, is one condition, and the spec's `What is linted` and `Capabilities reported` both define it | `rg -n "func Changes" internal/scan/`, `rg -n "func \(r \*state\) scope" internal/lint/` |
 | Reading the tree | none | new | nothing reads a nested list | `rg -n "domains" internal/` |
 
 ---
 
 ### Task 1: Parse the tree file
 
-**Scenarios:** domain-tree#nested-nodes-read, domain-tree#empty-node, domain-tree#name-in-any-language, domain-tree#windows-line-endings, domain-tree#file-with-no-items, domain-tree#line-that-is-not-an-item, domain-tree#tab-indent, domain-tree#odd-indent, domain-tree#level-skipped, domain-tree#capability-at-the-top-level, domain-tree#item-under-a-capability, domain-tree#code-span-mixed-with-text, domain-tree#capability-path-outside-the-specs, domain-tree#every-bad-line-reported, domain-tree#sibling-nodes-with-one-name, domain-tree#one-name-under-different-parents, domain-tree#capability-under-two-nodes
+**Scenarios:** domain-tree#nested-nodes-read, domain-tree#empty-node, domain-tree#name-in-any-language, domain-tree#windows-line-endings, domain-tree#file-with-no-items, domain-tree#line-that-is-not-an-item, domain-tree#tab-indent, domain-tree#odd-indent, domain-tree#level-skipped, domain-tree#capability-at-the-top-level, domain-tree#item-under-a-capability, domain-tree#code-span-mixed-with-text, domain-tree#stray-backtick, domain-tree#capability-path-outside-the-specs, domain-tree#every-bad-line-reported, domain-tree#sibling-nodes-with-one-name, domain-tree#one-name-under-different-parents, domain-tree#capability-under-two-nodes
 
 **Review:** checks
 
@@ -98,6 +98,7 @@ func TestParseTree(t *testing.T) {
 | under a capability | ``- A\n  - `refund`\n    - B\n`` | 3 |
 | mixed span | ``- Payments `refund`\n`` | 1 |
 | span then text | ``- A\n  - `refund` x\n`` | 2 |
+| stray backtick | ``- Customer `beta\n`` | 1 |
 | outside the specs | ``- A\n  - `../refund`\n`` | 2 |
 | absolute path | ``- A\n  - `/refund`\n`` | 2 |
 | leading dash | ``- A\n  - `-x`\n`` | 2 |
@@ -143,7 +144,7 @@ git commit -m "Parse the domain tree file" -m "Change: add-domain-tree/1"
 
 ### Task 2: Load the tree and report it with dkt domains
 
-**Scenarios:** domain-tree#nested-nodes-read, domain-tree#empty-node, domain-tree#node-apart-from-the-storage-path, domain-tree#uncommitted-edit, domain-tree#no-openspec-on-the-machine, domain-tree#main-spec-with-a-title, domain-tree#main-spec-without-a-title, domain-tree#new-capability-in-an-active-change, domain-tree#delta-to-an-existing-capability, domain-tree#nested-capability-path, domain-tree#archived-change-ignored, domain-tree#spec-outside-the-tree, domain-tree#project-without-a-tree, domain-tree#file-with-no-items, domain-tree#line-that-is-not-an-item, domain-tree#sibling-nodes-with-one-name, domain-tree#capability-that-no-longer-exists, domain-tree#capability-with-only-a-delta, domain-tree#linked-tree-file, domain-tree#unreadable-spec, domain-tree#text-output, domain-tree#text-output-without-a-tree, domain-tree#argument-given, cli-output#init-outside-a-repository, cli-output#new-outside-a-repository, cli-output#record-outside-a-repository, cli-output#issue-outside-a-repository, cli-output#sync-outside-a-repository, cli-output#lint-outside-a-repository, cli-output#conflicts-outside-a-repository, cli-output#status-outside-a-repository, cli-output#domains-outside-a-repository
+**Scenarios:** domain-tree#nested-nodes-read, domain-tree#empty-node, domain-tree#node-apart-from-the-storage-path, domain-tree#uncommitted-edit, domain-tree#no-openspec-on-the-machine, domain-tree#main-spec-with-a-title, domain-tree#main-spec-without-a-title, domain-tree#new-capability-in-an-active-change, domain-tree#delta-to-an-existing-capability, domain-tree#nested-capability-path, domain-tree#archived-change-ignored, domain-tree#front-matter-that-cannot-be-parsed, domain-tree#spec-outside-the-tree, domain-tree#project-without-a-tree, domain-tree#file-with-no-items, domain-tree#file-in-place-of-the-docket-folder, domain-tree#line-that-is-not-an-item, domain-tree#sibling-nodes-with-one-name, domain-tree#capability-that-no-longer-exists, domain-tree#capability-with-only-a-delta, domain-tree#linked-tree-file, domain-tree#unreadable-spec, domain-tree#unreadable-proposal, domain-tree#text-output, domain-tree#text-output-without-a-tree, domain-tree#argument-given, cli-output#init-outside-a-repository, cli-output#new-outside-a-repository, cli-output#record-outside-a-repository, cli-output#issue-outside-a-repository, cli-output#sync-outside-a-repository, cli-output#lint-outside-a-repository, cli-output#conflicts-outside-a-repository, cli-output#status-outside-a-repository, cli-output#domains-outside-a-repository
 
 **Review:** judgment
 
@@ -160,7 +161,8 @@ git commit -m "Parse the domain tree file" -m "Change: add-domain-tree/1"
 - Consumes: `domain.File`, `Parse`, `Node`, `Entry`, `Problem`, `RuleUnknown` from Task 1.
 - Produces, in package `domain`:
   - `type Capability struct { Path, Title string; Main bool; Changes []string }`
-  - `type Loaded struct { Found, Stopped bool; Nodes []*Node; Capabilities map[string]*Capability; Problems []Problem; Unreadable []scan.Unreadable }`: `Found` says the file exists. `Stopped` says it could not be used, so that `result` is null; `Nodes` and `Capabilities` are then empty and nothing else was read.
+  - `type Unreadable struct { Source, Reason string }`
+  - `type Loaded struct { Found, Stopped bool; Nodes []*Node; Capabilities map[string]*Capability; Problems []Problem; Unreadable []Unreadable }`: `Found` says the file exists. `Stopped` says it could not be used, so that `result` is null; `Nodes` and `Capabilities` are then empty and nothing else was read.
   - `func Load(root fs.FS) Loaded`
 - Produces, in package `cli`: `func domainsCommand() Command`, added to `commands`.
 
@@ -201,13 +203,15 @@ Expected: PASS.
 
 In `internal/cli/cmd_domains_test.go`, following `stRun` in `internal/cli/cmd_status_test.go`, which sets `DOCKET_OPENSPEC` to a path that does not exist, so every test also shows that OpenSpec is not needed:
 
-- `TestDomainsTree`: a committed `docket/domains.md` holding the `付款` node with the capability `billing/invoice`, an empty node `帳號` and an uncommitted edit adding a node, with `openspec/specs/billing/invoice/spec.md` titled `Invoice` and `openspec/specs/other/spec.md` titled `Other`. Exit 0. Decode `result` and compare with `found: true`, the nodes in order with the edit, the capability `{"path": "billing/invoice", "title": "Invoice", "main": true, "changes": []}`, and `unclassified` listing `other`. Also assert on the raw JSON that it holds `"children":[]` and `"changes":[]`, and no `null`. Assert `git status --porcelain` is unchanged by the run.
+- `TestDomainsTree`: a committed `docket/domains.md` holding the `付款` node with the capability `billing/invoice`, an empty node `帳號` and an uncommitted edit adding a node, with `openspec/specs/billing/invoice/spec.md` titled `Invoice` and `openspec/specs/other/spec.md` titled `Other`. Exit 0. Decode `result` and compare with `found: true`, the nodes in order with the edit, the capability `{"path": "billing/invoice", "title": "Invoice", "main": true, "changes": []}`, and `unclassified` listing `other`. Also decode the envelope's `result` as a `json.RawMessage` and assert that it holds `"children":[]` and `"changes":[]`, and no `null`; the envelope's own `repo` fields may be null. Assert `git status --porcelain` is unchanged by the run.
 - `TestDomainsNoTree`: no file, one spec. Exit 0, `found` false, `nodes` `[]`, `unclassified` lists it.
 - `TestDomainsFormat`: a bad line gives exit 1, the finding with `rule` `domain-format`, `file` `docket/domains.md` and its `line`, and a null `result`.
 - `TestDomainsDuplicate`: the same for `domain-duplicate`.
 - `TestDomainsUnknown`: exit 1, `domain-unknown` with its line, `result.nodes` still lists the capability with `main` false and `changes` `[]`.
 - `TestDomainsLinkedTree`: a `docket/domains.md` that is a symbolic link gives exit 3, `unreadable` listing it, and a null `result`.
 - `TestDomainsUnreadableSpec`: with `skipRoot` as in `internal/lint/lint_test.go`, an unreadable spec and a tree listing a capability that does not exist. Exit 3, `unreadable` lists the spec, no `domain-unknown`, and `result.nodes` is set.
+- `TestDomainsUnreadableProposal`: the same guard, the proposal of `add-x` unreadable, `add-x` holding a delta for `refund`, and a tree listing a capability that does not exist. Exit 3, `unreadable` lists the proposal, no `domain-unknown`, and `result.unclassified` holds `refund` with `changes` `["add-x"]` and an empty title.
+- `TestDomainsDocketIsAFile`: `docket` a regular file. Exit 0, `found` false.
 - `TestDomainsText`: without `--json`, the output is exactly `付款\n  refund: 退款\nUnclassified:\n  invoice\n`, where `invoice` has no title.
 - `TestDomainsTextNoTree`: the output holds `docket/domains.md does not exist`.
 - `TestDomainsArgument`: `dkt domains x` exits with 2.
@@ -283,6 +287,7 @@ In `internal/lint/lint_test.go`, with `repo` and `has`:
 - `TestDomainTreeLinted`, a table of files and the findings they give, each with `File` `docket/domains.md`: `Users\n- A\n  - A2\n  - A2\n` gives `domain-format` on line 1 and `domain-duplicate` on line 4. ``- A\n  - `gone`\n``, with no such capability, gives `domain-unknown` on line 2.
 - `TestDomainTreeMissing`: no file, no finding with a rule starting `domain-`.
 - `TestDomainTreeLinked`: with `docket/domains.md` made by `os.Symlink` in the temporary directory, `Unreadable` holds that `Source`, and no finding is about it.
+- `TestDomainTreeUnreadableSpec`: with `skipRoot`, an unreadable main spec, which `SpecTitles` also reads, and a tree listing a capability that does not exist. `Unreadable` lists that spec exactly once, and no finding has the rule `domain-unknown`.
 - `TestDomainTreeSkippedForNamedChange`: the file with a bad line, `Slugs: []string{"real"}` over a clean change named `real`; no finding with a rule starting `domain-`.
 
 - [ ] **Step 2: Run them to verify they fail**

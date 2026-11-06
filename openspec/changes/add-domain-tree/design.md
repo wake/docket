@@ -49,7 +49,11 @@ A `domain` field on a change was also considered and dropped: a change can touch
 
 **Authorization lives in the skill, not the CLI.** `dkt` does not ask or decide. The rule that an agent suggests a node and adds, renames or moves one only with the user's agreement is prompt text. No tool could tell an authorized node from another, so the review of the pull request is the check.
 
-**Shared code.** `internal/domain` holds the parser and `Load`, which `dkt domains` and `dkt lint` both call, so both report the same findings.
+**A file where the `docket` folder would be means no tree.** `docket/domains.md` then does not exist, and `internal/scan` treats a file where a folder would be the same way. `dkt domains` is not the place to report a broken project layout.
+
+**A proposal's front matter only costs a title.** `dkt domains` needs nothing from a proposal but a display name, so front matter it cannot parse gives an empty title and no finding. `dkt status` treats the same problem as unreadable because its answer depends on `source`; this one does not. `dkt lint` still reports `metadata-invalid`, so the two commands differ here on purpose.
+
+**Shared code.** `internal/domain` holds the parser and `Load`, which `dkt domains` and `dkt lint` both call, so both report the same findings about the tree.
 
 ## Risks / Trade-offs
 
