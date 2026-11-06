@@ -4,11 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/wake/docket/internal/setup"
 	"github.com/wake/docket/internal/testutil"
@@ -589,6 +591,123 @@ func TestInspectLintFromSubdirectoryRootRelative(t *testing.T) {
 		for _, w := range want {
 			if !got[w] {
 				t.Errorf("%s: missing %s in %s", name, w, out)
+			}
+		}
+	}
+}
+
+const wfPath = "docket/workflow.md"
+
+// withShippedWorkflow makes dkt see a shipped workflow template with the given text.
+func withShippedWorkflow(t *testing.T, text string) {
+	t.Helper()
+	saved := shippedFS
+	t.Cleanup(func() { shippedFS = saved })
+	m := fstest.MapFS{}
+	fs.WalkDir(saved(), ".", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			b, _ := fs.ReadFile(saved(), p)
+			m[p] = &fstest.MapFile{Data: b}
+		}
+		return nil
+	})
+	m["workflow/workflow.md"] = &fstest.MapFile{Data: []byte(text)}
+	shippedFS = func() fs.FS { return m }
+}
+
+func wfStatus(m inspectOut) string {
+	for _, f := range m.Result.Files {
+		if f.Path == wfPath {
+			return f.Status
+		}
+	}
+	return ""
+}
+
+func TestInspectWorkflowMissing(t *testing.T) {
+	r := testutil.NewRepo(t)
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if code != 1 || one(m, "workflow-missing") != wfPath || wfStatus(m) != "missing" {
+		t.Errorf("code=%d %v %q", code, rules(m), wfStatus(m))
+	}
+}
+
+func TestInspectWorkflowCustomized(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	r.Write(wfPath, strings.ReplaceAll(shippedWorkflow(t), "Before any code", "Before any of our code"))
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if code != 0 || wfStatus(m) != "same" || len(m.Findings) != 0 {
+		t.Errorf("code=%d %v %q", code, rules(m), wfStatus(m))
+	}
+}
+
+func TestInspectWorkflowHigherVersion(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	r.Write(wfPath, strings.Replace(shippedWorkflow(t), "template: 1", "template: 99", 1))
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if wfStatus(m) != "differs" || one(m, "workflow-template-unknown") != wfPath {
+		t.Errorf("%v %q", rules(m), wfStatus(m))
+	}
+}
+
+func TestInspectWorkflowNotANumber(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	r.Write(wfPath, strings.Replace(shippedWorkflow(t), "template: 1", "template: one", 1))
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if wfStatus(m) != "differs" || one(m, "workflow-template-unknown") != wfPath {
+		t.Errorf("%v %q", rules(m), wfStatus(m))
+	}
+}
+
+func TestInspectWorkflowNoFrontMatter(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	r.Write(wfPath, "just words\n")
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if one(m, "workflow-template-unknown") != wfPath || len(rules(m)["workflow-section-missing"]) != 0 {
+		t.Errorf("%v", rules(m))
+	}
+}
+
+func TestInspectWorkflowOutdated(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	withShippedWorkflow(t, strings.Replace(shippedWorkflow(t), "template: 1", "template: 2", 1))
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if code != 1 || wfStatus(m) != "outdated" || one(m, "workflow-outdated") != wfPath {
+		t.Errorf("code=%d %v %q", code, rules(m), wfStatus(m))
+	}
+}
+
+func TestWorkflowFindings(t *testing.T) {
+	cases := []struct {
+		name string
+		d    setup.Decision
+		want []string // rules
+		in   [][]string
+	}{
+		{"outdated", setup.Decision{Status: setup.StatusOutdated, Workflow: &setup.WorkflowState{Version: 1, Shipped: 2}}, []string{"workflow-outdated"}, [][]string{{"template 1", "template 2"}}},
+		{"unknown", setup.Decision{Status: setup.StatusDiffers, Workflow: &setup.WorkflowState{Version: 0, Shipped: 1}}, []string{"workflow-template-unknown"}, [][]string{{"template 1"}}},
+		{"sections", setup.Decision{Status: setup.StatusDiffers, Workflow: &setup.WorkflowState{Version: 1, Shipped: 1, Missing: []string{"Plan review", "Reviewers"}}}, []string{"workflow-section-missing", "workflow-section-missing"}, [][]string{{`"Plan review"`}, {`"Reviewers"`}}},
+		{"same", setup.Decision{Status: setup.StatusSame, Workflow: &setup.WorkflowState{Version: 1, Shipped: 1}}, nil, nil},
+	}
+	for _, c := range cases {
+		got := workflowFindings(c.d)
+		if len(got) != len(c.want) {
+			t.Errorf("%s: %+v", c.name, got)
+			continue
+		}
+		for i, f := range got {
+			if f.Rule != c.want[i] || f.File != wfPath {
+				t.Errorf("%s: %+v", c.name, f)
+			}
+			for _, s := range c.in[i] {
+				if !strings.Contains(f.Message, s) {
+					t.Errorf("%s: %q lacks %q", c.name, f.Message, s)
+				}
 			}
 		}
 	}

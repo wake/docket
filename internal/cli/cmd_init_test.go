@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	docket "github.com/wake/docket"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,6 +99,9 @@ func TestInitFresh(t *testing.T) {
 	if status(m, ".claude/skills/openspec-explore/SKILL.md") != "created" {
 		t.Errorf("%+v", m.Result.Files)
 	}
+	if f := fileOf(m, "docket/workflow.md"); f.Kind != "workflow" || f.Status != "created" || readFile(t, r, "docket/workflow.md") != shippedWorkflow(t) {
+		t.Errorf("workflow %+v", f)
+	}
 	n := 0
 	for _, f := range m.Result.Files {
 		if f.Path == "openspec/config.yaml" {
@@ -115,7 +119,7 @@ func TestInitFresh(t *testing.T) {
 	}
 	ds, _, _ := setup.Decide(r.Dir, shippedFS(), false)
 	for _, d := range ds {
-		if d.Action != setup.ActionNone {
+		if d.Action != setup.ActionNone && d.Kind != setup.KindWorkflow {
 			t.Errorf("%s still %s", d.Path, d.Action)
 		}
 	}
@@ -203,9 +207,44 @@ func TestInitRerunSame(t *testing.T) {
 		t.Errorf("%+v", m.Result)
 	}
 	for _, f := range m.Result.Files {
+		if f.Path == "docket/workflow.md" {
+			if f.Status != "kept" {
+				t.Errorf("%+v", f)
+			}
+			continue
+		}
 		if f.Status != "same" {
 			t.Errorf("%+v", f)
 		}
+	}
+}
+
+func fileOf(m initOut, path string) struct{ Path, Kind, Status string } {
+	for _, f := range m.Result.Files {
+		if f.Path == path {
+			return f
+		}
+	}
+	return struct{ Path, Kind, Status string }{}
+}
+
+func shippedWorkflow(t *testing.T) string {
+	t.Helper()
+	b, err := fs.ReadFile(shippedFS(), "workflow/workflow.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestInitWorkflowKeptWithForce(t *testing.T) {
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	mine := strings.ReplaceAll(shippedWorkflow(t), "Before any code", "Before any of our code")
+	r.Write("docket/workflow.md", mine)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil, "--force")
+	if code != 0 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != mine || len(m.Findings) != 0 {
+		t.Errorf("code=%d %+v", code, m)
 	}
 }
 
@@ -457,4 +496,70 @@ func TestInitText(t *testing.T) {
 			t.Errorf("missing %q in\n%s", want, out)
 		}
 	}
+}
+
+// lastStep fails unless the last next step is the doctor step.
+func lastStep(t *testing.T, m initOut) {
+	t.Helper()
+	b, err := fs.ReadFile(shippedFS(), "next-steps/doctor.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(m.Result.NextSteps); n == 0 || m.Result.NextSteps[n-1] != strings.TrimSpace(string(b)) {
+		t.Fatalf("next_steps = %q", m.Result.NextSteps)
+	}
+}
+
+func TestInitWorkflowSectionMissing(t *testing.T) {
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	mine := strings.Replace(shippedWorkflow(t), "### Plan review", "### Our own review", 1)
+	r.Write("docket/workflow.md", mine)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	var n int
+	for _, f := range m.Findings {
+		if f.Rule == "workflow-section-missing" && f.File == "docket/workflow.md" && strings.Contains(f.Message, "Plan review") {
+			n++
+		}
+	}
+	if code != 1 || n != 1 || len(m.Findings) != 1 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != mine {
+		t.Errorf("code=%d %+v", code, m.Findings)
+	}
+	lastStep(t, m)
+}
+
+func TestInitWorkflowTemplateUnknown(t *testing.T) {
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	mine := strings.Replace(shippedWorkflow(t), "template: 1", "template: 99", 1)
+	r.Write("docket/workflow.md", mine)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	var n int
+	for _, f := range m.Findings {
+		if f.Rule == "workflow-template-unknown" && f.File == "docket/workflow.md" {
+			n++
+		}
+	}
+	if code != 1 || n != 1 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != mine {
+		t.Errorf("code=%d %+v", code, m.Findings)
+	}
+}
+
+func TestInitWorkflowOutdated(t *testing.T) {
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	before := readFile(t, r, "docket/workflow.md")
+	withShippedWorkflow(t, strings.Replace(shippedWorkflow(t), "template: 1", "template: 2", 1))
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	var msg string
+	for _, f := range m.Findings {
+		if f.Rule == "workflow-outdated" && f.File == "docket/workflow.md" {
+			msg = f.Message
+		}
+	}
+	if code != 1 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != before ||
+		!strings.Contains(msg, "template 1") || !strings.Contains(msg, "template 2") {
+		t.Errorf("code=%d %+v", code, m.Findings)
+	}
+	lastStep(t, m)
 }

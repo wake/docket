@@ -1,11 +1,14 @@
 package docket
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io/fs"
 	"os"
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -42,6 +45,7 @@ func TestShippedFileSet(t *testing.T) {
 		"shipped/schema/templates/proposal.md",
 		"shipped/schema/templates/spec.md",
 		"shipped/skill/SKILL.md",
+		"shipped/workflow/workflow.md",
 	}
 	sort.Strings(got)
 	if !reflect.DeepEqual(got, want) {
@@ -74,6 +78,7 @@ func TestShippedStarts(t *testing.T) {
 		"shipped/schema/templates/proposal.md": "---\n",
 		"shipped/schema/templates/plan.md":     "# Implementation Plan\n",
 		"shipped/config/operations.yaml":       "operations:\n",
+		"shipped/workflow/workflow.md":         "---\ntemplate: ",
 	} {
 		if !strings.HasPrefix(readShipped(t, path), prefix) {
 			t.Errorf("%s does not start with %q", path, prefix)
@@ -88,4 +93,58 @@ func TestShippedNextStepsAreOneLine(t *testing.T) {
 			t.Errorf("%s: want one non-empty line, got %q", n, s)
 		}
 	}
+}
+
+// workflowTemplates maps each template version to the SHA-256 of the template as shipped at that version.
+var workflowTemplates = map[int]string{
+	1: "6642708242c599fe3930bce7873c8feca7234f3ea84e3c5a48f3870fa2453be6",
+}
+
+func TestWorkflowTemplatePinned(t *testing.T) {
+	body := readShipped(t, "shipped/workflow/workflow.md")
+	m := regexp.MustCompile(`(?m)\A---\n(?:.*\n)*?template: (\d+)\n`).FindStringSubmatch(body)
+	if m == nil {
+		t.Fatal("shipped/workflow/workflow.md has no template version")
+	}
+	version, _ := strconv.Atoi(m[1])
+	largest := 0
+	for v := range workflowTemplates {
+		if v > largest {
+			largest = v
+		}
+	}
+	if version < 1 || version != largest {
+		t.Fatalf("template version = %d, want the largest pinned version %d", version, largest)
+	}
+	sum := sha256.Sum256([]byte(body))
+	if hex.EncodeToString(sum[:]) != workflowTemplates[version] {
+		t.Errorf("shipped/workflow/workflow.md changed: raise its template version and add the new hash to workflowTemplates")
+	}
+}
+
+func TestSkillSectionsInTemplate(t *testing.T) {
+	skill := strings.Join(strings.Fields(readShipped(t, "shipped/skill/SKILL.md")), " ")
+	var names []string
+	for _, m := range regexp.MustCompile(`"([^"]+)"(?: and "([^"]+)")? in `+"`docket/workflow.md`").FindAllStringSubmatch(skill, -1) {
+		for _, n := range m[1:] {
+			if n != "" {
+				names = append(names, n)
+			}
+		}
+	}
+	if len(names) == 0 {
+		t.Fatal("shipped/skill/SKILL.md names no section of docket/workflow.md")
+	}
+	headings := map[string]bool{}
+	for _, l := range strings.Split(readShipped(t, "shipped/workflow/workflow.md"), "\n") {
+		if h, ok := strings.CutPrefix(strings.TrimRight(l, "\r"), "### "); ok {
+			headings[strings.TrimSpace(h)] = true
+		}
+	}
+	for _, n := range names {
+		if !headings[n] {
+			t.Errorf("skill names section %q, which is not a ### heading of the shipped template", n)
+		}
+	}
+	t.Logf("collected %d names: %q", len(names), names)
 }
