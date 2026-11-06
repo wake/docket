@@ -35,6 +35,7 @@ func TestShippedFileSet(t *testing.T) {
 		"shipped/next-steps/commit.md",
 		"shipped/next-steps/doctor.md",
 		"shipped/next-steps/reload.md",
+		"shipped/record/template.md",
 		"shipped/schema/schema.yaml",
 		"shipped/schema/templates/design.md",
 		"shipped/schema/templates/plan.md",

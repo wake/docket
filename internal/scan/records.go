@@ -11,10 +11,9 @@ import (
 	"syscall"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/safepath"
 )
-
-const recordsDir = "docket/records"
 
 // Records scans every worktree, local branch and remote-tracking branch for
 // record files; each use is one docket/records/<slug>.md file and its Slug has
@@ -62,13 +61,13 @@ func Records(g gitx.Git) (Inventory, error) {
 
 // treeRecords lists the files directly in the records folder of commit's tree.
 func treeRecords(g gitx.Git, commit string) ([]string, error) {
-	files, err := g.TreeFiles(commit, recordsDir)
+	files, err := g.TreeFiles(commit, record.Dir)
 	if err != nil {
 		return nil, err
 	}
 	var paths []string
 	for _, f := range files {
-		if path.Dir(f.Path) == recordsDir {
+		if path.Dir(f.Path) == record.Dir {
 			paths = append(paths, f.Path)
 		}
 	}
@@ -92,7 +91,7 @@ func worktreeRecords(root string) (paths []string, reason string) {
 	if reason := worktreeMissing(root); reason != "" {
 		return nil, reason
 	}
-	if err := safepath.Check(root, recordsDir); err != nil {
+	if err := safepath.Check(root, record.Dir); err != nil {
 		var se *safepath.SymlinkError
 		if errors.As(err, &se) {
 			return nil, se.Path + " is a symbolic link; Docket does not read through it"
@@ -102,7 +101,7 @@ func worktreeRecords(root string) (paths []string, reason string) {
 		}
 		return nil, err.Error()
 	}
-	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(recordsDir)))
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(record.Dir)))
 	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
 		return nil, ""
 	}
@@ -111,7 +110,7 @@ func worktreeRecords(root string) (paths []string, reason string) {
 	}
 	for _, e := range entries {
 		if !e.IsDir() {
-			paths = append(paths, recordsDir+"/"+e.Name())
+			paths = append(paths, record.Dir+"/"+e.Name())
 		}
 	}
 	return paths, ""
