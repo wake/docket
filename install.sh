@@ -39,6 +39,11 @@ main() {
 	*) base=$releases/download/v$DKT_VERSION ;;
 	esac
 
+	case ${HOME:-} in
+	/*) ;;
+	*) die "HOME is not an absolute path" ;;
+	esac
+
 	dir=$HOME/.local/bin
 	target=$dir/dkt
 	[ ! -d "$target" ] || die "$target is a directory"

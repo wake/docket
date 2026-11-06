@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
+      - name: Tag is on main
+        run: git merge-base --is-ancestor HEAD origin/main
       - name: Plugin version matches the tag
         run: go test -run TestPluginVersion .
         env:
@@ -28,3 +30,5 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A commit may hold several tags; build the one that was pushed.
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}

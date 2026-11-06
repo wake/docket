@@ -453,6 +453,32 @@ func tail(b []byte) string {
 	return string(b)
 }
 
+func TestInstallHomeNotAbsolute(t *testing.T) {
+	script, err := os.ReadFile("install.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, home := range []string{"", "relative"} {
+		t.Run("HOME="+home, func(t *testing.T) {
+			e := newInstallEnv(t)
+			dir := t.TempDir() // a failure must not write into the repository
+			c := e.cmd(script, "HOME="+home)
+			c.Dir = dir
+			var errb bytes.Buffer
+			c.Stderr = &errb
+			if err := c.Run(); err == nil || !strings.Contains(errb.String(), "HOME") {
+				t.Errorf("err = %v, stderr = %q; want failure naming HOME", err, errb.String())
+			}
+			if got := e.requests(t); got != nil {
+				t.Errorf("requests = %v, want none", got)
+			}
+			if got := listDir(t, dir); len(got) != 0 {
+				t.Errorf("working directory holds %v, want it empty", got)
+			}
+		})
+	}
+}
+
 func TestInstallHomeWithBackslash(t *testing.T) {
 	e := newInstallEnv(t)
 	e.home = filepath.Join(t.TempDir(), `home\dir`)
