@@ -28,8 +28,7 @@ func stRun(t *testing.T, r *testutil.Repo, dir string, args ...string) (int, sta
 	t.Helper()
 	env := append(slices.Clone(r.Env), "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "nope"))
 	var out, errb bytes.Buffer
-	code := RunWith(Options{Args: append([]string{"status", "--json"}, args...), Dir: dir, Env: env, Stdout: &out, Stderr: &errb},
-		[]func() Command{statusCommand})
+	code := Run(Options{Args: append([]string{"status", "--json"}, args...), Dir: dir, Env: env, Stdout: &out, Stderr: &errb})
 	var m statusOut
 	if out.Len() > 0 {
 		if err := json.Unmarshal(out.Bytes(), &m); err != nil {
@@ -433,7 +432,7 @@ func TestStatusText(t *testing.T) {
 	r := twoIdeas(t)
 	env := append(slices.Clone(r.Env), "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "nope"))
 	var out bytes.Buffer
-	code := RunWith(Options{Args: []string{"status"}, Dir: r.Dir, Env: env, Stdout: &out, Stderr: &bytes.Buffer{}}, []func() Command{statusCommand})
+	code := Run(Options{Args: []string{"status"}, Dir: r.Dir, Env: env, Stdout: &out, Stderr: &bytes.Buffer{}})
 	if code != 0 || !strings.Contains(out.String(), "docket/ideas/a.md") || !strings.Contains(out.String(), "A") {
 		t.Errorf("%d %q", code, out.String())
 	}
@@ -444,7 +443,7 @@ func TestStatusTextWaiting(t *testing.T) {
 	stBranch(r, "other", map[string]string{propX: stProposal(ideaA)})
 	env := append(slices.Clone(r.Env), "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "nope"))
 	var out bytes.Buffer
-	RunWith(Options{Args: []string{"status"}, Dir: r.Dir, Env: env, Stdout: &out, Stderr: &bytes.Buffer{}}, []func() Command{statusCommand})
+	Run(Options{Args: []string{"status"}, Dir: r.Dir, Env: env, Stdout: &out, Stderr: &bytes.Buffer{}})
 	if !strings.Contains(out.String(), ideaA) {
 		t.Errorf("text: %q", out.String())
 	}
@@ -452,6 +451,18 @@ func TestStatusTextWaiting(t *testing.T) {
 	stNext(t, code, m, raw, 0, "", "waiting")
 	if !slices.Equal(m.Result.WaitingOn, []string{ideaA}) {
 		t.Errorf("%s", raw)
+	}
+}
+
+func TestStatusOutsideRepo(t *testing.T) { // Status outside a repository
+	var out bytes.Buffer
+	code := Run(Options{Args: []string{"status", "--json"}, Dir: t.TempDir(), Env: testutil.Env(t), Stdout: &out, Stderr: &bytes.Buffer{}})
+	var m statusOut
+	if err := json.Unmarshal(out.Bytes(), &m); err != nil {
+		t.Fatalf("%q: %v", out.String(), err)
+	}
+	if code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "no-repository" {
+		t.Errorf("code=%d out=%q", code, out.String())
 	}
 }
 

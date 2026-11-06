@@ -127,7 +127,7 @@
 
 Start this task only after `add-dkt-issue` has merged, on a branch rebased on it.
 
-**Scenarios:** none
+**Scenarios:** cli-output#status-outside-a-repository, cli-output#init-outside-a-repository, cli-output#new-outside-a-repository, cli-output#record-outside-a-repository, cli-output#issue-outside-a-repository, cli-output#sync-outside-a-repository, cli-output#lint-outside-a-repository, cli-output#conflicts-outside-a-repository
 
 **Review:** checks
 
