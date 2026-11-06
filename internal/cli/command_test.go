@@ -21,6 +21,7 @@ func TestCommandHelp(t *testing.T) {
 	cases := map[string][]string{
 		"init":    {"--tools", "--force", "--json"},
 		"inspect": {"--json"},
+		"issue":   {"--source", "--title", "--json"},
 	}
 	for name, flags := range cases {
 		for _, h := range []string{"--help", "-h"} {
