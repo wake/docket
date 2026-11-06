@@ -99,7 +99,9 @@ off (such as `//nolint`) is a check setting.
   the issues on the default branch, so an edit counts only once it is
   merged.
   To pick up the next piece of work, run `dkt status --json` and do the one
-  `result.next` names. When `result.next` is null, act on `result.reason`:
+  `result.next` names. When `unreadable` lists anything, report it to the
+  user and let them decide whether to go on with the work. When
+  `result.next` is null, act on `result.reason`:
   - `no-order` or `none-left`: nothing in the order can be done; ask the
     user what to work on next.
   - `order-invalid`: the order, an idea or an issue has problems that

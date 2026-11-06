@@ -18,5 +18,4 @@ Mechanical: the three copies are byte for byte the same, the front matter still 
 
 ## Review
 
-<!-- Who reviewed the diff (a model, or a person), what the review found,
-and how each finding was handled. -->
+An adversarial review on another model found one problem: `dkt status` can name a `result.next` while `unreadable` lists a worktree or branch it could not read, where that item may already be taken, so doing it at once could duplicate work. Fixed: the skill now says to report `unreadable` to the user, who decides whether to go on. The maintainer wrote that sentence. The fix was not reviewed again; it adds one sentence.
