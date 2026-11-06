@@ -66,7 +66,7 @@ An idea SHALL be a file `docket/ideas/<name>.md` whose front matter has `title` 
 - **WHEN** an issue in the order has `dropped: true` and `needs: [docket/ideas/a.md]` in its front matter, and nothing has been done on it
 - **THEN** both keys are ignored, and the issue can be next
 
-### Requirement: Work that names an idea
+### Requirement: Work that names an item
 A change or record SHALL name an idea or an issue when the `source` in its front matter is exactly its path: the `proposal.md` of a change, active or archived, or a record file. Changes and records SHALL be found as `workspace-scan` defines: in every worktree, local branch and remote-tracking branch. One is enough for the item to be taken.
 
 #### Scenario: Change in another worktree
@@ -112,7 +112,7 @@ A need SHALL name an idea, not an issue. It SHALL be met when that idea is dropp
 - **WHEN** `docket/ideas/b.md` needs `docket/ideas/a.md`, which has `dropped: true`, and nothing has been done on `docket/ideas/b.md`
 - **THEN** `docket/ideas/b.md` can be next
 
-### Requirement: No next idea
+### Requirement: No next item
 When `result.next` is null, `result.reason` SHALL say why: `no-order` when there is no default branch, the tip has no `docket/order.md`, or the file names no item; `order-invalid` when a problem is reported; `waiting` when items are left but none can start; `none-left` when every item in the order is dropped or taken. `result.waiting_on` SHALL hold the unmet needs of the first idea that waits, and be empty otherwise. Only `order-invalid` SHALL make dkt exit with 1.
 
 #### Scenario: No order file
