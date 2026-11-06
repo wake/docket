@@ -163,6 +163,18 @@ func TestCopiesOnlySpecMd(t *testing.T) {
 	}
 }
 
+func TestCopiesOnlySpecMdOnBranch(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{
+		"openspec/changes/add-y/specs/booking/spec.md":  "s",
+		"openspec/changes/add-y/specs/booking/notes.md": "n",
+	})
+	cs, un := run(t, r)
+	if len(un) != 0 || len(cs) != 1 || len(cs[0].Files) != 1 || string(cs[0].Files["booking/spec.md"]) != "s" {
+		t.Errorf("copies = %+v, unreadable = %v", cs, un)
+	}
+}
+
 func TestCopiesDistinctSlugsNeverMerge(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("init", map[string]string{
