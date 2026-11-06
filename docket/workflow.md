@@ -58,7 +58,7 @@ not stack pull requests.
 
 ### When to archive
 
-Until this repository has a release process, archive each change in its own pull request, as its last commit.
+Archive each change in its own pull request, as its last commit.
 
 ## Light review
 
