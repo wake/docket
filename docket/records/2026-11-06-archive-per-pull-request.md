@@ -18,4 +18,4 @@ The release process now exists, so the old wording would have silently switched 
 
 ## Review
 
-Pending: one adversarial review by codex.
+Adversarial review by codex found one issue: the skill lists archive (step 9) after merge (step 8), so "last commit of the pull request" looks unexecutable. Not changed: step 9 says when to archive follows "When to archive" in `docket/workflow.md`, so the skill defers to this sentence; the sentence is the same as the one it replaces and as AGENTS.md says. No contradiction with docs/release.md found.
