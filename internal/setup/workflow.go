@@ -35,7 +35,8 @@ func templateVersion(b []byte) int {
 func headingTexts(b []byte, level int) []string {
 	lines := markdown.Lines(b)
 	var out []string
-	for _, h := range markdown.Headings(lines, markdown.FenceMask(lines)) {
+	mask := markdown.FenceMask(lines)
+	for _, h := range markdown.Headings(markdown.BlankComments(lines, mask), mask) {
 		if level == 0 || h.Level == level {
 			out = append(out, h.Text)
 		}

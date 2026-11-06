@@ -528,6 +528,23 @@ func TestInitWorkflowSectionMissing(t *testing.T) {
 	lastStep(t, m)
 }
 
+func TestInitWorkflowTemplateUnknown(t *testing.T) {
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	mine := strings.Replace(shippedWorkflow(t), "template: 1", "template: 99", 1)
+	r.Write("docket/workflow.md", mine)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	var n int
+	for _, f := range m.Findings {
+		if f.Rule == "workflow-template-unknown" && f.File == "docket/workflow.md" {
+			n++
+		}
+	}
+	if code != 1 || n != 1 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != mine {
+		t.Errorf("code=%d %+v", code, m.Findings)
+	}
+}
+
 func TestInitWorkflowOutdated(t *testing.T) {
 	r := testutil.NewRepo(t)
 	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")

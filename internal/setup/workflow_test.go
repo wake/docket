@@ -102,6 +102,14 @@ func TestWorkflowVersionUnknown(t *testing.T) {
 	}
 }
 
+func TestWorkflowHeadingInComment(t *testing.T) {
+	content := strings.Replace(template(t), "### Plan review\n", "<!--\n### Plan review\n-->\n", 1)
+	d := decideWorkflowFile(t, content, shipped(t))
+	if d.Status != StatusDiffers || !reflect.DeepEqual(d.Workflow.Missing, []string{"Plan review"}) {
+		t.Errorf("%+v %+v", d, d.Workflow)
+	}
+}
+
 func TestWorkflowSame(t *testing.T) {
 	tpl := template(t)
 	cases := map[string]string{

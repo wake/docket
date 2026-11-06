@@ -652,6 +652,16 @@ func TestInspectWorkflowHigherVersion(t *testing.T) {
 	}
 }
 
+func TestInspectWorkflowNotANumber(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	r.Write(wfPath, strings.Replace(shippedWorkflow(t), "template: 1", "template: one", 1))
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if wfStatus(m) != "differs" || one(m, "workflow-template-unknown") != wfPath {
+		t.Errorf("%v %q", rules(m), wfStatus(m))
+	}
+}
+
 func TestInspectWorkflowNoFrontMatter(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
