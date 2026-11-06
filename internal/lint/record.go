@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/record"
@@ -16,12 +17,13 @@ import (
 const recordTemplateName = "shipped/record/template.md"
 
 // readRecords lists the regular .md files directly under the records folder,
-// keeping their slugs on the state; a missing folder holds none.
+// keeping their slugs on the state; a missing folder, or a file in its place,
+// holds none.
 func (r *state) readRecords() {
 	r.recordSlugs = map[string]bool{}
 	entries, err := fs.ReadDir(r.in.Root, record.Dir)
 	if err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
+		if !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
 			r.unreadable(record.Dir, err)
 			r.recordsUnreadable = true
 		}
@@ -37,6 +39,9 @@ func (r *state) readRecords() {
 // recordScope returns the slugs of the records to lint, sorted: the ones in
 // Input.Records and the ones named, reporting named ones that are not files.
 func (r *state) recordScope(named []string) []string {
+	if len(r.in.Records) == 0 && len(named) == 0 {
+		return nil // no record is in scope, so the folder does not matter
+	}
 	r.readRecords()
 	want := map[string]bool{}
 	for _, p := range r.in.Records {

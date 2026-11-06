@@ -182,6 +182,8 @@ func TestLintRecordScope(t *testing.T) {
 		"docket/records/2026-11-06-b.md":     good,
 		"docket/records/2026-11-06-a.md":     good,
 		"docket/records/sub/x.md":            bad,
+		"docket/records/2026-11-06-c.md":     good, // not added; a nested file of the same name is
+		"docket/records/sub/2026-11-06-c.md": bad,
 		"docket/records/x.txt":               bad,
 		"docket/other/y.md":                  bad,
 		"docket/records/target-outside.md.x": bad,
@@ -198,7 +200,7 @@ func TestLintRecordScope(t *testing.T) {
 	}
 	in, _ := open(t, dir)
 	in.RecordTemplate = recTemplate(t)
-	in.Records = []string{"docket/records/2026-11-06-b.md", "docket/records/sub/x.md", "docket/records/x.txt",
+	in.Records = []string{"docket/records/2026-11-06-b.md", "docket/records/sub/x.md", "docket/records/sub/2026-11-06-c.md", "docket/records/x.txt",
 		"docket/other/y.md", "docket/records/2026-11-06-link.md", "docket/records/2026-11-06-a.md", "docket/records/gone.md"}
 	rep := run(t, in)
 	if len(rep.Findings) != 0 || !reflect.DeepEqual(rep.Records, []string{"2026-11-06-a", "2026-11-06-b"}) {

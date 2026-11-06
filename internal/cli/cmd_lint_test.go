@@ -418,6 +418,46 @@ func TestLintNamedChangeSkipsRecords(t *testing.T) {
 	}
 }
 
+// lockRecordsFolder makes docket/records unreadable until the test ends.
+func lockRecordsFolder(t *testing.T, dir string) {
+	t.Helper()
+	folder := filepath.Join(dir, "docket/records")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(folder, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(folder, 0o755) })
+}
+
+func TestLintNamedChangeIgnoresRecordsFolder(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write("openspec/changes/add-x/.openspec.yaml", "schema: spec-driven\ncreated: 2026-01-01\n")
+	lockRecordsFolder(t, r.Dir)
+	if code, _, raw, _ := doLint(t, r.Dir, r.Env, "add-x"); code != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintUnreadableRecordsFolder(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	lockRecordsFolder(t, r.Dir)
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, lintRecSlug)
+	if code != 3 || len(m.Findings) != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestLintRecordsFolderIsFile(t *testing.T) {
+	r := routingRepo(t, map[string]string{"README.md": "x\n"})
+	r.Write("docket/records", "a file where the folder would be\n")
+	code, m, raw, _ := doLint(t, r.Dir, r.Env, lintRecSlug)
+	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "record-missing" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
 func TestLintResultRecords(t *testing.T) { // Records in the result
 	r := routingRepo(t, map[string]string{"README.md": "x\n"})
 	r.Write(lintRecPath, lintRecGood)
