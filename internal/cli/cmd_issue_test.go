@@ -204,3 +204,44 @@ func TestIssueOutsideRepo(t *testing.T) { // Issue outside a repository
 		t.Error("wrote something")
 	}
 }
+
+func TestIssueTemplate(t *testing.T) { // Template for another tool
+	r := recordRepo(t)
+	want, err := docket.Shipped.ReadFile("shipped/issue/external.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _, raw := doIssue(t, r, r.Dir, "template")
+	var m struct{ Result struct{ Template string } }
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		t.Fatal(err)
+	}
+	if code != 0 || m.Result.Template != string(want) {
+		t.Errorf("code=%d template=%q", code, m.Result.Template)
+	}
+	if _, err := os.Stat(filepath.Join(r.Dir, "docket")); err == nil {
+		t.Error("docket/ was created")
+	}
+	var out, errb bytes.Buffer
+	code = Run(Options{Args: []string{"issue", "template"}, Dir: r.Dir, Env: r.Env, Stdout: &out, Stderr: &errb,
+		Now: func() time.Time { return recordNow }})
+	if code != 0 || out.String() != string(want) {
+		t.Errorf("text: code=%d out=%q err=%q", code, out.String(), errb.String())
+	}
+}
+
+func TestIssueTemplateWithFlag(t *testing.T) { // Template with a flag
+	for name, args := range map[string][]string{
+		"flags":  {"template", "--title", "X", "--source", "x"},
+		"second": {"template", "extra"},
+	} {
+		r := recordRepo(t)
+		code, _, raw := doIssue(t, r, r.Dir, args...)
+		if code != 2 {
+			t.Errorf("%s: code=%d %s", name, code, raw)
+		}
+		if _, err := os.Stat(filepath.Join(r.Dir, "docket")); err == nil {
+			t.Errorf("%s: docket/ was created", name)
+		}
+	}
+}

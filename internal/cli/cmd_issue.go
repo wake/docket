@@ -3,6 +3,7 @@ package cli
 import (
 	"flag"
 	"strconv"
+	"strings"
 
 	docket "github.com/wake/docket"
 	"github.com/wake/docket/internal/change"
@@ -17,7 +18,7 @@ func issueCommand() Command {
 	return Command{
 		Name:  "issue",
 		Args:  1,
-		Usage: "issue <name> --source <text> --title <text> [--json]",
+		Usage: "issue <name> --source <text> --title <text> [--json] | issue template [--json]",
 		Define: func(fs *flag.FlagSet) {
 			fs.StringVar(&source, "source", "", "where the request came from")
 			fs.StringVar(&title, "title", "", "one-line title of the issue")
@@ -25,6 +26,18 @@ func issueCommand() Command {
 		Run: func(c *Context, args []string) (Outcome, error) {
 			if len(args) == 0 {
 				return Outcome{}, UsageError{Msg: "issue needs a name"}
+			}
+			if args[0] == "template" {
+				if source != "" || title != "" {
+					return Outcome{}, UsageError{Msg: "issue template takes no other argument or flag"}
+				}
+				tpl, err := docket.Shipped.ReadFile("shipped/issue/external.md")
+				if err != nil {
+					return Outcome{}, err
+				}
+				// Human lines are printed with a newline each; the file ends with one.
+				return Outcome{Result: map[string]string{"template": string(tpl)},
+					Human: []string{strings.TrimSuffix(string(tpl), "\n")}}, nil
 			}
 			return runIssue(c, args[0], source, title)
 		},
