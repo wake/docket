@@ -55,6 +55,7 @@ Once a project is set up, the agent loads the docket skill when development work
 | `dkt lint` | Checks the structure of changes, records, issues and main spec titles |
 | `dkt conflicts` | Finds active changes that touch the same requirement |
 | `dkt status` | Names the next idea or issue to work on from `docket/order.md` |
+| `dkt domains` | Shows the capabilities in the domain tree of `docket/domains.md`, and those not in it |
 
 Run `dkt --help` for the arguments. Every command takes `--json`.
 
