@@ -14,11 +14,13 @@ import (
 
 func issueCommand() Command {
 	var source, title string
+	var flags *flag.FlagSet
 	return Command{
 		Name:  "issue",
 		Args:  1,
 		Usage: "issue <name> --source <text> --title <text> [--json] | issue template [--json]",
 		Define: func(fs *flag.FlagSet) {
+			flags = fs
 			fs.StringVar(&source, "source", "", "where the request came from")
 			fs.StringVar(&title, "title", "", "one-line title of the issue")
 		},
@@ -27,7 +29,9 @@ func issueCommand() Command {
 				return Outcome{}, UsageError{Msg: "issue needs a name"}
 			}
 			if args[0] == "template" {
-				if source != "" || title != "" {
+				given := false // an empty value is still a flag given
+				flags.Visit(func(f *flag.Flag) { given = given || f.Name != "json" })
+				if given {
 					return Outcome{}, UsageError{Msg: "issue template takes no other argument or flag"}
 				}
 				tpl, err := docket.Shipped.ReadFile("shipped/issue/external.md")
