@@ -28,6 +28,8 @@ See proposal.md for the motivation. The docket skill says to take `result.next`,
 
 **Only the ideas the order reaches are read.** The order's lines and their needs. Linting every idea is `dkt lint`'s job, later.
 
+**With no order or a problem in it, no scan.** `next` is null whatever the work says, so reading every worktree and branch would only add to the report. Fixing the order brings any unreadable source to light on the next run.
+
 **An unreadable source does not stop the answer.** `next` is still reported with exit 3, so a broken proposal in someone's worktree does not stop every session; the cost is that the unread proposal might have named that idea, which `unreadable` shows. The rest of Docket treats an unreadable place the same way.
 
 **`result.next` is an object.** `{path, title}` can grow for the workbench without breaking callers, where a bare path could not, and the title is read anyway.
@@ -38,4 +40,5 @@ See proposal.md for the motivation. The docket skill says to take `result.next`,
 
 - [The skill says what `result.next` is for but not what to do when it is null] → An agent reads `reason`; the skill's text is the maintainer's to change, and is not touched here.
 - [Nothing shipped states the order's format] → The `order-format` finding states it.
+- [A record's `scan.Use` has no commit, so `FindWork` looks its ref up in a second `Refs` call; a ref that moves in between is read at its new commit] → Accepted: the window is milliseconds and the answer is one a run a moment later would give. Setting the commit in `scan.Records` is a one-line change for later, in a file `add-dkt-issue` is changing now.
 - [The tip is only as fresh as the last fetch] → Accepted: `dkt` does not contact a remote, and `default-branch` defines the tip this way everywhere.

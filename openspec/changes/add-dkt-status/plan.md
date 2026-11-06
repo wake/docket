@@ -39,7 +39,7 @@
 | Lines of a file | internal/markdown/markdown.go:Lines | reuse | as the other parsers read files, CRLF included | `rg -n "func Lines" internal/markdown/` |
 | The tip | internal/gitx/branch.go:DefaultBranch | reuse | the one definition of the tip | `rg -n "DefaultBranch\(\)" internal/` |
 | Reading from a commit | internal/gitx/blobs.go:ReadBlobs | reuse | one git call per commit | `rg -n "ReadBlobs\(" internal/` |
-| Commit of a ref use | internal/gitx/refs.go:Refs | reuse | a record's `scan.Use` has no `Commit`; `Refs` maps its `Source` to one, leaving `internal/scan/records.go` alone | `rg -n "Commit:" internal/scan/` |
+| Commit of a ref use | internal/scan/scan.go:Use.Commit, internal/gitx/refs.go:Refs | extend | a change's use has its commit; a record's does not, and `internal/scan/records.go` is changing in `add-dkt-issue`, so `Refs` fills it in (see design.md, Risks) | `rg -n "Commit:" internal/scan/` |
 | Finding changes | internal/scan/scan.go:Changes | reuse | every worktree and branch, archived included | `rg -n "func Changes" internal/scan/` |
 | Finding records | internal/scan/records.go:Records | reuse | same sources | `rg -n "func Records" internal/scan/` |
 | Reading in a worktree | internal/safepath/safepath.go:Check, internal/safefile/safefile.go:ReadNoFollow | reuse | refuses links as `conflicts.worktreeSpecs` does | `rg -n "safepath.Check\|ReadNoFollow" internal/` |
@@ -86,7 +86,7 @@
 
 ### Task 2: dkt status reads from the tip and finds the work
 
-**Scenarios:** ideas#order-edited-in-a-worktree-only, ideas#idea-only-on-a-branch, ideas#no-openspec, ideas#change-in-another-worktree, ideas#record-on-another-branch, ideas#archived-change, ideas#source-with-other-text, ideas#work-with-no-front-matter, ideas#no-order-file, ideas#empty-order-file, ideas#no-default-branch, ideas#line-not-of-the-form, ideas#order-names-a-missing-idea, ideas#later-line-broken, ideas#idea-without-a-title, ideas#needs-as-a-block, ideas#need-names-a-missing-idea, ideas#broken-proposal-elsewhere, ideas#linked-proposal, ideas#text-output, ideas#argument-given
+**Scenarios:** ideas#order-edited-in-a-worktree-only, ideas#idea-only-on-a-branch, ideas#no-openspec, ideas#change-in-another-worktree, ideas#record-on-another-branch, ideas#archived-change, ideas#source-with-other-text, ideas#work-with-no-front-matter, ideas#no-order-file, ideas#empty-order-file, ideas#no-default-branch, ideas#line-not-of-the-form, ideas#order-names-a-missing-idea, ideas#later-line-broken, ideas#idea-without-a-title, ideas#needs-as-a-block, ideas#need-names-a-missing-idea, ideas#same-file-names-another-idea-on-the-tip, ideas#broken-proposal-elsewhere, ideas#linked-proposal, ideas#broken-record-elsewhere, ideas#problem-and-a-broken-proposal, ideas#text-output, ideas#argument-given
 
 **Review:** judgment
 
@@ -98,13 +98,15 @@
 **Interfaces:**
 - Consumes: `idea.Parse`, `idea.ParseOrder`, `idea.Next`, `idea.Work`, `idea.OrderFile`, `idea.LineForm` from Task 1.
 - Produces:
-  - in package `idea`: `func FindWork(g gitx.Git, tip string) (map[string]Work, []scan.Unreadable, error)`, keyed by the `source` value of each change's `proposal.md` and each record, for sources that hold one. `OnTip` is true when the file is in the tree of commit `tip`. A file's front matter that cannot be read goes in the `[]scan.Unreadable`, as `<source>:<path>`; so does a worktree file that is a symbolic link. A missing file names nothing.
+  - in package `idea`: `func FindWork(g gitx.Git, tip string) (map[string]Work, []scan.Unreadable, error)`, keyed by the `source` value of each change's `proposal.md` and each record, for files that hold one. `Any` is true when any copy has that value; `OnTip` only when a copy read from commit `tip` does. Take a use's commit from `scan.Use.Commit`, and when that is empty and its `Source` is a ref, from `Refs`. A file's front matter that cannot be read goes in the `[]scan.Unreadable`, as `<source>:<path>`; so does a worktree file that is a symbolic link. A missing file names nothing.
   - in package `cli`: `func statusCommand() Command`, with `Name: "status"`, `Args: 0` and `Usage: "status [--json]"`. Task 3 adds it to `commands`; until then the tests run it with `RunWith(opts, []func() Command{statusCommand})`.
 
 - [ ] **Step 1: Write the failing tests** in `internal/cli/cmd_status_test.go`, through a helper that runs the command with `--json` and decodes the envelope, using `testutil.NewRepo`. Each scenario in this task's line has one test, with the values in the spec. In addition:
   - `TestStatusQuotedSource`: a change's front matter holds `source: "docket/ideas/a.md"`, quotes included; the idea is taken.
   - `TestStatusLocalAheadOfTip`: `refs/remotes/origin/main` and a local `main` one commit ahead that adds a record naming the need; an idea that needs it waits.
   - `TestStatusNoRemote`: no remote; `main` holds the order, its ideas and a record naming the need; the idea can start.
+  - `TestStatusLinkedRecord`: another worktree's record is a symbolic link; `unreadable` lists it and dkt exits with 3.
+  - `TestStatusBrokenProposalOnBranch`: an unmerged branch's `proposal.md` has front matter that cannot be read; `unreadable` lists the branch and file and dkt exits with 3.
   - `TestStatusFolderWithoutProposal`: another worktree holds `openspec/changes/add-x/` with no `proposal.md`; `unreadable` is empty and dkt exits with 0.
   - `TestStatusWritesNothing`: `git status --short` is the same before and after.
   - `TestStatusFromAnotherWorktree`: running from a worktree on a stale branch gives the same `next` as from the main worktree.
@@ -113,7 +115,7 @@
 
 - [ ] **Step 3: Write `internal/idea/work.go`** using `scan.Changes` and `scan.Records` and the Reuse rows. Reads from a ref are grouped by commit into one `ReadBlobs` call each. Reads from a worktree check `safepath.Check`, then `safefile.ReadNoFollow`. `scan.Unreadable` entries from both scans are carried over.
 
-- [ ] **Step 4: Write `internal/cli/cmd_status.go`.** In order: take the tip, with `no-order` when there is none; read `idea.OrderFile`, with `no-order` when it is missing; `ParseOrder`, each `bad` line an `order-format` finding on `idea.OrderFile` with its line and `idea.LineForm` in the message; `no-order` when there are no lines and nothing bad; read each line's idea and each need's idea from the tip, in one `ReadBlobs` per round: `order-idea` on the line, `idea-front-matter` on the idea's file, `idea-needs` on the file of the idea that needs it; with any finding, `order-invalid` and no scan; otherwise `FindWork` and `Next`, then `waiting` or `none-left` when `next` is empty. `waiting_on` is never null. Human lines: `Next: <path> (<title>)`, or one line for each reason.
+- [ ] **Step 4: Write `internal/cli/cmd_status.go`.** In order: take the tip, with `no-order` when there is none; read `idea.OrderFile`, with `no-order` when it is missing; `ParseOrder`, each `bad` line an `order-format` finding on `idea.OrderFile` with its line and `idea.LineForm` in the message; `no-order` when there are no lines and nothing bad; read each line's idea and each need's idea from the tip, in one `ReadBlobs` per round: `order-idea` on the line, `idea-front-matter` on the idea's file, `idea-needs` on the file of the idea that needs it; with any finding, `order-invalid` and no `FindWork`; otherwise `FindWork` and `Next`, then `waiting` or `none-left` when `next` is empty. `waiting_on` is never null. Human lines: `Next: <path> (<title>)`, or one line for each reason.
 
 - [ ] **Step 5: Run** `go test -run TestStatus ./internal/cli/ ./internal/idea/`; expect PASS. Mutate and see a test fail for each, then restore: read the order from the worktree instead of the tip; match `source` by prefix; set `OnTip` for every ref; ignore a worktree symbolic link's refusal.
 

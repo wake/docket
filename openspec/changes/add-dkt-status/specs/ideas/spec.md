@@ -74,7 +74,7 @@ A change or record SHALL name an idea when the `source` in its front matter is e
 - **THEN** it names no idea and is not reported as a problem
 
 ### Requirement: Needs
-An idea it needs SHALL be met when that idea is dropped, or when a change or record that names it is on the default branch tip. Work only in a worktree or on another branch SHALL NOT meet it.
+An idea it needs SHALL be met when that idea is dropped, or when the tip's own copy of a change or record names it. Work only in a worktree or on another branch SHALL NOT meet it.
 
 #### Scenario: Need merged
 - **WHEN** `docket/ideas/b.md` needs `docket/ideas/a.md`, and the tip holds a record that names `docket/ideas/a.md`
@@ -83,6 +83,10 @@ An idea it needs SHALL be met when that idea is dropped, or when a change or rec
 #### Scenario: Need in progress
 - **WHEN** the order names `docket/ideas/a.md`, then `docket/ideas/b.md`, which needs it, and only an unmerged branch holds a change that names `docket/ideas/a.md`
 - **THEN** `result.next` is null, `result.reason` is `waiting`, and `result.waiting_on` holds `docket/ideas/a.md`
+
+#### Scenario: Same file names another idea on the tip
+- **WHEN** `docket/ideas/b.md` needs `docket/ideas/a.md`, the tip's `openspec/changes/add-x/proposal.md` has the `source` `docket/ideas/c.md`, and another worktree's copy of that file has the `source` `docket/ideas/a.md`
+- **THEN** `docket/ideas/a.md` is taken, and `docket/ideas/b.md` waits on it
 
 #### Scenario: Need ordered later
 - **WHEN** the order names `docket/ideas/b.md`, which needs `docket/ideas/a.md`, then `docket/ideas/a.md`, and nothing has been done on either
@@ -145,7 +149,7 @@ With any problem in the order or in an idea, `result.next` SHALL be null, `resul
 - **THEN** the findings hold `order-idea`, `result.next` is null, and `result.reason` is `order-invalid`
 
 ### Requirement: Unreadable sources
-A source the scan cannot read, and a change's `proposal.md` or a record whose front matter cannot be read, SHALL be listed in `unreadable`, and dkt SHALL exit with 3. `result.next` SHALL still be reported from what could be read.
+When `dkt status` looks for the work that names ideas, a source it cannot read, and a change's `proposal.md` or a record whose front matter cannot be read, SHALL be listed in `unreadable`, and dkt SHALL exit with 3. `result.next` SHALL still be reported from what could be read. With no order, or with a problem in it, the answer does not depend on that work, and dkt SHALL NOT look for it.
 
 #### Scenario: Broken proposal elsewhere
 - **WHEN** another worktree's `proposal.md` has front matter that cannot be read, and the first idea in the order has nothing done on it
@@ -154,6 +158,14 @@ A source the scan cannot read, and a change's `proposal.md` or a record whose fr
 #### Scenario: Linked proposal
 - **WHEN** another worktree's `proposal.md` is a symbolic link
 - **THEN** `unreadable` lists it, Docket does not read through it, and dkt exits with 3
+
+#### Scenario: Broken record elsewhere
+- **WHEN** an unmerged branch holds a record whose front matter cannot be read
+- **THEN** `unreadable` lists that branch and file, and dkt exits with 3
+
+#### Scenario: Problem and a broken proposal
+- **WHEN** a line of the order names a missing idea, and another worktree's `proposal.md` has front matter that cannot be read
+- **THEN** the findings hold `order-idea`, `unreadable` is empty, `result.next` is null, and dkt exits with 1
 
 ### Requirement: Output
 `dkt status` SHALL take no positional argument. With `--json`, `result` SHALL hold `next`, `reason` and `waiting_on`. Without it, dkt SHALL print the next idea's path and title, or one line saying why there is none.
