@@ -129,18 +129,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 		chosen = cand
 	}
 
-	used := []newUse{}
-	for _, u := range inv.Uses {
-		if u.Slug != slug {
-			continue
-		}
-		i := slices.IndexFunc(used, func(x newUse) bool { return x.Path == u.Path })
-		if i < 0 {
-			used = append(used, newUse{Path: u.Path})
-			i = len(used) - 1
-		}
-		used[i].Sources = append(used[i].Sources, u.Source)
-	}
+	used := usedPlaces(inv.Uses, slug)
 	if chosen != slug && !seen {
 		used = append(used, newUse{Path: "openspec/changes/" + slug, Sources: []string{root}})
 	}
@@ -198,6 +187,30 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	}
 
 	res := newResult{Slug: chosen, Requested: slug, Path: "openspec/changes/" + chosen, Title: title, Kind: kind, Source: source, Used: used}
+	human := usedLines(slug, used)
+	human = append(human, "created "+res.Path)
+	return Outcome{Result: res, Human: human}, nil
+}
+
+// usedPlaces groups the uses of slug by path, each with its sources; never nil.
+func usedPlaces(uses []scan.Use, slug string) []newUse {
+	used := []newUse{}
+	for _, u := range uses {
+		if u.Slug != slug {
+			continue
+		}
+		i := slices.IndexFunc(used, func(x newUse) bool { return x.Path == u.Path })
+		if i < 0 {
+			used = append(used, newUse{Path: u.Path})
+			i = len(used) - 1
+		}
+		used[i].Sources = append(used[i].Sources, u.Source)
+	}
+	return used
+}
+
+// usedLines is the human line for each place slug is used.
+func usedLines(slug string, used []newUse) []string {
 	var human []string
 	for _, u := range used {
 		s := u.Sources
@@ -207,6 +220,5 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 		}
 		human = append(human, fmt.Sprintf("%s is used at %s in %s", slug, u.Path, list))
 	}
-	human = append(human, "created "+res.Path)
-	return Outcome{Result: res, Human: human}, nil
+	return human
 }
