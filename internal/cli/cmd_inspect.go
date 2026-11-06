@@ -133,7 +133,7 @@ func (c *Context) inspectDefaultBranch(res *inspectResult, out *Outcome) error {
 	}
 	for _, slug := range slugs {
 		carried := slices.ContainsFunc(trs, func(t gitx.Trailers) bool {
-			return slices.ContainsFunc(t.Change, func(v string) bool { _, _, mine := change.TaskRefs(v, slug); return mine })
+			return slices.ContainsFunc(t.Values, func(v string) bool { _, _, mine := change.TaskRefs(v, slug); return mine })
 		})
 		if !carried {
 			out.Findings = append(out.Findings, Finding{Rule: "trailer-missing", Change: slug, File: "openspec/changes/" + slug + "/plan.md",

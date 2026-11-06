@@ -44,7 +44,7 @@ func TestChangeTrailersMerge(t *testing.T) {
 	}
 	seen := map[string][]string{}
 	for _, tr := range got {
-		seen[tr.SHA] = tr.Change
+		seen[tr.SHA] = tr.Values
 	}
 	if len(got) != 4 || !reflect.DeepEqual(seen[side], []string{"add-x/1"}) || !reflect.DeepEqual(seen[main], []string{"add-x/2"}) {
 		t.Errorf("got %+v", got)
