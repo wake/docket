@@ -1,6 +1,8 @@
 package lint
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
@@ -101,7 +103,26 @@ func TestIssueTasksSection(t *testing.T) {
 func TestIssuePlaceholder(t *testing.T) {
 	comments := regexp.MustCompile(`(?s)<!--.*?-->`).FindAllString(string(issTemplate(t)), -1)
 	rep := lintIss(t, issFront+"## Current\nc\n"+comments[1]+"\n\n## Expected\ne\n\n## Unchanged\nu\n\n## Evidence\nv\n")
-	only(t, rep, "placeholder", "")
+	only(t, rep, "placeholder", "shipped/issue/template.md")
+}
+
+// A folder that cannot be read may hold the named file, so nothing is reported missing.
+func TestNamedMissingWithUnreadableIssues(t *testing.T) {
+	dir := t.TempDir()
+	locked := filepath.Join(dir, "docket", "issues")
+	if err := os.MkdirAll(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(locked, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(locked, 0o755) })
+	in, _ := open(t, dir)
+	in.Slugs = []string{issSlug}
+	rep := run(t, in)
+	if count(rep, "record-missing") != 0 || len(rep.Unreadable) == 0 {
+		t.Fatalf("%+v", rep)
+	}
 }
 
 func TestNamedIssue(t *testing.T) {
