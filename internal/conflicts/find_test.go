@@ -106,6 +106,29 @@ func TestFindMergesOperations(t *testing.T) {
 	}
 }
 
+func TestFindSpellingFirstInInput(t *testing.T) {
+	m := []string{"main"}
+	got := Find([]Parsed{
+		p("add-x", []string{"a"}, tc("booking", "Cancel booking", "MODIFIED")),
+		p("add-x", []string{"b"}, tc("booking", "cancel  BOOKING", "MODIFIED")),
+		p("add-y", m, tc("booking", "Cancel Booking", "MODIFIED")),
+	})
+	if len(got) != 1 || got[0].Requirement != "Cancel booking" {
+		t.Errorf("got %+v", got)
+	}
+}
+
+func TestFindSortsRequirementsWithinCapability(t *testing.T) {
+	m := []string{"main"}
+	got := Find([]Parsed{
+		p("add-x", m, tc("booking", "Refund points", "MODIFIED"), tc("booking", "Cancel booking", "MODIFIED")),
+		p("add-y", m, tc("booking", "Refund points", "MODIFIED"), tc("booking", "Cancel booking", "MODIFIED")),
+	})
+	if len(got) != 2 || got[0].Requirement != "Cancel booking" || got[1].Requirement != "Refund points" {
+		t.Errorf("got %+v", got)
+	}
+}
+
 func TestInvolving(t *testing.T) {
 	a := Overlap{Capability: "a", Changes: []Entry{{Slug: "add-x"}, {Slug: "add-y"}}}
 	b := Overlap{Capability: "b", Changes: []Entry{{Slug: "add-y"}, {Slug: "add-z"}}}
