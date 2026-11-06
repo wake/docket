@@ -57,3 +57,17 @@ func TestChangeTrailersUnbornHead(t *testing.T) {
 		t.Error("want git's error for an unborn HEAD")
 	}
 }
+
+func TestRecordTrailers(t *testing.T) {
+	r := testutil.NewRepo(t)
+	a := r.Commit("a\n\nRecord: 2026-11-01-fix-x/1\nChange: b", map[string]string{"f": "1"})
+	b := r.Commit("b\n\nChange: b", map[string]string{"f": "2"})
+	got, err := Git{Dir: r.Dir, Env: r.Env}.RecordTrailers("HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Trailers{{a, []string{"2026-11-01-fix-x/1"}}, {b, nil}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}

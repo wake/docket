@@ -20,6 +20,9 @@ const recordTemplateName = "shipped/record/template.md"
 // keeping their slugs on the state; a missing folder, or a file in its place,
 // holds none.
 func (r *state) readRecords() {
+	if r.recordSlugs != nil {
+		return // read already; the listing is the same for the whole run
+	}
 	r.recordSlugs = map[string]bool{}
 	entries, err := fs.ReadDir(r.in.Root, record.Dir)
 	if err != nil {
@@ -33,6 +36,28 @@ func (r *state) readRecords() {
 		if slug, ok := strings.CutSuffix(e.Name(), ".md"); ok && e.Type().IsRegular() {
 			r.recordSlugs[slug] = true
 		}
+	}
+}
+
+// checkRecordTrailers reports each trailer that is not a record's slug alone
+// or with a task list, or whose record is not a regular file. An unreadable
+// folder is already listed as unreadable, so it reports nothing here.
+func (r *state) checkRecordTrailers() {
+	if len(r.in.RecordTrailers) == 0 {
+		return
+	}
+	r.readRecords()
+	if r.recordsUnreadable {
+		return
+	}
+	for _, t := range r.in.RecordTrailers {
+		slug, _, _ := strings.Cut(t.Value, "/")
+		if _, ok, _ := change.TaskRefs(t.Value, slug); ok && r.recordSlugs[slug] {
+			continue
+		}
+		r.rep.Findings = append(r.rep.Findings, Finding{Rule: "record-trailer",
+			Message: fmt.Sprintf("commit %s has the trailer Record: %s, which is not the slug of a record under %s, alone or followed by / and task numbers separated by commas",
+				t.Commit[:min(7, len(t.Commit))], t.Value, record.Dir)})
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/safefile"
 	"github.com/wake/docket/internal/safepath"
 )
@@ -37,6 +38,9 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 		return Outcome{}, UsageError{Msg: fmt.Sprintf("%q is not a change name", slug)}
 	}
 	root := c.Repo.Root
+	if change.HasDate(slug) {
+		return syncRecord(c, slug, check)
+	}
 	rel := "openspec/changes/" + slug
 	plan := rel + "/plan.md"
 	if err := safepath.Check(root, plan); err != nil {
@@ -75,6 +79,30 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 	}
 	return syncFile(syncFileArgs{Slug: slug, File: plan, Path: planPath, Src: src, Plan: change.ParsePlan(src),
 		Key: "Change", Commits: commits, Finding: slug, Check: check})
+}
+
+// syncRecord is dkt sync for a record: its tasks and the Record trailer.
+func syncRecord(c *Context, slug string, check bool) (Outcome, error) {
+	rel := record.Path(slug)
+	if err := safepath.Check(c.Repo.Root, rel); err != nil {
+		return refuse(err)
+	}
+	file := filepath.Join(c.Repo.Root, rel)
+	src, err := safefile.ReadNoFollow(file)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return finding("record-missing", rel+" does not exist")
+	case err != nil:
+		return Outcome{Unreadable: []Unreadable{{Source: rel, Reason: err.Error()}}}, nil
+	}
+	var commits []gitx.Trailers
+	if c.Repo.Head != nil {
+		if commits, err = c.Git.RecordTrailers("HEAD"); err != nil {
+			return Outcome{}, err
+		}
+	}
+	return syncFile(syncFileArgs{Slug: slug, File: rel, Path: file, Src: src, Plan: record.Parse(src).Tasks,
+		Key: "Record", Commits: commits, Check: check})
 }
 
 type syncFileArgs struct {

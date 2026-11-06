@@ -16,6 +16,9 @@ type Trailers struct {
 // the values of its Change trailer as git reads trailers.
 func (g Git) ChangeTrailers(rev string) ([]Trailers, error) { return g.trailers("Change", rev) }
 
+// RecordTrailers is ChangeTrailers for the Record trailer.
+func (g Git) RecordTrailers(rev string) ([]Trailers, error) { return g.trailers("Record", rev) }
+
 func (g Git) trailers(key, rev string) ([]Trailers, error) {
 	out, err := g.output("log", "-z", "--reverse", "--format=%H%x00%(trailers:key="+key+",valueonly,unfold)", rev)
 	if err != nil {

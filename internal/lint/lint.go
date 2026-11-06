@@ -36,6 +36,9 @@ type Input struct {
 	// RecordTemplate is the shipped record template; its comments are the
 	// placeholders a record must not keep.
 	RecordTemplate []byte
+	// RecordTrailers are the Record trailer values of the commits the branch
+	// adds; each must name a regular file under docket/records.
+	RecordTrailers []RecordTrailer
 }
 
 // Linted is a change that was linted and the schema it names.
@@ -117,6 +120,9 @@ func (r *state) unreadable(source string, err error) {
 	r.rep.Unreadable = append(r.rep.Unreadable, u)
 }
 
+// RecordTrailer is one Record trailer value and the commit that carries it.
+type RecordTrailer struct{ Commit, Value string }
+
 // Run lints the named changes and records, or every active change, the main
 // specs' titles and the records in Input.Records when none is named. A name
 // starting with a date is a record.
@@ -169,6 +175,7 @@ func Run(in Input) (Report, error) {
 			lintRecord(r, slug, known)
 		}
 	}
+	r.checkRecordTrailers()
 	if len(in.Slugs) == 0 {
 		fnd, us, n := SpecTitles(in.Root)
 		rep.Findings = append(rep.Findings, fnd...)
