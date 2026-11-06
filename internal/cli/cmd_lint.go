@@ -8,6 +8,7 @@ import (
 
 	docket "github.com/wake/docket"
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/lint"
 	"github.com/wake/docket/internal/record"
 )
@@ -15,6 +16,7 @@ import (
 type lintResult struct {
 	Changes []lintChange `json:"changes"` // never null
 	Records []string     `json:"records"` // slugs; never null
+	Issues  []string     `json:"issues"`  // slugs; never null
 	Specs   int          `json:"specs"`
 	// DefaultBranch is null when the routing rule was skipped.
 	DefaultBranch *string `json:"default_branch"`
@@ -50,7 +52,7 @@ func runLint(c *Context, names []string) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	var added, records []string
+	var added, records, issues []string
 	var recordTrailers []lint.RecordTrailer
 	var branch *string
 	skip := "No default branch found; the routing rule and record checks were skipped."
@@ -78,6 +80,9 @@ func runLint(c *Context, names []string) (Outcome, error) {
 					if records, err = g.AddedSince(base, record.Dir); err != nil {
 						return Outcome{}, err
 					}
+					if issues, err = g.AddedSince(base, issue.Dir); err != nil {
+						return Outcome{}, err
+					}
 					trs, err := g.RecordTrailers(base + "..HEAD")
 					if err != nil {
 						return Outcome{}, err
@@ -96,9 +101,13 @@ func runLint(c *Context, names []string) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
+	issueTemplate, err := docket.Shipped.ReadFile("shipped/issue/template.md")
+	if err != nil {
+		return Outcome{}, err
+	}
 	rep, err := lint.Run(lint.Input{
 		Root: root.FS(), Templates: templates, Slugs: names, Added: added,
-		Records: records, RecordTemplate: recordTemplate, RecordTrailers: recordTrailers,
+		Records: records, RecordTemplate: recordTemplate, Issues: issues, IssueTemplate: issueTemplate, RecordTrailers: recordTrailers,
 		OpenSpec: func() (lint.OpenSpec, error) {
 			r, err := openSpecRunner(c)
 			if err != nil {
@@ -110,12 +119,12 @@ func runLint(c *Context, names []string) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	res := lintResult{Changes: []lintChange{}, Records: append([]string{}, rep.Records...), Specs: rep.Specs, DefaultBranch: branch}
+	res := lintResult{Changes: []lintChange{}, Records: append([]string{}, rep.Records...), Issues: append([]string{}, rep.Issues...), Specs: rep.Specs, DefaultBranch: branch}
 	for _, l := range rep.Changes {
 		res.Changes = append(res.Changes, lintChange{Slug: l.Slug, Schema: l.Schema})
 	}
 	out := Outcome{Result: res,
-		Human: []string{fmt.Sprintf("Linted %d changes, %d records and %d main spec titles.", len(res.Changes), len(res.Records), res.Specs)}}
+		Human: []string{fmt.Sprintf("Linted %d changes, %d records, %d issues and %d main spec titles.", len(res.Changes), len(res.Records), len(res.Issues), res.Specs)}}
 	if skip != "" {
 		out.Human = append(out.Human, skip)
 	}

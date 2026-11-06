@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/record"
 )
 
@@ -35,6 +36,14 @@ var recordKind = dated{
 	prefix:       "record",
 	template:     "shipped/record/template.md",
 	limit:        record.BodyLimit,
+}
+
+var issueKind = dated{
+	dir:      issue.Dir,
+	sections: issue.Sections,
+	prefix:   "issue",
+	template: "shipped/issue/template.md",
+	limit:    issue.BodyLimit,
 }
 
 // list lists the regular .md files directly under dir, keeping their slugs; a
@@ -87,7 +96,7 @@ func (r *state) checkRecordTrailers() {
 }
 
 // datedScope returns the slugs of the files of kind d to lint, sorted: the
-// ones in files and the ones named, reporting named ones that are not files.
+// ones in files and the ones named that are files.
 func (r *state) datedScope(d dated, files, named []string) []string {
 	if len(files) == 0 && len(named) == 0 {
 		return nil // nothing is in scope, so the folder does not matter
@@ -100,13 +109,8 @@ func (r *state) datedScope(d dated, files, named []string) []string {
 		}
 	}
 	for _, n := range named {
-		switch {
-		case l.slugs[n]:
+		if l.slugs[n] {
 			want[n] = true
-		case !l.unreadable:
-			file := d.dir + "/" + n + ".md"
-			r.rep.Findings = append(r.rep.Findings, Finding{Rule: "record-missing", File: file,
-				Message: fmt.Sprintf("record %q does not exist: %s is not a regular file", n, file)})
 		}
 	}
 	slugs := make([]string, 0, len(want))
@@ -115,6 +119,45 @@ func (r *state) datedScope(d dated, files, named []string) []string {
 	}
 	sort.Strings(slugs)
 	return slugs
+}
+
+func article(noun string) string {
+	if strings.ContainsRune("aeiou", rune(noun[0])) {
+		return "an"
+	}
+	return "a"
+}
+
+// lintKind lints the files of kind d in files and named, and returns their slugs.
+func (r *state) lintKind(d dated, files, named []string, template []byte) []string {
+	slugs := r.datedScope(d, files, named)
+	if len(slugs) == 0 {
+		return nil
+	}
+	known := map[string]string{}
+	if len(template) == 0 {
+		r.unreadable(d.template, errors.New("no template given"))
+	} else {
+		addPlaceholders(known, d.template, template)
+	}
+	for _, slug := range slugs {
+		lintDated(r, d, slug, known)
+	}
+	return slugs
+}
+
+// checkDatedMissing reports each dated name that is a regular file in neither
+// folder; an unreadable folder is already listed as unreadable.
+func (r *state) checkDatedMissing(named []string) {
+	for _, n := range named {
+		rl, il := r.list(recordKind.dir), r.list(issueKind.dir)
+		if rl.slugs[n] || il.slugs[n] || rl.unreadable || il.unreadable {
+			continue
+		}
+		rf, itf := recordKind.dir+"/"+n+".md", issueKind.dir+"/"+n+".md"
+		r.rep.Findings = append(r.rep.Findings, Finding{Rule: "record-missing", File: rf,
+			Message: fmt.Sprintf("no record or issue named %q: neither %s nor %s is a regular file", n, rf, itf)})
+	}
 }
 
 // lintDated applies the rules of kind d to one file.
@@ -185,7 +228,7 @@ func checkDatedSections(r *state, d dated, c *loaded, file string, p record.Pars
 	for _, s := range p.Sections {
 		i := slices.IndexFunc(canon, func(n string) bool { return strings.EqualFold(n, s.Name) })
 		if i < 0 {
-			r.add(c, rule, file, s.Line, "section %q is not part of a %s; use %s", s.Name, d.prefix, strings.Join(canon, ", "))
+			r.add(c, rule, file, s.Line, "section %q is not part of %s %s; use %s", s.Name, article(d.prefix), d.prefix, strings.Join(canon, ", "))
 			continue
 		}
 		present[canon[i]] = true

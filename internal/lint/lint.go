@@ -36,6 +36,10 @@ type Input struct {
 	// RecordTemplate is the shipped record template; its comments are the
 	// placeholders a record must not keep.
 	RecordTemplate []byte
+	// Issues are the paths the branch adds under docket/issues, nil when
+	// skipped; IssueTemplate is the shipped issue template.
+	Issues        []string
+	IssueTemplate []byte
 	// RecordTrailers are the Record trailer values of the commits the branch
 	// adds; each must name a regular file under docket/records.
 	RecordTrailers []RecordTrailer
@@ -61,6 +65,7 @@ type Unreadable struct{ Source, Reason string }
 type Report struct {
 	Changes    []Linted
 	Records    []string
+	Issues     []string
 	Specs      int
 	Findings   []Finding
 	Unreadable []Unreadable
@@ -169,18 +174,9 @@ func Run(in Input) (Report, error) {
 			lintChange(r, c)
 		}
 	}
-	if slugs := r.datedScope(recordKind, in.Records, recordNames); len(slugs) > 0 {
-		known := map[string]string{}
-		if len(in.RecordTemplate) == 0 {
-			r.unreadable(recordKind.template, errors.New("no template given"))
-		} else {
-			addPlaceholders(known, recordKind.template, in.RecordTemplate)
-		}
-		rep.Records = slugs
-		for _, slug := range slugs {
-			lintDated(r, recordKind, slug, known)
-		}
-	}
+	rep.Records = r.lintKind(recordKind, in.Records, recordNames, in.RecordTemplate)
+	rep.Issues = r.lintKind(issueKind, in.Issues, recordNames, in.IssueTemplate)
+	r.checkDatedMissing(recordNames)
 	r.checkRecordTrailers()
 	if len(in.Slugs) == 0 {
 		fnd, us, n := SpecTitles(in.Root)
