@@ -1,4 +1,5 @@
 {
   "name": "docket",
+  "version": "0.16.0",
   "description": "An SDD development workflow that combines superpowers and OpenSpec"
 }

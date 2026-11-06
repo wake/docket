@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"sort"
@@ -532,5 +533,45 @@ func TestInstallSnapshot(t *testing.T) {
 	}
 	if got, want := strings.TrimSpace(string(out)), "dkt "+meta.Tag; got != want {
 		t.Errorf("dkt --version = %q, want %q", got, want)
+	}
+}
+
+// TestPluginVersion checks that the plugin and the marketplace name the same
+// version. The release workflow sets DOCKET_RELEASE_TAG to the pushed tag, so
+// a tag that differs from the files fails before anything is published.
+func TestPluginVersion(t *testing.T) {
+	read := func(path string, v any) {
+		t.Helper()
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(b, v); err != nil {
+			t.Fatalf("%s: %v", path, err)
+		}
+	}
+	var plugin struct{ Version string }
+	read(".claude-plugin/plugin.json", &plugin)
+	if !regexp.MustCompile(`^\d+\.\d+\.\d+$`).MatchString(plugin.Version) {
+		t.Fatalf(".claude-plugin/plugin.json: version %q is not X.Y.Z", plugin.Version)
+	}
+	want := "v" + plugin.Version
+
+	var market struct {
+		Plugins []struct {
+			Name   string
+			Source struct{ Source, Repo, Ref string }
+		}
+	}
+	read(".claude-plugin/marketplace.json", &market)
+	if len(market.Plugins) != 1 || market.Plugins[0].Name != "docket" {
+		t.Fatalf(".claude-plugin/marketplace.json: want exactly one plugin, docket; got %+v", market.Plugins)
+	}
+	src := market.Plugins[0].Source
+	if src.Source != "github" || src.Repo != "wake/docket" || src.Ref != want {
+		t.Errorf(".claude-plugin/marketplace.json: source is %+v, want github wake/docket ref %s", src, want)
+	}
+	if tag := os.Getenv("DOCKET_RELEASE_TAG"); tag != "" && tag != want {
+		t.Errorf("tag %s differs from version %s in .claude-plugin/plugin.json", tag, want)
 	}
 }
