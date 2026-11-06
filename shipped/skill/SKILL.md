@@ -91,9 +91,24 @@ off (such as `//nolint`) is a check setting.
   and fill its sections, then run `dkt lint` and fix what it reports.
   When you cannot find where the expected behavior is settled, the request
   is an idea.
-- **Order**: `docket/order.md` lists the ideas to work on next, in order. To
-  pick up the next piece of work, run `dkt status --json` and do the one
-  `result.next` names.
+- **Order**: `docket/order.md` lists the ideas and issues to work on next,
+  in order, one per line, as `- docket/ideas/<name>.md` or
+  `- docket/issues/<slug>.md`. Blank lines and lines starting with `#` are
+  ignored, and a line may stay once its work is done. Issues kept in the
+  project's tool are not listed. `dkt status` reads the order, the ideas and
+  the issues on the default branch, so an edit counts only once it is
+  merged.
+  To pick up the next piece of work, run `dkt status --json` and do the one
+  `result.next` names. When `unreadable` lists anything, report it to the
+  user and let them decide whether to go on with the work. When
+  `result.next` is null, act on `result.reason`:
+  - `no-order` or `none-left`: nothing in the order can be done; ask the
+    user what to work on next.
+  - `order-invalid`: the order, an idea or an issue has problems that
+    `dkt status` reports; fix them in a direct merge of their own, then run
+    it again.
+  - `waiting`: everything left waits for the ideas in `result.waiting_on`
+    to be merged. Tell the user which ones, and let them decide.
 
 While working on a change or a record, do not touch `docket/order.md` or
 `docket/ideas/`. A new idea found during the work, and any edit to the
