@@ -44,6 +44,27 @@ var guidanceAdvice = map[string]string{
 	"differs":  "has its own operations section; dkt init keeps it",
 }
 
+const workflowFile = "docket/workflow.md"
+
+// workflowFindings reports what docket/workflow.md says about its template.
+func workflowFindings(d setup.Decision) []Finding {
+	w := d.Workflow
+	if w == nil {
+		return nil
+	}
+	var fs []Finding
+	switch {
+	case w.Version == 0 || w.Version > w.Shipped:
+		fs = append(fs, Finding{Rule: "workflow-template-unknown", File: workflowFile, Message: fmt.Sprintf("%s has no template version this release knows; it ships template %d", workflowFile, w.Shipped)})
+	case w.Version < w.Shipped:
+		fs = append(fs, Finding{Rule: "workflow-outdated", File: workflowFile, Message: fmt.Sprintf("%s follows template %d; this release ships template %d: run docket-doctor to bring in the changes", workflowFile, w.Version, w.Shipped)})
+	}
+	for _, h := range w.Missing {
+		fs = append(fs, Finding{Rule: "workflow-section-missing", File: workflowFile, Message: fmt.Sprintf("%s has no %q section; the template has it", workflowFile, h)})
+	}
+	return fs
+}
+
 // decisionFindings reports what dkt init would do with one decided file.
 func decisionFindings(d setup.Decision) []Finding {
 	switch d.Kind {
@@ -52,6 +73,11 @@ func decisionFindings(d setup.Decision) []Finding {
 			return nil
 		}
 		return []Finding{{Rule: string(d.Kind) + "-" + string(d.Status), File: d.Path, Message: fmt.Sprintf("%s is %s; %s", d.Path, d.Status, fileAdvice[d.Status])}}
+	case setup.KindWorkflow:
+		if d.Status == setup.StatusMissing {
+			return []Finding{{Rule: "workflow-missing", File: d.Path, Message: d.Path + " is missing; dkt init writes it"}}
+		}
+		return workflowFindings(d)
 	case setup.KindConfig:
 		if d.Config == nil {
 			return nil

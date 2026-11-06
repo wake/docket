@@ -145,6 +145,8 @@ func initFindings(d setup.Decision) []Finding {
 		if d.Action == setup.ActionKeep {
 			fs = append(fs, Finding{Rule: string(d.Kind) + "-differs", File: d.Path, Message: d.Path + " differs from the shipped file and was kept; dkt init --force replaces it"})
 		}
+	case setup.KindWorkflow:
+		fs = workflowFindings(d)
 	case setup.KindConfig:
 		if d.Config.Schema == "other" {
 			fs = append(fs, Finding{Rule: "config-schema-other", File: d.Path, Message: d.Path + " names another schema; dkt init keeps it"})

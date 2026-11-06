@@ -497,3 +497,52 @@ func TestInitText(t *testing.T) {
 		}
 	}
 }
+
+func lastStep(t *testing.T, m initOut) string {
+	t.Helper()
+	b, err := fs.ReadFile(shippedFS(), "next-steps/doctor.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(m.Result.NextSteps); n == 0 || m.Result.NextSteps[n-1] != strings.TrimSpace(string(b)) {
+		t.Fatalf("next_steps = %q", m.Result.NextSteps)
+	}
+	return ""
+}
+
+func TestInitWorkflowSectionMissing(t *testing.T) {
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	mine := strings.Replace(shippedWorkflow(t), "### Plan review", "### Our own review", 1)
+	r.Write("docket/workflow.md", mine)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	var n int
+	for _, f := range m.Findings {
+		if f.Rule == "workflow-section-missing" && f.File == "docket/workflow.md" && strings.Contains(f.Message, "Plan review") {
+			n++
+		}
+	}
+	if code != 1 || n != 1 || len(m.Findings) != 1 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != mine {
+		t.Errorf("code=%d %+v", code, m.Findings)
+	}
+	lastStep(t, m)
+}
+
+func TestInitWorkflowOutdated(t *testing.T) {
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	before := readFile(t, r, "docket/workflow.md")
+	withShippedWorkflow(t, strings.Replace(shippedWorkflow(t), "template: 1", "template: 2", 1))
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	var msg string
+	for _, f := range m.Findings {
+		if f.Rule == "workflow-outdated" && f.File == "docket/workflow.md" {
+			msg = f.Message
+		}
+	}
+	if code != 1 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != before ||
+		!strings.Contains(msg, "template 1") || !strings.Contains(msg, "template 2") {
+		t.Errorf("code=%d %+v", code, m.Findings)
+	}
+	lastStep(t, m)
+}

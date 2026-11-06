@@ -8,8 +8,9 @@ import (
 	"github.com/wake/docket/internal/setup"
 )
 
-// shippedFS is the shipped/ tree that dkt init writes from.
-func shippedFS() fs.FS {
+// shippedFS is the shipped/ tree that dkt init writes from. Tests may replace
+// it and must restore it, as setup.Earlier says.
+var shippedFS = func() fs.FS {
 	sub, err := fs.Sub(docket.Shipped, "shipped")
 	if err != nil { // only a bad path name fails, and it is constant
 		panic(err)
