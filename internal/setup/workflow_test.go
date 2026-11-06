@@ -91,6 +91,8 @@ func TestWorkflowVersionUnknown(t *testing.T) {
 		"not a number":    strings.Replace(template(t), "template: 1", "template: one", 1),
 		"no front matter": "# Mine\n",
 		"unclosed":        "---\ntemplate: 1\n",
+		"zero":            strings.Replace(template(t), "template: 1", "template: 0", 1),
+		"negative":        strings.Replace(template(t), "template: 1", "template: -1", 1),
 	}
 	for name, content := range cases {
 		d := decideWorkflowFile(t, content, shipped(t))
@@ -131,8 +133,9 @@ func TestWorkflowSectionMissing(t *testing.T) {
 	}
 }
 
+// The two version tests drop a section: at another version the sections are not checked.
 func TestWorkflowHigherVersion(t *testing.T) {
-	d := decideWorkflowFile(t, strings.Replace(template(t), "template: 1", "template: 2", 1), shipped(t))
+	d := decideWorkflowFile(t, withoutPlanReview(t, strings.Replace(template(t), "template: 1", "template: 2", 1)), shipped(t))
 	if d.Status != StatusDiffers || d.Workflow.Version != 2 || d.Workflow.Missing != nil {
 		t.Errorf("%+v %+v", d, d.Workflow)
 	}
@@ -140,10 +143,19 @@ func TestWorkflowHigherVersion(t *testing.T) {
 
 func TestWorkflowLowerVersion(t *testing.T) {
 	sh := shippedWith(t, strings.Replace(template(t), "template: 1", "template: 2", 1))
-	d := decideWorkflowFile(t, template(t), sh)
+	d := decideWorkflowFile(t, withoutPlanReview(t, template(t)), sh)
 	if d.Status != StatusOutdated || d.Action != ActionKeep || d.Workflow.Version != 1 || d.Workflow.Shipped != 2 || d.Workflow.Missing != nil {
 		t.Errorf("%+v %+v", d, d.Workflow)
 	}
+}
+
+func withoutPlanReview(t *testing.T, s string) string {
+	t.Helper()
+	out := strings.Replace(s, "### Plan review\n", "", 1)
+	if out == s {
+		t.Fatal("no Plan review heading to remove")
+	}
+	return out
 }
 
 func TestWorkflowDocketIsAFile(t *testing.T) {
