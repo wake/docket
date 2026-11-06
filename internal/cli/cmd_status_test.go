@@ -439,6 +439,22 @@ func TestStatusText(t *testing.T) {
 	}
 }
 
+func TestStatusTextWaiting(t *testing.T) {
+	r := stRepo(t, stOrder("a", "b"), map[string]string{"a": stIdea("A"), "b": stIdea("B", "needs: [docket/ideas/a.md]\n")})
+	stBranch(r, "other", map[string]string{propX: stProposal(ideaA)})
+	env := append(slices.Clone(r.Env), "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "nope"))
+	var out bytes.Buffer
+	RunWith(Options{Args: []string{"status"}, Dir: r.Dir, Env: env, Stdout: &out, Stderr: &bytes.Buffer{}}, []func() Command{statusCommand})
+	if !strings.Contains(out.String(), ideaA) {
+		t.Errorf("text: %q", out.String())
+	}
+	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 0, "", "waiting")
+	if !slices.Equal(m.Result.WaitingOn, []string{ideaA}) {
+		t.Errorf("%s", raw)
+	}
+}
+
 func TestStatusArgumentGiven(t *testing.T) {
 	r := twoIdeas(t)
 	code, _, raw := stRun(t, r, r.Dir, "add-x")

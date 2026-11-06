@@ -111,14 +111,9 @@ func readWorktree(root, rel string) ([]byte, string) {
 	b, err := safefile.ReadNoFollow(filepath.Join(root, filepath.FromSlash(rel)))
 	switch {
 	case err == nil:
-		if b == nil {
-			b = []byte{}
-		}
 		return b, ""
 	case errors.Is(err, fs.ErrNotExist):
 		return nil, ""
-	case errors.Is(err, syscall.ELOOP):
-		return nil, rel + linkReason
 	}
 	return nil, err.Error()
 }

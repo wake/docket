@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/wake/docket/internal/idea"
 )
@@ -24,7 +25,6 @@ func statusCommand() Command {
 var statusText = map[string]string{
 	"no-order":      "No next idea: there is no order.",
 	"order-invalid": "No next idea: fix the problems found.",
-	"waiting":       "No next idea: the ideas left wait on other ideas.",
 	"none-left":     "No next idea: every idea in the order is dropped or taken.",
 }
 
@@ -35,6 +35,8 @@ func runStatus(c *Context, _ []string) (Outcome, error) {
 	finish := func() (Outcome, error) {
 		if res.Next != nil {
 			out.Human = []string{fmt.Sprintf("Next: %s (%s)", res.Next.Path, res.Next.Title)}
+		} else if res.Reason == "waiting" {
+			out.Human = []string{"No next idea: the ideas left wait on " + strings.Join(res.WaitingOn, ", ") + "."}
 		} else {
 			out.Human = []string{statusText[res.Reason]}
 		}
