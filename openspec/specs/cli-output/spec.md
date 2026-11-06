@@ -82,7 +82,7 @@ When a command cannot read a source it needs, it SHALL list that source with the
 ### Requirement: Repository required
 A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new`, `dkt sync` and `dkt lint`, SHALL do nothing outside one, report `no-repository`, and exit with 4. When `git` cannot be run, it SHALL report `git-missing` and exit with 4.
 
-#### Scenario: Outside a repository
+#### Scenario: Init outside a repository
 - **WHEN** a user runs `dkt init --json --tools claude` outside any git repository
 - **THEN** no file is written, `repo` is null, the findings hold `no-repository`, and dkt exits with 4
 
