@@ -3,6 +3,7 @@ package change
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -19,9 +20,30 @@ func ValidLine(s string) bool {
 	return utf8.ValidString(s) && !strings.ContainsAny(s, "\n\r") && strings.TrimSpace(s) != ""
 }
 
+// TitleLimit is the longest a change title may be, in bytes (see Size).
+const TitleLimit = 120
+
+// Size is the length of text with runs of white space counted as one space.
+// shortcut: Cyrillic, Arabic, Indic and Thai text reach the limit up to three times sooner than English; weigh Chinese, Japanese and Korean characters as 3 and others as 1 if that is reported.
+func Size(text string) int {
+	return len(strings.Join(strings.Fields(text), " "))
+}
+
+// TitleTooLong says whether title is over TitleLimit, with the message to report.
+func TitleTooLong(title string) (msg string, tooLong bool) {
+	n := Size(title)
+	if n <= TitleLimit {
+		return "", false
+	}
+	return fmt.Sprintf("title is %d bytes; the limit is %d", n, TitleLimit), true
+}
+
+// HasDate reports whether s starts with a date (YYYY-MM-DD).
+func HasDate(s string) bool { return datePrefix.MatchString(s) }
+
 // CheckSlug refuses the slugs Docket reserves; OpenSpec checks the rest.
 func CheckSlug(slug string) error {
-	if datePrefix.MatchString(slug) {
+	if HasDate(slug) {
 		return errors.New("slug must not start with a date (YYYY-MM-DD): archiving adds the date")
 	}
 	if slug == "archive" {

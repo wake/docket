@@ -112,3 +112,39 @@ func TestSchemaOf(t *testing.T) {
 		}
 	}
 }
+
+func TestSize(t *testing.T) {
+	for s, want := range map[string]int{"  a   b \n": 3, strings.Repeat("字", 40): 120, "": 0} {
+		if got := Size(s); got != want {
+			t.Errorf("Size(%q) = %d, want %d", s, got, want)
+		}
+	}
+}
+
+func TestTitleTooLong(t *testing.T) {
+	for name, tc := range map[string]struct {
+		title string
+		want  bool
+	}{
+		"120 bytes":        {strings.Repeat("a", 120), false},
+		"121 bytes":        {strings.Repeat("a", 121), true},
+		"40 Chinese":       {strings.Repeat("字", 40), false},
+		"spaces collapsed": {strings.Repeat("a", 118) + "   b", false},
+	} {
+		msg, got := TitleTooLong(tc.title)
+		if got != tc.want {
+			t.Errorf("%s: got %v", name, got)
+		}
+		if got && (!strings.Contains(msg, "121") || !strings.Contains(msg, "120")) {
+			t.Errorf("%s: message %q", name, msg)
+		}
+	}
+}
+
+func TestHasDate(t *testing.T) {
+	for s, want := range map[string]bool{"2026-10-30-x": true, "2026-10-30": true, "add-x": false} {
+		if HasDate(s) != want {
+			t.Errorf("HasDate(%q) = %v", s, !want)
+		}
+	}
+}
