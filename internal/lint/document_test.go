@@ -58,6 +58,14 @@ func TestFrontMatterRules(t *testing.T) {
 	}
 }
 
+func TestLintTitleTooLong(t *testing.T) { // Change title too long
+	front := "---\ntitle: " + strings.Repeat("a", 121) + "\nkind: feature\nsource: s\n---\n"
+	rep := lintX(t, map[string]string{"proposal.md": front + "\n" + goodSections})
+	if !has(rep, "title-too-long", pf, 2, "121") || !has(rep, "title-too-long", pf, 2, "120") || count(rep, "title-missing") != 0 {
+		t.Errorf("%v", rep.Findings)
+	}
+}
+
 func TestNewCapabilities(t *testing.T) {
 	spec := "## ADDED Requirements\n"
 	front := func(specs string) string {

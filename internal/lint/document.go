@@ -28,6 +28,8 @@ func checkFront(r *state, c *loaded, fm change.Front, has bool, err error) {
 		r.add(c, "title-missing", proposalFile, 0, "title is missing from the front matter")
 	} else if !change.ValidLine(f.Value) {
 		r.add(c, "title-missing", proposalFile, f.Line, "title must be one line of text")
+	} else if msg, tooLong := change.TitleTooLong(f.Value); tooLong {
+		r.add(c, "title-too-long", proposalFile, f.Line, "%s", msg)
 	}
 	if f, ok := fm.Fields["kind"]; !ok {
 		r.add(c, "metadata-invalid", proposalFile, 0, "kind is missing from the front matter")

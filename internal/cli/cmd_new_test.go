@@ -163,6 +163,33 @@ func TestNewUsageErrors(t *testing.T) { // Missing source, Unknown kind, Title o
 	}
 }
 
+func TestNewTitleTooLong(t *testing.T) { // Title over the limit
+	e := newProject(t)
+	code, _, raw, calls := e.doNew(t, e.r.Dir, nil, "add-x", "--kind", "feature", "--source", "x", "--title", strings.Repeat("a", 121))
+	if code != 2 || calls != "" || e.exists("openspec/changes/add-x") {
+		t.Fatalf("code=%d calls=%q %s", code, calls, raw)
+	}
+	if !strings.Contains(raw, "121") || !strings.Contains(raw, "120") {
+		t.Errorf("%s", raw)
+	}
+}
+
+func TestNewTitleAtLimit(t *testing.T) { // Chinese title at the limit
+	e := newProject(t)
+	code, _, raw, _ := e.doNew(t, e.r.Dir, nil, "add-x", "--kind", "feature", "--source", "x", "--title", strings.Repeat("字", 40))
+	if code != 0 || !e.exists("openspec/changes/add-x") {
+		t.Fatalf("code=%d %s", code, raw)
+	}
+}
+
+func TestNewLongSource(t *testing.T) { // Long source
+	e := newProject(t)
+	code, _, raw, _ := e.doNew(t, e.r.Dir, nil, "add-x", "--kind", "feature", "--source", strings.Repeat("s", 500), "--title", "X")
+	if code != 0 || !e.exists("openspec/changes/add-x") {
+		t.Fatalf("code=%d %s", code, raw)
+	}
+}
+
 func TestNewSlugRules(t *testing.T) {
 	e := newProject(t)
 	e.r.Write("openspec/changes/archive/2026-01-02-keep/proposal.md", "k")

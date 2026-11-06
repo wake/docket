@@ -75,6 +75,9 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	case !change.ValidLine(title):
 		return Outcome{}, UsageError{Msg: "new needs --title: one line of text that is not blank"}
 	}
+	if msg, tooLong := change.TitleTooLong(title); tooLong {
+		return Outcome{}, UsageError{Msg: "new needs --title: " + msg}
+	}
 	if err := change.CheckSlug(slug); err != nil {
 		return finding("slug-invalid", err.Error())
 	}
