@@ -55,13 +55,13 @@ func runLint(c *Context, names []string) (Outcome, error) {
 	var added, records, issues []string
 	var recordTrailers []lint.RecordTrailer
 	var branch *string
-	skip := "No default branch found; the routing rule and record checks were skipped."
+	skip := "No default branch found; the routing rule and the record and issue checks were skipped."
 	db, ok, err := c.Git.DefaultBranch()
 	if err != nil {
 		return Outcome{}, err
 	}
 	if ok {
-		skip = "No merge base with " + db.Name + "; the routing rule and record checks were skipped."
+		skip = "No merge base with " + db.Name + "; the routing rule and the record and issue checks were skipped."
 		if c.Repo.Head != nil {
 			// AddedSince needs the repository root as the git directory.
 			g := gitx.Git{Dir: c.Repo.Root, Env: c.Git.Env}

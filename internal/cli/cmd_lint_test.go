@@ -341,13 +341,13 @@ func TestLintRoutingText(t *testing.T) {
 		return out
 	}
 	none := testutil.NewRepo(t)
-	if out := text(none); !strings.Contains(out, "Linted 0 changes, 0 records, 0 issues and 0 main spec titles.\nNo default branch found; the routing rule and record checks were skipped.\n") {
+	if out := text(none); !strings.Contains(out, "Linted 0 changes, 0 records, 0 issues and 0 main spec titles.\nNo default branch found; the routing rule and the record and issue checks were skipped.\n") {
 		t.Fatalf("%q", out)
 	}
 	r := routingRepo(t, map[string]string{"README.md": "x\n"})
 	r.Git("checkout", "-q", "--orphan", "other")
 	r.Commit("other", nil)
-	if out := text(r); !strings.Contains(out, "Linted 0 changes, 0 records, 0 issues and 0 main spec titles.\nNo merge base with main; the routing rule and record checks were skipped.\n") {
+	if out := text(r); !strings.Contains(out, "Linted 0 changes, 0 records, 0 issues and 0 main spec titles.\nNo merge base with main; the routing rule and the record and issue checks were skipped.\n") {
 		t.Fatalf("%q", out)
 	}
 	ok := routingRepo(t, map[string]string{"README.md": "x\n"})
