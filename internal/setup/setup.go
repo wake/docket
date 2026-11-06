@@ -24,6 +24,7 @@ const (
 	KindConfig   Kind = "config"
 	KindSkill    Kind = "skill"
 	KindOpenSpec Kind = "openspec"
+	KindWorkflow Kind = "workflow"
 )
 
 type Status string
@@ -55,6 +56,9 @@ type Decision struct {
 	// Config is set for the config kind only.
 	Config *ConfigState
 
+	// Workflow is set for the workflow kind when the file exists.
+	Workflow *WorkflowState
+
 	data    []byte
 	existed bool
 }
@@ -74,9 +78,10 @@ type Problem struct {
 }
 
 type target struct {
-	rel  string
-	want []byte
-	kind Kind
+	rel     string
+	want    []byte
+	kind    Kind
+	version int // the shipped template version, for the workflow kind
 }
 
 // Decide reads every target under root, changing nothing. shipped is the
@@ -105,7 +110,7 @@ func Decide(root string, shipped fs.FS, force bool) ([]Decision, []Problem, erro
 	return ds, problems, nil
 }
 
-// targetsOf lists the schema files sorted by path, then openspec/config.yaml, then the skill in each skill root.
+// targetsOf lists the schema files sorted by path, then openspec/config.yaml, then the skill in each skill root, then the workflow file.
 func targetsOf(shipped fs.FS) ([]target, error) {
 	var out []target
 	err := fs.WalkDir(shipped, "schema", func(p string, d fs.DirEntry, err error) error {
@@ -134,6 +139,15 @@ func targetsOf(shipped fs.FS) ([]target, error) {
 	for _, r := range []string{".claude/skills/docket/SKILL.md", ".agents/skills/docket/SKILL.md"} {
 		out = append(out, target{rel: r, want: skill, kind: KindSkill})
 	}
+	tpl, err := fs.ReadFile(shipped, "workflow/workflow.md")
+	if err != nil {
+		return nil, err
+	}
+	v := templateVersion(tpl)
+	if v == 0 {
+		return nil, errors.New("the shipped workflow template has no template version")
+	}
+	out = append(out, target{rel: workflowPath, want: tpl, kind: KindWorkflow, version: v})
 	return out, nil
 }
 
@@ -165,6 +179,9 @@ func decide(root string, t target, force bool) (Decision, *Problem) {
 	d.existed = err == nil
 	if t.kind == KindConfig {
 		return decideConfig(d, got, t.want)
+	}
+	if t.kind == KindWorkflow {
+		return decideWorkflow(d, got, t.want, t.version), nil
 	}
 	sum := sha256.Sum256(got)
 	switch {

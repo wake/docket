@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	docket "github.com/wake/docket"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,6 +99,9 @@ func TestInitFresh(t *testing.T) {
 	if status(m, ".claude/skills/openspec-explore/SKILL.md") != "created" {
 		t.Errorf("%+v", m.Result.Files)
 	}
+	if f := fileOf(m, "docket/workflow.md"); f.Kind != "workflow" || f.Status != "created" || readFile(t, r, "docket/workflow.md") != shippedWorkflow(t) {
+		t.Errorf("workflow %+v", f)
+	}
 	n := 0
 	for _, f := range m.Result.Files {
 		if f.Path == "openspec/config.yaml" {
@@ -115,7 +119,7 @@ func TestInitFresh(t *testing.T) {
 	}
 	ds, _, _ := setup.Decide(r.Dir, shippedFS(), false)
 	for _, d := range ds {
-		if d.Action != setup.ActionNone {
+		if d.Action != setup.ActionNone && d.Kind != setup.KindWorkflow {
 			t.Errorf("%s still %s", d.Path, d.Action)
 		}
 	}
@@ -203,9 +207,44 @@ func TestInitRerunSame(t *testing.T) {
 		t.Errorf("%+v", m.Result)
 	}
 	for _, f := range m.Result.Files {
+		if f.Path == "docket/workflow.md" {
+			if f.Status != "kept" {
+				t.Errorf("%+v", f)
+			}
+			continue
+		}
 		if f.Status != "same" {
 			t.Errorf("%+v", f)
 		}
+	}
+}
+
+func fileOf(m initOut, path string) struct{ Path, Kind, Status string } {
+	for _, f := range m.Result.Files {
+		if f.Path == path {
+			return f
+		}
+	}
+	return struct{ Path, Kind, Status string }{}
+}
+
+func shippedWorkflow(t *testing.T) string {
+	t.Helper()
+	b, err := fs.ReadFile(shippedFS(), "workflow/workflow.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestInitWorkflowKeptWithForce(t *testing.T) {
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	mine := strings.ReplaceAll(shippedWorkflow(t), "Before any code", "Before any of our code")
+	r.Write("docket/workflow.md", mine)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil, "--force")
+	if code != 0 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != mine || len(m.Findings) != 0 {
+		t.Errorf("code=%d %+v", code, m)
 	}
 }
 
