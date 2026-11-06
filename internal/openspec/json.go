@@ -104,6 +104,9 @@ func (r *Runner) ShowChange(slug string) ([]Delta, error) {
 	}
 	var ds []Delta
 	for _, d := range w.Deltas {
+		if err := checkDelta(d.Spec, d.Operation, d.Requirements, d.Rename != nil && d.Rename.From != "" && d.Rename.To != ""); err != nil {
+			return nil, decodeErr(args, err)
+		}
 		x := Delta{Spec: d.Spec, Operation: d.Operation, Requirements: reqs(d.Requirements)}
 		if d.Rename != nil {
 			x.Rename = &Rename{From: d.Rename.From, To: d.Rename.To}
@@ -111,6 +114,31 @@ func (r *Runner) ShowChange(slug string) ([]Delta, error) {
 		ds = append(ds, x)
 	}
 	return ds, nil
+}
+
+// checkDelta rejects a delta that lacks what its operation carries.
+func checkDelta(spec, op string, rs []wireReq, hasRename bool) error {
+	if spec == "" {
+		return errors.New("a delta has no spec")
+	}
+	switch op {
+	case "RENAMED":
+		if !hasRename {
+			return fmt.Errorf("a RENAMED delta of %s has no rename", spec)
+		}
+	case "ADDED", "MODIFIED", "REMOVED":
+		if len(rs) == 0 {
+			return fmt.Errorf("a %s delta of %s has no requirement", op, spec)
+		}
+		for _, r := range rs {
+			if r.Name == "" {
+				return fmt.Errorf("a %s delta of %s has a requirement without a name", op, spec)
+			}
+		}
+	default:
+		return fmt.Errorf("a delta of %s has the unknown operation %q", spec, op)
+	}
+	return nil
 }
 
 // ShowSpec returns the requirements of the capability.

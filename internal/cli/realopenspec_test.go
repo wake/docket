@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -173,5 +174,48 @@ func TestRealOpenSpec(t *testing.T) {
 	l = lint(1)
 	if l.Result == nil || len(l.Result.Changes) != 1 || l.Result.Changes[0].Slug != "add-x" || l.Result.Specs != 0 {
 		t.Errorf("lint without a name: result=%+v", l.Result)
+	}
+}
+
+// TestRealOpenSpecConflicts runs dkt conflicts against the real OpenSpec CLI: a rename in one
+// worktree and a modification, with other spacing in the name, in another.
+func TestRealOpenSpecConflicts(t *testing.T) {
+	if os.Getenv("DOCKET_TEST_OPENSPEC") != "1" {
+		t.Skip("set DOCKET_TEST_OPENSPEC=1 to run against the real OpenSpec")
+	}
+	r := testutil.NewRepo(t)
+	r.Commit("base", map[string]string{"README.md": "x"})
+	env := append([]string{}, r.Env...)
+	for _, k := range []string{"DOCKET_OPENSPEC", "PATH", "npm_config_cache"} {
+		if v, ok := os.LookupEnv(k); ok {
+			env = append(env, k+"="+v)
+		}
+	}
+	other := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "-q", "-b", "other", other)
+
+	put(t, r.Dir, map[string]string{
+		"openspec/changes/add-x/proposal.md":           string(change.FrontMatter("Add", "feature", "x")),
+		"openspec/changes/add-x/specs/booking/spec.md": "## RENAMED Requirements\n\n- FROM: `### Requirement: Cancel booking`\n- TO: `### Requirement: Cancel reservation`\n",
+	})
+	put(t, other, map[string]string{
+		"openspec/changes/add-y/specs/booking/spec.md": "## MODIFIED Requirements\n\n### Requirement: Cancel  Booking\nThe system SHALL cancel a booking.\n\n" +
+			"#### Scenario: Cancel\n- **WHEN** a user cancels\n- **THEN** the booking is cancelled\n",
+	})
+
+	code, out, errs := runIn(t, r.Dir, env, "conflicts", "--json")
+	var m conflictsOut
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatalf("%q %q: %v", out, errs, err)
+	}
+	if code != 1 || m.Result == nil || len(m.Result.Overlaps) != 1 {
+		t.Fatalf("code=%d out=%q err=%q", code, out, errs)
+	}
+	got := map[string][]string{}
+	for _, c := range m.Result.Overlaps[0].Changes {
+		got[c.Slug] = c.Operations
+	}
+	if !slices.Equal(got["add-x"], []string{"RENAMED-FROM"}) || !slices.Equal(got["add-y"], []string{"MODIFIED"}) {
+		t.Errorf("overlap = %+v", m.Result.Overlaps[0])
 	}
 }
