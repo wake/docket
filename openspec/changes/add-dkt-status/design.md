@@ -18,15 +18,21 @@ See proposal.md for the motivation. The docket skill says to take `result.next`,
 
 **`- docket/ideas/<name>.md` per line.** Reordering moves one line, with no numbers to rewrite, unlike v0.15.0's numbered lines. Headings are ignored so that the file can be titled. Anything else is an error rather than skipped, because a skipped line could be the first idea, and the agent would start the wrong work. The finding states the form, since no shipped text does.
 
+**Issues in the order, local ones only.** An issue has a settled expected behavior and can be as next as any idea. It stays out of the rest: no `dropped`, since an issue no longer wanted leaves the order; `needs` names only ideas, and either can be widened later without breaking anything. An address in another tool is refused because dkt could not read its title or tell whether it is closed, and a differently written address would look untaken.
+
+**`result.next` has no `kind`.** The path already says it, under `docket/ideas/` or `docket/issues/`, and a field can be added later without breaking callers.
+
 **One-line `needs`.** The front matter reader in `internal/change` takes one line per key apart from `specs`, and this keeps it: no YAML dependency for one list. A block list fails with a finding that shows the form.
 
 **Honor `needs`.** The skill's rule for work that has to wait writes the waiting part as an idea that needs the original, and that idea sits behind one in progress: ignoring `needs` would make it next too early. A need is met only when the work is on the tip, since the skill says dependent work waits for the merge.
 
 **A dropped need counts as met.** Otherwise the idea would wait forever and say only `waiting`. The agent reads the idea before starting, and the person who dropped the need can drop or edit this one too. Alternative: report a problem: that blocks the whole order on a decision that may be fine.
 
+**A committed symbolic link names nothing.** `ReadBlobs` returns a link's target as text, which has no front matter, so a linked `proposal.md` on a branch counts as no work rather than as unreadable, unlike one in a worktree. `dkt new` refuses links, so this takes a link committed by hand, and telling them apart needs another git call per commit.
+
 **Any problem makes `next` null, even a later line.** A simple rule, and `ok: false` beside a `next` would ask the agent to weigh them. The fix is a one-line direct merge. Alternative: answer from the lines before the first problem: more cases, and it hides a broken order until it is reached.
 
-**Only the ideas the order reaches are read.** The order's lines and their needs. Linting every idea is `dkt lint`'s job, later.
+**Only the items the order reaches are read.** The order's lines and their needs. Linting every idea is `dkt lint`'s job, later.
 
 **With no order or a problem in it, no scan.** `next` is null whatever the work says, so reading every worktree and branch would only add to the report. Fixing the order brings any unreadable source to light on the next run.
 
@@ -41,4 +47,5 @@ See proposal.md for the motivation. The docket skill says to take `result.next`,
 - [The skill says what `result.next` is for but not what to do when it is null] → An agent reads `reason`; the skill's text is the maintainer's to change, and is not touched here.
 - [Nothing shipped states the order's format] → The `order-format` finding states it.
 - [A record's `scan.Use` has no commit, so `FindWork` looks its ref up in a second `Refs` call; a ref that moves in between is read at its new commit] → Accepted: the window is milliseconds and the answer is one a run a moment later would give. Setting the commit in `scan.Records` is a one-line change for later, in a file `add-dkt-issue` is changing now.
+- [A worktree's file that disappears between the scan and the read names nothing] → Accepted: a run a moment later would give the same answer, and a change folder without `proposal.md` looks the same.
 - [The tip is only as fresh as the last fetch] → Accepted: `dkt` does not contact a remote, and `default-branch` defines the tip this way everywhere.

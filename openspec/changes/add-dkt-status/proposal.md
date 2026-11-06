@@ -14,25 +14,26 @@ The docket skill tells an agent picking up work to run `dkt status --json` and d
 
 ## What Changes
 
-- New command `dkt status`: reads `docket/order.md` and the ideas it names from the default branch tip, and reports in `result.next` the first idea still to do, with `result.reason` saying why when there is none.
-- `docket/order.md` gets a format: one `- docket/ideas/<name>.md` line per idea, in order.
+- New command `dkt status`: reads `docket/order.md` and the ideas and issues it names from the default branch tip, and reports in `result.next` the first item still to do, with `result.reason` saying why when there is none.
+- `docket/order.md` gets a format: one `- docket/ideas/<name>.md` or `- docket/issues/<slug>.md` line per item, in order.
 - An idea's front matter gets a settled form: `title`, `dropped: true` and a one-line `needs` list.
-- An idea stops being next once a change or record anywhere names it as its source, and an idea that needs another waits until that work is on the default branch.
+- An idea or issue stops being next once a change or record anywhere names it as its source, and an idea that needs another idea waits until that work is on the default branch.
 - This repository's `AGENTS.md` drops `dkt status` from its stopgaps, and the README lists the command.
 
 ## Non-Goals
 
-- Issues: their state and list.
-- A list of ideas, or of their states (pending, in progress, done). `dkt status` names one idea.
+- A list of issues or ideas, or of their states (pending, in progress, done). `dkt status` names one item.
+- Issues kept in another tool: their addresses cannot go in `docket/order.md`, so such a project orders only ideas. A string compare would miss a differently written address and take a closed issue for open, and adding them later breaks nothing, where removing them would.
+- `dropped` or `needs` on an issue: an issue no longer wanted leaves the order, and `needs` names only ideas.
 - A list of changes or records, or any flag such as `--merged`.
-- `dkt lint` checking the order or the ideas: `dkt status` reports only what it needs to read, for the ideas the order reaches.
+- `dkt lint` checking the order or the ideas: `dkt status` reports only what it needs to read, for the items the order reaches.
 - A shipped template or prompt text for `docket/order.md` or ideas.
 - Fetching from a remote: the default branch tip is what is already on the machine.
 
 ## Capabilities
 
 ### New Capabilities
-- `ideas`: what an idea file and `docket/order.md` hold, and how `dkt status` names the next idea from them.
+- `ideas`: what an idea file and `docket/order.md` hold, and how `dkt status` names the next idea or issue from them.
 
 ### Modified Capabilities
 - `cli-output`: `dkt status` is a command that needs a repository. `add-dkt-issue` changes the same requirement, so this delta is written once that change has merged (plan Task 3).
