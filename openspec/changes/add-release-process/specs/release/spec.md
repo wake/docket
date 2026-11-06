@@ -15,7 +15,7 @@ Pushing a tag of the form `vX.Y.Z` SHALL publish a GitHub release of that tag wi
 
 #### Scenario: Another tag pushed
 - **WHEN** a maintainer pushes the tag `v0.16.0-rc.1`
-- **THEN** no release workflow runs and nothing is published
+- **THEN** nothing is published, whether or not the workflow's tag filter lets it through
 
 #### Scenario: Executable reports the tag
 - **WHEN** a user runs `dkt --version` with the executable from the release `v0.16.0`
@@ -127,7 +127,7 @@ When `DKT_VERSION` is set and not empty, `install.sh` SHALL download from the re
 `install.sh` SHALL take no action until the shell has read the whole script, so that a download cut short by `curl | sh` downloads and changes nothing.
 
 #### Scenario: Script cut short
-- **WHEN** only the first lines of the script reach `sh`, at any line
+- **WHEN** the script reaches `sh` cut short at any byte before the end of its last command
 - **THEN** nothing is downloaded and nothing is written under the home directory
 
 ### Requirement: Saying when the directory is not on PATH

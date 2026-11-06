@@ -24,7 +24,9 @@ See proposal.md for the motivation. `dkt --version` already prints a version sta
 
 **`install.sh` keeps its temporary directory inside `~/.local/bin`.** `mv` within one filesystem replaces the target in one step, and the new executable can be run before it replaces a working one, without depending on `/tmp`, which may be mounted `noexec`. The cost is an empty `~/.local/bin` after a failed first install, and traps to clean up on a signal.
 
-**Everything in `install.sh` is inside `main`, called on the last line.** A shell reading from `curl` runs commands as they arrive; with the wrapper, a cut-short download holds no complete command that acts.
+**Everything in `install.sh` is inside `main`, called on the last line with no arguments.** A shell reading from `curl` runs commands as they arrive; with the wrapper, a cut-short download holds no complete command that acts. The only cut that runs anything leaves the whole script, because `main` is then complete: with `main "$@"` as the last line a cut could run a command that differs from the one written, even if harmlessly.
+
+**The tag filter has a second check behind it.** GitHub's filter cannot run in a pull request, so no test can exercise it. `TestPluginVersion` can: with the tag passed in, it requires the tag to be exactly `v` plus a plain `X.Y.Z` version, so `v0.16.0-rc.1` fails before GoReleaser even if the filter lets it through.
 
 **No test hook in `install.sh`.** The tests put fake `curl` and `uname` on `PATH` and feed the script to `sh` on standard input, as `curl | sh` does. The script has no base URL setting: a variable that redirects where an executable comes from is one more thing to attack, and nobody asked for it.
 
