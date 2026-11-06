@@ -58,13 +58,15 @@ func runConflicts(c *Context, names []string) (Outcome, error) {
 	out := Outcome{Result: &res}
 	var parseBad []scan.Unreadable
 	var slug string
+	compared := true // false when the slug is not active and nothing was compared
 	if len(names) == 1 {
 		slug = names[0]
 	}
 	switch {
 	case slug != "" && !active[slug]:
+		compared = false
 		// No OpenSpec is needed to say the slug is not there.
-		if dirs := slices.Compact(archived[slug]); len(dirs) > 0 {
+		if dirs := sortedUnique(archived[slug]); len(dirs) > 0 {
 			out.Findings = append(out.Findings, Finding{Rule: "change-missing", Change: slug,
 				Message: fmt.Sprintf("%s is not an active change: it is archived (%s).", slug, strings.Join(dirs, ", "))})
 		} else if len(inv.Unreadable) == 0 {
@@ -102,8 +104,12 @@ func runConflicts(c *Context, names []string) (Outcome, error) {
 		out.Findings = append(out.Findings, Finding{Rule: "requirement-overlap",
 			Message: fmt.Sprintf("%s / %q: %s", o.Capability, o.Requirement, strings.Join(parts, ", "))})
 	}
-	if len(res.Overlaps) == 0 {
-		out.Human = append(out.Human, fmt.Sprintf("Compared %d changes; no requirement is touched by two of them.", len(res.Changes)))
+	if len(res.Overlaps) == 0 && compared {
+		noun := "changes"
+		if len(res.Changes) == 1 {
+			noun = "change"
+		}
+		out.Human = append(out.Human, fmt.Sprintf("Compared %d %s; no requirement is touched by two of them.", len(res.Changes), noun))
 	}
 	if out.Findings == nil {
 		out.Findings = []Finding{}
@@ -114,4 +120,10 @@ func runConflicts(c *Context, names []string) (Outcome, error) {
 		}
 	}
 	return out, nil
+}
+
+func sortedUnique(s []string) []string {
+	s = slices.Clone(s)
+	slices.Sort(s)
+	return slices.Compact(s)
 }

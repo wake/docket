@@ -215,11 +215,21 @@ func TestConflictsFocus(t *testing.T) {
 
 func TestConflictsSlugArchived(t *testing.T) { // Slug not active
 	e := newCfEnv(t)
-	put(t, e.r.Dir, spec("archive/2026-11-01-add-q", "q"))
+	// The same folder comes from the worktree, refs/heads/a and a remote-tracking ref, with another folder between.
+	e.r.Commit("arch", spec("archive/2026-11-01-add-q", "q"))
+	e.branch("a", spec("archive/2026-11-01-add-q", "q2"))
+	e.branch("b", spec("archive/2026-11-02-add-q", "q"))
+	e.r.Git("update-ref", "refs/remotes/origin/c", e.r.Git("rev-parse", "a"))
 	code, m, raw, calls := e.do(t, "add-q")
 	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "change-missing" || m.Findings[0].Change != "add-q" ||
-		!strings.Contains(m.Findings[0].Message, "openspec/changes/archive/2026-11-01-add-q") || calls != "" {
+		strings.Count(m.Findings[0].Message, "openspec/changes/archive/2026-11-01-add-q") != 1 ||
+		!strings.Contains(m.Findings[0].Message, "openspec/changes/archive/2026-11-02-add-q") || calls != "" ||
+		!strings.Contains(raw, `"changes":[]`) {
 		t.Fatalf("%d %q %s", code, calls, raw)
+	}
+	_, out, _ := runIn(t, e.r.Dir, e.env(e.cmd), "conflicts", "add-q")
+	if strings.Contains(out, "Compared") {
+		t.Errorf("summary for an inactive slug: %q", out)
 	}
 }
 
@@ -231,12 +241,16 @@ func TestConflictsSlugUnreadable(t *testing.T) { // Slug possibly in an unreadab
 	if code != 3 || cfHasRule(m, "change-missing") || len(m.Unreadable) != 1 || m.Unreadable[0].Source != wt {
 		t.Fatalf("%d %s", code, raw)
 	}
+	_, out, _ := runIn(t, e.r.Dir, e.env(e.cmd), "conflicts", "add-q")
+	if strings.Contains(out, "Compared") {
+		t.Errorf("summary for an inactive slug: %q", out)
+	}
 }
 
 func TestConflictsSlugNowhere(t *testing.T) {
 	e := newCfEnv(t)
 	code, m, raw, _ := e.do(t, "add-q")
-	if code != 1 || !cfHasRule(m, "change-missing") {
+	if code != 1 || !cfHasRule(m, "change-missing") || !strings.Contains(raw, `"changes":[]`) {
 		t.Fatalf("%d %s", code, raw)
 	}
 }
@@ -303,5 +317,19 @@ func TestConflictsOutsideRepository(t *testing.T) { // Conflicts outside a repos
 	calls, _ := os.ReadFile(log)
 	if code != 4 || ruleList(m.Findings) != "no-repository" || len(calls) != 0 {
 		t.Fatalf("%d %s %q", code, out, calls)
+	}
+}
+
+func TestConflictsSummaryCount(t *testing.T) {
+	e := newCfEnv(t)
+	put(t, e.r.Dir, spec("add-x", "x"))
+	if _, out, _ := runIn(t, e.r.Dir, e.env(e.cmd), "conflicts"); !strings.Contains(out, "Compared 1 change; no requirement") {
+		t.Errorf("%q", out)
+	}
+	put(t, e.r.Dir, spec("add-y", "y"))
+	e.answer(t, "add-x", [3]string{"booking", "ADDED", "A"})
+	e.answer(t, "add-y", [3]string{"booking", "ADDED", "B"})
+	if _, out, _ := runIn(t, e.r.Dir, e.env(e.cmd), "conflicts"); !strings.Contains(out, "Compared 2 changes; no requirement") {
+		t.Errorf("%q", out)
 	}
 }
