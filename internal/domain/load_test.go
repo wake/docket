@@ -184,6 +184,7 @@ func TestLoadLinkedFolders(t *testing.T) {
 		{"specs", "openspec/specs", map[string]string{"real/refund/spec.md": spec}},
 		{"openspec", "openspec", map[string]string{"real/specs/refund/spec.md": spec}},
 		{"changes", "openspec/changes", map[string]string{"real/add-x/specs/refund/spec.md": spec}},
+		{"changes holding no change", "openspec/changes", map[string]string{"real/notes.md": "x"}},
 		{"change specs", "openspec/changes/add-x/specs", map[string]string{"real/refund/spec.md": spec, "openspec/changes/add-x/proposal.md": "x"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
