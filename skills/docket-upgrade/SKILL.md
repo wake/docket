@@ -29,7 +29,9 @@ Upgrade `dkt` and the Docket plugin on this machine to the latest release, then 
 
    These instructions are still the old version's; the new plugin takes effect once it is reloaded (`/reload-plugins` in Claude Code).
 
-4. When this is not a git directory, or the project has no `openspec/schemas/docket/`, go to step 5. Otherwise run `dkt inspect --json`; it is a read-only command. When it exits with 2 or 4, it did not check properly and has no result: say what else it reported and go to step 5. Otherwise act on the result:
+4. Go on only when all three hold: this is a git directory, it has a `docket/workflow.md` file, and `dkt` is the latest or the user agreed to update it. Otherwise skip the rest of this step, tell the user the project was not adjusted, and go to step 5.
+
+   Run `dkt inspect --json`; it is a read-only command. When it exits with 2 or 4, it did not check properly and has no result: say what else it reported and go to step 5. Otherwise act on the result:
    - `schema-outdated`, `skill-outdated`, `guidance-outdated`: name the files that will be updated, run `dkt init --json` once the user agrees, and help reload the skills as its next steps say. When these files are committed, triage them by the docket skill.
    - Any other finding, or `unreadable`: list them and do not fix them here. Suggest that the user run docket-doctor; when the plugin was just updated, it has to be reloaded first.
    - None of these: tell the user the project is up to date.

@@ -18,4 +18,4 @@ Mechanical: both skills equal the settled drafts byte for byte, and `claude plug
 
 ## Review
 
-Not reviewed yet.
+An attack review on another model found two problems in step 4. A `dkt` the user declined to update only compares with its own older files, so it would report the project as up to date. And gating on `openspec/schemas/docket/` skipped the case where that folder is missing. The maintainer rewrote the step; it now needs the latest `dkt` and looks for `docket/workflow.md`. Not reviewed again; one step changed.
