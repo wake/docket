@@ -35,8 +35,8 @@ them `install-ignored` (a path `dkt init` writes is ignored by git),
 `trailer-missing` (no commit carries the trailer of a change on the default
 branch), and the four starting with `workflow-` (`docket/workflow.md` is
 missing, follows an older template, has an unknown version, or lacks a
-section). When it exits with 2 or 4, nothing was checked: tell the user
-what it said and stop.
+section). When it exits with 2 or 4, it did not check properly and has no
+result: say what else it reported and stop.
 
 Then run `dkt lint --json` and look only at `result.changes`: those whose
 `schema` is not `docket` are active changes made with another schema. Its
