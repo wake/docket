@@ -37,6 +37,19 @@ This puts the latest release at `~/.local/bin/dkt`, after verifying its SHA-256.
 curl -fsSL https://raw.githubusercontent.com/wake/docket/main/install.sh | DKT_VERSION=v0.16.0 sh
 ```
 
+## Upgrade
+
+In your project, run `/docket:docket-upgrade` in Claude Code. It shows what is new, updates `dkt` and the plugin once you agree, then updates the project's Docket files. See [what it does](skills/docket-upgrade/SKILL.md).
+
+A plugin older than v0.19.0 does not have this command yet, so update it once by hand, then reload it with `/reload-plugins`:
+
+```sh
+claude plugin marketplace update docket
+claude plugin update docket@docket
+```
+
+To upgrade without the command, update `dkt` with the install command above and the plugin as shown here, then run `dkt init` in each project and commit what it wrote. `dkt init` updates the files an earlier release wrote, keeps the ones you changed, and never changes `docket/workflow.md`; `/docket:docket-doctor` helps with those.
+
 ## Commands
 
 Once a project is set up, the agent loads the docket skill when development work starts, and runs these commands as the workflow calls for them.
@@ -45,6 +58,7 @@ Once a project is set up, the agent loads the docket skill when development work
 |---|---|
 | `/docket:docket-init` | Sets Docket up in the current project (plugin skill, run by hand) |
 | `/docket:docket-doctor` | Checks the project's Docket setup and helps fix it (plugin skill, run by hand) |
+| `/docket:docket-upgrade` | Upgrades `dkt` and the plugin, then the project's Docket files (plugin skill, run by hand) |
 | `dkt init` | Writes Docket's files into the project, keeping existing files that differ |
 | `dkt inspect` | Reports on the project's Docket setup and writes nothing |
 | `dkt new` | Opens a change on the full review path |

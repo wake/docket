@@ -1,0 +1,5 @@
+interface:
+  display_name: "Docket upgrade"
+  short_description: "Upgrade Docket and adjust this project's Docket files"
+policy:
+  allow_implicit_invocation: false
