@@ -51,6 +51,10 @@ A `domain` field on a change was also considered and dropped: a change can touch
 
 **A file where the `docket` folder would be means no tree.** `docket/domains.md` then does not exist, and `internal/scan` treats a file where a folder would be the same way. `dkt domains` is not the place to report a broken project layout.
 
+**A file where `openspec/changes` would be is unreadable.** Unlike a missing tree, this one has a cost: treating it as no changes could report a line as stale when the capability is held by a change Docket could not list. `dkt lint` reports the same path the same way.
+
+**A link anywhere on the path is refused.** `internal/scan` reports a path that passes through a symbolic link as unreadable, and `dkt domains` does the same for `docket`, `openspec/specs`, `openspec/changes` and a change's `specs` folder; otherwise a link hides or invents capabilities depending on the level it sits at. A linked `spec.md` or `proposal.md` below them is skipped, as `lint.SpecTitles` skips a linked spec. `Load` reads an `fs.FS`, so it finds links through directory listings, which never follow them. `dkt lint` already reads through these folders for its own rules, so it reports what `Load` found only when the project has a tree, and a project without one is unaffected.
+
 **A proposal's front matter only costs a title.** `dkt domains` needs nothing from a proposal but a display name, so front matter it cannot parse gives an empty title and no finding. `dkt status` treats the same problem as unreadable because its answer depends on `source`; this one does not. `dkt lint` still reports `metadata-invalid`, so the two commands differ here on purpose.
 
 **Shared code.** `internal/domain` holds the parser and `Load`, which `dkt domains` and `dkt lint` both call, so both report the same findings about the tree.

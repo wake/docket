@@ -45,12 +45,17 @@
 | The lint run with no change named | internal/lint/lint.go:Run | extend | main spec titles are checked at that point | `rg -n "SpecTitles\(in.Root\)" internal/lint/` |
 | Change folders in the worktree | internal/lint/lint.go:scope | new | `scan.Changes` scans every worktree and ref and takes a `gitx.Git`. `scope` lists one worktree, but it is a method on lint's state that also reports named changes, and `lint` imports this package, so this cannot call it. Its rule, a directory other than `archive`, is one condition, and the spec's `What is linted` and `Capabilities reported` both define it | `rg -n "func Changes" internal/scan/`, `rg -n "func \(r \*state\) scope" internal/lint/` |
 | Reading the tree | none | new | nothing reads a nested list | `rg -n "domains" internal/` |
+| A link on a path | internal/safepath:Check | new | `Check` walks an OS path with `Lstat`, and `Load` reads an `fs.FS` so that `dkt domains`, `dkt lint` and the tests share it. The rule is one walk over directory listings | `rg -n "func Check" internal/safepath/` |
 
 ## Revision 1 (2026-11-07): the skill wording the maintainer settled
 
 The maintainer asked for these in conversation while settling the wording of Task 4. The skill also says to run `dkt domains` after any edit to the tree, and that an edit to the tree alone is a direct merge only when `dkt domains` reports no problem, because neither the checks of a direct merge nor CI name that command. It says to update or delete a capability's line when its path changes or it is removed, because `dkt lint <change>`, which runs before archiving, does not check the tree. Running `dkt domains` and asking before changing a node sit in the section on the tree rather than in step 2 of Full review, since both apply on every path.
 
 No code changes follow. Archiving a change that removes a capability's last requirement either stops or, with `retire_capabilities: true`, deletes the spec, so `domain-unknown` reports the stale line.
+
+## Revision 2 (2026-11-07): links on the path, from the pre-merge review
+
+The pre-merge attack review, on the other model, found that a link at `docket`, `openspec/specs` or `openspec/changes` is followed while a link at `docket/domains.md` is refused. Task 2 had deferred this as minor; the workspace-scan spec settles the opposite, so Task 5 refuses them. The same review and the spec check also asked for the spec to pin behaviors the tests already held: `openspec/changes` as a regular file, a linked spec or proposal, and a capability path starting with `-`.
 
 ---
 
@@ -351,4 +356,75 @@ Expected: no difference, and PASS.
 ```bash
 git add shipped/skill/SKILL.md .claude/skills/docket/SKILL.md .agents/skills/docket/SKILL.md
 git commit -m "Say in the docket skill how a coding agent uses the domain tree" -m "Change: add-domain-tree/4"
+```
+
+### Task 5: Refuse a link anywhere on the path
+
+**Scenarios:** domain-tree#linked-docket-folder, domain-tree#linked-specs-folder, domain-tree#linked-changes-folder, domain-tree#linked-specs-folder-in-a-change, domain-tree#file-in-place-of-the-changes-folder, domain-tree#linked-spec-or-proposal, domain-tree#capability-path-starting-with-a-dash, change-lint#linked-specs-folder-with-a-domain-tree, change-lint#linked-specs-folder-with-no-domain-tree
+
+**Review:** judgment
+
+**Compensates:** Task 2
+
+**Files:**
+- Modify: `internal/domain/load.go`
+- Modify: `internal/domain/load_test.go`
+- Modify: `internal/domain/parse_test.go`
+- Modify: `internal/lint/lint.go`
+- Modify: `internal/lint/lint_test.go`
+- Modify: `internal/cli/cmd_domains_test.go`
+
+**Interfaces:**
+- Consumes: `domain.Load`, `domain.File`, `domain.RuleUnknown`, `Loaded.Found`, `Loaded.Stopped`, `Loaded.Unreadable`.
+- Produces: no new exported symbol. In `internal/domain/load.go`: `linkOnPath(root fs.FS, p string) string` and `linkError(p string) error`.
+
+- [ ] **Step 1: Write the failing tests**
+
+Directory links need a real folder and `os.OpenRoot`, as `TestLoadLinkedProposal` does: `fstest.MapFS` does not behave like a link for a folder.
+
+In `internal/domain/load_test.go`:
+- `TestLoadLinkedDocketFolder`: `real/domains.md` holds `- A`, and `docket` links to `real`. `Stopped` and `Found` are true, `Nodes` is empty, and `Unreadable` is one entry with `Source` `docket/domains.md` and a `Reason` containing `docket is a symbolic link`.
+- `TestLoadLinkedFolders`, one subtest for each link: `openspec/specs`, `openspec` (its target holding `specs/refund/spec.md`), `openspec/changes`, `openspec/changes/add-x/specs`. Each target holds a `refund` capability that following the link would find, and `docket/domains.md` lists a capability that does not exist. `Stopped` is false, `Nodes` is the tree, `Unreadable` has exactly one entry with `Source` the link and a `Reason` containing `symbolic link`, `Capabilities` has no `refund`, and `Problems` has no `domain-unknown`.
+- `TestLoadChangesIsAFile`: `openspec/changes` is a regular file, and the tree lists a capability that does not exist. `Unreadable` has `Source` `openspec/changes`, `Stopped` is false, and `Problems` has no `domain-unknown`.
+- `TestLoadLinkedSpec`: `openspec/specs/refund/spec.md` links to a file. `Capabilities` has no `refund`, and `Unreadable` is empty.
+
+In `internal/domain/parse_test.go`: confirm a capability path starting with `-` gives `domain-format`; add the case when no test holds it.
+
+In `internal/cli/cmd_domains_test.go`, in the style of the linked tree test:
+- `TestDomainsLinkedDocketFolder`: exit 3, `result` null, `unreadable` lists `docket/domains.md`.
+- `TestDomainsLinkedSpecsFolder`: exit 3, `result` not null, `unreadable` lists `openspec/specs`, no `domain-unknown` finding.
+- `TestDomainsChangesIsAFile`: exit 3, `result` not null, `unreadable` lists `openspec/changes`.
+
+In `internal/lint/lint_test.go`:
+- `TestDomainTreeLinkedDocketFolder`: `docket` links to a folder; `Unreadable` lists `docket/domains.md`.
+- `TestDomainTreeLinkedSpecsFolder`: with `docket/domains.md` present and `openspec/specs` a link, `Unreadable` lists `openspec/specs`.
+- `TestDomainTreeLinkedSpecsFolderNoTree`: with no `docket/domains.md` and `openspec/specs` a link, `Unreadable` is empty.
+
+- [ ] **Step 2: Run the tests and see the new ones fail**
+
+Run: `go test ./internal/domain/ ./internal/lint/ && go test ./internal/cli/ -run Domains`
+Expected: FAIL on the new tests, except any that pin behavior already there (`TestLoadChangesIsAFile`, `TestLoadLinkedSpec`, `TestDomainsChangesIsAFile`, `TestDomainTreeLinkedSpecsFolderNoTree`).
+
+- [ ] **Step 3: Implement**
+
+In `internal/domain/load.go`:
+- `linkOnPath` walks `p` from `.` one part at a time with `fs.ReadDir`, returning the path of the first entry whose type has `fs.ModeSymlink`. A part it cannot list or find returns `""`: reading `p` then reports that.
+- `linkError` gives `<p> is a symbolic link; Docket does not read through it`, the wording `internal/scan` uses.
+- `readTree` starts with `linkOnPath(root, File)`, returning found true and `linkError` for any link; this replaces its own symlink case.
+- `walkSpecs` starts with `linkOnPath(root, dir)`, reporting the link through `unreadable` and returning.
+- `Load` checks `linkOnPath(root, changesDir)` before listing it, and lists no change when there is a link.
+- The `unreadable` closure in `Load` skips a source it already holds, so a linked `openspec` is listed once.
+
+In `internal/lint/lint.go`, report `d.Unreadable` only when `d.Found`, with a one-line comment that lint's own rules report what they cannot read when there is no tree.
+
+- [ ] **Step 4: Run the tests and see them pass**
+
+Run: `go vet ./... && go test ./internal/domain/ ./internal/lint/ && go test ./internal/cli/ -run Domains`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add internal/domain/load.go internal/domain/load_test.go internal/domain/parse_test.go internal/lint/lint.go internal/lint/lint_test.go internal/cli/cmd_domains_test.go
+git commit -m "Refuse a link anywhere on the path to the domain tree and the specs" -m "Change: add-domain-tree/5"
 ```

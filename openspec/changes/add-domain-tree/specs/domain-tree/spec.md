@@ -71,6 +71,10 @@ A capability SHALL be a main spec under `openspec/specs/` or a delta spec under 
 - **WHEN** the proposal of the active change `add-x`, the only one holding a delta for `refund`, has front matter that cannot be parsed
 - **THEN** `refund` has an empty title, `dkt domains` reports no finding and nothing unreadable about the proposal, and `dkt lint` reports `metadata-invalid` as `change-lint` defines
 
+#### Scenario: Linked spec or proposal
+- **WHEN** `openspec/specs/refund/spec.md` is a symbolic link, or the proposal of an active change is one
+- **THEN** Docket does not read through it: the link gives no capability and no title, and `unreadable` does not list it
+
 ### Requirement: Unclassified capabilities
 `result.unclassified` SHALL hold every capability no node holds, sorted by path. A capability being unclassified SHALL NOT be a finding.
 
@@ -94,7 +98,7 @@ When `docket/domains.md` does not exist, `result.found` SHALL be false and `resu
 - **THEN** `docket/domains.md` does not exist, `result.found` is false, and dkt exits with 0
 
 ### Requirement: Format problems
-`dkt domains` SHALL report `domain-format`, naming `docket/domains.md` and the line, for each line that is not an item of the form above, or that breaks its rules: an indent that is not two spaces per level, a level skipped, a capability at the top level, an item under a capability, a backtick anywhere but around one whole code span, or a capability path that is not a valid relative path. `result` SHALL be null, and dkt SHALL exit with 1.
+`dkt domains` SHALL report `domain-format`, naming `docket/domains.md` and the line, for each line that is not an item of the form above, or that breaks its rules: an indent that is not two spaces per level, a level skipped, a capability at the top level, an item under a capability, a backtick anywhere but around one whole code span, or a capability path that is not a valid relative path or starts with `-`. `result` SHALL be null, and dkt SHALL exit with 1.
 
 #### Scenario: Line that is not an item
 - **WHEN** a line of `docket/domains.md` is `Users`
@@ -132,6 +136,10 @@ When `docket/domains.md` does not exist, `result.found` SHALL be false and `resu
 - **WHEN** an item's text is `` `../refund` ``
 - **THEN** the finding `domain-format` names that line
 
+#### Scenario: Capability path starting with a dash
+- **WHEN** an item's text is `` `-refund` ``
+- **THEN** the finding `domain-format` names that line
+
 #### Scenario: Every bad line reported
 - **WHEN** two lines of `docket/domains.md` break the form
 - **THEN** there is one `domain-format` finding for each
@@ -162,12 +170,35 @@ When `docket/domains.md` does not exist, `result.found` SHALL be false and `resu
 - **WHEN** a node lists `refund`, there is no main spec, and the active change `add-x` holds a delta for it
 - **THEN** there is no finding
 
-### Requirement: Unreadable sources
-When `docket/domains.md` is a symbolic link, is not a regular file or cannot be read, `unreadable` SHALL list it, `result` SHALL be null, and dkt SHALL exit with 3. When a spec or a proposal cannot be read, `unreadable` SHALL list it, `result` SHALL be reported from what could be read, `domain-unknown` SHALL NOT be reported, and dkt SHALL exit with 3.
+### Requirement: Unreadable tree file
+When a symbolic link is on the path to `docket/domains.md`, or the file is not a regular file or cannot be read, `unreadable` SHALL list it, `result` SHALL be null, and dkt SHALL exit with 3.
 
 #### Scenario: Linked tree file
 - **WHEN** `docket/domains.md` is a symbolic link
 - **THEN** `unreadable` lists it, Docket does not read through it, `result` is null, and dkt exits with 3
+
+#### Scenario: Linked docket folder
+- **WHEN** `docket` is a symbolic link to a folder holding `domains.md`
+- **THEN** `unreadable` lists `docket/domains.md` and names `docket` as the link, Docket does not read through it, `result` is null, and dkt exits with 3
+
+### Requirement: Unreadable sources
+When a symbolic link is on the path to `openspec/specs`, `openspec/changes` or a change's `specs` folder, or when `openspec/changes`, a spec or a proposal cannot be read, `unreadable` SHALL list it, nothing SHALL be read through the link, `result` SHALL be reported from what could be read, `domain-unknown` SHALL NOT be reported, and dkt SHALL exit with 3.
+
+#### Scenario: Linked specs folder
+- **WHEN** a node lists a capability that does not exist, and `openspec/specs`, or the `openspec` folder above it, is a symbolic link to a folder holding `refund/spec.md`
+- **THEN** `unreadable` lists the link once, `refund` is not a capability, there is no `domain-unknown` finding, `result.nodes` is reported, and dkt exits with 3
+
+#### Scenario: Linked changes folder
+- **WHEN** a node lists a capability that does not exist, and `openspec/changes` is a symbolic link to a folder holding `add-x/specs/refund/spec.md`
+- **THEN** `unreadable` lists the link, `refund` is not a capability, there is no `domain-unknown` finding, `result.nodes` is reported, and dkt exits with 3
+
+#### Scenario: Linked specs folder in a change
+- **WHEN** a node lists a capability that does not exist, and `openspec/changes/add-x/specs` is a symbolic link to a folder holding `refund/spec.md`
+- **THEN** `unreadable` lists the link, `refund` is not a capability, there is no `domain-unknown` finding, `result.nodes` is reported, and dkt exits with 3
+
+#### Scenario: File in place of the changes folder
+- **WHEN** a node lists a capability that does not exist, and `openspec/changes` is a regular file
+- **THEN** `unreadable` lists `openspec/changes`, there is no `domain-unknown` finding, `result.nodes` is reported, and dkt exits with 3
 
 #### Scenario: Unreadable spec
 - **WHEN** a node lists `refund`, and a file named `spec.md` under `openspec/specs/` cannot be read

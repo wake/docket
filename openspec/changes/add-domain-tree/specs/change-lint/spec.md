@@ -33,6 +33,14 @@
 - **WHEN** `docket/domains.md` is a symbolic link and a user runs `dkt lint`
 - **THEN** `unreadable` lists it and dkt exits with 3
 
+#### Scenario: Linked specs folder with a domain tree
+- **WHEN** `docket/domains.md` exists, `openspec/specs` is a symbolic link, and a user runs `dkt lint`
+- **THEN** `unreadable` lists `openspec/specs` and dkt exits with 3
+
+#### Scenario: Linked specs folder with no domain tree
+- **WHEN** there is no `docket/domains.md`, `openspec/specs` is a symbolic link, and a user runs `dkt lint`
+- **THEN** the domain tree adds nothing to `unreadable`
+
 #### Scenario: Named change skips the domain tree
 - **WHEN** `docket/domains.md` has a line that is not an item and a user runs `dkt lint add-x`
 - **THEN** no finding is about the domain tree
