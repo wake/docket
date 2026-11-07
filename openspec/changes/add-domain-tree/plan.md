@@ -46,6 +46,12 @@
 | Change folders in the worktree | internal/lint/lint.go:scope | new | `scan.Changes` scans every worktree and ref and takes a `gitx.Git`. `scope` lists one worktree, but it is a method on lint's state that also reports named changes, and `lint` imports this package, so this cannot call it. Its rule, a directory other than `archive`, is one condition, and the spec's `What is linted` and `Capabilities reported` both define it | `rg -n "func Changes" internal/scan/`, `rg -n "func \(r \*state\) scope" internal/lint/` |
 | Reading the tree | none | new | nothing reads a nested list | `rg -n "domains" internal/` |
 
+## Revision 1 (2026-11-07): the skill wording the maintainer settled
+
+The maintainer asked for these in conversation while settling the wording of Task 4. The skill also says to run `dkt domains` after any edit to the tree, and that an edit to the tree alone is a direct merge only when `dkt domains` reports no problem, because neither the checks of a direct merge nor CI name that command. It says to update or delete a capability's line when its path changes or it is removed, because `dkt lint <change>`, which runs before archiving, does not check the tree. Running `dkt domains` and asking before changing a node sit in the section on the tree rather than in step 2 of Full review, since both apply on every path.
+
+No code changes follow. Archiving a change that removes a capability's last requirement either stops or, with `retire_capabilities: true`, deletes the spec, so `domain-unknown` reports the stale line.
+
 ---
 
 ### Task 1: Parse the tree file
@@ -67,7 +73,7 @@
   - `type Node struct { Name string; Capabilities []Entry; Children []*Node }`
   - `func Parse(b []byte) ([]*Node, []Problem)`: every problem in the file; the nodes must not be used when there is one.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `internal/domain/parse_test.go`, with a helper `dump(nodes []*Node) string` that prints the tree one line per item, two spaces per level, a capability as `` `path` ``:
 
@@ -117,12 +123,12 @@ func TestParseTree(t *testing.T) {
 
 `TestParseSameNameElsewhere` feeds `- A\n  - H\n- B\n  - H\n` and wants no problem.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `go test ./internal/domain/`
 Expected: FAIL, the package has no `Parse`.
 
-- [ ] **Step 3: Implement `Parse` in `internal/domain/parse.go`**
+- [x] **Step 3: Implement `Parse` in `internal/domain/parse.go`**
 
 Read with `markdown.Lines`. Skip a line that `markdown.Trim` leaves empty, or that starts with `#` in the first column. Anything else must match `^( *)- (.+)$` and be valid UTF-8, with a non-empty `markdown.Trim` of the text; otherwise it is a `RuleFormat` problem and takes no place in the tree.
 
@@ -130,12 +136,12 @@ Keep a stack of the open items, one per level, where an item is a node or a capa
 
 Report `RuleDuplicate` with the first line in the message, per parent for node names and once across the file for capabilities, comparing the trimmed text exactly.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test ./internal/domain/ && go vet ./internal/domain/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/domain/parse.go internal/domain/parse_test.go
@@ -166,7 +172,7 @@ git commit -m "Parse the domain tree file" -m "Change: add-domain-tree/1"
   - `func Load(root fs.FS) Loaded`
 - Produces, in package `cli`: `func domainsCommand() Command`, added to `commands`.
 
-- [ ] **Step 1: Write the failing tests of `Load`**
+- [x] **Step 1: Write the failing tests of `Load`**
 
 In `internal/domain/load_test.go`, with `fstest.MapFS` and a helper for a main spec `"# " + name + " Specification\n"`:
 
@@ -181,12 +187,12 @@ In `internal/domain/load_test.go`, with `fstest.MapFS` and a helper for a main s
 - `TestLoadOddPaths`: `docket` as a file gives `Found` false and no unreadable. `docket/domains.md/x` (a folder) gives `Stopped` true and `Unreadable[0].Source == File`.
 - `TestLoadLinkedTree`: `MapFS` entry `docket/domains.md` with `Mode: fs.ModeSymlink` gives `Stopped` true, `Unreadable[0].Source == File`, and a reason holding `symbolic link`.
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `go test ./internal/domain/`
 Expected: FAIL, `Load` is not defined.
 
-- [ ] **Step 3: Implement `Load` in `internal/domain/load.go`**
+- [x] **Step 3: Implement `Load` in `internal/domain/load.go`**
 
 When `fs.Stat(root, "docket")` gives `fs.ErrNotExist` or something that is not a directory, there is no file. Otherwise find the file by `fs.ReadDir(root, "docket")` and the entry's type, so that a link is never read through. The reason for a link is `docket/domains.md is a symbolic link; Docket does not read through it`, and for anything else that is not a regular file `docket/domains.md is not a regular file`. When the file holds problems or cannot be read, return with `Stopped` set and read nothing else.
 
@@ -194,12 +200,12 @@ Then walk `openspec/specs` for regular files named `spec.md`, the capability bei
 
 When nothing was unreadable, add `RuleUnknown`, with its line, for each tree entry not in `Capabilities`.
 
-- [ ] **Step 4: Run them to verify they pass**
+- [x] **Step 4: Run them to verify they pass**
 
 Run: `go test ./internal/domain/`
 Expected: PASS.
 
-- [ ] **Step 5: Write the failing tests of the command**
+- [x] **Step 5: Write the failing tests of the command**
 
 In `internal/cli/cmd_domains_test.go`, following `stRun` in `internal/cli/cmd_status_test.go`, which sets `DOCKET_OPENSPEC` to a path that does not exist, so every test also shows that OpenSpec is not needed:
 
@@ -220,12 +226,12 @@ In `internal/cli/cmd_domains_test.go`, following `stRun` in `internal/cli/cmd_st
 
 In `TestCommandHelp` of `internal/cli/command_test.go`, add `"domains": {"--json"}`.
 
-- [ ] **Step 6: Run them to verify they fail**
+- [x] **Step 6: Run them to verify they fail**
 
 Run: `go test ./internal/cli/ -run 'Domains|TestCommandHelp'`
 Expected: FAIL, the command does not exist.
 
-- [ ] **Step 7: Implement the command**
+- [x] **Step 7: Implement the command**
 
 In `internal/cli/cmd_domains.go`: `Command{Name: "domains", Args: 0, Usage: "domains [--json]", Run: runDomains}`. `runDomains` opens the root with `os.OpenRoot(c.Repo.Root)`, as `runLint` does, calls `domain.Load`, and maps `Problems` to findings with `File: domain.File` and `Unreadable` to the envelope's. With `Stopped`, it returns no `Result`, as `finding` in `cmd_new.go` does. Otherwise `Result` is:
 
@@ -254,12 +260,12 @@ type domainsResult struct {
 
 Add `domainsCommand` to `commands` in `internal/cli/command.go`. In `README.md`, add after the `dkt status` row: `` | `dkt domains` | Shows the capabilities in the domain tree of `docket/domains.md`, and those not in it | ``.
 
-- [ ] **Step 8: Run everything**
+- [x] **Step 8: Run everything**
 
 Run: `go vet ./... && go test ./...`
 Expected: PASS, including the existing tests that run each command outside a repository.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add internal/domain/load.go internal/domain/load_test.go internal/cli/cmd_domains.go internal/cli/cmd_domains_test.go internal/cli/command.go internal/cli/command_test.go README.md
@@ -280,7 +286,7 @@ git commit -m "Report the domain tree with dkt domains" -m "Change: add-domain-t
 **Interfaces:**
 - Consumes: `domain.Load`, `domain.Loaded`, `domain.File` from Task 2.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `internal/lint/lint_test.go`, with `repo` and `has`:
 
@@ -290,21 +296,21 @@ In `internal/lint/lint_test.go`, with `repo` and `has`:
 - `TestDomainTreeUnreadableSpec`: with `skipRoot`, an unreadable main spec, which `SpecTitles` also reads, and a tree listing a capability that does not exist. `Unreadable` lists that spec exactly once, and no finding has the rule `domain-unknown`.
 - `TestDomainTreeSkippedForNamedChange`: the file with a bad line, `Slugs: []string{"real"}` over a clean change named `real`; no finding with a rule starting `domain-`.
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 Run: `go test ./internal/lint/ -run DomainTree`
 Expected: FAIL for `TestDomainTreeLinted` and `TestDomainTreeLinked`.
 
-- [ ] **Step 3: Call the loader in `Run`**
+- [x] **Step 3: Call the loader in `Run`**
 
 In the `len(in.Slugs) == 0` block of `internal/lint/lint.go`, after `SpecTitles`, call `domain.Load(in.Root)`. Add a `Finding{Rule, File: domain.File, Line, Message}` for each problem, and `r.unreadable` for each unreadable source. In `README.md`, change the `dkt lint` row to `Checks the structure of changes, records, issues, main spec titles and the domain tree`.
 
-- [ ] **Step 4: Run everything**
+- [x] **Step 4: Run everything**
 
 Run: `go vet ./... && go test ./...`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/lint/lint.go internal/lint/lint_test.go README.md
@@ -328,19 +334,19 @@ The wording is the maintainer's and is settled before this task starts; do not s
 - A new section on the tree: what the file is and its form; that it is optional and says nothing about where a spec is stored.
 - Full review, step 2: when the project has the file, run `dkt domains --json` while writing `proposal.md`, and list each new capability under the node that fits, in the same change, then run `dkt domains` and fix what it reports. When no node fits, suggest one to the user. Add, rename or move a node only once the user agrees.
 
-- [ ] **Step 1: Apply the settled text to `shipped/skill/SKILL.md`**
+- [x] **Step 1: Apply the settled text to `shipped/skill/SKILL.md`**
 
-- [ ] **Step 2: Install the copies**
+- [x] **Step 2: Install the copies**
 
 Run: `go run ./cmd/dkt init --force`
 Expected: `.claude/skills/docket/SKILL.md` and `.agents/skills/docket/SKILL.md` change; `git status --short` lists nothing else outside the files of this task.
 
-- [ ] **Step 3: Check the copies mechanically**
+- [x] **Step 3: Check the copies mechanically**
 
 Run: `cmp shipped/skill/SKILL.md .claude/skills/docket/SKILL.md && cmp shipped/skill/SKILL.md .agents/skills/docket/SKILL.md && go test . ./internal/setup/ ./internal/cli/`
 Expected: no difference, and PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add shipped/skill/SKILL.md .claude/skills/docket/SKILL.md .agents/skills/docket/SKILL.md

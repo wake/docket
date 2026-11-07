@@ -19,7 +19,7 @@ How a project is viewed should not depend on how its files are stored. A tree ke
 - New optional file `docket/domains.md`: a nested list of nodes, with capability paths under them. A node may be empty, and its name may be in any language.
 - New read-only command `dkt domains`: reports the tree, with each capability's title, whether its main spec exists and the active changes touching it, and lists the capabilities no node holds as unclassified.
 - `dkt lint`, when no change is named, reports problems in the tree: `domain-format`, `domain-duplicate` and `domain-unknown`.
-- The docket skill says when a coding agent places a new capability in the tree, that it may suggest a new node, and that it adds, renames or moves a node only once the user agrees. Editing only the tree is a direct merge.
+- The docket skill says when a coding agent places a new capability in the tree, that it updates or deletes the line when a capability's path changes or the capability is removed, that it may suggest a new node, and that it adds, renames or moves a node only once the user agrees. Editing only the tree is a direct merge, when `dkt domains` reports no problem.
 - The README lists the command.
 
 ## Non-Goals
