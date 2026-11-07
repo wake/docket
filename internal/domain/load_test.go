@@ -134,6 +134,90 @@ func TestLoadLinkedTree(t *testing.T) {
 	}
 }
 
+// linkedRoot builds a real folder from files, then links each key to the folder or file named by its value.
+func linkedRoot(t *testing.T, files map[string]string, links map[string]string) fs.FS {
+	t.Helper()
+	dir := t.TempDir()
+	for name, data := range files {
+		p := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for link, target := range links {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, link)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		rel, err := filepath.Rel(filepath.Dir(link), target) // relative, so the link stays inside the root
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(rel, filepath.Join(dir, link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { root.Close() })
+	return root.FS()
+}
+
+func TestLoadLinkedDocketFolder(t *testing.T) {
+	got := Load(linkedRoot(t, map[string]string{"real/domains.md": "- A\n"}, map[string]string{"docket": "real"}))
+	if !got.Stopped || !got.Found || len(got.Nodes) != 0 || len(got.Unreadable) != 1 ||
+		got.Unreadable[0].Source != File || !strings.Contains(got.Unreadable[0].Reason, "docket is a symbolic link") {
+		t.Errorf("%+v", got)
+	}
+}
+
+func TestLoadLinkedFolders(t *testing.T) {
+	spec := "# Refund Specification\n"
+	for _, c := range []struct {
+		name, link string
+		files      map[string]string
+	}{
+		{"specs", "openspec/specs", map[string]string{"real/refund/spec.md": spec}},
+		{"openspec", "openspec", map[string]string{"real/specs/refund/spec.md": spec}},
+		{"changes", "openspec/changes", map[string]string{"real/add-x/specs/refund/spec.md": spec}},
+		{"change specs", "openspec/changes/add-x/specs", map[string]string{"real/refund/spec.md": spec, "openspec/changes/add-x/proposal.md": "x"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			c.files["docket/domains.md"] = "- A\n  - `gone`\n"
+			got := Load(linkedRoot(t, c.files, map[string]string{c.link: "real"}))
+			if got.Stopped || len(got.Nodes) != 1 || len(got.Unreadable) != 1 ||
+				got.Unreadable[0].Source != c.link || !strings.Contains(got.Unreadable[0].Reason, "symbolic link") {
+				t.Fatalf("%+v", got)
+			}
+			if got.Capabilities["refund"] != nil || len(got.Problems) != 0 {
+				t.Errorf("%+v %+v", got.Capabilities, got.Problems)
+			}
+		})
+	}
+}
+
+func TestLoadChangesIsAFile(t *testing.T) {
+	got := Load(fstest.MapFS{
+		"docket/domains.md": {Data: []byte("- A\n  - `gone`\n")},
+		"openspec/changes":  {Data: []byte("x")},
+	})
+	if got.Stopped || len(got.Unreadable) != 1 || got.Unreadable[0].Source != changesDir || len(got.Problems) != 0 {
+		t.Errorf("%+v", got)
+	}
+}
+
+func TestLoadLinkedSpec(t *testing.T) {
+	got := Load(linkedRoot(t, map[string]string{"notes.md": "# X Specification\n"},
+		map[string]string{"openspec/specs/refund/spec.md": "notes.md"}))
+	if got.Capabilities["refund"] != nil || len(got.Unreadable) != 0 {
+		t.Errorf("%+v %+v", got.Capabilities, got.Unreadable)
+	}
+}
+
 func TestLoadLinkedProposal(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, data string) {

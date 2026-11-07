@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -380,6 +381,64 @@ func TestDomainTreeLinked(t *testing.T) {
 		if f.File == domainFile {
 			t.Errorf("%+v", f)
 		}
+	}
+}
+
+func unreadableSources(t *testing.T, dir string) []string {
+	t.Helper()
+	in, _ := open(t, dir)
+	var out []string
+	for _, u := range run(t, in).Unreadable {
+		out = append(out, u.Source)
+	}
+	return out
+}
+
+func mkdirs(t *testing.T, dir string, names ...string) {
+	t.Helper()
+	for _, n := range names {
+		if err := os.MkdirAll(filepath.Join(dir, n), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestDomainTreeLinkedDocketFolder(t *testing.T) {
+	dir := t.TempDir()
+	mkdirs(t, dir, "real")
+	if err := os.WriteFile(filepath.Join(dir, "real/domains.md"), []byte("- A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("real", filepath.Join(dir, "docket")); err != nil {
+		t.Fatal(err)
+	}
+	if got := unreadableSources(t, dir); !slices.Contains(got, domainFile) {
+		t.Errorf("unreadable = %v", got)
+	}
+}
+
+func TestDomainTreeLinkedSpecsFolder(t *testing.T) {
+	dir := t.TempDir()
+	mkdirs(t, dir, "docket", "real", "openspec")
+	if err := os.WriteFile(filepath.Join(dir, domainFile), []byte("- A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../real",filepath.Join(dir, "openspec/specs")); err != nil {
+		t.Fatal(err)
+	}
+	if got := unreadableSources(t, dir); !slices.Contains(got, "openspec/specs") {
+		t.Errorf("unreadable = %v", got)
+	}
+}
+
+func TestDomainTreeLinkedSpecsFolderNoTree(t *testing.T) {
+	dir := t.TempDir()
+	mkdirs(t, dir, "real", "openspec")
+	if err := os.Symlink("../real", filepath.Join(dir, "openspec/specs")); err != nil {
+		t.Fatal(err)
+	}
+	if got := unreadableSources(t, dir); len(got) != 0 {
+		t.Errorf("unreadable = %v", got)
 	}
 }
 

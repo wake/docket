@@ -150,6 +150,40 @@ func TestDomainsLinkedTree(t *testing.T) {
 	}
 }
 
+func TestDomainsLinkedDocketFolder(t *testing.T) {
+	r := dmRepo(t, map[string]string{"real/domains.md": "- A\n"})
+	if err := os.Symlink("real", filepath.Join(r.Dir, "docket")); err != nil {
+		t.Fatal(err)
+	}
+	code, m, raw := dmRun(t, r, r.Dir, true)
+	if code != 3 || !strings.Contains(raw, `"result":null`) || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "docket/domains.md" {
+		t.Errorf("%d %s", code, raw)
+	}
+}
+
+func TestDomainsLinkedSpecsFolder(t *testing.T) {
+	r := dmRepo(t, map[string]string{
+		"docket/domains.md":      "- A\n  - `gone`\n",
+		"real/refund/spec.md":    dmSpec("Refund"),
+		"openspec/changes/.keep": "",
+	})
+	if err := os.Symlink("../real", filepath.Join(r.Dir, "openspec/specs")); err != nil {
+		t.Fatal(err)
+	}
+	code, m, raw := dmRun(t, r, r.Dir, true)
+	if code != 3 || m.Result == nil || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/specs" || strings.Contains(raw, "domain-unknown") {
+		t.Errorf("%d %s", code, raw)
+	}
+}
+
+func TestDomainsChangesIsAFile(t *testing.T) {
+	r := dmRepo(t, map[string]string{"docket/domains.md": "- A\n  - `gone`\n", "openspec/changes": "x"})
+	code, m, raw := dmRun(t, r, r.Dir, true)
+	if code != 3 || m.Result == nil || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/changes" {
+		t.Errorf("%d %s", code, raw)
+	}
+}
+
 func skipRoot(t *testing.T) {
 	t.Helper()
 	if os.Geteuid() == 0 {

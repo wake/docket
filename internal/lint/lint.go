@@ -190,8 +190,11 @@ func Run(in Input) (Report, error) {
 		for _, p := range d.Problems {
 			rep.Findings = append(rep.Findings, Finding{Rule: p.Rule, File: domain.File, Line: p.Line, Message: p.Message})
 		}
+		// With no tree, lint's own rules report what they cannot read.
 		for _, u := range d.Unreadable {
-			r.unreadable(u.Source, errors.New(u.Reason))
+			if d.Found {
+				r.unreadable(u.Source, errors.New(u.Reason))
+			}
 		}
 	}
 	for _, p := range in.Added {

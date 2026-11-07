@@ -59,7 +59,9 @@ func Load(root fs.FS) Loaded {
 	}
 
 	unreadable := func(src string, err error) {
-		l.Unreadable = append(l.Unreadable, Unreadable{src, err.Error()})
+		if !slices.ContainsFunc(l.Unreadable, func(u Unreadable) bool { return u.Source == src }) {
+			l.Unreadable = append(l.Unreadable, Unreadable{src, err.Error()})
+		}
 	}
 	get := func(p string) *Capability {
 		if l.Capabilities[p] == nil {
@@ -81,8 +83,10 @@ func Load(root fs.FS) Loaded {
 		}
 	})
 
-	entries, err := fs.ReadDir(root, changesDir)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	var entries []fs.DirEntry
+	if link := linkOnPath(root, changesDir); link != "" {
+		unreadable(link, linkError(link))
+	} else if entries, err = fs.ReadDir(root, changesDir); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		unreadable(changesDir, err)
 	}
 	names := map[string]map[string]string{} // slug -> name under specs:
@@ -147,6 +151,9 @@ func Load(root fs.FS) Loaded {
 // readTree finds docket/domains.md through the directory listing, so that a
 // link is never read through.
 func readTree(root fs.FS) ([]byte, bool, error) {
+	if link := linkOnPath(root, File); link != "" {
+		return nil, true, linkError(link)
+	}
 	if info, err := fs.Stat(root, "docket"); err != nil || !info.IsDir() {
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, false, err
@@ -161,10 +168,7 @@ func readTree(root fs.FS) ([]byte, bool, error) {
 		if e.Name() != "domains.md" {
 			continue
 		}
-		switch t := e.Type(); {
-		case t&fs.ModeSymlink != 0:
-			return nil, true, fmt.Errorf("%s is a symbolic link; Docket does not read through it", File)
-		case !t.IsRegular():
+		if !e.Type().IsRegular() {
 			return nil, true, fmt.Errorf("%s is not a regular file", File)
 		}
 		b, err := fs.ReadFile(root, File)
@@ -173,8 +177,37 @@ func readTree(root fs.FS) ([]byte, bool, error) {
 	return nil, false, nil
 }
 
+// linkOnPath returns the first part of p that is a symbolic link, or "". A
+// part it cannot list or find gives "": reading p reports that.
+func linkOnPath(root fs.FS, p string) string {
+	cur := "."
+	for _, part := range strings.Split(p, "/") {
+		entries, err := fs.ReadDir(root, cur)
+		if err != nil {
+			return ""
+		}
+		i := slices.IndexFunc(entries, func(e fs.DirEntry) bool { return e.Name() == part })
+		if i < 0 {
+			return ""
+		}
+		cur = path.Join(cur, part)
+		if entries[i].Type()&fs.ModeSymlink != 0 {
+			return cur
+		}
+	}
+	return ""
+}
+
+func linkError(p string) error {
+	return fmt.Errorf("%s is a symbolic link; Docket does not read through it", p)
+}
+
 // walkSpecs calls fn for each regular spec.md under dir with its capability path.
 func walkSpecs(root fs.FS, dir string, unreadable func(string, error), fn func(file, cp string)) {
+	if link := linkOnPath(root, dir); link != "" {
+		unreadable(link, linkError(link))
+		return
+	}
 	_ = fs.WalkDir(root, dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if !errors.Is(err, fs.ErrNotExist) {
