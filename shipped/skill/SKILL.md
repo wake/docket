@@ -68,6 +68,8 @@ one with the most complete review.
   - version bumps
   - dependency upgrades that touch only the dependency manifests (such as
     `go.mod` and `go.sum`)
+  - edits that touch only `docket/domains.md`, when `dkt domains` reports no
+    problem
 
 A comment that changes how the code builds or runs (such as `//go:build`)
 counts as code and is triaged by its effect: changing a behavior the specs
@@ -120,6 +122,21 @@ When the work handles an issue or takes up an idea, `--source` holds only
 its path (`docket/issues/<slug>.md`, `docket/ideas/<name>.md`), or the
 issue's address in the project's tool.
 
+## Domain tree
+
+`docket/domains.md` is an optional tree of the project's areas, which records
+each spec's area, whatever path the spec is stored at. Specs do not record
+their area themselves, so editing this file touches no spec.
+
+- Each line is an item, `- <text>`, indented by two spaces per level: text
+  that is one code span is a capability path, and anything else is a node. A
+  node may be empty, and its name may be in any language. A capability sits
+  under a node, and under one node only. Blank lines and lines starting with
+  `#` are ignored.
+- After editing this file, run `dkt domains` and fix what it reports.
+- Add, rename or move a node only with the user's agreement; when no node
+  fits, suggest one to the user.
+
 ## Full review
 
 1. Work where "Where to work" in `docket/workflow.md` says, and open the
@@ -143,6 +160,10 @@ issue's address in the project's tool.
      template and rules.
    - Give each new capability a name under `specs:` in the front matter of
      `proposal.md`.
+   - When the project has `docket/domains.md`, run `dkt domains --json` to see
+     the tree, and in the same change list each new capability under a node
+     that fits; when a capability's path changes or it is removed, update or
+     delete its line.
 3. superpowers:writing-plans writes the plan to
    `openspec/changes/<slug>/plan.md`, not `docs/superpowers/plans/`,
    following the template and rules from
