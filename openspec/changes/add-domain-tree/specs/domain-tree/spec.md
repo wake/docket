@@ -75,6 +75,10 @@ A capability SHALL be a main spec under `openspec/specs/` or a delta spec under 
 - **WHEN** `openspec/specs/refund/spec.md` is a symbolic link, or the proposal of an active change is one
 - **THEN** Docket does not read through it: the link gives no capability and no title, and `unreadable` does not list it
 
+#### Scenario: Linked change folder
+- **WHEN** `openspec/changes/add-x` is a symbolic link to a folder holding `specs/refund/spec.md`
+- **THEN** it is not a change, as `change-lint` and `workspace-scan` treat it: `refund` is not a capability, and `unreadable` does not list it
+
 ### Requirement: Unclassified capabilities
 `result.unclassified` SHALL hold every capability no node holds, sorted by path. A capability being unclassified SHALL NOT be a finding.
 

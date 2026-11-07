@@ -219,6 +219,14 @@ func TestLoadLinkedSpec(t *testing.T) {
 	}
 }
 
+func TestLoadLinkedChangeFolder(t *testing.T) {
+	got := Load(linkedRoot(t, map[string]string{"real/specs/refund/spec.md": "x"},
+		map[string]string{"openspec/changes/add-x": "real"}))
+	if got.Capabilities["refund"] != nil || len(got.Unreadable) != 0 {
+		t.Errorf("%+v %+v", got.Capabilities, got.Unreadable)
+	}
+}
+
 func TestLoadLinkedProposal(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, data string) {

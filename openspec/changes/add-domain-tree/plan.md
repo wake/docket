@@ -360,7 +360,7 @@ git commit -m "Say in the docket skill how a coding agent uses the domain tree" 
 
 ### Task 5: Refuse a link anywhere on the path
 
-**Scenarios:** domain-tree#linked-docket-folder, domain-tree#linked-specs-folder, domain-tree#linked-changes-folder, domain-tree#linked-specs-folder-in-a-change, domain-tree#file-in-place-of-the-changes-folder, domain-tree#linked-spec-or-proposal, domain-tree#capability-path-starting-with-a-dash, change-lint#linked-specs-folder-with-a-domain-tree, change-lint#linked-specs-folder-with-no-domain-tree
+**Scenarios:** domain-tree#linked-docket-folder, domain-tree#linked-specs-folder, domain-tree#linked-changes-folder, domain-tree#linked-specs-folder-in-a-change, domain-tree#file-in-place-of-the-changes-folder, domain-tree#linked-spec-or-proposal, domain-tree#linked-change-folder, domain-tree#capability-path-starting-with-a-dash, change-lint#linked-specs-folder-with-a-domain-tree, change-lint#linked-specs-folder-with-no-domain-tree
 
 **Review:** judgment
 
