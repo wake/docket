@@ -4,7 +4,8 @@ package setup
 // earlier releases shipped there; the key for the operations section of
 // openspec/config.yaml is "openspec/config.yaml#operations". A change to a
 // shipped file adds its new hash here, and TestEarlierHoldsShippedFiles fails
-// until it does. Tests in other packages may replace it, and must restore it.
+// until it does; TestEarlierHoldsReleases fails when a hash of a release is
+// gone. Tests in other packages may replace it, and must restore it.
 var Earlier = map[string][]string{
 	".agents/skills/docket/SKILL.md": {
 		"0930d8fc316c0c7a152cbf3535de013bbc5e5ac9918f97444099f27e051b5a18", // v0.16.0
