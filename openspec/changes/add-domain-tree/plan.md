@@ -378,7 +378,7 @@ git commit -m "Say in the docket skill how a coding agent uses the domain tree" 
 - Consumes: `domain.Load`, `domain.File`, `domain.RuleUnknown`, `Loaded.Found`, `Loaded.Stopped`, `Loaded.Unreadable`.
 - Produces: no new exported symbol. In `internal/domain/load.go`: `linkOnPath(root fs.FS, p string) string` and `linkError(p string) error`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Directory links need a real folder and `os.OpenRoot`, as `TestLoadLinkedProposal` does: `fstest.MapFS` does not behave like a link for a folder.
 
@@ -400,12 +400,12 @@ In `internal/lint/lint_test.go`:
 - `TestDomainTreeLinkedSpecsFolder`: with `docket/domains.md` present and `openspec/specs` a link, `Unreadable` lists `openspec/specs`.
 - `TestDomainTreeLinkedSpecsFolderNoTree`: with no `docket/domains.md` and `openspec/specs` a link, `Unreadable` is empty.
 
-- [ ] **Step 2: Run the tests and see the new ones fail**
+- [x] **Step 2: Run the tests and see the new ones fail**
 
 Run: `go test ./internal/domain/ ./internal/lint/ && go test ./internal/cli/ -run Domains`
 Expected: FAIL on the new tests, except any that pin behavior already there (`TestLoadChangesIsAFile`, `TestLoadLinkedSpec`, `TestDomainsChangesIsAFile`, `TestDomainTreeLinkedSpecsFolderNoTree`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `internal/domain/load.go`:
 - `linkOnPath` walks `p` from `.` one part at a time with `fs.ReadDir`, returning the path of the first entry whose type has `fs.ModeSymlink`. A part it cannot list or find returns `""`: reading `p` then reports that.
@@ -417,12 +417,12 @@ In `internal/domain/load.go`:
 
 In `internal/lint/lint.go`, report `d.Unreadable` only when `d.Found`, with a one-line comment that lint's own rules report what they cannot read when there is no tree.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `go vet ./... && go test ./internal/domain/ ./internal/lint/ && go test ./internal/cli/ -run Domains`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/domain/load.go internal/domain/load_test.go internal/domain/parse_test.go internal/lint/lint.go internal/lint/lint_test.go internal/cli/cmd_domains_test.go
