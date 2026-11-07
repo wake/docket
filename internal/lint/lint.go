@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/domain"
 	"github.com/wake/docket/internal/openspec"
 )
 
@@ -185,6 +186,16 @@ func Run(in Input) (Report, error) {
 			r.unreadable(u.Source, errors.New(u.Reason))
 		}
 		rep.Specs = n
+		d := domain.Load(in.Root)
+		for _, p := range d.Problems {
+			rep.Findings = append(rep.Findings, Finding{Rule: p.Rule, File: domain.File, Line: p.Line, Message: p.Message})
+		}
+		// With no tree, lint's own rules report what they cannot read.
+		for _, u := range d.Unreadable {
+			if d.Found {
+				r.unreadable(u.Source, errors.New(u.Reason))
+			}
+		}
 	}
 	for _, p := range in.Added {
 		// Added only holds paths under docs/superpowers/plans or docs/superpowers/specs.

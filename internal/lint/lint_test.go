@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -321,5 +322,164 @@ func TestUnreadableChangesDirectory(t *testing.T) {
 	rep := run(t, in)
 	if len(rep.Unreadable) != 1 || count(rep, "change-missing") != 0 {
 		t.Errorf("%+v", rep)
+	}
+}
+
+const domainFile = "docket/domains.md"
+
+func TestDomainTreeLinted(t *testing.T) {
+	type want struct {
+		rule string
+		line int
+	}
+	for _, tc := range []struct {
+		name, body string
+		want       []want
+	}{
+		{"format and duplicate", "Users\n- A\n  - A2\n  - A2\n", []want{{"domain-format", 1}, {"domain-duplicate", 4}}},
+		{"unknown", "- A\n  - `gone`\n", []want{{"domain-unknown", 2}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in, _ := repo(t, map[string]string{domainFile: tc.body})
+			rep := run(t, in)
+			for _, w := range tc.want {
+				if !has(rep, w.rule, domainFile, w.line, "") {
+					t.Errorf("missing %s on line %d: %+v", w.rule, w.line, rep.Findings)
+				}
+			}
+		})
+	}
+}
+
+func TestDomainTreeMissing(t *testing.T) {
+	in, _ := repo(t, map[string]string{})
+	for _, f := range run(t, in).Findings {
+		if strings.HasPrefix(f.Rule, "domain-") {
+			t.Errorf("%+v", f)
+		}
+	}
+}
+
+func TestDomainTreeLinked(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "docket"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(dir, "elsewhere.md"), filepath.Join(dir, domainFile)); err != nil {
+		t.Fatal(err)
+	}
+	in, _ := open(t, dir)
+	rep := run(t, in)
+	found := false
+	for _, u := range rep.Unreadable {
+		found = found || u.Source == domainFile
+	}
+	if !found {
+		t.Errorf("unreadable = %+v", rep.Unreadable)
+	}
+	for _, f := range rep.Findings {
+		if f.File == domainFile {
+			t.Errorf("%+v", f)
+		}
+	}
+}
+
+func unreadableSources(t *testing.T, dir string) []string {
+	t.Helper()
+	in, _ := open(t, dir)
+	var out []string
+	for _, u := range run(t, in).Unreadable {
+		out = append(out, u.Source)
+	}
+	return out
+}
+
+func mkdirs(t *testing.T, dir string, names ...string) {
+	t.Helper()
+	for _, n := range names {
+		if err := os.MkdirAll(filepath.Join(dir, n), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestDomainTreeLinkedDocketFolder(t *testing.T) {
+	dir := t.TempDir()
+	mkdirs(t, dir, "real")
+	if err := os.WriteFile(filepath.Join(dir, "real/domains.md"), []byte("- A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("real", filepath.Join(dir, "docket")); err != nil {
+		t.Fatal(err)
+	}
+	if got := unreadableSources(t, dir); !slices.Contains(got, domainFile) {
+		t.Errorf("unreadable = %v", got)
+	}
+}
+
+func TestDomainTreeLinkedSpecsFolder(t *testing.T) {
+	dir := t.TempDir()
+	mkdirs(t, dir, "docket", "real", "openspec")
+	if err := os.WriteFile(filepath.Join(dir, domainFile), []byte("- A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../real", filepath.Join(dir, "openspec/specs")); err != nil {
+		t.Fatal(err)
+	}
+	if got := unreadableSources(t, dir); !slices.Contains(got, "openspec/specs") {
+		t.Errorf("unreadable = %v", got)
+	}
+}
+
+func TestDomainTreeLinkedSpecsFolderNoTree(t *testing.T) {
+	dir := t.TempDir()
+	mkdirs(t, dir, "real", "openspec")
+	if err := os.Symlink("../real", filepath.Join(dir, "openspec/specs")); err != nil {
+		t.Fatal(err)
+	}
+	if got := unreadableSources(t, dir); len(got) != 0 {
+		t.Errorf("unreadable = %v", got)
+	}
+}
+
+func TestDomainTreeUnreadableSpec(t *testing.T) {
+	skipRoot(t)
+	dir := t.TempDir()
+	spec := filepath.Join(dir, "openspec/specs/booking/spec.md")
+	for p, c := range map[string]string{spec: "# Booking Specification\n", filepath.Join(dir, domainFile): "- A\n  - `gone`\n"} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(spec, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(spec, 0o644) })
+	in, _ := open(t, dir)
+	rep := run(t, in)
+	n := 0
+	for _, u := range rep.Unreadable {
+		if u.Source == "openspec/specs/booking/spec.md" {
+			n++
+		}
+	}
+	if n != 1 || count(rep, "domain-unknown") != 0 {
+		t.Errorf("n = %d, %+v", n, rep)
+	}
+}
+
+func TestDomainTreeSkippedForNamedChange(t *testing.T) {
+	in, _ := repo(t, map[string]string{
+		domainFile:                          "Users\n",
+		"openspec/changes/real/proposal.md": goodProposal,
+	})
+	in.Slugs = []string{"real"}
+	for _, f := range run(t, in).Findings {
+		if strings.HasPrefix(f.Rule, "domain-") {
+			t.Errorf("%+v", f)
+		}
 	}
 }

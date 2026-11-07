@@ -6,7 +6,7 @@ Defines the rules `dkt lint` checks in a change and in the main specs' titles, s
 ## Requirements
 
 ### Requirement: What is linted
-`dkt lint` SHALL lint each change named on the command line, or, when none is named, every active change in the worktree's `openspec/changes/` then the title of every main spec under `openspec/specs/`. It SHALL also lint records and issues, as their specs define. It SHALL read the worktree's files as they are, uncommitted edits included, and SHALL report `change-missing` for a named change that does not exist. A name that is empty, holds `/` or `\`, or is `.` or `..` SHALL be a usage error.
+`dkt lint` SHALL lint each change named on the command line, or, when none is named, every active change in the worktree's `openspec/changes/`, then the title of every main spec under `openspec/specs/`, then the domain tree as `domain-tree` defines. It SHALL also lint records and issues, as their specs define. It SHALL read the worktree's files as they are, uncommitted edits included, and SHALL report `change-missing` for a named change that does not exist. A name that is empty, holds `/` or `\`, or is `.` or `..` SHALL be a usage error.
 
 #### Scenario: Lint every active change
 - **WHEN** the worktree has the active changes `add-x` and `add-y` and a user runs `dkt lint`
@@ -23,6 +23,30 @@ Defines the rules `dkt lint` checks in a change and in the main specs' titles, s
 #### Scenario: Named change skips records
 - **WHEN** the branch adds a record that breaks a rule and a user runs `dkt lint add-x`
 - **THEN** no finding is about that record
+
+#### Scenario: Lint reports the domain tree
+- **WHEN** `docket/domains.md` has a line that is not an item, lists a capability twice, or lists a capability that does not exist, and a user runs `dkt lint`
+- **THEN** the findings hold `domain-format`, `domain-duplicate` or `domain-unknown` as `domain-tree` defines, naming `docket/domains.md` and the line, and dkt exits with 1
+
+#### Scenario: Lint with no domain tree
+- **WHEN** there is no `docket/domains.md` and a user runs `dkt lint`
+- **THEN** no finding is about the domain tree
+
+#### Scenario: Linked domain tree
+- **WHEN** `docket/domains.md` is a symbolic link and a user runs `dkt lint`
+- **THEN** `unreadable` lists it and dkt exits with 3
+
+#### Scenario: Linked specs folder with a domain tree
+- **WHEN** `docket/domains.md` exists, `openspec/specs` is a symbolic link, and a user runs `dkt lint`
+- **THEN** `unreadable` lists `openspec/specs` and dkt exits with 3
+
+#### Scenario: Linked specs folder with no domain tree
+- **WHEN** there is no `docket/domains.md`, `openspec/specs` is a symbolic link, and a user runs `dkt lint`
+- **THEN** the domain tree adds nothing to `unreadable`
+
+#### Scenario: Named change skips the domain tree
+- **WHEN** `docket/domains.md` has a line that is not an item and a user runs `dkt lint add-x`
+- **THEN** no finding is about the domain tree
 
 ### Requirement: Front matter checked
 For a change of the `docket` schema, `dkt lint` SHALL report `title-missing` when `proposal.md` has no front matter or no title that is one line of text, `title-too-long` giving the length and the limit for a title over the limit `change-metadata` defines, and `metadata-invalid` for a front matter it cannot read and for a `kind` or `source` that is missing or not of the form `change-metadata` defines.

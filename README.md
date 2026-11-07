@@ -52,9 +52,10 @@ Once a project is set up, the agent loads the docket skill when development work
 | `dkt issue` | Writes an issue file for work whose expected behavior is settled but put off |
 | `dkt issue template` | Prints an issue's sections, for a project that keeps issues in another tool |
 | `dkt sync` | Ticks the tasks of a plan or a record from commit trailers |
-| `dkt lint` | Checks the structure of changes, records, issues and main spec titles |
+| `dkt lint` | Checks the structure of changes, records, issues, main spec titles and the domain tree |
 | `dkt conflicts` | Finds active changes that touch the same requirement |
 | `dkt status` | Names the next idea or issue to work on from `docket/order.md` |
+| `dkt domains` | Shows the capabilities in the domain tree of `docket/domains.md`, and those not in it |
 
 Run `dkt --help` for the arguments. Every command takes `--json`.
 
