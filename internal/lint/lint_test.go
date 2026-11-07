@@ -423,7 +423,7 @@ func TestDomainTreeLinkedSpecsFolder(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, domainFile), []byte("- A\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink("../real",filepath.Join(dir, "openspec/specs")); err != nil {
+	if err := os.Symlink("../real", filepath.Join(dir, "openspec/specs")); err != nil {
 		t.Fatal(err)
 	}
 	if got := unreadableSources(t, dir); !slices.Contains(got, "openspec/specs") {
