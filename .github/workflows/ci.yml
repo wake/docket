@@ -18,6 +18,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # TestEarlierHoldsReleases reads the release tags.
+          fetch-depth: 0
       - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go }}
