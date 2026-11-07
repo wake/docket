@@ -14,7 +14,7 @@ An upgrade is three steps in order across two tools, and the plugin manager cove
 
 ## Verification
 
-Mechanical: both skills equal the settled drafts byte for byte, and `claude plugin validate .` passes. The prompt's commands were followed by hand in a throwaway home: `dkt` from v0.17.0 to v0.18.0, the plugin from 0.17.0 to 0.18.0 through a local clone of the marketplace, and a project from `skill-outdated` to clean, with the build of the earlier-release-hashes fix. Not verified: an agent running the prompt, and the plugin step from the GitHub marketplace; the release checks cover the second.
+Mechanical: both skills equal the settled drafts byte for byte, and `claude plugin validate .` passes. The prompt's commands were followed by hand in a throwaway home: `dkt` from v0.17.0 to v0.18.0, the plugin from 0.17.0 to 0.18.0 through a local clone of the marketplace, and a project from `skill-outdated` to clean, with the build of the earlier-release-hashes fix. Not verified: an agent running the prompt.
 
 ## Review
 
