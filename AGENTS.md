@@ -15,7 +15,7 @@ This repository is developed with Docket's own workflow: follow the docket skill
 
 ## Development
 
-- Check with `go vet ./...` and `go test ./...`.
+- Check with `gofmt -l .` (which should print nothing), `go vet ./...` and `go test ./...`. CI runs the same three.
 - Requires OpenSpec 1.14.0 or later.
 
 ## Prompt files
