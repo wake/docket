@@ -3,14 +3,18 @@ package snapshot
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/wake/docket/internal/gitx"
 )
 
-func c(sha, time string, parents []string, trailers ...string) gitx.Commit {
-	x := gitx.Commit{SHA: sha, Parents: parents, Time: time, Subject: "s " + sha}
+func c(sha, ts string, parents []string, trailers ...string) gitx.Commit {
+	if n, err := strconv.Atoi(ts); err == nil { // "3" means 3 hours after a fixed day
+		ts = time.Date(2026, 11, 1, n, 0, 0, 0, time.UTC).Format(time.RFC3339)
+	}
+	x := gitx.Commit{SHA: sha, Parents: parents, Time: ts, Subject: "s " + sha}
 	for i := 0; i+1 < len(trailers); i += 2 {
 		x.Trailers = append(x.Trailers, gitx.Trailer{Key: trailers[i], Value: trailers[i+1]})
 	}
@@ -194,5 +198,25 @@ func TestMergeOlderAttribution(t *testing.T) {
 	})
 	if r := g.Merge("m4", addX); r == nil || r.Commit != "m2" {
 		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestOffsetOrder(t *testing.T) {
+	g := NewGraph([]gitx.Commit{
+		c("a", "2026-11-03T00:30:00+14:00", nil, "Change", "add-x/1"),
+		c("b", "2026-11-02T23:00:00-12:00", nil, "Change", "add-x/1"),
+	})
+	if r := g.Last([]string{"a", "b"}, addX); r == nil || r.Commit != "b" {
+		t.Fatalf("Last: %+v", r)
+	}
+	if got := g.TaskCommits("a", addX); !reflect.DeepEqual(got[1], []string{"a"}) {
+		t.Fatalf("got %v", got)
+	}
+	g = NewGraph([]gitx.Commit{
+		c("a", "2026-11-03T00:30:00+14:00", []string{"b"}, "Change", "add-x/1"),
+		c("b", "2026-11-02T23:00:00-12:00", nil, "Change", "add-x/1"),
+	})
+	if got := g.TaskCommits("a", addX); !reflect.DeepEqual(got[1], []string{"a", "b"}) {
+		t.Fatalf("got %v", got)
 	}
 }

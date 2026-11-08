@@ -4,6 +4,7 @@ package snapshot
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
@@ -12,6 +13,7 @@ import (
 // Graph is the commit graph of a history, held in memory.
 type Graph struct {
 	bySHA  map[string]gitx.Commit
+	when   map[string]time.Time      // commit time as an instant; zero when unparsable
 	intro  map[string]introduced     // per tip, see introducers
 	byWork map[Work][]string         // commits naming each work
 	rel    map[string]map[string]int // per tag list, commit -> first tag
@@ -24,9 +26,10 @@ type introduced struct {
 
 // NewGraph indexes commits by SHA.
 func NewGraph(commits []gitx.Commit) *Graph {
-	g := &Graph{bySHA: make(map[string]gitx.Commit, len(commits))}
+	g := &Graph{bySHA: make(map[string]gitx.Commit, len(commits)), when: make(map[string]time.Time, len(commits))}
 	for _, c := range commits {
 		g.bySHA[c.SHA] = c
+		g.when[c.SHA], _ = time.Parse(time.RFC3339, c.Time)
 	}
 	return g
 }
@@ -192,7 +195,7 @@ func (g *Graph) Last(from []string, w Work) *Ref {
 		if named, _ := Names(c, w); !named {
 			continue
 		}
-		if best == nil || c.Time > best.Time || c.Time == best.Time && c.SHA > best.SHA {
+		if best == nil || g.when[s].After(g.when[best.SHA]) || g.when[s].Equal(g.when[best.SHA]) && c.SHA > best.SHA {
 			best = &c
 		}
 	}
@@ -210,8 +213,8 @@ func (g *Graph) TaskCommits(from string, w Work) map[int][]string {
 		cs = append(cs, g.bySHA[s])
 	}
 	sort.Slice(cs, func(i, j int) bool {
-		if cs[i].Time != cs[j].Time {
-			return cs[i].Time < cs[j].Time
+		if a, b := g.when[cs[i].SHA], g.when[cs[j].SHA]; !a.Equal(b) {
+			return a.Before(b)
 		}
 		return cs[i].SHA < cs[j].SHA
 	})
