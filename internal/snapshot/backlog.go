@@ -57,15 +57,17 @@ func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []O
 		for _, p := range paths {
 			if b, ok := in.Ideas[p]; ok {
 				got[p] = b
-			} else if g := byPath[p]; g != nil && first(g) != nil {
-				got[p] = first(g)
+			} else if b, ok := in.IssueFiles[in.DefaultRef][p]; ok && byPath[p] != nil {
+				got[p] = b // the tip's copy, as dkt status reads it
 			}
 		}
 		return got, nil
 	})
 	position := map[string]int{}
 	for n, l := range lines {
-		position[l.Path] = n + 1
+		if _, ok := position[l.Path]; !ok { // the first line counts
+			position[l.Path] = n + 1
+		}
 		order = append(order, OrderItem{Position: n + 1, Path: l.Path})
 	}
 
@@ -117,6 +119,9 @@ func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []O
 			e.State = "queued"
 		default:
 			e.State = "pool"
+		}
+		if e.State == "taken" || e.State == "dropped" {
+			e.WaitingOn = []string{}
 		}
 		ideas = append(ideas, e)
 	}

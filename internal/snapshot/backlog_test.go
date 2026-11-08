@@ -45,6 +45,34 @@ func issueFile(title string) Files {
 	return Files{issueX: []byte("---\ntitle: " + title + "\n---\n")}
 }
 
+func TestWaitingOnEmptyWhenTakenOrDropped(t *testing.T) {
+	in := BacklogInput{
+		Ideas: map[string][]byte{
+			ideaA:               ideaFile("A", ""),
+			ideaB:               ideaFile("B", "needs: ["+ideaA+"]\n"),
+			"docket/ideas/c.md": ideaFile("C", "dropped: true\nneeds: ["+ideaA+"]\n"),
+		},
+		Works:  []WorkEntry{work("add-b", ideaB, false, featRef)},
+		Places: places(), DefaultRef: mainRef,
+	}
+	ideas, _, _, _ := Backlog(in)
+	if ideas[1].State != "taken" || ideas[2].State != "dropped" || len(ideas[1].WaitingOn) != 0 || len(ideas[2].WaitingOn) != 0 {
+		t.Fatalf("%+v", ideas)
+	}
+}
+
+func TestOrderDuplicateFirstPosition(t *testing.T) {
+	in := BacklogInput{
+		Order:  []byte("- " + ideaA + "\n- " + ideaB + "\n- " + ideaA + "\n"),
+		Ideas:  map[string][]byte{ideaA: ideaFile("A", ""), ideaB: ideaFile("B", "")},
+		Places: places(), DefaultRef: mainRef,
+	}
+	ideas, _, _, _ := Backlog(in)
+	if ideas[0].Position == nil || *ideas[0].Position != 1 {
+		t.Fatalf("%+v", ideas[0])
+	}
+}
+
 func TestOrderPositions(t *testing.T) {
 	ord := "# Order\n\n- " + ideaA + "\n<!-- note -->\n- " + issueX + "\n"
 	_, _, order, _ := Backlog(BacklogInput{Order: []byte(ord), Ideas: map[string][]byte{ideaA: ideaFile("A", "")},
