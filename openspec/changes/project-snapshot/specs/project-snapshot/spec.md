@@ -122,6 +122,10 @@ A record's `stages` SHALL list, in this order, those it has reached: `record` al
 - **WHEN** a record without tasks is on a branch, and a commit there carries `Record: 2026-11-06-fix-x`
 - **THEN** its `stages` are `["record", "dev"]`
 
+#### Scenario: Merged record without trailers
+- **WHEN** the tip holds a record and no commit anywhere carries its `Record` trailer
+- **THEN** its `stages` are `["record", "merged"]`, without `dev`
+
 ### Requirement: Proposed date
 A work's `proposed` SHALL be the `date` of the idea, or of the issue, that its `source` names, and its `created` otherwise.
 
