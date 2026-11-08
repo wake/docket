@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/idea"
-	"github.com/wake/docket/internal/issue"
 )
 
 type statusNext struct {
@@ -59,78 +58,17 @@ func runStatus(c *Context, _ []string) (Outcome, error) {
 	if !found {
 		return finish()
 	}
-	lines, bad := idea.ParseOrder(raw)
-	for _, n := range bad {
-		out.Findings = append(out.Findings, Finding{Rule: "order-format", File: idea.OrderFile, Line: n,
-			Message: fmt.Sprintf("%s line %d is not of the form %s.", idea.OrderFile, n, idea.LineForm)})
+	lines, ideas, problems, err := idea.Check(raw, func(paths []string) (map[string][]byte, error) {
+		return c.Git.ReadBlobs(tip.Commit, paths)
+	})
+	if err != nil {
+		return Outcome{}, err
 	}
-	if len(lines) == 0 && len(bad) == 0 {
+	for _, p := range problems {
+		out.Findings = append(out.Findings, Finding{Rule: p.Rule, File: p.File, Line: p.Line, Message: p.Message})
+	}
+	if len(lines) == 0 && len(problems) == 0 {
 		return finish()
-	}
-
-	ideas := map[string]idea.Idea{}
-	seen := map[string]bool{}
-	held := map[string]bool{}
-	read := func(paths []string) error {
-		var want []string
-		for _, p := range paths {
-			if !seen[p] {
-				seen[p] = true
-				want = append(want, p)
-			}
-		}
-		b, err := c.Git.ReadBlobs(tip.Commit, want)
-		if err != nil {
-			return err
-		}
-		for _, p := range want {
-			data, ok := b[p]
-			if !ok {
-				continue
-			}
-			held[p] = true
-			id, perr := idea.ParseItem(p, data)
-			if perr != nil {
-				rule := "idea-front-matter"
-				if strings.HasPrefix(p, issue.Dir+"/") {
-					rule = "issue-front-matter"
-				}
-				out.Findings = append(out.Findings, Finding{Rule: rule, File: p,
-					Message: fmt.Sprintf("%s: %s.", p, perr)})
-				continue
-			}
-			ideas[p] = id
-		}
-		return nil
-	}
-	var first []string
-	for _, l := range lines {
-		first = append(first, l.Path)
-	}
-	if err := read(first); err != nil {
-		return Outcome{}, err
-	}
-	for _, l := range lines {
-		if !held[l.Path] {
-			out.Findings = append(out.Findings, Finding{Rule: "order-item", File: idea.OrderFile, Line: l.N,
-				Message: fmt.Sprintf("%s line %d names %s, which the default branch does not hold.", idea.OrderFile, l.N, l.Path)})
-		}
-	}
-	// A need may not be in the order; needs are followed one level only.
-	var needs []string
-	for _, p := range first {
-		needs = append(needs, ideas[p].Needs...)
-	}
-	if err := read(needs); err != nil {
-		return Outcome{}, err
-	}
-	for _, p := range first {
-		for _, n := range ideas[p].Needs {
-			if !held[n] {
-				out.Findings = append(out.Findings, Finding{Rule: "idea-needs", File: p,
-					Message: fmt.Sprintf("%s needs %s, which the default branch does not hold.", p, n)})
-			}
-		}
 	}
 
 	if len(out.Findings) > 0 {
