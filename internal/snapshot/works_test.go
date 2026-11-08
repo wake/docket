@@ -155,6 +155,23 @@ func in1() WorksInput {
 	}
 }
 
+func TestWorksCopiesNameTheirOwnSource(t *testing.T) {
+	const other = "refs/heads/main"
+	in := WorksInput{
+		Changes: []scan.Use{{Slug: "add-x", Path: "openspec/changes/add-x", Source: wt}, {Slug: "add-x", Path: "openspec/changes/add-x", Source: other}},
+		Places:  map[string]Place{wt: {Kind: "worktree"}, other: {Kind: "branch", Default: true}},
+		Files: map[string]Files{
+			wt:    {dir + "proposal.md": []byte("---\nsource: docket/ideas/a.md\n---\n")},
+			other: {dir + "proposal.md": []byte("---\nsource: docket/ideas/z.md\n---\n")},
+		},
+	}
+	ws, _ := Works(in)
+	cs := ws[0].Copies
+	if len(cs) != 2 || *cs[0].Named != "docket/ideas/a.md" || cs[1].Source != other || *cs[1].Named != "docket/ideas/z.md" {
+		t.Fatalf("%+v", cs)
+	}
+}
+
 func TestWorksOneEntry(t *testing.T) {
 	ws, bad := Works(in1())
 	if len(ws) != 1 || len(bad) != 0 || len(ws[0].Locations) != 3 {

@@ -85,6 +85,14 @@ type WorkEntry struct {
 	Tasks      []Task       `json:"tasks" null:"ok"`
 	Documents  []Document   `json:"documents"`
 	Deltas     []DeltaEntry `json:"deltas"`
+	Copies     []Copy       `json:"-"`
+}
+
+// Copy is what one location's copy of a work names as its source; Backlog
+// decides taken, handlers and met needs from it.
+type Copy struct {
+	Source string
+	Named  *string
 }
 
 // Merge is the commit that brought a work into the default branch; a *Ref

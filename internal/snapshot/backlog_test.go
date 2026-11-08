@@ -32,6 +32,7 @@ func work(slug, source string, merged bool, at ...string) WorkEntry {
 	}
 	for _, s := range at {
 		w.Locations = append(w.Locations, Location{Source: s, Default: s == mainRef})
+		w.Copies = append(w.Copies, Copy{Source: s, Named: w.Source})
 	}
 	return w
 }
@@ -65,7 +66,7 @@ func TestIdeaStates(t *testing.T) {
 			"docket/ideas/e.md": ideaFile("E", ""),
 		},
 		Works:  []WorkEntry{work("add-a", ideaA, false, featRef), work("add-d", "", false, mainRef)},
-		Places: places(),
+		Places: places(), DefaultRef: mainRef,
 	}
 	ideas, _, _, problems := Backlog(in)
 	if len(problems) != 0 || len(ideas) != 5 {
@@ -87,7 +88,7 @@ func TestNeedTakenNotMet(t *testing.T) {
 	in := BacklogInput{
 		Ideas:  map[string][]byte{ideaA: ideaFile("A", ""), ideaB: ideaFile("B", "needs: ["+ideaA+"]\n")},
 		Works:  []WorkEntry{work("add-a", ideaA, false, featRef)},
-		Places: places(),
+		Places: places(), DefaultRef: mainRef,
 	}
 	ideas, _, _, _ := Backlog(in)
 	if ideas[0].State != "taken" || !reflect.DeepEqual(ideas[1].WaitingOn, []string{ideaA}) {
@@ -110,7 +111,7 @@ func TestIdeaDates(t *testing.T) {
 func issueIn(works ...WorkEntry) BacklogInput {
 	return BacklogInput{Order: []byte("- " + issueX + "\n"),
 		Issues:     []scan.Use{{Slug: "2026-11-01-fix-x", Path: issueX, Source: mainRef}},
-		IssueFiles: map[string]Files{mainRef: issueFile("Fix X")}, Works: works, Places: places()}
+		IssueFiles: map[string]Files{mainRef: issueFile("Fix X")}, Works: works, Places: places(), DefaultRef: mainRef}
 }
 
 func TestIssueStates(t *testing.T) {
@@ -165,7 +166,7 @@ func TestProposed(t *testing.T) {
 func TestSourceDocument(t *testing.T) {
 	in := BacklogInput{Ideas: map[string][]byte{ideaA: ideaFile("A", "")},
 		Works:  []WorkEntry{work("add-a", ideaA, false, mainRef), work("add-z", "docket/ideas/z.md", false, mainRef)},
-		Places: places()}
+		Places: places(), DefaultRef: mainRef}
 	in.Works[0].Documents = []Document{{"proposal", "p", mainRef}}
 	Backlog(in)
 	want := []Document{{"idea", ideaA, mainRef}, {"proposal", "p", mainRef}}
@@ -179,5 +180,43 @@ func TestBacklogProblems(t *testing.T) {
 		Ideas: map[string][]byte{ideaA: []byte("---\ndropped: false\n---\n"), ideaB: ideaFile("B", "")}})
 	if len(problems) != 1 || problems[0].Rule != "idea-front-matter" || len(ideas) != 2 || *ideas[1].Title != "B" {
 		t.Fatalf("%+v %+v", problems, ideas)
+	}
+}
+
+func TestCopiesDisagree(t *testing.T) {
+	base := func(w WorkEntry) BacklogInput {
+		return BacklogInput{Ideas: map[string][]byte{ideaA: ideaFile("A", ""), ideaB: ideaFile("B", "needs: ["+ideaA+"]\n")},
+			Works: []WorkEntry{w}, Places: places(), DefaultRef: mainRef}
+	}
+	// read_from copy names a.md, the default-ref copy names something else.
+	w := work("add-a", ideaA, false, featRef, mainRef)
+	w.Copies[1].Named = sp("docket/ideas/z.md")
+	ideas, _, _, _ := Backlog(base(w))
+	if ideas[0].State != "taken" || !reflect.DeepEqual(ideas[1].WaitingOn, []string{ideaA}) {
+		t.Fatalf("%+v", ideas)
+	}
+	// read_from copy names something else, the default-ref copy names a.md.
+	w = work("add-a", "docket/ideas/z.md", false, featRef, mainRef)
+	w.Copies[1].Named = sp(ideaA)
+	ideas, _, _, _ = Backlog(base(w))
+	if ideas[0].State != "taken" || len(ideas[1].WaitingOn) != 0 {
+		t.Fatalf("%+v", ideas)
+	}
+	// only a worktree copy names it
+	ideas, _, _, _ = Backlog(base(work("add-a", ideaA, false, wt)))
+	if ideas[0].State != "taken" || !reflect.DeepEqual(ideas[1].WaitingOn, []string{ideaA}) {
+		t.Fatalf("%+v", ideas)
+	}
+}
+
+func TestDefaultRefFromCaller(t *testing.T) {
+	const remote = "refs/remotes/origin/main"
+	pl := places()
+	pl[remote] = Place{Kind: "remote", Branch: "main", Default: true}
+	in := BacklogInput{Ideas: map[string][]byte{ideaA: ideaFile("A", "")}, Works: []WorkEntry{work("add-a", ideaA, false, mainRef)},
+		Places: pl, DefaultRef: remote}
+	Backlog(in)
+	if in.Works[0].Documents[0].Source != remote {
+		t.Fatalf("%+v", in.Works[0].Documents)
 	}
 }

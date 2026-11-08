@@ -21,6 +21,7 @@ type BacklogInput struct {
 	Dates      map[string]string
 	Works      []WorkEntry
 	Places     map[string]Place
+	DefaultRef string // default_branch.ref, the source of an idea document
 }
 
 type issueGroup struct {
@@ -32,7 +33,8 @@ func (g *issueGroup) date() string { return g.slug[:min(10, len(g.slug))] }
 
 // Backlog reports the ideas, the issues and the order. It sets the position of
 // each work whose source names an item of the order, and puts the source idea
-// or issue of a work first in its documents.
+// or issue of a work first in its documents. It fills the given works in
+// place, so it is called once.
 func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []OrderItem, problems []idea.Problem) {
 	// Issues are grouped by slug and read from the first location.
 	var list []*issueGroup
@@ -67,16 +69,23 @@ func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []O
 		order = append(order, OrderItem{Position: n + 1, Path: l.Path})
 	}
 
-	// Who names each item, and which items the tip's own copy of a work names.
+	// Who names each item through any copy, and which items a copy on the
+	// default ref itself names.
 	named := map[string][]WorkRef{}
 	onTip := map[string]bool{}
 	for _, w := range in.Works {
-		if w.Source == nil {
-			continue
-		}
-		named[*w.Source] = append(named[*w.Source], WorkRef{Type: w.Type, Slug: w.Slug})
-		for _, l := range w.Locations {
-			onTip[*w.Source] = onTip[*w.Source] || l.Default
+		seen := map[string]bool{}
+		for _, c := range w.Copies {
+			if c.Named == nil {
+				continue
+			}
+			if !seen[*c.Named] {
+				seen[*c.Named] = true
+				named[*c.Named] = append(named[*c.Named], WorkRef{Type: w.Type, Slug: w.Slug})
+			}
+			if c.Source == in.DefaultRef {
+				onTip[*c.Named] = true
+			}
 		}
 	}
 
@@ -129,7 +138,7 @@ func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []O
 		}
 		merged := 0
 		for _, w := range in.Works {
-			if w.Source != nil && *w.Source == g.path {
+			if slices.ContainsFunc(w.Copies, func(c Copy) bool { return c.Named != nil && *c.Named == g.path }) {
 				e.Handlers = append(e.Handlers, Handler{Type: w.Type, Slug: w.Slug, Merged: w.Merged})
 				if w.Merged {
 					merged++
@@ -145,20 +154,6 @@ func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []O
 		issues = append(issues, e)
 	}
 
-	// The default ref is the first non-worktree source that is the default branch.
-	var defRef string
-	srcs := make([]string, 0, len(in.Places))
-	for s := range in.Places {
-		srcs = append(srcs, s)
-	}
-	slices.Sort(srcs)
-	for _, s := range srcs {
-		if p := in.Places[s]; p.Default && p.Kind != "worktree" {
-			defRef = s
-			break
-		}
-	}
-
 	for i := range in.Works {
 		w := &in.Works[i]
 		if w.Source == nil {
@@ -170,7 +165,7 @@ func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []O
 		var doc Document
 		var date string
 		if _, ok := in.Ideas[*w.Source]; ok {
-			doc, date = Document{Kind: "idea", Path: *w.Source, Source: defRef}, in.Dates[*w.Source]
+			doc, date = Document{Kind: "idea", Path: *w.Source, Source: in.DefaultRef}, in.Dates[*w.Source]
 		} else if g := byPath[*w.Source]; g != nil {
 			doc, date = Document{Kind: "issue", Path: g.path, Source: g.uses[0].Source}, g.date()
 		} else {

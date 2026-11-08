@@ -71,6 +71,9 @@ func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable) {
 			w.Locations = append(w.Locations, Location{Source: u.Source, Kind: p.Kind, Branch: str(p.Branch),
 				Default: p.Default, Commit: str(p.Commit), Time: str(p.Time), Path: u.Path, Archived: u.Archived})
 		}
+		for _, u := range us {
+			w.Copies = append(w.Copies, Copy{Source: u.Source, Named: copySource(k.Key, u, in.Files[u.Source])})
+		}
 		files := in.Files[read.Source]
 		var front change.Front
 		var file string
@@ -134,6 +137,18 @@ func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable) {
 		return strings.Compare(a.Slug, b.Slug)
 	})
 	return works, bad
+}
+
+// copySource is the source named by one copy of a work; nil when the copy
+// does not read or names none.
+func copySource(typ string, u scan.Use, files Files) *string {
+	var front change.Front
+	if typ == "record" {
+		front = record.Parse(files[u.Path]).Front
+	} else if fm, ok, err := change.ReadFrontMatter(files[path.Join(u.Path, "proposal.md")]); err == nil && ok {
+		front = fm
+	}
+	return field(front, "source")
 }
 
 // str is nil for the empty string.
