@@ -28,6 +28,13 @@
 - A delta written with CRLF line endings, a BOM, headings in code blocks or comments: read as OpenSpec reads them. Pinned in Task 1 (`TestParseDeltaEdges`).
 - A slug that is a prefix of another (`add-x` and `add-x-2`): trailers of one never count for the other. Pinned in Task 3 (`TestNamesPrefixSlug`).
 
+## Revision 1 (2026-11-08): rulings from the task reviews of Tasks 3 and 4
+
+The task reviewers, in fresh contexts, found two costs the plan had not pinned, and the controller ruled on them; no requirement changed.
+
+- Task 3: `Merge` and `Release` walked the history once per work, which breaks the one-second target on long histories. They now mark each commit once per tip and per tag list, cached on the `Graph` (9d2d3ee, bc0d8a5, `TestMergeLongHistory`, `TestMergeOlderAttribution`). A malformed task list names the work with no task (`TestNamesMalformed`), so a change's `dev` uses `len(tasks) > 0`.
+- Task 4: `ls-tree` ran once per wanted path; `gitx.Git.TreeFiles` became variadic, `TreeFiles(commit string, dirs ...string)`, so one run per commit lists every path (0d5b523). This touches `internal/gitx/refs.go`, outside the task's Files block; its two callers pass one dir and are unchanged. A symbolic link inside one wanted path now costs that path only, `<source>:<path>`, while a missing worktree, or a link at or above `openspec/changes` or `docket/records`, still costs the whole source (`TestReadLinkPerPath`).
+
 ## Reuse
 
 | Need | Existing (path:symbol) | Decision | Reason | Evidence |
@@ -77,27 +84,27 @@
   - `func ParseDelta(b []byte) Delta`
   - `func Requirements(b []byte) []string`: the names of `### Requirement:` headings, never nil.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestParseDelta`: a delta with `## ADDED Requirements` holding `### Requirement: Join when full` with `#### Scenario: Full slot` and `#### Scenario: Slot frees up`; `## MODIFIED Requirements` with `### Requirement: Cancel` and one scenario; `## REMOVED Requirements` with `### Requirement: Walk-in mark` and a line `**Reason**: Walk-ins moved to paper.`; `## RENAMED Requirements` with `- FROM: \`### Requirement: Party limit\`` and `- TO: \`### Requirement: Group size limit\``. The result equals those four groups exactly, the reason being `Walk-ins moved to paper.`.
 - `TestParseDeltaEdges`: CRLF line endings and a BOM give the same result; `### Requirement: Example` inside a fenced block and inside `<!-- -->` is not reported; `### Requirement: Join when full ###` (closing hashes) gives `Join when full`; a `#### Scenario:` before any requirement is ignored; a requirement under no operation heading is ignored; names are trimmed.
 - `TestRequirements`: a main spec with two requirements, one more in a code block: the two names in file order; an empty file gives an empty, non-nil slice.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/specdoc/`
 Expected: FAIL, the package does not build.
 
-- [ ] **Step 3: Implement `internal/specdoc/specdoc.go`**
+- [x] **Step 3: Implement `internal/specdoc/specdoc.go`**
 
 Lines through `markdown.Lines`, masked with `markdown.FenceMask` and `markdown.BlankComments`, headings found with `markdown.Headings`, all as `change.ParsePlan` does; a heading's text is matched against `ADDED Requirements` and the others, `Requirement:` and `Scenario:`. A removed requirement's reason is the text after `**Reason**:` on the first such line under it. A rename pairs each `FROM:` with the next `TO:`, taking the name after `### Requirement:` inside the backticks.
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `gofmt -l . && go vet ./... && go test ./internal/specdoc/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit "Read delta and main specs without OpenSpec" with the trailer `Change: project-snapshot/1`.
 
@@ -122,7 +129,7 @@ Commit "Read delta and main specs without OpenSpec" with the trailer `Change: pr
   - `func (g Git) Tags() ([]Tag, error)`: `refs/tags`, oldest first by creation date, in one `for-each-ref`; a tag that does not point at a commit is left out.
   - `func (g Git) AddedDates(rev, dir string) (map[string]string, error)`: for each path under `dir` that a commit reachable from `rev` added, the date (`YYYY-MM-DD`, in that commit's own offset) of the oldest such commit; renames count as adds (`--no-renames`); one `git log`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 With `testutil.NewRepo` and commits made with fixed `GIT_COMMITTER_DATE`:
 - `TestHistory`: a merge commit of a branch carrying `Change: add-x/1` and a commit carrying `Record: 2026-11-06-fix-x` in a paragraph that is not the last: `History("main")` holds each commit once, the merge with two parents, the subject, `%cI` times with their offsets, the `Change` trailer, and not the misplaced `Record`.
@@ -130,21 +137,21 @@ With `testutil.NewRepo` and commits made with fixed `GIT_COMMITTER_DATE`:
 - `TestTags`: a lightweight tag on an older commit and an annotated tag on a newer one, created in the other order: oldest-created first; the annotated tag's `Commit` is the commit, not the tag object; a tag on a blob is left out.
 - `TestAddedDates`: `docket/ideas/a.md` added on 2026-11-04 and edited on 2026-11-06, `docket/ideas/c.md` renamed to `docket/ideas/b.md` on 2026-11-07: `a.md` gives `2026-11-04`, `b.md` gives `2026-11-07`; a path outside `dir` is absent.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/gitx/ -run 'TestHistory|TestTags|TestAddedDates'`
 Expected: FAIL, the functions are not defined.
 
-- [ ] **Step 3: Implement `internal/gitx/history.go`**
+- [x] **Step 3: Implement `internal/gitx/history.go`**
 
 `History` separates revs from paths with `--`; fields are NUL-separated as `trailers` does.
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `gofmt -l . && go vet ./... && go test ./internal/gitx/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit "Read the history, the tags and the dates files were added in one git run each" with the trailer `Change: project-snapshot/2`.
 
@@ -173,7 +180,7 @@ Commit "Read the history, the tags and the dates files were added in one git run
   - `func (g *Graph) Last(from []string, w Work) *Ref`: among commits reachable from `from` that name `w`, the newest by `Time`, ties broken by SHA; nil when none.
   - `func (g *Graph) TaskCommits(from string, w Work) map[int][]string`: for each task number, the commits reachable from `from` that name it, oldest first.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 On graphs built from literal `gitx.Commit` values:
 - `TestMerge`: a first-parent line `m3 → m2 → m1`, `m2` merging a side branch whose two commits carry `Change: add-x/1` and `Change: add-x`: `Merge("m3", {Change, add-x})` is `m2` with its time and subject.
@@ -185,21 +192,21 @@ On graphs built from literal `gitx.Commit` values:
 - `TestLast`: one naming commit reachable from the tip, a newer one only from a branch: `Last([tip, branch])` is the newer.
 - `TestTaskCommits`: commits reachable only from another ref are not counted; oldest first.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/snapshot/`
 Expected: FAIL, the package does not build.
 
-- [ ] **Step 3: Implement `internal/snapshot/graph.go`**
+- [x] **Step 3: Implement `internal/snapshot/graph.go`**
 
 `Merge` walks the first-parent line once; for a merge commit, the commits it brought in are those reachable from its other parents and not from its first parent. `Release` keeps each tag's reachable set only while it is used.
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `gofmt -l . && go vet ./... && go test ./internal/snapshot/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit "Find the merge, the release and the commits that name a work" with the trailer `Change: project-snapshot/3`.
 
@@ -222,26 +229,26 @@ Commit "Find the merge, the release and the commits that name a work" with the t
   - `type Wanted struct { Source, Commit string; Paths []string }`: a folder or a file to read in a source; `Commit` empty for a worktree, whose `Source` is its absolute path.
   - `func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error)`: keyed by `Source`. For a ref, one `ls-tree` and one `ReadBlobs` per distinct commit, whatever the number of sources sharing it, every file under each path. For a worktree, the files on disk, refusing a symbolic link anywhere below the root, which is reported as unreadable naming the link. A source that cannot be read is listed and has no entry; the error is for git failing as a whole.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestReadRefAndWorktree`: a change folder committed on a branch and edited, uncommitted, in a linked worktree: the branch's entry holds the committed text, the worktree's the edited one, both with every file under the folder.
 - `TestReadSharesCommits`: three refs on one commit: the result has all three sources, and git is run for that commit once (count the runs through a fake `git` on the PATH that logs and calls the real one).
 - `TestReadUnreadable`: a worktree whose directory was removed, a worktree whose `openspec/changes` is a link, and a `Wanted` whose `Commit` is a blob (`git hash-object -w`): all three in the unreadable list with reasons, the rest read, and no error.
 - `TestReadFile`: a `Wanted` naming a single file (a record) reads that file only.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/snapshot/ -run TestRead`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `internal/snapshot/source.go`**
+- [x] **Step 3: Implement `internal/snapshot/source.go`**
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `gofmt -l . && go vet ./... && go test ./internal/snapshot/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit, and open the first pull request**
+- [x] **Step 5: Commit, and open the first pull request**
 
 Commit "Read the files of every location once per commit" with the trailer `Change: project-snapshot/4`. Run `dkt sync project-snapshot` and `dkt lint project-snapshot`, commit the plan, and open the first pull request (Tasks 1 to 4). The rest waits for its merge.
 
