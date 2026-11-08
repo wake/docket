@@ -29,7 +29,7 @@ type Command struct {
 }
 
 // commands is the real command set.
-var commands = []func() Command{initCommand, inspectCommand, newCommand, recordCommand, issueCommand, syncCommand, lintCommand, conflictsCommand, statusCommand, domainsCommand}
+var commands = []func() Command{initCommand, inspectCommand, newCommand, recordCommand, issueCommand, syncCommand, lintCommand, conflictsCommand, statusCommand, domainsCommand, projectsCommand}
 
 func syncCommand() Command {
 	var check bool
