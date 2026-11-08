@@ -16,7 +16,7 @@
 - Stage names: a change `proposal`, `design`, `plan`, `dev`, `merged`, `archived`; a record `record`, `dev`, `merged`. Task states `done`, `pending`. Idea states `queued`, `pool`, `dropped`, `taken`. Issue states `open`, `in-progress`, `done`. Location kinds `worktree`, `branch`, `remote-branch`. Document kinds `proposal`, `design`, `plan`, `spec-delta`, `record`, `idea`, `issue`, `other`.
 - Read-only: nothing in the repository is written (the project index registration of every command is not this change's). No network. OpenSpec is never run.
 - Findings reuse the rule names of `dkt status` and `dkt domains`: `order-format`, `order-item`, `idea-front-matter`, `idea-needs`, `issue-front-matter`, `domain-format`, `domain-duplicate`, `domain-unknown`. Exit 3 when anything is unreadable, else 1 with a finding, else 0.
-- git is started a number of times bounded by the refs and worktrees, never once per work: the three scans of `workspace-scan` as they are; `for-each-ref` once for tags; `log` twice (history, idea dates); for the files of works, `ls-tree` and `cat-file --batch` once per distinct commit read.
+- git is started a number of times bounded by the refs and worktrees, never once per work: the three scans of `workspace-scan` as they are; `for-each-ref` once for tags; `log` twice (history, idea dates); for the files of works, `ls-tree` and `cat-file --batch` once per distinct commit read. From Task 10 (Revision 2): the worktrees and refs are listed once, one `ls-tree -r` per distinct ref commit serves the three scans and the files of works together, and one `cat-file --batch` reads every commit's files.
 - No new dependency. Commits carry `Change: project-snapshot/<N>` in the last paragraph, with no other trailer. `gofmt -l .` prints nothing, `go vet ./...` and `go test ./...` pass after every task.
 - Two pull requests, one after the other (`docket/workflow.md`, Splitting pull requests: product code and tests run far past 1000 lines): the first holds Tasks 1 to 4, which nothing calls yet; the second Tasks 5 to 9 and the archive. The second is opened only once the first is merged.
 
@@ -36,6 +36,11 @@ The task reviewers, in fresh contexts, and the pre-merge review of the first pul
 - Task 4, from the same review: several `Wanted` of one source are merged into that source's `Files` (`TestReadTwoWantedOneSource`), and the tests run git only through `testutil`'s environment.
 - Task 8: `History` also runs over every tag's commit, in the same single run, so `Release` sees a tag no location reaches.
 - Task 4: `ls-tree` ran once per wanted path; `gitx.Git.TreeFiles` became variadic, `TreeFiles(commit string, dirs ...string)`, so one run per commit lists every path (0d5b523). This touches `internal/gitx/refs.go`, outside the task's Files block; its two callers pass one dir and are unchanged. A symbolic link inside one wanted path now costs that path only, `<source>:<path>`, while a missing worktree, or a link at or above `openspec/changes` or `docket/records`, still costs the whole source (`TestReadLinkPerPath`).
+
+## Revision 2 (2026-11-08): the measurement of Task 9
+
+Task 9's run in this repository found two things. First, every record and issue on a ref was reported unreadable: `scan.Dated` left `Use.Commit` empty for a ref use, against the field's own comment, so `snapshot.Read` took the ref for a worktree (`idea.FindWork` had worked around it by looking the commit up); `scan.Dated` now sets it, pinned by `TestRecordsOnBranch`, `TestIssuesOnBranch` and `TestSnapshotRecordOnBranch` (04c345d, inside Task 9). Second, the command took 2.2 to 2.6 s against the target of about one second: it started git 42 times on 4 worktrees and 7 refs, and on macOS each git run costs about 44 ms through `/usr/bin/git` (25 ms for the git it forwards to), so the time is the number of runs. Of the 42, the three scans, `Collect` and `DefaultBranch` listed the worktrees and refs 9 times; the scans read each of the 5 ref commits 3 times; and `Read` listed and read 4 of those commits again, one `cat-file` each. The design left merging the scans until a measurement showed the need; Task 10 does it, and the constraint on git runs above is amended. No requirement or field changes.
+
 
 ## Reuse
 
@@ -493,3 +498,56 @@ Run: `gofmt -l . && go vet ./... && go test ./...`
 Expected: PASS.
 
 Commit "Add dkt snapshot" with the trailer `Change: project-snapshot/9`.
+
+---
+
+### Task 10: One listing per commit
+
+Added by Revision 2.
+
+**Scenarios:** none
+
+**Review:** judgment
+
+**Files:**
+- Modify: `internal/scan/scan.go`, `internal/scan/records.go` (one pass for the three scans)
+- Modify: `internal/scan/scan_test.go`
+- Modify: `internal/gitx/blobs.go`, `internal/gitx/branch.go`
+- Modify: `internal/gitx/blobs_test.go`, `internal/gitx/branch_test.go`
+- Modify: `internal/snapshot/source.go`, `internal/snapshot/source_test.go`
+- Modify: `internal/snapshot/snapshot.go`, `internal/snapshot/snapshot_test.go`
+
+**Interfaces:**
+- Consumes: `gitx.Git.Worktrees`, `Refs`, `TreeFiles`; `scan.Inventory`.
+- Produces:
+  - In package `scan`: `type Workspace struct { Changes, Records, Issues Inventory; Worktrees []gitx.Worktree; Refs []gitx.Ref; Trees map[string][]gitx.TreeFile }` and `func Scan(g gitx.Git, extra ...string) (Workspace, error)`. It lists the worktrees and the refs once and runs `TreeFiles(commit, "openspec/changes", "docket/records", "docket/issues", extra...)` once per distinct ref commit; `Trees` holds that listing by commit. A commit whose listing fails is not in `Trees`, and each of the three inventories lists every ref on it as unreadable, as the scans do now. The change folders of a ref are the direct subfolders of `openspec/changes` and `openspec/changes/archive` that its listing has a file under, which is what `ls-tree -d` gives, since git stores no empty folder. `Changes`, `Records` and `Issues` become `Scan(g)` and the one field, so the uses are worked out in one place.
+  - In package `gitx`: `func (g Git) ReadBlobsAt(names map[string][]string) (map[string]map[string][]byte, error)`, commit → paths → contents, with one `cat-file --batch` for every commit; `ReadBlobs(commit, paths)` becomes a call of it. `func (g Git) DefaultBranchIn(refs []Ref) (DefaultBranch, bool, error)`: `DefaultBranch` without its own `Refs` run; `DefaultBranch` becomes `Refs` and a call of it.
+  - In package `snapshot`: `Read(g gitx.Git, want []Wanted, trees map[string][]gitx.TreeFile)`. A ref's files come from `trees[commit]`; `TreeFiles` runs only for a commit that is not there. One `ReadBlobsAt` reads every commit's files. `Collect` uses `scan.Scan(g, <the tip's paths>)`, its `Worktrees` and `Refs`, and `DefaultBranchIn`.
+
+- [ ] **Step 1: Write the failing tests**
+
+- `TestScanGitRuns` (scan): two refs on two commits and one on the first again: `Scan` starts git exactly 4 times (one `worktree list`, one `for-each-ref`, two `ls-tree`), and gives the same three inventories as `Changes`, `Records` and `Issues` on the same repository. Count the runs with a fake `git` on the PATH, as `TestReadSharesCommits` does.
+- `TestScanUnreadableRef` (scan): a ref on a blob: all three inventories list it, and the other refs are scanned.
+- `TestReadBlobsAt` (gitx): two commits, a path in each, a missing path and a folder: one run, each file under its commit, the missing path and the folder left out.
+- `TestDefaultBranchIn` (gitx): the same answers as `DefaultBranch` for the cases its tests cover, with no `for-each-ref` run.
+- `TestReadFromTrees` (snapshot): a `Wanted` on a commit that `trees` holds starts no `ls-tree`; one that it lacks starts one.
+- `TestSnapshotGitRuns` (snapshot): `main`, two branches on distinct commits, a tag, a linked worktree, a change on a branch and a record on another: `Collect` starts git exactly C + 7 times, C the number of distinct ref commits (one `worktree list`, one `for-each-ref` for the refs, one `symbolic-ref`, one `for-each-ref` for tags, C `ls-tree`, two `log`, one `cat-file`).
+- The existing scan, snapshot and cli tests still pass unchanged.
+
+- [ ] **Step 2: Run them and see them fail**
+
+Run: `go test ./internal/scan/ ./internal/gitx/ ./internal/snapshot/ -run 'TestScanGitRuns|TestScanUnreadableRef|TestReadBlobsAt|TestDefaultBranchIn|TestReadFromTrees|TestSnapshotGitRuns'`
+Expected: FAIL.
+
+- [ ] **Step 3: Implement**
+
+- [ ] **Step 4: Measure again**
+
+As Task 9's Step 4, with a fake `git` on the PATH to count runs (`GIT_TRACE` does not reach them). Record the times, the count, and the number of worktrees and refs.
+
+- [ ] **Step 5: Run the whole suite and commit**
+
+Run: `gofmt -l . && go vet ./... && go test ./...`
+Expected: PASS.
+
+Commit "List each commit once for the whole snapshot" with the trailer `Change: project-snapshot/10`.
