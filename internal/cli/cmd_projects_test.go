@@ -166,6 +166,9 @@ func TestProjectsAddNotRepository(t *testing.T) {
 	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "not-a-repository" {
 		t.Fatalf("%d %s", code, raw)
 	}
+	if _, err := os.Stat(prIndexPath(env)); err == nil {
+		t.Fatal("index created")
+	}
 }
 
 func TestProjectsUnreadableIndex(t *testing.T) {
@@ -417,5 +420,76 @@ func TestProjectsIgnoreNotRepository(t *testing.T) {
 	code, m, raw, _ := prRun(t, env, dir, "ignore", dir)
 	if code != 0 || m.Result.State != "ignored" || m.Result.Project.Path != dir || !strings.Contains(raw, `"origin":null`) {
 		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsLsUnderAFile(t *testing.T) {
+	env := testutil.Env(t)
+	f := filepath.Join(t.TempDir(), "f")
+	if err := os.WriteFile(f, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prWrite(t, env, `{"projects":[`+prEntry(filepath.Join(f, "app"), false)+`]}`)
+	code, m, raw, _ := prRun(t, env, t.TempDir(), "ls")
+	if code != 0 || len(m.Result.Projects) != 1 || !m.Result.Projects[0].Missing {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsAddNotProjectInWorktree(t *testing.T) {
+	r := prRepo(t, false)
+	r.Commit("docket", map[string]string{"docket/workflow.md": "# w\n"})
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "-b", "old", wt, "HEAD~1")
+	code, m, raw, _ := prRun(t, r.Env, wt, "add")
+	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "not-a-project" || !strings.Contains(m.Findings[0].Message, prReal(t, wt)) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsLsUnreadableIndex(t *testing.T) {
+	env := testutil.Env(t)
+	idx := prWrite(t, env, "not json")
+	code, m, raw, _ := prRun(t, env, t.TempDir(), "ls")
+	data, _ := os.ReadFile(idx)
+	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != idx || string(data) != "not json" {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsIgnoreGitMissing(t *testing.T) {
+	var env []string
+	for _, kv := range testutil.Env(t) {
+		if !strings.HasPrefix(kv, "PATH=") {
+			env = append(env, kv)
+		}
+	}
+	env = append(env, "PATH="+t.TempDir())
+	tmp := t.TempDir()
+	idx := prWrite(t, env, `{"projects":[`+prEntry(tmp, false)+`]}`)
+	before, _ := os.ReadFile(idx)
+	code, m, raw, _ := prRun(t, env, tmp, "ignore", tmp)
+	after, _ := os.ReadFile(idx)
+	if code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "git-missing" || !bytes.Equal(before, after) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsText(t *testing.T) {
+	r := prRepo(t, true)
+	text := func(args ...string) string {
+		var out bytes.Buffer
+		Run(Options{Args: append([]string{"projects"}, args...), Dir: r.Dir, Env: r.Env, Stdout: &out, Stderr: &bytes.Buffer{}})
+		return out.String()
+	}
+	if got := text("ls"); got != "" {
+		t.Fatalf("ls: %q", got)
+	}
+	p := prReal(t, r.Dir)
+	if got, want := text("add"), "added "+p+"\n"; got != want {
+		t.Fatalf("%q want %q", got, want)
+	}
+	if got, want := text("ignore", r.Dir), "ignored "+p+"\n"; got != want {
+		t.Fatalf("%q want %q", got, want)
 	}
 }

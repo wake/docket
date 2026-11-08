@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"syscall"
 
 	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/projects"
@@ -96,7 +97,7 @@ func projectsAdd(c *Context, rest []string) (Outcome, error) {
 	case err != nil:
 		return Outcome{}, err
 	case !p.Docket:
-		return Outcome{Findings: []Finding{{Rule: "not-a-project", Message: p.Path + " has no docket/workflow.md"}}}, nil
+		return Outcome{Findings: []Finding{{Rule: "not-a-project", Message: p.Worktree + " has no docket/workflow.md"}}}, nil
 	}
 	state := "exists"
 	if i := x.Find(p.Path); i < 0 {
@@ -184,7 +185,7 @@ func projectsLs(c *Context) (Outcome, error) {
 	list := projectList{Projects: []listedProject{}}
 	for _, e := range x.Projects {
 		lp := listedProject{Entry: e}
-		if _, err := os.Lstat(e.Path); errors.Is(err, fs.ErrNotExist) {
+		if _, err := os.Lstat(e.Path); errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
 			lp.Missing = true
 		} else if err != nil {
 			out.Unreadable = append(out.Unreadable, Unreadable{Source: e.Path, Reason: err.Error()})
