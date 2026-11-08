@@ -119,6 +119,8 @@ func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error) {
 		var paths []string
 		for _, f := range ws.Trees[def.Commit] {
 			switch {
+			case f.Link && (f.Path == ideasDir || f.Path == specsDir[:len(specsDir)-1] || strings.HasPrefix(f.Path, specsDir)):
+				// a linked folder is listed by Read as unreadable, never read through
 			case f.Path == domain.File || f.Path == idea.OrderFile:
 			case path.Dir(f.Path) == ideasDir && strings.HasSuffix(f.Path, ".md"):
 				tipIdeas[f.Path] = true

@@ -70,6 +70,26 @@ func TestSnapshotTipLinkCostsOneFile(t *testing.T) {
 	}
 }
 
+func TestSnapshotTipFolderLinks(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Write("notes/x.md", "---\ntitle: X\n---\n")
+	r.Write("openspec/specs/a/spec.md", "# a Specification\n")
+	if err := os.MkdirAll(filepath.Join(r.Dir, "docket"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../notes", filepath.Join(r.Dir, "docket/ideas")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("a", filepath.Join(r.Dir, "openspec/specs/b")); err != nil {
+		t.Fatal(err)
+	}
+	r.Commit("base", nil)
+	res, _, un := collect(t, r)
+	if !contains(un, "refs/heads/main:docket/ideas") || !contains(un, "refs/heads/main:openspec/specs/b") || len(res.Specs) != 1 || res.Specs[0].Capability != "a" {
+		t.Fatalf("%v %+v", un, res.Specs)
+	}
+}
+
 func TestSnapshotProposedDeletedIdea(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Env = append(r.Env, "GIT_COMMITTER_DATE=2026-11-01T12:00:00Z")
