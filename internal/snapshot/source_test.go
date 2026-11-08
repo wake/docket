@@ -8,11 +8,16 @@ import (
 	"testing"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/testutil"
 )
+
+// envs holds the isolated git environment of each repository newRepo made.
+var envs = map[string][]string{}
 
 func git(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = envs[dir]
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -33,14 +38,15 @@ func write(t *testing.T, root, rel, text string) {
 
 func newRepo(t *testing.T) (string, gitx.Git) {
 	t.Helper()
-	dir, _ := filepath.EvalSymlinks(t.TempDir())
-	git(t, dir, "init", "-q", "-b", "main")
+	r := testutil.NewRepo(t)
+	dir, _ := filepath.EvalSymlinks(r.Dir)
+	envs[dir] = r.Env
 	write(t, dir, "openspec/changes/x/proposal.md", "committed")
 	write(t, dir, "openspec/changes/x/specs/a/spec.md", "spec")
 	write(t, dir, "docket/records/r.md", "record")
 	git(t, dir, "add", ".")
 	git(t, dir, "commit", "-q", "-m", "one")
-	return dir, gitx.Git{Dir: dir, Env: os.Environ()}
+	return dir, gitx.Git{Dir: dir, Env: r.Env}
 }
 
 const folder = "openspec/changes/x"
@@ -75,7 +81,7 @@ func TestReadSharesCommits(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	g.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
+	g.Env = append(g.Env, "PATH="+bin+":"+os.Getenv("PATH")) // the last PATH wins
 	var want []Wanted
 	for _, s := range []string{"a", "b", "c"} {
 		want = append(want, Wanted{Source: s, Commit: sha, Paths: []string{folder, "docket/records/r.md"}})
@@ -177,6 +183,24 @@ func TestReadFolderBoundary(t *testing.T) {
 		t.Fatalf("%v %v", err, un)
 	}
 	if len(got["a"]) != 1 || string(got["a"][a+"/proposal.md"]) != "a" || len(got["b"]) != 1 || string(got["b"][b+"/proposal.md"]) != "b" || len(got["none"]) != 0 {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestReadTwoWantedOneSource(t *testing.T) {
+	dir, g := newRepo(t)
+	rec := "docket/records/r.md"
+	sha := git(t, dir, "rev-parse", "HEAD")
+	got, un, err := Read(g, []Wanted{
+		{Source: "ref", Commit: sha, Paths: []string{folder}},
+		{Source: "ref", Commit: sha, Paths: []string{rec}},
+		{Source: dir, Paths: []string{folder}},
+		{Source: dir, Paths: []string{rec}},
+	})
+	if err != nil || len(un) != 0 {
+		t.Fatalf("%v %v", err, un)
+	}
+	if len(got["ref"]) != 3 || len(got[dir]) != 3 {
 		t.Fatalf("got %v", got)
 	}
 }

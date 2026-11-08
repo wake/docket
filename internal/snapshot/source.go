@@ -35,15 +35,31 @@ const linkReason = " is a symbolic link; Docket does not read through it"
 func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error) {
 	out := map[string]Files{}
 	var bad []scan.Unreadable
+	dead := map[string]bool{} // sources unreadable as a whole, listed once
+	lose := func(src, reason string) {
+		if !dead[src] {
+			dead[src] = true
+			delete(out, src)
+			bad = append(bad, scan.Unreadable{Source: src, Reason: reason})
+		}
+	}
+	add := func(src string, files Files) { // several Wanted may share a source
+		if out[src] == nil {
+			out[src] = Files{}
+		}
+		for k, v := range files {
+			out[src][k] = v
+		}
+	}
 	byCommit := map[string][]Wanted{}
 	var commits []string
 	for _, w := range want {
 		if w.Commit == "" {
 			files, un, reason := readWorktree(w)
 			if reason != "" {
-				bad = append(bad, scan.Unreadable{Source: w.Source, Reason: reason})
-			} else {
-				out[w.Source] = files
+				lose(w.Source, reason)
+			} else if !dead[w.Source] {
+				add(w.Source, files)
 				bad = append(bad, un...)
 			}
 			continue
@@ -65,7 +81,7 @@ func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error
 		}
 		if len(dirs) == 0 { // no path means no files, not the whole tree
 			for _, w := range ws {
-				out[w.Source] = Files{}
+				add(w.Source, nil)
 			}
 			continue
 		}
@@ -73,7 +89,7 @@ func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error
 		var xe *gitx.ExitError
 		if errors.As(err, &xe) { // such as a commit that is not one
 			for _, w := range ws {
-				bad = append(bad, scan.Unreadable{Source: w.Source, Reason: err.Error()})
+				lose(w.Source, err.Error())
 			}
 			continue
 		}
@@ -118,7 +134,9 @@ func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error
 					files[k] = v
 				}
 			}
-			out[w.Source] = files
+			if !dead[w.Source] {
+				add(w.Source, files)
+			}
 		}
 	}
 	return out, bad, nil
