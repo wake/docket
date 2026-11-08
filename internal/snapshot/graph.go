@@ -139,14 +139,16 @@ func (g *Graph) markFrom(sha string, mark map[string]int, v int) {
 	}
 }
 
-// named indexes, once, the commits whose trailers name each work.
+// named indexes, once, the commits whose trailers name each work. A slug never
+// contains "/" (Docket slug rules), so the key is the text before the first "/".
+// gitx.History already trims trailer values, as Names expects.
 func (g *Graph) named() map[Work][]string {
 	if g.byWork == nil {
 		g.byWork = map[Work][]string{}
 		for sha, c := range g.bySHA {
 			for _, t := range c.Trailers {
 				slug, _, _ := strings.Cut(t.Value, "/")
-				w := Work{t.Key, strings.TrimSpace(slug)}
+				w := Work{t.Key, slug}
 				if l := g.byWork[w]; len(l) == 0 || l[len(l)-1] != sha {
 					g.byWork[w] = append(l, sha)
 				}

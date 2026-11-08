@@ -172,7 +172,27 @@ func TestMergeLongHistory(t *testing.T) {
 		g.Merge(prev, Work{"Change", fmt.Sprintf("w%d", w)})
 		g.Release(tags, fmt.Sprintf("c%05d", w*100))
 	}
+	if r := g.Merge(prev, Work{"Change", "w3"}); r == nil || r.Commit != "c19803" {
+		t.Fatalf("merge: %+v", r)
+	}
+	if r := g.Release(tags, "c00100"); r == nil || r.Name != "v399" {
+		t.Fatalf("release: %+v", r)
+	}
 	if d := time.Since(start); d > 2*time.Second {
 		t.Fatalf("took %v", d)
+	}
+}
+
+func TestMergeOlderAttribution(t *testing.T) {
+	g := NewGraph([]gitx.Commit{
+		c("m4", "4", []string{"m3", "d"}),
+		c("d", "4", []string{"b"}),
+		c("m3", "3", []string{"m2"}),
+		c("m2", "2", []string{"m1", "b"}),
+		c("b", "2", []string{"m1"}, "Change", "add-x/1"),
+		c("m1", "1", nil),
+	})
+	if r := g.Merge("m4", addX); r == nil || r.Commit != "m2" {
+		t.Fatalf("got %+v", r)
 	}
 }
