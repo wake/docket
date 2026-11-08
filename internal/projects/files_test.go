@@ -61,6 +61,7 @@ func TestLoadInvalid(t *testing.T) {
 		"not json", "{}", `{"projects":"x"}`,
 		`{"projects":[{"path":"rel","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`,
 		`{"projects":[{"path":"/p","origin":null,"added":"yesterday","ignored":false}]}`,
+		`{"projects":[{"path":"/p","origin":null,"added":"2026-13-08T09:10:11Z","ignored":false}]}`,
 		`{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T17:10:11+08:00","ignored":false}]}`,
 		`{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T09:10:11Z","ignored":"no"}]}`,
 	} {
