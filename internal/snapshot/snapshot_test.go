@@ -164,9 +164,9 @@ func TestSnapshotNoOpenSpec(t *testing.T) {
 		"openspec/changes/add-x/proposal.md":     proposal,
 		"openspec/changes/add-x/specs/a/spec.md": "## ADDED Requirements\n\n### Requirement: R\nx\n",
 	})
-	res, _, _ := collect(t, r, "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "none"))
+	res, rules, un := collect(t, r, "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "none"))
 	w := hasWork(res, "add-x")
-	if w == nil || len(w.Deltas) != 1 {
+	if w == nil || len(w.Deltas) != 1 || len(rules) != 0 || len(un) != 0 {
 		t.Fatalf("%+v", w)
 	}
 }

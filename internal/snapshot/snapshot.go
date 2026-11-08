@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"path"
 	"slices"
 	"strings"
 
@@ -110,12 +111,33 @@ func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error) {
 			want = append(want, Wanted{Source: u.Source, Commit: u.Commit, Paths: []string{u.Path}})
 		}
 	}
+	// The tip is read only when its ref could be listed; its files are wanted
+	// one by one, so that a link costs only itself.
+	tipIdeas := map[string]bool{}
 	var dates map[string]string
-	if hasDef {
-		want = append(want, Wanted{Source: defRef, Commit: def.Commit,
-			Paths: []string{"openspec/specs", domain.File, idea.OrderFile, ideasDir}})
-		if dates, err = g.AddedDates(def.Commit, ideasDir); err != nil {
+	if hasDef && !bad[defRef] {
+		var paths []string
+		for _, f := range ws.Trees[def.Commit] {
+			switch {
+			case f.Path == domain.File || f.Path == idea.OrderFile:
+			case path.Dir(f.Path) == ideasDir && strings.HasSuffix(f.Path, ".md"):
+				tipIdeas[f.Path] = true
+			case strings.HasPrefix(f.Path, specsDir) && strings.HasSuffix(f.Path, "/spec.md"):
+			default:
+				continue
+			}
+			paths = append(paths, f.Path)
+		}
+		want = append(want, Wanted{Source: defRef, Commit: def.Commit, Paths: paths})
+		all, err := g.AddedDates(def.Commit, ideasDir)
+		if err != nil {
 			return res, nil, nil, err
+		}
+		dates = map[string]string{} // only the ideas the tip still holds
+		for p, d := range all {
+			if tipIdeas[p] {
+				dates[p] = d
+			}
 		}
 	}
 	files, readBad, err := Read(g, want, ws.Trees)
@@ -130,8 +152,8 @@ func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error) {
 
 	tip := files[defRef] // nil without a default branch
 	ideas := map[string][]byte{}
-	for p, b := range tip {
-		if strings.HasPrefix(p, ideasDir+"/") && strings.HasSuffix(p, ".md") {
+	for p := range tipIdeas {
+		if b, ok := tip[p]; ok {
 			ideas[p] = b
 		}
 	}
