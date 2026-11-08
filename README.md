@@ -60,7 +60,7 @@ Once a project is set up, the agent loads the docket skill when development work
 | `/docket:docket-doctor` | Checks the project's Docket setup and helps fix it (plugin skill, run by hand) |
 | `/docket:docket-upgrade` | Upgrades `dkt` and the plugin, then the project's Docket files (plugin skill, run by hand) |
 | `dkt init` | Writes Docket's files into the project, keeping existing files that differ |
-| `dkt inspect` | Reports on the project's Docket setup and writes nothing |
+| `dkt inspect` | Reports on the project's Docket setup and writes nothing in the project |
 | `dkt new` | Opens a change on the full review path |
 | `dkt record` | Opens a record on the light review path |
 | `dkt issue` | Writes an issue file for work whose expected behavior is settled but put off |
@@ -70,8 +70,11 @@ Once a project is set up, the agent loads the docket skill when development work
 | `dkt conflicts` | Finds active changes that touch the same requirement |
 | `dkt status` | Names the next idea or issue to work on from `docket/order.md` |
 | `dkt domains` | Shows the capabilities in the domain tree of `docket/domains.md`, and those not in it |
+| `dkt projects` | Adds, lists, removes or ignores the Docket projects in this machine's index |
 
 Run `dkt --help` for the arguments. Every command takes `--json`.
+
+Every command run in a Docket project, apart from `dkt projects` and a usage error, also adds it to this machine's project index (`$XDG_STATE_HOME/docket/projects.json`, else `~/.local/state/docket/projects.json`), which `dkt projects ls` lists; `dkt projects ignore` keeps one project out, and `{"projects": {"autoRegister": false}}` in `$XDG_CONFIG_HOME/docket/config.json` (else `~/.config/docket/config.json`) stops it for all.
 
 ## Developing Docket
 

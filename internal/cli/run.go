@@ -7,9 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/projects"
 )
 
 // Version is the dkt version; release builds set it with -ldflags.
@@ -96,12 +98,22 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 	}
 	var out Outcome
 	ctx.Git = gitx.Git{Dir: o.Dir, Env: o.Env}
-	if ctx.Repo, err = identify(ctx); err == nil {
+	ctx.Repo, err = identify(ctx)
+	if err != nil && cmd.NoRepo {
+		ctx.Repo, err = nil, nil // the command works outside a repository
+	}
+	if err == nil {
 		out, err = cmd.Run(ctx, pos)
 	}
 	if err != nil {
 		out.Findings = append(out.Findings, errorFinding(err))
 		fmt.Fprintf(o.Stderr, "dkt %s: %v\n", cmd.Name, err)
+	}
+	if !cmd.NoRepo && ctx.Repo != nil && !asUsage(err) {
+		if rerr := projects.Register(ctx.Repo.Root, ctx.Git, ctx.Env, ctx.Now()); rerr != nil {
+			msg := strings.Join(strings.Fields(rerr.Error()), " ")
+			fmt.Fprintf(o.Stderr, "dkt: project index: %s\n", msg)
+		}
 	}
 	return finish(o, cmd.Name, ctx.JSON, out, ctx.Repo, err)
 }

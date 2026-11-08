@@ -6,7 +6,7 @@ Defines what `dkt inspect` checks and reports about a project's Docket setup: do
 ## Requirements
 
 ### Requirement: Inspect writes nothing
-`dkt inspect` SHALL change no file, inside the repository or outside it, and the only processes it SHALL start are git and the OpenSpec CLI's version query. It SHALL exit with 0 when it reports no finding and with 1 when it reports any.
+`dkt inspect` SHALL change no file, inside the repository or outside it, apart from adding the project to the project index as `project-index` defines for every command, and the only processes it SHALL start are git and the OpenSpec CLI's version query. It SHALL exit with 0 when it reports no finding and with 1 when it reports any.
 
 #### Scenario: Nothing written
 - **WHEN** a user runs `dkt inspect` in a repository where `dkt init` never ran
