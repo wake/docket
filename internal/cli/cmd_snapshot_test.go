@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
@@ -58,7 +59,7 @@ func TestSnapshotCommand(t *testing.T) {
 func TestSnapshotCommandFindings(t *testing.T) {
 	r := stRepo(t, stOrder("a"), map[string]string{"a": "---\ndropped: false\n---\n"})
 	code, m, raw := snRun(t, r, true)
-	if code != 1 || m.Result == nil || len(m.Findings) == 0 || m.Findings[0].Rule != "idea-front-matter" {
+	if code != 1 || m.Result == nil || len(m.Findings) == 0 || m.Findings[0].Rule != "idea-front-matter" || m.Findings[0].File != ideaA || m.Findings[0].Line != 0 {
 		t.Errorf("%d %s", code, raw)
 	}
 }
@@ -72,7 +73,7 @@ func TestSnapshotCommandUnreadable(t *testing.T) {
 		t.Fatal(err)
 	}
 	code, m, raw := snRun(t, r, true)
-	if code != 3 || len(m.Unreadable) == 0 {
+	if code != 3 || len(m.Unreadable) == 0 || !strings.Contains(m.Unreadable[0].Source, filepath.Base(wt)) || m.Unreadable[0].Reason == "" {
 		t.Errorf("%d %s", code, raw)
 	}
 }
