@@ -78,10 +78,10 @@ func TestReadSharesCommits(t *testing.T) {
 	g.Env = append(os.Environ(), "PATH="+bin+":"+os.Getenv("PATH"))
 	var want []Wanted
 	for _, s := range []string{"a", "b", "c"} {
-		want = append(want, Wanted{Source: s, Commit: sha, Paths: []string{folder}})
+		want = append(want, Wanted{Source: s, Commit: sha, Paths: []string{folder, "docket/records/r.md"}})
 	}
 	got, un, err := Read(g, want)
-	if err != nil || len(un) != 0 || len(got) != 3 || len(got["c"]) != 2 {
+	if err != nil || len(un) != 0 || len(got) != 3 || len(got["c"]) != 3 {
 		t.Fatalf("got %v %v %v", got, un, err)
 	}
 	b, _ := os.ReadFile(log)
@@ -131,6 +131,31 @@ func TestReadUnreadable(t *testing.T) {
 		t.Fatalf("unreadable %v", un)
 	}
 	if len(got) != 1 || len(got[dir]) != 2 {
+		t.Fatalf("got %v", got)
+	}
+}
+
+func TestReadLinkPerPath(t *testing.T) {
+	dir, g := newRepo(t)
+	y := "openspec/changes/y"
+	write(t, dir, y+"/proposal.md", "y")
+	if err := os.Symlink("proposal.md", filepath.Join(dir, y, "link.md")); err != nil {
+		t.Fatal(err)
+	}
+	git(t, dir, "add", ".")
+	git(t, dir, "commit", "-q", "-m", "two")
+	sha := git(t, dir, "rev-parse", "HEAD")
+	got, un, err := Read(g, []Wanted{
+		{Source: "ref", Commit: sha, Paths: []string{folder, y}},
+		{Source: dir, Paths: []string{folder, y}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(un) != 2 || un[0].Source != dir+":"+y || un[1].Source != "ref:"+y || !strings.Contains(un[1].Reason, y+"/link.md is a symbolic link") {
+		t.Fatalf("unreadable %v", un)
+	}
+	if len(got["ref"]) != 2 || len(got[dir]) != 2 {
 		t.Fatalf("got %v", got)
 	}
 }
