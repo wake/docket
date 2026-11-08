@@ -318,3 +318,22 @@ func TestResultJSON(t *testing.T) {
 		t.Fatalf("%s", b)
 	}
 }
+
+func TestEmptyPhase(t *testing.T) {
+	ws, _ := Works(stageIn(map[string]string{dir + ".openspec.yaml": "schema: docket\n"}, nil, "", false))
+	if len(ws[0].Stages) != 0 || ws[0].Stages == nil || ws[0].Phase != "" {
+		t.Fatalf("%+v", ws[0])
+	}
+}
+
+func TestDevFromOtherLocation(t *testing.T) {
+	in := stageIn(map[string]string{dir + "plan.md": planMd, dir + ".openspec.yaml": "schema: docket\n"},
+		[]gitx.Commit{c("c2", "2", []string{"c0"}, "Change", "add-x/1"), c("c1", "1", []string{"c0"}), c("c0", "0", nil)}, "c1", false)
+	in.Changes = append(in.Changes, scan.Use{Slug: "add-x", Path: "openspec/changes/add-x", Source: "refs/heads/b", Commit: "c2"})
+	in.Places["refs/heads/b"] = Place{Kind: "branch", Branch: "b", Commit: "c2"}
+	in.Files["refs/heads/b"] = Files{}
+	ws, _ := Works(in)
+	if ws[0].ReadFrom != wt || ws[0].Tasks[0].State != "pending" || len(ws[0].Tasks[0].Commits) != 0 || ws[0].Phase != "dev" {
+		t.Fatalf("%+v", ws[0])
+	}
+}

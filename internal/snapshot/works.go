@@ -213,9 +213,9 @@ func fill(w *WorkEntry, k Work, read scan.Use, files Files, in WorksInput) {
 				commits = append(commits, *l.Commit)
 			}
 		}
-		for s := range g.Reachable(commits...) {
-			named, tasks := Names(g.bySHA[s], k)
-			if named && (isRecord || len(tasks) > 0) {
+		reach := g.reachable(commits)
+		for _, s := range g.named()[Work{strings.ToLower(k.Key), k.Slug}] {
+			if named, tasks := Names(g.bySHA[s], k); reach[s] && named && (isRecord || len(tasks) > 0) {
 				dev = true
 				break
 			}
@@ -276,6 +276,7 @@ func fill(w *WorkEntry, k Work, read scan.Use, files Files, in WorksInput) {
 	add(dev, "dev")
 	add(w.Merged, "merged")
 	add(w.Archived != nil, "archived")
+	// no stage reached leaves phase empty
 	if n := len(w.Stages); n > 0 {
 		w.Phase = w.Stages[n-1]
 	}
