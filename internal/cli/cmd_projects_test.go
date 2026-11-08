@@ -261,3 +261,91 @@ func TestProjectsNoHome(t *testing.T) {
 		t.Fatalf("%d %s", code, raw)
 	}
 }
+
+func prEntry(path string, ignored bool) string {
+	i := "false"
+	if ignored {
+		i = "true"
+	}
+	return `{"path":"` + path + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":` + i + `}`
+}
+
+func TestProjectsRm(t *testing.T) {
+	r := prRepo(t, true)
+	prRun(t, r.Env, r.Dir, "add")
+	code, m, raw, _ := prRun(t, r.Env, r.Dir, "rm", r.Dir)
+	data, _ := os.ReadFile(prIndexPath(r.Env))
+	if code != 0 || m.Result.State != "removed" || m.Result.Project.Path != prReal(t, r.Dir) || strings.Contains(string(data), m.Result.Project.Path) {
+		t.Fatalf("%d %s %s", code, raw, data)
+	}
+}
+
+func TestProjectsRmSubdirectory(t *testing.T) {
+	r := prRepo(t, true)
+	r.Commit("sub", map[string]string{"internal/x.go": "x"})
+	prRun(t, r.Env, r.Dir, "add")
+	code, m, raw, _ := prRun(t, r.Env, r.Dir, "rm", filepath.Join(r.Dir, "internal"))
+	if code != 0 || m.Result.State != "removed" || m.Result.Project.Path != prReal(t, r.Dir) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsRmGone(t *testing.T) {
+	env := testutil.Env(t)
+	tmp := t.TempDir()
+	old := filepath.Join(tmp, "old")
+	for _, arg := range []string{old + "/", filepath.Join(tmp, "x", "..", "old")} {
+		prWrite(t, env, `{"projects":[`+prEntry(old, false)+`]}`)
+		code, m, raw, _ := prRun(t, env, tmp, "rm", arg)
+		if code != 0 || m.Result.State != "removed" {
+			t.Fatalf("%s: %d %s", arg, code, raw)
+		}
+	}
+}
+
+func TestProjectsRmUnknown(t *testing.T) {
+	env := testutil.Env(t)
+	tmp := t.TempDir()
+	idx := prWrite(t, env, `{"projects":[`+prEntry(filepath.Join(tmp, "a"), false)+`]}`)
+	before, _ := os.ReadFile(idx)
+	code, m, raw, _ := prRun(t, env, tmp, "rm", filepath.Join(tmp, "none"))
+	after, _ := os.ReadFile(idx)
+	if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "not-in-index" || !bytes.Equal(before, after) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsIgnoreRegistered(t *testing.T) {
+	r := prRepo(t, true)
+	prRun(t, r.Env, r.Dir, "add")
+	code, m, raw, _ := prRun(t, r.Env, r.Dir, "ignore", r.Dir)
+	if code != 0 || m.Result.State != "ignored" || !m.Result.Project.Ignored {
+		t.Fatalf("%d %s", code, raw)
+	}
+	before, _ := os.ReadFile(prIndexPath(r.Env))
+	code, m, raw, _ = prRun(t, r.Env, r.Dir, "ignore", r.Dir)
+	after, _ := os.ReadFile(prIndexPath(r.Env))
+	if code != 0 || m.Result.State != "exists" || !bytes.Equal(before, after) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsIgnoreNew(t *testing.T) {
+	r := prRepo(t, true)
+	r.Git("remote", "add", "origin", "https://example.com/a/b.git")
+	code, m, raw, _ := prRun(t, r.Env, r.Dir, "ignore", r.Dir)
+	data, _ := os.ReadFile(prIndexPath(r.Env))
+	if code != 0 || m.Result.State != "ignored" || !m.Result.Project.Ignored || m.Result.Project.Added != "2026-11-08T09:10:11Z" ||
+		!strings.Contains(string(data), "example.com/a/b") {
+		t.Fatalf("%d %s %s", code, raw, data)
+	}
+}
+
+func TestProjectsIgnoreNotRepository(t *testing.T) {
+	env := testutil.Env(t)
+	dir := t.TempDir()
+	code, m, raw, _ := prRun(t, env, dir, "ignore", dir)
+	if code != 0 || m.Result.State != "ignored" || m.Result.Project.Path != dir || !strings.Contains(raw, `"origin":null`) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
