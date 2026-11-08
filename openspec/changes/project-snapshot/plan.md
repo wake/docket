@@ -41,6 +41,8 @@ The task reviewers, in fresh contexts, and the pre-merge review of the first pul
 
 Task 9's run in this repository found two things. First, every record and issue on a ref was reported unreadable: `scan.Dated` left `Use.Commit` empty for a ref use, against the field's own comment, so `snapshot.Read` took the ref for a worktree (`idea.FindWork` had worked around it by looking the commit up); `scan.Dated` now sets it, pinned by `TestRecordsOnBranch`, `TestIssuesOnBranch` and `TestSnapshotRecordOnBranch` (04c345d, inside Task 9). Second, the command took 2.2 to 2.6 s against the target of about one second: it started git 42 times on 4 worktrees and 7 refs, and on macOS each git run costs about 44 ms through `/usr/bin/git` (25 ms for the git it forwards to), so the time is the number of runs. Of the 42, the three scans, `Collect` and `DefaultBranch` listed the worktrees and refs 9 times; the scans read each of the 5 ref commits 3 times; and `Read` listed and read 4 of those commits again, one `cat-file` each. The design left merging the scans until a measurement showed the need; Task 10 does it, and the constraint on git runs above is amended. No requirement or field changes.
 
+From the review of Task 10, two differences from the separate scans are kept. A change folder on a ref that holds nothing but a submodule is no longer found there, since `ls-tree -r` lists no folder and `TreeFiles` leaves gitlinks out; such a folder has no file Docket reads. And an unreadable ref's reason now names the one `ls-tree -r` that failed, with all its paths, in each of the three inventories; no spec pins the text.
+
 
 ## Reuse
 
