@@ -22,7 +22,8 @@ type Context struct {
 // Command is one dkt subcommand.
 type Command struct {
 	Name, Usage string
-	Args        int // how many positional arguments it takes; -1 means any number
+	Args        int  // how many positional arguments it takes; -1 means any number
+	NoRepo      bool // runs with Repo nil when the directory is in no repository
 	Define      func(fs *flag.FlagSet)
 	Run         func(c *Context, args []string) (Outcome, error)
 }

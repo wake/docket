@@ -96,7 +96,11 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 	}
 	var out Outcome
 	ctx.Git = gitx.Git{Dir: o.Dir, Env: o.Env}
-	if ctx.Repo, err = identify(ctx); err == nil {
+	ctx.Repo, err = identify(ctx)
+	if err != nil && cmd.NoRepo {
+		ctx.Repo, err = nil, nil // the command works outside a repository
+	}
+	if err == nil {
 		out, err = cmd.Run(ctx, pos)
 	}
 	if err != nil {
