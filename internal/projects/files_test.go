@@ -64,6 +64,10 @@ func TestLoadInvalid(t *testing.T) {
 		`{"projects":[{"path":"/p","origin":null,"added":"2026-13-08T09:10:11Z","ignored":false}]}`,
 		`{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T17:10:11+08:00","ignored":false}]}`,
 		`{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T09:10:11Z","ignored":"no"}]}`,
+		`{"projects":[{"path":"/p","added":"2026-11-08T09:10:11Z","ignored":false}]}`,
+		`{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T09:10:11Z"}]}`,
+		`{"projects":[{"path":"/p","origin":3,"added":"2026-11-08T09:10:11Z","ignored":false}]}`,
+		`{"projects":[{"path":"/w/app","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false},{"path":"/w/app","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`,
 	} {
 		p := write(t, s)
 		if _, err := Load(p); err == nil || !strings.Contains(err.Error(), p) {
@@ -138,5 +142,20 @@ func TestAutoRegister(t *testing.T) {
 		if _, err := AutoRegister(p); err == nil || !strings.Contains(err.Error(), p) {
 			t.Errorf("%s: %v", s, err)
 		}
+	}
+}
+
+func TestAutoRegisterLink(t *testing.T) {
+	d := t.TempDir()
+	target := filepath.Join(d, "real.json")
+	if err := os.WriteFile(target, []byte(`{"projects":{"autoRegister":false}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l := filepath.Join(d, "config.json")
+	if err := os.Symlink(target, l); err != nil {
+		t.Fatal(err)
+	}
+	if on, err := AutoRegister(l); err != nil || on {
+		t.Errorf("%v %v", on, err)
 	}
 }

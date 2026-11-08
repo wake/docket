@@ -81,7 +81,23 @@ func Load(path string) (*Index, error) {
 	if x.Projects == nil {
 		return nil, fmt.Errorf("read %s: projects is missing", path)
 	}
-	for _, e := range x.Projects {
+	var raw struct {
+		Projects []map[string]json.RawMessage `json:"projects"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	seen := map[string]bool{}
+	for i, e := range x.Projects {
+		for _, k := range []string{"path", "origin", "added", "ignored"} {
+			if _, ok := raw.Projects[i][k]; !ok {
+				return nil, fmt.Errorf("read %s: an entry has no %s", path, k)
+			}
+		}
+		if seen[e.Path] {
+			return nil, fmt.Errorf("read %s: path %q is listed twice", path, e.Path)
+		}
+		seen[e.Path] = true
 		if !filepath.IsAbs(e.Path) {
 			return nil, fmt.Errorf("read %s: path %q is not absolute", path, e.Path)
 		}
@@ -117,7 +133,7 @@ func (x *Index) Save(path string) error {
 
 // AutoRegister reads projects.autoRegister from the settings; true when missing.
 func AutoRegister(settings string) (bool, error) {
-	data, err := safefile.ReadNoFollow(settings)
+	data, err := os.ReadFile(settings)
 	if errors.Is(err, fs.ErrNotExist) {
 		return true, nil
 	}
