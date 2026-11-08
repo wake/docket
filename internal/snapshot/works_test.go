@@ -343,6 +343,23 @@ func TestEmptyPhase(t *testing.T) {
 	}
 }
 
+func TestWorksUnreadableFrontMatterOtherCopy(t *testing.T) {
+	in := in1()
+	in.Files["refs/heads/b"]["openspec/changes/add-x/proposal.md"] = []byte("---\ntitle: X\nsource: docket/ideas/a.md\n")
+	ws, bad := Works(in)
+	if ws[0].ReadFrom != wt || len(bad) != 1 || bad[0].Source != "refs/heads/b:openspec/changes/add-x/proposal.md" {
+		t.Fatalf("%s %v", ws[0].ReadFrom, bad)
+	}
+}
+
+func TestTaskNoStepsDone(t *testing.T) {
+	files := map[string]string{dir + "plan.md": "### Task 1: One\n", dir + ".openspec.yaml": "schema: docket\n"}
+	ws, _ := Works(stageIn(files, []gitx.Commit{c("c1", "1", nil)}, "c1", false))
+	if len(ws[0].Tasks) != 1 || ws[0].Tasks[0].State != "done" || ws[0].Progress != (Progress{1, 1}) {
+		t.Fatalf("%+v", ws[0].Tasks)
+	}
+}
+
 func TestDevFromOtherLocation(t *testing.T) {
 	in := stageIn(map[string]string{dir + "plan.md": planMd, dir + ".openspec.yaml": "schema: docket\n"},
 		[]gitx.Commit{c("c2", "2", []string{"c0"}, "Change", "add-x/1"), c("c1", "1", []string{"c0"}), c("c0", "0", nil)}, "c1", false)

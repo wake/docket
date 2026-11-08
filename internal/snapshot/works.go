@@ -72,7 +72,11 @@ func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable) {
 				Default: p.Default, Commit: str(p.Commit), Time: str(p.Time), Path: u.Path, Archived: u.Archived})
 		}
 		for _, u := range us {
-			w.Copies = append(w.Copies, Copy{Source: u.Source, Named: copySource(k.Key, u, in.Files[u.Source])})
+			named, file, err := copySource(k.Key, u, in.Files[u.Source])
+			if err != nil && u != read { // the read copy is listed below
+				bad = append(bad, scan.Unreadable{Source: u.Source + ":" + file, Reason: err.Error()})
+			}
+			w.Copies = append(w.Copies, Copy{Source: u.Source, Named: named})
 		}
 		files := in.Files[read.Source]
 		var front change.Front
@@ -141,14 +145,23 @@ func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable) {
 
 // copySource is the source named by one copy of a work; nil when the copy
 // does not read or names none.
-func copySource(typ string, u scan.Use, files Files) *string {
+// The file and the error say which front matter could not be read.
+func copySource(typ string, u scan.Use, files Files) (named *string, file string, err error) {
 	var front change.Front
 	if typ == "record" {
-		front = record.Parse(files[u.Path]).Front
-	} else if fm, ok, err := change.ReadFrontMatter(files[path.Join(u.Path, "proposal.md")]); err == nil && ok {
-		front = fm
+		file = u.Path
+		if b, ok := files[file]; ok {
+			p := record.Parse(b)
+			front, err = p.Front, p.FrontErr
+		}
+	} else {
+		file = path.Join(u.Path, "proposal.md")
+		var ok bool
+		if front, ok, err = change.ReadFrontMatter(files[file]); err != nil || !ok {
+			front = change.Front{}
+		}
 	}
-	return field(front, "source")
+	return field(front, "source"), file, err
 }
 
 // str is nil for the empty string.
@@ -262,7 +275,7 @@ func fill(w *WorkEntry, k Work, read scan.Use, files Files, in WorksInput) {
 				cs = []string{}
 			}
 			state := "pending"
-			if len(cs) > 0 || len(t.Steps) > 0 && ticked == len(t.Steps) {
+			if len(cs) > 0 || ticked == len(t.Steps) {
 				state = "done"
 				w.Progress.Done++
 			}
