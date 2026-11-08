@@ -5,7 +5,7 @@ Defines the index of Docket projects that dkt keeps on a machine, the `dkt proje
 ## ADDED Requirements
 
 ### Requirement: Index file
-The index SHALL be the file `docket/projects.json` under `$XDG_STATE_HOME` when that variable is an absolute path, and under `$HOME/.local/state` otherwise. It SHALL hold one JSON object whose `projects` is an array of entries, each with `path` (an absolute path), `origin` (a URL or null), `added` (an RFC 3339 time in UTC) and `ignored` (a boolean). A missing file SHALL be an empty index. dkt SHALL write it by replacing the whole file, creating its folders when needed.
+The index SHALL be the file `docket/projects.json` under `$XDG_STATE_HOME` when that variable is an absolute path, and under `$HOME/.local/state` otherwise. A missing file SHALL be an empty index. dkt SHALL write it by replacing the whole file, creating its folders when needed.
 
 #### Scenario: Index under the state home
 - **WHEN** `XDG_STATE_HOME` is `/s` and a project is added
@@ -19,15 +19,26 @@ The index SHALL be the file `docket/projects.json` under `$XDG_STATE_HOME` when 
 - **WHEN** `XDG_STATE_HOME` is `state`, `HOME` is `/h`, and a project is added
 - **THEN** the entry is written to `/h/.local/state/docket/projects.json`
 
+### Requirement: Index form
+The index SHALL hold one JSON object whose `projects` is an array of entries, each with all four of `path` (an absolute path, held by no other entry), `origin` (a string or null), `added` (an RFC 3339 time in UTC) and `ignored` (a boolean).
+
+#### Scenario: Entry written
+- **WHEN** a project is added at `2026-11-08T17:10:11+08:00`
+- **THEN** its entry holds `path`, `origin`, `added` `2026-11-08T09:10:11Z` and `ignored` false
+
 ### Requirement: Index that cannot be read
-When the index exists but cannot be read, is not valid JSON, or does not have the form under Index file, `dkt projects` SHALL list it in `unreadable` with the reason, SHALL NOT write it, and SHALL exit with 3.
+When the index exists but cannot be read, is not valid JSON, or does not have the form under Index form, `dkt projects` SHALL list it in `unreadable` with the reason, SHALL NOT write it, and SHALL exit with 3.
 
 #### Scenario: Index that is not JSON
 - **WHEN** the index holds `not json` and a user runs `dkt projects add --json` in a Docket project
 - **THEN** `unreadable` lists the index, the file still holds `not json`, and dkt exits with 3
 
+#### Scenario: Two entries with one path
+- **WHEN** the index holds two entries whose `path` is `/w/app` and a user runs `dkt projects rm /w/app --json`
+- **THEN** `unreadable` lists the index, the file is unchanged, and dkt exits with 3
+
 ### Requirement: Project path
-A project SHALL be identified by the path of its repository's main worktree, the first one `git worktree list` reports. Given a directory, dkt SHALL use the main worktree of the repository holding it, so that a subdirectory or a linked worktree gives the same path. A Docket project SHALL be one whose worktree holding the given directory has a regular file `docket/workflow.md`.
+A project SHALL be identified by the path of its repository's main worktree, the first one `git worktree list` reports, or, when that one is bare, by the path of the worktree holding the given directory. Given a directory, dkt SHALL use that path for the repository holding it, so that a subdirectory or a linked worktree gives the same path. A Docket project SHALL be one whose worktree holding the given directory has a regular file `docket/workflow.md`.
 
 #### Scenario: Linked worktree
 - **WHEN** a user runs `dkt projects add` in a linked worktree of the repository at `/w/app`, and that worktree has `docket/workflow.md`
@@ -37,8 +48,23 @@ A project SHALL be identified by the path of its repository's main worktree, the
 - **WHEN** a user runs `dkt projects add` in `/w/app/internal` of a Docket project at `/w/app`
 - **THEN** the entry's path is `/w/app`
 
+#### Scenario: Worktree of a bare repository
+- **WHEN** a user runs `dkt projects add` in `/w/app-main`, a linked worktree of the bare repository `/w/app.git`, and it has `docket/workflow.md`
+- **THEN** the entry's path is `/w/app-main`
+
+### Requirement: Origin recorded
+An entry's `origin` SHALL be the URL of the `origin` remote of the repository holding the path, or null without one. When that URL has the scheme `http` or `https`, its user information SHALL be removed first, so that a token in the URL is never stored or printed; any other URL SHALL be stored as it is.
+
+#### Scenario: Token in the URL
+- **WHEN** the `origin` remote is `https://user:secret@example.com/org/app.git` and a user runs `dkt projects add`
+- **THEN** the entry's `origin` is `https://example.com/org/app.git`
+
+#### Scenario: SSH remote kept
+- **WHEN** the `origin` remote is `git@example.com:org/app.git`
+- **THEN** the entry's `origin` is `git@example.com:org/app.git`
+
 ### Requirement: Add a project
-`dkt projects add [<path>]` SHALL add the Docket project holding `<path>`, or the current directory when none is given, with its `origin` remote's URL (null without one), the current time and `ignored` false. `result.state` SHALL be `added`. When an entry with that path exists and is ignored, it SHALL set `ignored` to false and report `unignored`; when it exists and is not ignored, it SHALL write nothing and report `exists`. `result.project` SHALL be the entry as it stands afterwards.
+`dkt projects add [<path>]` SHALL add the Docket project holding `<path>`, or the current directory when none is given, with its origin as Origin recorded says, the current time and `ignored` false. `result.state` SHALL be `added`. When an entry with that path exists and is ignored, it SHALL set `ignored` to false and report `unignored`; when it exists and is not ignored, it SHALL write nothing and report `exists`. `result.project` SHALL be the entry as it stands afterwards.
 
 #### Scenario: New project
 - **WHEN** a user runs `dkt projects add --json` in a Docket project not in the index
@@ -64,11 +90,15 @@ A project SHALL be identified by the path of its repository's main worktree, the
 - **THEN** the findings hold `not-a-repository` and dkt exits with 1
 
 ### Requirement: List the projects
-`dkt projects ls` SHALL report every entry in `result.projects`, sorted by path, each with `path`, `origin`, `added`, `ignored` and `missing`. `missing` SHALL be true when nothing exists at the path, and the entry SHALL stay in the index. A path that cannot be checked for another reason SHALL be listed in `unreadable` with `missing` false. Without `--json`, it SHALL print one line per entry: the path, followed by `missing` and `ignored` when they apply.
+`dkt projects ls` SHALL report every entry in `result.projects`, sorted by path, each with `path`, `origin`, `added`, `ignored` and `missing`. `missing` SHALL be true when nothing exists at the path, and the entry SHALL stay in the index. A path that cannot be checked for another reason SHALL be listed in `unreadable` with `missing` false.
 
 #### Scenario: Project on an unmounted disk
 - **WHEN** an entry's path does not exist and a user runs `dkt projects ls --json`
 - **THEN** that entry has `missing` true, the index still holds it, and dkt exits with 0
+
+#### Scenario: Path under a file
+- **WHEN** an entry's path is `/w/f/app` and `/w/f` is now a regular file
+- **THEN** that entry has `missing` true and dkt exits with 0
 
 #### Scenario: Ignored entries listed
 - **WHEN** the index holds one ignored entry and one that is not, and a user runs `dkt projects ls --json`
@@ -81,6 +111,13 @@ A project SHALL be identified by the path of its repository's main worktree, the
 #### Scenario: Empty index
 - **WHEN** there is no index file and a user runs `dkt projects ls --json`
 - **THEN** `result.projects` is an empty array, no file is written, and dkt exits with 0
+
+### Requirement: Projects text
+Without `--json`, `dkt projects ls` SHALL print one line per entry: the path, followed by `missing` and `ignored` when they apply, separated by two spaces; and `add`, `rm` and `ignore` SHALL print one line, the state and the path.
+
+#### Scenario: Text of each subcommand
+- **WHEN** a user runs `dkt projects add`, then `dkt projects ignore` on the same project, then `dkt projects ls`
+- **THEN** they print `added <path>`, `ignored <path>` and `<path>  ignored`
 
 ### Requirement: Path argument
 `dkt projects rm` and `dkt projects ignore` SHALL take one path. When it is a directory in a git repository, the project path under Project path SHALL be used; otherwise the path itself, made absolute against the current directory and cleaned, so that an entry whose path is gone can still be named.
@@ -101,7 +138,7 @@ A project SHALL be identified by the path of its repository's main worktree, the
 - **THEN** the findings hold `not-in-index`, the index is not written, and dkt exits with 1
 
 ### Requirement: Ignore a project
-`dkt projects ignore <path>` SHALL set `ignored` true on the entry with that path and report `ignored`, or report `exists` and write nothing when it is already ignored. When no entry has that path, it SHALL add one with `ignored` true, the origin when the path is in a repository (null otherwise) and the current time, and report `ignored`. The path need not be a Docket project.
+`dkt projects ignore <path>` SHALL set `ignored` true on the entry with that path and report `ignored`, or report `exists` and write nothing when it is already ignored. When no entry has that path, it SHALL add one with `ignored` true, the origin as Origin recorded says when the path is in a repository (null otherwise) and the current time, and report `ignored`. The path need not be a Docket project.
 
 #### Scenario: Ignore a registered project
 - **WHEN** the index holds the project at `/w/app`, not ignored, and a user runs `dkt projects ignore /w/app --json`
@@ -112,7 +149,7 @@ A project SHALL be identified by the path of its repository's main worktree, the
 - **THEN** the index holds an entry for it with `ignored` true, and a later `dkt status` in that project does not change the entry
 
 ### Requirement: Projects command form
-`dkt projects` SHALL take one of the subcommands `add`, `ls`, `rm` and `ignore`; a missing or unknown subcommand, or a wrong number of paths for it, SHALL be a usage error. It SHALL run outside a git repository too, with `repo` null, and the envelope's `command` SHALL be `projects`. It SHALL NOT contact a remote. When the index has no location, because neither `HOME` nor an absolute `XDG_STATE_HOME` is set, it SHALL report `no-home` and exit with 4.
+`dkt projects` SHALL take one of the subcommands `add`, `ls`, `rm` and `ignore`; a missing or unknown subcommand, or a wrong number of paths for it, SHALL be a usage error. It SHALL run outside a git repository too, with `repo` null, and the envelope's `command` SHALL be `projects`. It SHALL NOT contact a remote.
 
 #### Scenario: Unknown subcommand
 - **WHEN** a user runs `dkt projects prune --json`
@@ -122,12 +159,19 @@ A project SHALL be identified by the path of its repository's main worktree, the
 - **WHEN** a user runs `dkt projects ls --json` outside any git repository
 - **THEN** `repo` is null, `result.projects` lists the index, and dkt exits with 0
 
+### Requirement: Projects environment
+When the index has no location, because neither `HOME` nor an absolute `XDG_STATE_HOME` is set, `dkt projects` SHALL report `no-home` and exit with 4. When `git` cannot be run where `add`, `rm` or `ignore` needs it to resolve an existing directory, it SHALL report `git-missing`, write nothing and exit with 4.
+
+#### Scenario: Git missing
+- **WHEN** no `git` is on the PATH and a user runs `dkt projects rm <an existing folder> --json`
+- **THEN** the findings hold `git-missing`, the index is not written, and dkt exits with 4
+
 #### Scenario: No home
 - **WHEN** neither `HOME` nor `XDG_STATE_HOME` is set and a user runs `dkt projects ls --json`
 - **THEN** the findings hold `no-home` and dkt exits with 4
 
 ### Requirement: Automatic registration
-After any command other than `dkt projects` has run with a repository identified, whatever its exit code, dkt SHALL add the Docket project it ran in, as `dkt projects add` would, when no entry has that path, ignored or not. It SHALL NOT write the index otherwise. It SHALL NOT run for `--version`, `--help`, a usage error, or a directory that is not a Docket project.
+After any command other than `dkt projects` has run with a repository identified, whatever its exit code, dkt SHALL add the Docket project it ran in, as `dkt projects add` would, when no entry has that path, ignored or not. It SHALL NOT write the index otherwise. It SHALL NOT run for `--version`, `--help`, or a usage error, whether the command line or the command itself reports it, and in a directory that is not a Docket project it SHALL read neither the settings nor the index.
 
 #### Scenario: First command in a project
 - **WHEN** a user runs `dkt status` in a Docket project not in the index
@@ -145,12 +189,16 @@ After any command other than `dkt projects` has run with a repository identified
 - **WHEN** a user runs `dkt sync add-none` in a Docket project not in the index, and it exits with 1 because there is no such change
 - **THEN** the index holds the project
 
+#### Scenario: Usage error from a command
+- **WHEN** a user runs `dkt new add-x --json` without `--kind` in a Docket project not in the index
+- **THEN** dkt exits with 2 and the index is not written
+
 #### Scenario: Status in a repository without Docket
-- **WHEN** a user runs `dkt status` in a git repository that has no `docket/workflow.md`
-- **THEN** the index is not written
+- **WHEN** a user runs `dkt status` in a git repository that has no `docket/workflow.md`, and the settings file holds `{`
+- **THEN** the index is not written and standard error holds no `project index` warning
 
 ### Requirement: Settings file
-The settings SHALL be the file `docket/config.json` under `$XDG_CONFIG_HOME` when that variable is an absolute path, and under `$HOME/.config` otherwise. When its `projects.autoRegister` is false, automatic registration SHALL NOT run; when the file or the key is missing, it SHALL be true. dkt SHALL NOT write this file.
+The settings SHALL be the file `docket/config.json` under `$XDG_CONFIG_HOME` when that variable is an absolute path, and under `$HOME/.config` otherwise. When its `projects.autoRegister` is false, automatic registration SHALL NOT run; when the file or the key is missing, it SHALL be true. A symbolic link at the file SHALL be followed. dkt SHALL NOT write this file.
 
 #### Scenario: Registration turned off
 - **WHEN** the settings hold `{"projects": {"autoRegister": false}}` and a user runs `dkt status` in a Docket project not in the index
@@ -159,6 +207,10 @@ The settings SHALL be the file `docket/config.json` under `$XDG_CONFIG_HOME` whe
 #### Scenario: No settings file
 - **WHEN** there is no settings file and a user runs `dkt status` in a Docket project not in the index
 - **THEN** the index holds the project
+
+#### Scenario: Linked settings file
+- **WHEN** the settings file is a symbolic link to a file holding `{"projects": {"autoRegister": false}}` and a user runs `dkt status` in a Docket project not in the index
+- **THEN** the index is not written and standard error holds no warning
 
 ### Requirement: Registration does not fail the command
 When automatic registration cannot complete, because the settings or the index cannot be read or do not have their form, neither `HOME` nor the variable for a file is set, or the index cannot be written, dkt SHALL print one warning line to standard error, naming the file, or the variables when there is no file, and the reason, and SHALL NOT register. The command's standard output and exit code SHALL be what they would be without registration.

@@ -34,6 +34,20 @@
 
 Task 4's implementer reported that `pathArg`, as the plan gave its signature, had no way to return an error, so with no git on the PATH `rm` and `ignore` fell back to the raw path and named a different entry than `add` would. The controller ruled that `pathArg` returns `gitx.ErrGitMissing`, which both report as `git-missing` (exit 4), as `add` does; any other `Locate` error still falls back to the path. Commit 1d93184, tested by `TestProjectsRmGitMissing`.
 
+## Revision 2 (2026-11-08): findings of the pre-merge review
+
+The pre-merge review ran as `docket/workflow.md` says: an attack on the other model (codex) and a spec check in a fresh context. The controller took these into the specs and design, and Tasks 6 to 9 carry them out:
+
+- A token in an `http` or `https` origin was stored and printed by `ls` (attack): its user information is removed (new requirement Origin recorded).
+- Two entries with one path, or an entry missing a key, were accepted, and `rm` then reported success with an entry left (attack, spec check): the index is unreadable.
+- A linked worktree of a bare repository registered the bare folder, where dkt cannot run (attack): the project path is then that worktree.
+- Registration ran after a usage error that a command reports itself, such as `dkt new` without `--kind` (spec check).
+- A linked settings file was refused, so every command warned (spec check): it is followed.
+- In a repository without Docket, a broken settings file or index warned on every command (spec check): registration checks `docket/workflow.md` first.
+- Smaller items from the spec check: one warning line even when git's message has several; the no-location warning names the variables in every case; `ls` reports a path under what is now a regular file as missing; the `not-a-project` message names the worktree it checked; tests for `ls` with a broken index, `ignore` without git, the text of `add` and `ignore`, and no write by a refused `add`; the README sentence.
+
+Not taken: the attack's concern that two dkt processes writing at once can lose an update stays a known trade-off (design.md, Risks); the envelope's `repo.origin`, which prints a token the same way, is `cli-output`'s settled behavior and is left to its own change.
+
 ## Reuse
 
 | Need | Existing (path:symbol) | Decision | Reason | Evidence |
@@ -330,3 +344,168 @@ Run: `gofmt -l . && go vet ./... && go test ./...`
 Expected: nothing printed by `gofmt`, PASS.
 
 Commit "Register a project when a command runs in it" with the trailer `Change: projects-index/5`.
+
+---
+
+### Task 6: A stricter index form, and a linked settings file
+
+**Compensates:** Task 1
+
+**Scenarios:** project-index#two-entries-with-one-path, project-index#linked-settings-file
+
+**Review:** checks
+
+**Files:**
+- Modify: `internal/projects/files.go`
+- Modify: `internal/projects/files_test.go`
+
+**Interfaces:**
+- Unchanged signatures. `Load` also rejects an entry missing any of `path`, `origin`, `added`, `ignored`, an `origin` that is neither a string nor null, and two entries with one `path`. `AutoRegister` reads with `os.ReadFile`, following a link.
+
+- [ ] **Step 1: Write the failing tests**
+
+- In `TestLoadInvalid`, add: an entry without `origin`, an entry without `ignored`, an entry with `"origin": 3`, and two entries both with `"path": "/w/app"`; each gives an error containing the file's path.
+- `TestAutoRegisterLink`: the settings path is a symbolic link to a file holding `{"projects":{"autoRegister":false}}`; `AutoRegister` returns false and no error.
+
+- [ ] **Step 2: Run them and see them fail**
+
+Run: `go test ./internal/projects/ -run 'TestLoadInvalid|TestAutoRegisterLink'`
+Expected: FAIL.
+
+- [ ] **Step 3: Implement the checks in `Load`, and read the settings with `os.ReadFile`**
+
+- [ ] **Step 4: Run them and see them pass**
+
+Run: `gofmt -l . && go vet ./... && go test ./internal/projects/`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+Commit "Refuse an index with a duplicate or a missing key, and follow a linked settings file" with the trailer `Change: projects-index/6`.
+
+---
+
+### Task 7: The project path of a bare repository's worktree, and origins without credentials
+
+**Compensates:** Task 2
+
+**Scenarios:** project-index#worktree-of-a-bare-repository, project-index#token-in-the-url, project-index#ssh-remote-kept
+
+**Review:** checks
+
+**Files:**
+- Modify: `internal/projects/locate.go`
+- Modify: `internal/projects/locate_test.go`
+- Modify: `internal/projects/register.go` (it calls `MainWorktree` and `RemoteURL` itself)
+
+**Interfaces:**
+- `func MainWorktree(g gitx.Git) (string, error)` becomes `func ProjectPath(g gitx.Git, worktree string) (string, error)`: the first entry of `g.Worktrees()`, or `worktree` when that entry is `Bare`. `Locate` and `Register` call it.
+- New `func Origin(g gitx.Git) (*string, error)`: the `origin` remote's URL or nil; for an `http` or `https` URL that `net/url.Parse` reads, with `User` set to nil. `Locate` and `Register` call it instead of `RemoteURL`.
+
+- [ ] **Step 1: Write the failing tests**
+
+- `TestLocateBareWorktree`: `git init --bare <tmp>/app.git`, a first commit pushed into it from a scratch clone holding `docket/workflow.md`, then `git -C <tmp>/app.git worktree add <tmp>/app-main main`; `Locate(<tmp>/app-main)` gives `Path` `<tmp>/app-main` and `Docket` true.
+- `TestOrigin`: table over remotes: `https://user:secret@example.com/org/app.git` gives `https://example.com/org/app.git`; `https://ghp_token@github.com/org/app.git` gives `https://github.com/org/app.git`; `http://u:p@example.com/app` gives `http://example.com/app`; `git@example.com:org/app.git` and `ssh://git@example.com/app.git` are unchanged; no remote gives nil.
+- `TestLocateOrigin` keeps passing.
+
+- [ ] **Step 2: Run them and see them fail**
+
+Run: `go test ./internal/projects/ -run 'TestLocateBareWorktree|TestOrigin'`
+Expected: FAIL.
+
+- [ ] **Step 3: Implement `ProjectPath` and `Origin`, and use them in `Locate` and `Register`**
+
+- [ ] **Step 4: Run them and see them pass**
+
+Run: `gofmt -l . && go vet ./... && go test ./internal/projects/`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+Commit "Use the worktree of a bare repository, and drop credentials from an origin" with the trailer `Change: projects-index/7`.
+
+---
+
+### Task 8: `dkt projects` output and the tests the spec check found missing
+
+**Compensates:** Task 3
+
+**Scenarios:** project-index#entry-written, project-index#path-under-a-file, project-index#text-of-each-subcommand, project-index#git-missing, project-index#repository-without-docket, project-index#index-that-is-not-json
+
+**Review:** checks
+
+**Files:**
+- Modify: `internal/cli/cmd_projects.go`
+- Modify: `internal/cli/cmd_projects_test.go`
+
+**Interfaces:**
+- Unchanged. `ls` also sets `missing` when `os.Lstat` fails with `syscall.ENOTDIR`. The `not-a-project` message names `Project.Worktree`, the folder whose `docket/workflow.md` was checked.
+
+- [ ] **Step 1: Write the failing tests**
+
+- `TestProjectsLsUnderAFile`: an entry `<tmp>/f/app` where `<tmp>/f` is a regular file: `missing` true, exit 0.
+- `TestProjectsAddNotProjectInWorktree`: a linked worktree without `docket/workflow.md` of a repository whose main worktree has it: `not-a-project`, and the message holds the linked worktree's path.
+- `TestProjectsLsUnreadableIndex`: the index holds `not json`: `ls` exits 3, `unreadable[0].source` is the index, the file still holds `not json`.
+- `TestProjectsIgnoreGitMissing`: as `TestProjectsRmGitMissing`, for `ignore`.
+- `TestProjectsText`: without `--json`, `add` prints `added <path>`, `ignore` prints `ignored <path>`, and `ls` on an empty index prints nothing.
+- In `TestProjectsAddNotRepository`, also assert that no index file exists afterwards.
+
+- [ ] **Step 2: Run them and see the first two fail**
+
+Run: `go test ./internal/cli/ -run 'TestProjectsLsUnderAFile|TestProjectsAddNotProjectInWorktree'`
+Expected: FAIL. The others pin behavior that already holds and are expected to pass.
+
+- [ ] **Step 3: Implement the `ENOTDIR` case and the message**
+
+- [ ] **Step 4: Run them and see them pass**
+
+Run: `gofmt -l . && go vet ./... && go test ./internal/cli/ -run TestProjects`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+Commit "Report a path under a file as missing, and name the worktree checked" with the trailer `Change: projects-index/8`.
+
+---
+
+### Task 9: Registration after usage errors and outside Docket projects
+
+**Compensates:** Task 5
+
+**Scenarios:** project-index#usage-error-from-a-command, project-index#status-in-a-repository-without-docket, project-index#settings-that-are-not-json
+
+**Review:** judgment
+
+**Files:**
+- Modify: `internal/projects/register.go`
+- Modify: `internal/cli/run.go`
+- Modify: `internal/cli/register_test.go`
+- Modify: `README.md`
+
+**Interfaces:**
+- `Register` checks `IsDocket(root)` before reading anything; its error for a missing location names `HOME`, `XDG_CONFIG_HOME` and `XDG_STATE_HOME` whichever file it was locating.
+- `runCommand` skips registration when the command's error is a usage error (`asUsage(err)`), and prints the warning with every line break replaced by a space.
+
+- [ ] **Step 1: Write the failing tests**
+
+- `TestRegisterNotAfterCommandUsageError`: `new add-x --json` without `--kind` in a Docket repository not in the index: exit 2, no index file.
+- `TestRegisterNoDocketNoWarning`: a repository without `docket/workflow.md` and the settings holding `{`: `status --json` writes no index and stderr has no `project index` line.
+- `TestRegisterNoStateHome`: `XDG_CONFIG_HOME` absolute, no `HOME` and no `XDG_STATE_HOME`: the warning names `XDG_STATE_HOME`.
+
+- [ ] **Step 2: Run them and see them fail**
+
+Run: `go test ./internal/cli/ -run 'TestRegisterNotAfterCommandUsageError|TestRegisterNoDocketNoWarning|TestRegisterNoStateHome'`
+Expected: FAIL.
+
+- [ ] **Step 3: Implement the order in `Register`, the usage-error skip and the one-line warning**
+
+- [ ] **Step 4: Fix the README sentence**
+
+It reads: "Every command run in a Docket project, apart from `dkt projects` and a usage error, also adds it to this machine's project index (`$XDG_STATE_HOME/docket/projects.json`, else `~/.local/state/docket/projects.json`), which `dkt projects ls` lists; `dkt projects ignore` keeps one project out, and `{"projects": {"autoRegister": false}}` in `$XDG_CONFIG_HOME/docket/config.json` (else `~/.config/docket/config.json`) stops it for all."
+
+- [ ] **Step 5: Check and commit**
+
+Run: `gofmt -l . && go vet ./... && go test ./...`
+Expected: PASS.
+
+Commit "Register only in Docket projects and never after a usage error" with the trailer `Change: projects-index/9`.
