@@ -3,13 +3,24 @@ package snapshot
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
 )
 
 // Graph is the commit graph of a history, held in memory.
-type Graph struct{ bySHA map[string]gitx.Commit }
+type Graph struct {
+	bySHA  map[string]gitx.Commit
+	intro  map[string]introduced     // per tip, see introducers
+	byWork map[Work][]string         // commits naming each work
+	rel    map[string]map[string]int // per tag list, commit -> first tag
+}
+
+type introduced struct {
+	line []string
+	at   map[string]int
+}
 
 // NewGraph indexes commits by SHA.
 func NewGraph(commits []gitx.Commit) *Graph {
@@ -42,7 +53,8 @@ func (g *Graph) Reachable(from ...string) map[string]bool {
 type Work struct{ Key, Slug string }
 
 // Names reports whether a trailer of c names w, with or without tasks, and
-// the task numbers it lists.
+// the task numbers it lists. A malformed task list names the work with no
+// task.
 func Names(c gitx.Commit, w Work) (named bool, tasks []int) {
 	for _, t := range c.Trailers {
 		if t.Key != w.Key {
@@ -66,39 +78,105 @@ func ref(c gitx.Commit) *Ref { return &Ref{c.SHA, c.Time, c.Subject} }
 // brought in a commit naming w: a merge commit, or the commit itself on the
 // line. It is nil when none did.
 func (g *Graph) Merge(tip string, w Work) *Ref {
+	line, intro := g.introducers(tip)
+	best := -1
+	for _, s := range g.named()[w] {
+		if i, ok := intro[s]; ok && i > best {
+			best = i
+		}
+	}
+	if best < 0 {
+		return nil
+	}
+	return ref(g.bySHA[line[best]])
+}
+
+// introducers lists the first-parent line of tip, oldest first, and maps each
+// commit of its history to the index of the line commit that brought it in.
+// It is computed once per tip.
+func (g *Graph) introducers(tip string) ([]string, map[string]int) {
+	if r, ok := g.intro[tip]; ok {
+		return r.line, r.at
+	}
+	var line []string
 	for sha := tip; ; {
 		c, ok := g.bySHA[sha]
 		if !ok {
-			return nil
+			break
 		}
-		if named, _ := Names(c, w); named {
-			return ref(c)
-		}
+		line = append(line, sha)
 		if len(c.Parents) == 0 {
-			return nil
-		}
-		if len(c.Parents) > 1 {
-			in := g.Reachable(c.Parents[1:]...)
-			for s := range g.Reachable(c.Parents[0]) {
-				delete(in, s)
-			}
-			for s := range in {
-				if named, _ := Names(g.bySHA[s], w); named {
-					return ref(c)
-				}
-			}
+			break
 		}
 		sha = c.Parents[0]
 	}
+	for i, j := 0, len(line)-1; i < j; i, j = i+1, j-1 {
+		line[i], line[j] = line[j], line[i]
+	}
+	at := map[string]int{}
+	for i, l := range line {
+		g.markFrom(l, at, i)
+	}
+	if g.intro == nil {
+		g.intro = map[string]introduced{}
+	}
+	g.intro[tip] = introduced{line, at}
+	return line, at
+}
+
+// markFrom sets mark[c] = v for sha and its ancestors not yet marked.
+func (g *Graph) markFrom(sha string, mark map[string]int, v int) {
+	stack := []string{sha}
+	for len(stack) > 0 {
+		s := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		c, ok := g.bySHA[s]
+		if _, done := mark[s]; !ok || done {
+			continue
+		}
+		mark[s] = v
+		stack = append(stack, c.Parents...)
+	}
+}
+
+// named indexes, once, the commits whose trailers name each work.
+func (g *Graph) named() map[Work][]string {
+	if g.byWork == nil {
+		g.byWork = map[Work][]string{}
+		for sha, c := range g.bySHA {
+			for _, t := range c.Trailers {
+				slug, _, _ := strings.Cut(t.Value, "/")
+				w := Work{t.Key, strings.TrimSpace(slug)}
+				if l := g.byWork[w]; len(l) == 0 || l[len(l)-1] != sha {
+					g.byWork[w] = append(l, sha)
+				}
+			}
+		}
+	}
+	return g.byWork
 }
 
 // Release returns the first tag, in the given order, whose commit reaches
 // commit; nil when none does.
 func (g *Graph) Release(tags []gitx.Tag, commit string) *gitx.Tag {
-	for i := range tags {
-		if g.Reachable(tags[i].Commit)[commit] {
-			return &tags[i]
+	key := make([]string, len(tags))
+	for i, t := range tags {
+		key[i] = t.Commit
+	}
+	k := strings.Join(key, " ")
+	at, ok := g.rel[k]
+	if !ok {
+		at = map[string]int{}
+		for i, t := range tags {
+			g.markFrom(t.Commit, at, i)
 		}
+		if g.rel == nil {
+			g.rel = map[string]map[string]int{}
+		}
+		g.rel[k] = at
+	}
+	if i, ok := at[commit]; ok {
+		return &tags[i]
 	}
 	return nil
 }

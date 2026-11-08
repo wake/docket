@@ -1,8 +1,10 @@
 package snapshot
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/wake/docket/internal/gitx"
 )
@@ -130,5 +132,47 @@ func TestTaskCommits(t *testing.T) {
 	want := map[int][]string{1: {"a2", "a3"}, 2: {"a3"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestNamesMalformed(t *testing.T) {
+	for _, v := range []string{"add-x/a", "add-x/1,a"} {
+		n, tasks := Names(c("a", "", nil, "Change", v), addX)
+		if !n || tasks != nil {
+			t.Fatalf("%s: got %v %v", v, n, tasks)
+		}
+	}
+}
+
+func TestMergeLongHistory(t *testing.T) {
+	var cs []gitx.Commit
+	var tags []gitx.Tag
+	prev := ""
+	for i := 0; i < 20000; i++ {
+		sha := fmt.Sprintf("c%05d", i)
+		var parents []string
+		if prev != "" {
+			parents = []string{prev}
+		}
+		var tr []string
+		if i%4 == 3 { // a merge of a side commit naming a work
+			side := fmt.Sprintf("s%05d", i)
+			cs = append(cs, c(side, "0", []string{prev}, "Change", fmt.Sprintf("w%d/1", i%200)))
+			parents = append(parents, side)
+		}
+		cs = append(cs, c(sha, "0", parents, tr...))
+		if i%400 == 399 {
+			tags = append(tags, gitx.Tag{Name: fmt.Sprint("v", i), Commit: sha})
+		}
+		prev = sha
+	}
+	g := NewGraph(cs)
+	start := time.Now()
+	for w := 0; w < 200; w++ {
+		g.Merge(prev, Work{"Change", fmt.Sprintf("w%d", w)})
+		g.Release(tags, fmt.Sprintf("c%05d", w*100))
+	}
+	if d := time.Since(start); d > 2*time.Second {
+		t.Fatalf("took %v", d)
 	}
 }
