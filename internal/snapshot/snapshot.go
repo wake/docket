@@ -24,24 +24,16 @@ const (
 func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error) {
 	var res Result
 	var unreadable []scan.Unreadable
-	var invs [3]scan.Inventory
-	for i, f := range []func(gitx.Git) (scan.Inventory, error){scan.Changes, scan.Records, scan.Issues} {
-		inv, err := f(g)
-		if err != nil {
-			return res, nil, nil, err
-		}
-		invs[i] = inv
+	ws, err := scan.Scan(g, "openspec/specs", domain.File, idea.OrderFile, ideasDir)
+	if err != nil {
+		return res, nil, nil, err
+	}
+	invs := [3]scan.Inventory{ws.Changes, ws.Records, ws.Issues}
+	for _, inv := range invs {
 		unreadable = append(unreadable, inv.Unreadable...)
 	}
-	wts, err := g.Worktrees()
-	if err != nil {
-		return res, nil, nil, err
-	}
-	refs, err := g.Refs()
-	if err != nil {
-		return res, nil, nil, err
-	}
-	def, hasDef, err := g.DefaultBranch()
+	wts, refs := ws.Worktrees, ws.Refs
+	def, hasDef, err := g.DefaultBranchIn(refs)
 	if err != nil {
 		return res, nil, nil, err
 	}
@@ -126,7 +118,7 @@ func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error) {
 			return res, nil, nil, err
 		}
 	}
-	files, readBad, err := Read(g, want)
+	files, readBad, err := Read(g, want, ws.Trees)
 	if err != nil {
 		return res, nil, nil, err
 	}

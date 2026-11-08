@@ -2,8 +2,10 @@ package gitx
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
@@ -104,5 +106,61 @@ func TestAddedSince(t *testing.T) {
 	got, err = (Git{Dir: "/nonexistent"}).AddedSince(base)
 	if err != nil || len(got) != 0 {
 		t.Errorf("no dirs: %q %v", got, err)
+	}
+}
+
+// fakeGit puts a git first on PATH that logs its arguments, one line per run,
+// and returns g using it and the log's path.
+func fakeGit(t *testing.T, r *testutil.Repo) (Git, string) {
+	t.Helper()
+	bin := t.TempDir()
+	real, _ := exec.LookPath("git")
+	log := filepath.Join(bin, "log")
+	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return Git{Dir: r.Dir, Env: append(append([]string(nil), r.Env...), "PATH="+bin+":"+os.Getenv("PATH"))}, log
+}
+
+func TestReadBlobsAt(t *testing.T) {
+	r := testutil.NewRepo(t)
+	c1 := r.Commit("one", map[string]string{"a.txt": "A", "d/x": "x"})
+	c2 := r.Commit("two", map[string]string{"b.txt": "B"})
+	g, log := fakeGit(t, r)
+	got, err := g.ReadBlobsAt(map[string][]string{c1: {"a.txt", "missing", "d"}, c2: {"b.txt", "a.txt"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]map[string][]byte{c1: {"a.txt": []byte("A")}, c2: {"b.txt": []byte("B"), "a.txt": []byte("A")}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+	if b, _ := os.ReadFile(log); strings.Count(string(b), "cat-file") != 1 || strings.Count(string(b), "\n") != 1 {
+		t.Errorf("runs:\n%s", b)
+	}
+}
+
+func TestDefaultBranchIn(t *testing.T) {
+	r := testutil.NewRepo(t)
+	c := r.Commit("one", map[string]string{"a": "1"})
+	r.Git("update-ref", "refs/remotes/origin/trunk", c)
+	r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
+	g, log := fakeGit(t, r)
+	plain := Git{Dir: r.Dir, Env: r.Env}
+	refs, err := plain.Refs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, wantOK, _ := plain.DefaultBranch()
+	db, ok, err := g.DefaultBranchIn(refs)
+	if err != nil || ok != wantOK || db != want || db != (DefaultBranch{"trunk", c}) {
+		t.Errorf("got %v %v %v", db, ok, err)
+	}
+	if b, _ := os.ReadFile(log); strings.Contains(string(b), "for-each-ref") {
+		t.Errorf("listed refs:\n%s", b)
+	}
+	if db, ok, err := g.DefaultBranchIn(nil); err != nil || ok {
+		t.Errorf("no refs: %v %v %v", db, ok, err)
 	}
 }

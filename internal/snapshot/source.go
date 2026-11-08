@@ -28,11 +28,11 @@ type Wanted struct {
 const linkReason = " is a symbolic link; Docket does not read through it"
 
 // Read reads every file under each Wanted path, keyed by Source. A ref costs
-// one ls-tree and one cat-file per distinct commit, however many sources and
-// paths share it. A link under a path lists "<source>:<path>" as unreadable and
+// one ls-tree per distinct commit that trees (the listings by commit, which may
+// be nil) lacks, and all of them share one cat-file. A link under a path lists "<source>:<path>" as unreadable and
 // leaves that path out; a source that cannot be read at all is listed by its
 // name and has no entry. The error is for git failing as a whole.
-func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error) {
+func Read(g gitx.Git, want []Wanted, trees map[string][]gitx.TreeFile) (map[string]Files, []scan.Unreadable, error) {
 	out := map[string]Files{}
 	var bad []scan.Unreadable
 	dead := map[string]bool{} // sources unreadable as a whole, listed once
@@ -69,6 +69,13 @@ func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error
 		}
 		byCommit[w.Commit] = append(byCommit[w.Commit], w)
 	}
+	type listed struct {
+		commit string
+		ws     []Wanted
+		tree   []gitx.TreeFile
+	}
+	var reads []listed
+	names := map[string][]string{}
 	for _, commit := range commits {
 		ws := byCommit[commit]
 		var dirs []string
@@ -85,27 +92,38 @@ func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error
 			}
 			continue
 		}
-		tree, err := g.TreeFiles(commit, dirs...)
-		var xe *gitx.ExitError
-		if errors.As(err, &xe) { // such as a commit that is not one
-			for _, w := range ws {
-				lose(w.Source, err.Error())
+		tree, ok := trees[commit]
+		if !ok {
+			var err error
+			tree, err = g.TreeFiles(commit, dirs...)
+			var xe *gitx.ExitError
+			if errors.As(err, &xe) { // such as a commit that is not one
+				for _, w := range ws {
+					lose(w.Source, err.Error())
+				}
+				continue
 			}
-			continue
+			if err != nil {
+				return nil, nil, err
+			}
 		}
-		if err != nil {
-			return nil, nil, err
-		}
-		var paths []string
+		// A shared listing may hold more than the paths wanted here.
+		tree = slices.DeleteFunc(slices.Clone(tree), func(f gitx.TreeFile) bool {
+			return !slices.ContainsFunc(dirs, func(p string) bool { return f.Path == p || strings.HasPrefix(f.Path, p+"/") })
+		})
 		for _, f := range tree {
 			if !f.Link {
-				paths = append(paths, f.Path)
+				names[commit] = append(names[commit], f.Path)
 			}
 		}
-		blobs, err := g.ReadBlobs(commit, paths)
-		if err != nil {
-			return nil, nil, err
-		}
+		reads = append(reads, listed{commit, ws, tree})
+	}
+	all, err := g.ReadBlobsAt(names)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, rd := range reads {
+		ws, tree, blobs := rd.ws, rd.tree, all[rd.commit]
 		for _, w := range ws {
 			files := Files{}
 			for _, p := range w.Paths {

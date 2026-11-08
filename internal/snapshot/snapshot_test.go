@@ -290,3 +290,33 @@ func TestSnapshotWritesNothing(t *testing.T) {
 		t.Fatalf("status %q", s)
 	}
 }
+
+func TestSnapshotGitRuns(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{"README.md": "x"})
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "-q", "-b", "linked", wt)
+	r.Git("checkout", "-q", "-b", "has-change")
+	r.Commit("change", map[string]string{"openspec/changes/add-x/proposal.md": proposal})
+	r.Git("checkout", "-q", "-b", "has-record", "main")
+	r.Commit("record", map[string]string{"docket/records/r.md": "x"})
+	r.Git("checkout", "-q", "main")
+	r.Git("tag", "v1", "has-record")
+	g, runs := countingGit(t, gitx.Git{Dir: r.Dir, Env: r.Env})
+	if _, _, _, err := Collect(g); err != nil {
+		t.Fatal(err)
+	}
+	commits := map[string]bool{}
+	for _, l := range strings.Split(r.Git("for-each-ref", "--format=%(objectname)", "refs/heads", "refs/remotes"), "\n") {
+		commits[l] = true
+	}
+	n := map[string]int{}
+	for _, w := range runs() {
+		n[w]++
+	}
+	c := len(commits)
+	if len(runs()) != c+7 || n["worktree"] != 1 || n["for-each-ref"] != 2 || n["symbolic-ref"] != 1 ||
+		n["ls-tree"] != c || n["log"] != 2 || n["cat-file"] != 1 {
+		t.Fatalf("C=%d runs %v", c, runs())
+	}
+}

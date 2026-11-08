@@ -13,6 +13,8 @@ import (
 	"syscall"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/issue"
+	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/safepath"
 )
 
@@ -72,50 +74,114 @@ func sortedUses(paths []string, source string) []Use {
 	return uses
 }
 
-// Changes scans every worktree, local branch and remote-tracking branch.
-func Changes(g gitx.Git) (Inventory, error) {
-	var inv Inventory
-	wts, err := g.Worktrees()
-	if err != nil {
-		return inv, err
+// Workspace is what one Scan found: the three inventories, and the lists they
+// were made from.
+type Workspace struct {
+	Changes, Records, Issues Inventory
+	Worktrees                []gitx.Worktree
+	Refs                     []gitx.Ref
+	Trees                    map[string][]gitx.TreeFile // by commit; a commit that could not be listed is not here
+}
+
+// Scan scans every worktree, local branch and remote-tracking branch for
+// changes, records and issues. It lists the worktrees and the refs once and
+// each distinct ref commit once, under the three folders and extra.
+func Scan(g gitx.Git, extra ...string) (Workspace, error) {
+	ws := Workspace{Trees: map[string][]gitx.TreeFile{}}
+	var err error
+	if ws.Worktrees, err = g.Worktrees(); err != nil {
+		return ws, err
 	}
-	refs, err := g.Refs()
-	if err != nil {
-		return inv, err
+	if ws.Refs, err = g.Refs(); err != nil {
+		return ws, err
 	}
-	for _, w := range wts {
+	for _, w := range ws.Worktrees {
 		if w.Bare {
 			continue
 		}
-		paths, reason := worktreeDirs(w.Path)
-		if reason != "" {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: w.Path, Reason: reason})
+		for _, one := range []struct {
+			inv  *Inventory
+			read func() ([]string, string)
+			uses func([]string, string) []Use
+		}{
+			{&ws.Changes, func() ([]string, string) { return worktreeDirs(w.Path) }, sortedUses},
+			{&ws.Records, func() ([]string, string) { return worktreeRecords(w.Path, record.Dir) }, recordUses},
+			{&ws.Issues, func() ([]string, string) { return worktreeRecords(w.Path, issue.Dir) }, recordUses},
+		} {
+			paths, reason := one.read()
+			if reason != "" {
+				one.inv.Unreadable = append(one.inv.Unreadable, Unreadable{Source: w.Path, Reason: reason})
+				continue
+			}
+			one.inv.Uses = append(one.inv.Uses, one.uses(paths, w.Path)...)
+		}
+	}
+	roots := append([]string{changesDir, record.Dir, issue.Dir}, extra...)
+	errs := map[string]error{}
+	for _, r := range ws.Refs {
+		if _, ok := ws.Trees[r.Commit]; ok || errs[r.Commit] != nil {
 			continue
 		}
-		inv.Uses = append(inv.Uses, sortedUses(paths, w.Path)...)
+		if files, err := g.TreeFiles(r.Commit, roots...); err != nil {
+			errs[r.Commit] = err
+		} else {
+			ws.Trees[r.Commit] = files
+		}
 	}
-	type result struct {
-		paths []string
-		err   error
+	for _, r := range ws.Refs {
+		if err := errs[r.Commit]; err != nil {
+			for _, inv := range []*Inventory{&ws.Changes, &ws.Records, &ws.Issues} {
+				inv.Unreadable = append(inv.Unreadable, Unreadable{Source: r.Name, Reason: err.Error()})
+			}
+			continue
+		}
+		files := ws.Trees[r.Commit]
+		for _, one := range []struct {
+			inv   *Inventory
+			paths []string
+			uses  func([]string, string) []Use
+		}{
+			{&ws.Changes, treeChangeDirs(files), sortedUses},
+			{&ws.Records, treeRecords(files, record.Dir), recordUses},
+			{&ws.Issues, treeRecords(files, issue.Dir), recordUses},
+		} {
+			uses := one.uses(one.paths, r.Name)
+			for i := range uses {
+				uses[i].Commit = r.Commit
+			}
+			one.inv.Uses = append(one.inv.Uses, uses...)
+		}
 	}
-	byCommit := map[string]result{}
-	for _, r := range refs {
-		res, ok := byCommit[r.Commit]
+	return ws, nil
+}
+
+// Changes scans for change folders: see Scan.
+func Changes(g gitx.Git) (Inventory, error) {
+	ws, err := Scan(g)
+	return ws.Changes, err
+}
+
+// treeChangeDirs returns the direct subfolders of the changes and archive
+// folders that files has a file under, which is what ls-tree -d gave.
+func treeChangeDirs(files []gitx.TreeFile) []string {
+	var dirs []string
+	seen := map[string]bool{}
+	for _, f := range files {
+		rest, ok := strings.CutPrefix(f.Path, changesDir+"/")
 		if !ok {
-			res.paths, res.err = g.TreeDirs(r.Commit, changesDir+"/", archiveDir+"/")
-			byCommit[r.Commit] = res
-		}
-		if res.err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: r.Name, Reason: res.err.Error()})
 			continue
 		}
-		uses := sortedUses(res.paths, r.Name)
-		for i := range uses {
-			uses[i].Commit = r.Commit
+		parts := strings.Split(rest, "/")
+		dir := changesDir + "/" + parts[0]
+		if parts[0] == "archive" && len(parts) > 2 {
+			dir = archiveDir + "/" + parts[1]
 		}
-		inv.Uses = append(inv.Uses, uses...)
+		if len(parts) > 1 && !seen[dir] {
+			seen[dir] = true
+			dirs = append(dirs, dir)
+		}
 	}
-	return inv, nil
+	return dirs
 }
 
 // worktreeMissing says why root cannot be read at all, or "" if it can.

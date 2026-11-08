@@ -2,6 +2,7 @@ package scan
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -365,5 +366,87 @@ func TestRefReadFailureIsUnreadable(t *testing.T) {
 	if len(inv.Unreadable) != 1 || inv.Unreadable[0].Source != "refs/heads/broken" ||
 		!strings.Contains(inv.Unreadable[0].Reason, "ls-tree") {
 		t.Errorf("got %+v", inv)
+	}
+}
+
+// counted returns g with a fake git first on PATH, and a function that gives
+// the arguments of every git run so far, one line each.
+func counted(t *testing.T, g gitx.Git) (gitx.Git, func() []string) {
+	t.Helper()
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := realPath(t, t.TempDir())
+	log := filepath.Join(bin, "log")
+	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	g.Env = append(slices.Clone(g.Env), "PATH="+bin+":"+os.Getenv("PATH")) // the last PATH wins
+	return g, func() []string {
+		b, _ := os.ReadFile(log)
+		return strings.Split(strings.TrimSpace(string(b)), "\n")
+	}
+}
+
+func TestScanGitRuns(t *testing.T) {
+	r := newRepo(t)
+	c1 := r.Commit("one", map[string]string{"openspec/changes/a/proposal.md": "x", "docket/records/r.md": "x"})
+	c2 := commitRef(r, "refs/heads/two", map[string]string{"openspec/changes/b/proposal.md": "x", "docket/issues/i.md": "x"})
+	r.Git("branch", "again", c1)
+	g, runs := counted(t, gitOf(r))
+	ws, err := Scan(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := map[string]int{}
+	for _, l := range runs() {
+		n[strings.Fields(l)[0]]++
+	}
+	if len(runs()) != 4 || n["worktree"] != 1 || n["for-each-ref"] != 1 || n["ls-tree"] != 2 {
+		t.Fatalf("runs %q", runs())
+	}
+	if len(ws.Trees) != 2 || ws.Trees[c2] == nil {
+		t.Fatalf("trees %v", ws.Trees)
+	}
+	count := func(inv Inventory, ref string) (k int) {
+		for _, u := range inv.Uses {
+			if u.Source == ref {
+				k++
+			}
+		}
+		return k
+	}
+	if count(ws.Changes, "refs/heads/again") != 1 || count(ws.Changes, "refs/heads/two") != 2 ||
+		count(ws.Records, "refs/heads/again") != 1 || count(ws.Issues, "refs/heads/two") != 1 || count(ws.Issues, "refs/heads/again") != 0 {
+		t.Fatalf("%+v", ws)
+	}
+	for _, f := range []func(gitx.Git) (Inventory, error){Changes, Records, Issues} {
+		if inv, err := f(gitOf(r)); err != nil || len(inv.Unreadable) != 0 {
+			t.Fatalf("%+v %v", inv, err)
+		}
+	}
+}
+
+func TestScanUnreadableRef(t *testing.T) {
+	r := newRepo(t)
+	r.Commit("one", map[string]string{"openspec/changes/a/proposal.md": "x", "docket/records/r.md": "x"})
+	blob := r.Git("hash-object", "-w", "README.md")
+	r.Git("update-ref", "refs/remotes/origin/bad", blob)
+	ws, err := Scan(gitOf(r))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, inv := range map[string]Inventory{"changes": ws.Changes, "records": ws.Records, "issues": ws.Issues} {
+		if len(inv.Unreadable) != 1 || inv.Unreadable[0].Source != "refs/remotes/origin/bad" {
+			t.Errorf("%s: %+v", name, inv.Unreadable)
+		}
+	}
+	if len(ws.Changes.Uses) == 0 || len(ws.Records.Uses) == 0 {
+		t.Errorf("main not scanned: %+v", ws)
+	}
+	if _, ok := ws.Trees[blob]; ok {
+		t.Errorf("trees hold the blob")
 	}
 }

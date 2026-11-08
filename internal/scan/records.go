@@ -11,78 +11,30 @@ import (
 	"syscall"
 
 	"github.com/wake/docket/internal/gitx"
-	"github.com/wake/docket/internal/issue"
-	"github.com/wake/docket/internal/record"
 	"github.com/wake/docket/internal/safepath"
 )
 
-// Records scans for record files: see Dated.
-func Records(g gitx.Git) (Inventory, error) { return Dated(g, record.Dir) }
-
-// Issues scans for issue files: see Dated.
-func Issues(g gitx.Git) (Inventory, error) { return Dated(g, issue.Dir) }
-
-// Dated scans every worktree, local branch and remote-tracking branch for
-// files directly in dir; each use is one <dir>/<slug>.md file and its Slug has
-// the .md removed.
-func Dated(g gitx.Git, dir string) (Inventory, error) {
-	var inv Inventory
-	wts, err := g.Worktrees()
-	if err != nil {
-		return inv, err
-	}
-	refs, err := g.Refs()
-	if err != nil {
-		return inv, err
-	}
-	for _, w := range wts {
-		if w.Bare {
-			continue
-		}
-		paths, reason := worktreeRecords(w.Path, dir)
-		if reason != "" {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: w.Path, Reason: reason})
-			continue
-		}
-		inv.Uses = append(inv.Uses, recordUses(paths, w.Path)...)
-	}
-	type result struct {
-		paths []string
-		err   error
-	}
-	byCommit := map[string]result{}
-	for _, r := range refs {
-		res, ok := byCommit[r.Commit]
-		if !ok {
-			res.paths, res.err = treeRecords(g, r.Commit, dir)
-			byCommit[r.Commit] = res
-		}
-		if res.err != nil {
-			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: r.Name, Reason: res.err.Error()})
-			continue
-		}
-		uses := recordUses(res.paths, r.Name)
-		for i := range uses {
-			uses[i].Commit = r.Commit
-		}
-		inv.Uses = append(inv.Uses, uses...)
-	}
-	return inv, nil
+// Records scans for record files: see Scan.
+func Records(g gitx.Git) (Inventory, error) {
+	ws, err := Scan(g)
+	return ws.Records, err
 }
 
-// treeRecords lists the files directly in dir of commit's tree.
-func treeRecords(g gitx.Git, commit, dir string) ([]string, error) {
-	files, err := g.TreeFiles(commit, dir)
-	if err != nil {
-		return nil, err
-	}
+// Issues scans for issue files: see Scan.
+func Issues(g gitx.Git) (Inventory, error) {
+	ws, err := Scan(g)
+	return ws.Issues, err
+}
+
+// treeRecords returns the files directly in dir from a commit's listing.
+func treeRecords(files []gitx.TreeFile, dir string) []string {
 	var paths []string
 	for _, f := range files {
 		if path.Dir(f.Path) == dir {
 			paths = append(paths, f.Path)
 		}
 	}
-	return paths, nil
+	return paths
 }
 
 func recordUses(paths []string, source string) []Use {
