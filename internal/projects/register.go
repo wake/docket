@@ -33,19 +33,18 @@ func Register(root string, g gitx.Git, env []string, now time.Time) error {
 	if x.Find(root) >= 0 || !IsDocket(root) {
 		return nil
 	}
-	main, err := MainWorktree(g)
+	main, err := ProjectPath(g, root)
 	if err != nil {
 		return err
 	}
 	if x.Find(main) >= 0 {
 		return nil
 	}
-	e := Entry{Path: main, Added: Stamp(now)}
-	if url, ok, err := g.RemoteURL("origin"); err != nil {
+	origin, err := Origin(g)
+	if err != nil {
 		return err
-	} else if ok {
-		e.Origin = &url
 	}
+	e := Entry{Path: main, Added: Stamp(now), Origin: origin}
 	x.Projects = append(x.Projects, e)
 	return x.Save(path)
 }

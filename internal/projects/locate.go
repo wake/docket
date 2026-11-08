@@ -3,6 +3,7 @@ package projects
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -33,17 +34,13 @@ func Locate(dir string, env []string) (Project, error) {
 		return Project{}, err
 	}
 	g := gitx.Git{Dir: top, Env: env}
-	main, err := MainWorktree(g)
+	main, err := ProjectPath(g, top)
 	if err != nil {
 		return Project{}, err
 	}
 	p := Project{Path: main, Worktree: top, Docket: IsDocket(top)}
-	url, ok, err := g.RemoteURL("origin")
-	if err != nil {
+	if p.Origin, err = Origin(g); err != nil {
 		return Project{}, err
-	}
-	if ok {
-		p.Origin = &url
 	}
 	return p, nil
 }
@@ -54,8 +51,8 @@ func IsDocket(worktree string) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
-// MainWorktree returns the first worktree git lists.
-func MainWorktree(g gitx.Git) (string, error) {
+// ProjectPath returns the main worktree git lists, or worktree when the repository is bare.
+func ProjectPath(g gitx.Git, worktree string) (string, error) {
 	wts, err := g.Worktrees()
 	if err != nil {
 		return "", err
@@ -63,5 +60,21 @@ func MainWorktree(g gitx.Git) (string, error) {
 	if len(wts) == 0 {
 		return "", errors.New("git lists no worktree")
 	}
+	if wts[0].Bare {
+		return worktree, nil
+	}
 	return wts[0].Path, nil
+}
+
+// Origin returns the URL of the origin remote, or nil; an http or https URL loses its credentials.
+func Origin(g gitx.Git) (*string, error) {
+	raw, ok, err := g.RemoteURL("origin")
+	if err != nil || !ok {
+		return nil, err
+	}
+	if u, err := url.Parse(raw); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+		u.User = nil
+		raw = u.String()
+	}
+	return &raw, nil
 }
