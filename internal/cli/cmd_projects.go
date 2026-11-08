@@ -117,12 +117,16 @@ func projectsAdd(c *Context, rest []string) (Outcome, error) {
 
 // pathArg is the project path of arg and its origin when arg is in a repository;
 // otherwise the cleaned absolute path, so an entry whose path is gone can be named.
-func pathArg(c *Context, arg string) (string, *string) {
+func pathArg(c *Context, arg string) (path string, origin *string, err error) {
 	abs := absArg(c, arg)
-	if p, err := projects.Locate(abs, c.Env); err == nil {
-		return p.Path, p.Origin
+	p, err := projects.Locate(abs, c.Env)
+	switch {
+	case err == nil:
+		return p.Path, p.Origin, nil
+	case errors.Is(err, gitx.ErrGitMissing):
+		return "", nil, EnvError{Rule: "git-missing", Msg: err.Error()}
 	}
-	return abs, nil
+	return abs, nil, nil
 }
 
 // projectsEdit runs rm or ignore.
@@ -135,7 +139,10 @@ func projectsEdit(c *Context, verb, arg string) (Outcome, error) {
 	if err != nil {
 		return Outcome{Unreadable: []Unreadable{{Source: index, Reason: err.Error()}}}, nil
 	}
-	path, origin := pathArg(c, arg)
+	path, origin, err := pathArg(c, arg)
+	if err != nil {
+		return Outcome{}, err
+	}
 	i := x.Find(path)
 	state := "ignored"
 	var e projects.Entry

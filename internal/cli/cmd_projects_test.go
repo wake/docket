@@ -315,6 +315,24 @@ func TestProjectsRmUnknown(t *testing.T) {
 	}
 }
 
+func TestProjectsRmGitMissing(t *testing.T) {
+	var env []string
+	for _, kv := range testutil.Env(t) {
+		if !strings.HasPrefix(kv, "PATH=") {
+			env = append(env, kv)
+		}
+	}
+	env = append(env, "PATH="+t.TempDir())
+	tmp := t.TempDir()
+	idx := prWrite(t, env, `{"projects":[`+prEntry(tmp, false)+`]}`)
+	before, _ := os.ReadFile(idx)
+	code, m, raw, _ := prRun(t, env, tmp, "rm", tmp) // an existing directory, so git is asked
+	after, _ := os.ReadFile(idx)
+	if code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "git-missing" || !bytes.Equal(before, after) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
 func TestProjectsIgnoreRegistered(t *testing.T) {
 	r := prRepo(t, true)
 	prRun(t, r.Env, r.Dir, "add")
