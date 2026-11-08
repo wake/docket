@@ -13,10 +13,11 @@ import (
 // Graph is the commit graph of a history, held in memory.
 type Graph struct {
 	bySHA  map[string]gitx.Commit
-	when   map[string]time.Time      // commit time as an instant; zero when unparsable
-	intro  map[string]introduced     // per tip, see introducers
-	byWork map[Work][]string         // commits naming each work
-	rel    map[string]map[string]int // per tag list, commit -> first tag
+	reach  map[string]map[string]bool // memoized by sorted from list
+	when   map[string]time.Time       // commit time as an instant; zero when unparsable
+	intro  map[string]introduced      // per tip, see introducers
+	byWork map[Work][]string          // commits naming each work
+	rel    map[string]map[string]int  // per tag list, commit -> first tag
 }
 
 type introduced struct {
@@ -52,6 +53,22 @@ func (g *Graph) Reachable(from ...string) map[string]bool {
 	return seen
 }
 
+// reachable is Reachable memoized by the sorted from list; callers must not
+// modify the result.
+func (g *Graph) reachable(from []string) map[string]bool {
+	f := append([]string(nil), from...)
+	sort.Strings(f)
+	k := strings.Join(f, " ")
+	if r, ok := g.reach[k]; ok {
+		return r
+	}
+	if g.reach == nil {
+		g.reach = map[string]map[string]bool{}
+	}
+	g.reach[k] = g.Reachable(f...)
+	return g.reach[k]
+}
+
 // Work is a Change or a Record, by Key, and its slug.
 type Work struct{ Key, Slug string }
 
@@ -60,7 +77,7 @@ type Work struct{ Key, Slug string }
 // task.
 func Names(c gitx.Commit, w Work) (named bool, tasks []int) {
 	for _, t := range c.Trailers {
-		if t.Key != w.Key {
+		if !strings.EqualFold(t.Key, w.Key) {
 			continue
 		}
 		ts, _, mine := change.TaskRefs(t.Value, w.Slug)
@@ -83,7 +100,7 @@ func ref(c gitx.Commit) *Ref { return &Ref{c.SHA, c.Time, c.Subject} }
 func (g *Graph) Merge(tip string, w Work) *Ref {
 	line, intro := g.introducers(tip)
 	best := -1
-	for _, s := range g.named()[w] {
+	for _, s := range g.named()[Work{strings.ToLower(w.Key), w.Slug}] {
 		if i, ok := intro[s]; ok && i > best {
 			best = i
 		}
@@ -151,7 +168,7 @@ func (g *Graph) named() map[Work][]string {
 		for sha, c := range g.bySHA {
 			for _, t := range c.Trailers {
 				slug, _, _ := strings.Cut(t.Value, "/")
-				w := Work{t.Key, slug}
+				w := Work{strings.ToLower(t.Key), slug}
 				if l := g.byWork[w]; len(l) == 0 || l[len(l)-1] != sha {
 					g.byWork[w] = append(l, sha)
 				}
@@ -190,7 +207,7 @@ func (g *Graph) Release(tags []gitx.Tag, commit string) *gitx.Tag {
 // by Time, ties broken by SHA (the larger wins); nil when none.
 func (g *Graph) Last(from []string, w Work) *Ref {
 	var best *gitx.Commit
-	for s := range g.Reachable(from...) {
+	for s := range g.reachable(from) {
 		c := g.bySHA[s]
 		if named, _ := Names(c, w); !named {
 			continue
@@ -209,7 +226,7 @@ func (g *Graph) Last(from []string, w Work) *Ref {
 // name it, oldest first.
 func (g *Graph) TaskCommits(from string, w Work) map[int][]string {
 	var cs []gitx.Commit
-	for s := range g.Reachable(from) {
+	for s := range g.reachable([]string{from}) {
 		cs = append(cs, g.bySHA[s])
 	}
 	sort.Slice(cs, func(i, j int) bool {

@@ -220,3 +220,21 @@ func TestOffsetOrder(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+func TestNamesKeyCase(t *testing.T) {
+	n, tasks := Names(c("a", "1", nil, "change", "add-x/1"), addX)
+	if !n || !reflect.DeepEqual(tasks, []int{1}) {
+		t.Fatalf("got %v %v", n, tasks)
+	}
+	if n, _ := Names(c("a", "1", nil, "RECORD", "2026-11-06-fix-x"), Work{"Record", "2026-11-06-fix-x"}); !n {
+		t.Fatal("RECORD did not name the record")
+	}
+	g := NewGraph([]gitx.Commit{
+		c("m2", "2", []string{"m1", "s"}),
+		c("s", "1", []string{"m1"}, "change", "add-x"),
+		c("m1", "0", nil),
+	})
+	if r := g.Merge("m2", addX); r == nil || r.Commit != "m2" {
+		t.Fatalf("got %+v", r)
+	}
+}
