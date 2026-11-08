@@ -81,7 +81,9 @@ func TestTags(t *testing.T) {
 	repo.Git("tag", "-a", "-m", "v2", "v2", newer)
 	repo.Env = env
 	repo.Git("tag", "v1", old)
-	repo.Git("tag", "blobtag", repo.Git("rev-parse", "HEAD:a"))
+	blob := repo.Git("rev-parse", "HEAD:a")
+	repo.Git("tag", "blobtag", blob)
+	repo.Git("tag", "-a", "v-blob", blob, "-m", "x")
 
 	tags, err := g.Tags()
 	if err != nil {
@@ -108,5 +110,57 @@ func TestAddedDates(t *testing.T) {
 	want := map[string]string{"docket/ideas/a.md": "2026-11-04", "docket/ideas/b.md": "2026-11-07", "docket/ideas/c.md": "2026-11-04"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v want %v", got, want)
+	}
+}
+
+func TestHistoryTrailers(t *testing.T) {
+	repo := testutil.NewRepo(t)
+	commitAt(t, repo, "2026-11-04T10:00:00+08:00", "rec\n\nRecord: 2026-11-06-fix-x", map[string]string{"a": "1"})
+	commitAt(t, repo, "2026-11-05T10:00:00+08:00", "fold\n\nChange: add-x/1,\n 2", map[string]string{"a": "2"})
+	h, err := Git{Dir: repo.Dir, Env: repo.Env}.History("main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]Commit{}
+	for _, c := range h {
+		by[c.Subject] = c
+	}
+	if got, want := by["rec"].Trailers, []Trailer{{"Record", "2026-11-06-fix-x"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("rec: %+v", got)
+	}
+	if got, want := by["fold"].Trailers, []Trailer{{"Change", "add-x/1, 2"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("fold: %+v", got)
+	}
+}
+
+func TestAddedDatesOldestAndCommitter(t *testing.T) {
+	repo := testutil.NewRepo(t)
+	g := Git{Dir: repo.Dir, Env: repo.Env}
+	commitAt(t, repo, "2026-11-01T10:00:00+08:00", "add", map[string]string{"d/f.md": "f\n", "d/m.md": "m\n"})
+	repo.Git("rm", "-q", "d/f.md")
+	commitAt(t, repo, "2026-11-02T10:00:00+08:00", "del", nil)
+	commitAt(t, repo, "2026-11-03T10:00:00+08:00", "readd", map[string]string{"d/f.md": "f\n", "d/m.md": "m2\n"})
+	env := repo.Env
+	repo.Env = append(append([]string{}, env...), "GIT_COMMITTER_DATE=2026-11-04T10:00:00+08:00", "GIT_AUTHOR_DATE=2026-11-09T10:00:00+08:00")
+	repo.Commit("authored", map[string]string{"d/n.md": "n\n"})
+	repo.Env = env
+
+	got, err := g.AddedDates("main", "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"d/f.md": "2026-11-01", "d/m.md": "2026-11-01", "d/n.md": "2026-11-04"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v want %v", got, want)
+	}
+
+	// m.md was added before the range and only modified inside it.
+	got, err = g.AddedDates("main~3..main", "d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = map[string]string{"d/f.md": "2026-11-03", "d/n.md": "2026-11-04"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("range: got %v want %v", got, want)
 	}
 }
