@@ -95,11 +95,18 @@ func snapshot(dir string) string {
 func TestInspectNothingWritten(t *testing.T) {
 	r := testutil.NewRepo(t)
 	before := snapshot(r.Dir)
+	home := ""
+	for _, kv := range r.Env {
+		if v, ok := strings.CutPrefix(kv, "HOME="); ok {
+			home = v
+		}
+	}
+	homeBefore := snapshot(home)
 	exclude := filepath.Join(r.Dir, ".git/info/exclude")
 	b0, _ := os.ReadFile(exclude)
 	code, _, _ := inspect(t, r, "1.14.0", false)
 	b1, _ := os.ReadFile(exclude)
-	if code != 1 || snapshot(r.Dir) != before || string(b0) != string(b1) {
+	if code != 1 || snapshot(r.Dir) != before || snapshot(home) != homeBefore || string(b0) != string(b1) {
 		t.Errorf("code=%d, tree changed", code)
 	}
 }

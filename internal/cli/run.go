@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/projects"
 )
 
 // Version is the dkt version; release builds set it with -ldflags.
@@ -106,6 +107,11 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 	if err != nil {
 		out.Findings = append(out.Findings, errorFinding(err))
 		fmt.Fprintf(o.Stderr, "dkt %s: %v\n", cmd.Name, err)
+	}
+	if !cmd.NoRepo && ctx.Repo != nil {
+		if rerr := projects.Register(ctx.Repo.Root, ctx.Git, ctx.Env, ctx.Now()); rerr != nil {
+			fmt.Fprintf(o.Stderr, "dkt: project index: %v\n", rerr)
+		}
 	}
 	return finish(o, cmd.Name, ctx.JSON, out, ctx.Repo, err)
 }

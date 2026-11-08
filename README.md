@@ -60,7 +60,7 @@ Once a project is set up, the agent loads the docket skill when development work
 | `/docket:docket-doctor` | Checks the project's Docket setup and helps fix it (plugin skill, run by hand) |
 | `/docket:docket-upgrade` | Upgrades `dkt` and the plugin, then the project's Docket files (plugin skill, run by hand) |
 | `dkt init` | Writes Docket's files into the project, keeping existing files that differ |
-| `dkt inspect` | Reports on the project's Docket setup and writes nothing |
+| `dkt inspect` | Reports on the project's Docket setup and writes nothing in the project |
 | `dkt new` | Opens a change on the full review path |
 | `dkt record` | Opens a record on the light review path |
 | `dkt issue` | Writes an issue file for work whose expected behavior is settled but put off |
@@ -73,6 +73,8 @@ Once a project is set up, the agent loads the docket skill when development work
 | `dkt projects` | Adds, lists, removes or ignores the Docket projects in this machine's index |
 
 Run `dkt --help` for the arguments. Every command takes `--json`.
+
+Every command run in a Docket project also adds it to this machine's project index, which `dkt projects ls` lists; set `projects.autoRegister` to `false` in `~/.config/docket/config.json` to stop that.
 
 ## Developing Docket
 

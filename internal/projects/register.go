@@ -1,0 +1,51 @@
+package projects
+
+import (
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/wake/docket/internal/gitx"
+)
+
+// Register adds the Docket project at root to the index unless the settings turn that off,
+// the project or its main worktree is already listed, or root is not a Docket project.
+func Register(root string, g gitx.Git, env []string, now time.Time) error {
+	settings, err := SettingsPath(env)
+	if errors.Is(err, ErrNoHome) {
+		return fmt.Errorf("cannot locate the user folders: set HOME or XDG_CONFIG_HOME and XDG_STATE_HOME")
+	}
+	if err != nil {
+		return err
+	}
+	on, err := AutoRegister(settings)
+	if err != nil || !on {
+		return err
+	}
+	path, err := IndexPath(env)
+	if err != nil {
+		return err
+	}
+	x, err := Load(path)
+	if err != nil {
+		return err
+	}
+	if x.Find(root) >= 0 || !IsDocket(root) {
+		return nil
+	}
+	main, err := MainWorktree(g)
+	if err != nil {
+		return err
+	}
+	if x.Find(main) >= 0 {
+		return nil
+	}
+	e := Entry{Path: main, Added: Stamp(now)}
+	if url, ok, err := g.RemoteURL("origin"); err != nil {
+		return err
+	} else if ok {
+		e.Origin = &url
+	}
+	x.Projects = append(x.Projects, e)
+	return x.Save(path)
+}
