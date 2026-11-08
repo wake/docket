@@ -1,7 +1,6 @@
 package snapshot
 
 import (
-	"errors"
 	"path"
 	"regexp"
 	"slices"
@@ -79,7 +78,7 @@ func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable) {
 			file = read.Path
 			if b, ok := files[file]; ok {
 				p := record.Parse(b)
-				front, err = p.Front, frontErr(p.HasFront, p.FrontErr)
+				front, err = p.Front, p.FrontErr
 			}
 			if dateRe.MatchString(k.Slug) {
 				w.Created = str(k.Slug[:10])
@@ -90,7 +89,9 @@ func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable) {
 			if b, ok := files[file]; ok {
 				var has bool
 				front, has, err = change.ReadFrontMatter(b)
-				err = frontErr(has, err)
+				if !has {
+					front = change.Front{}
+				}
 			}
 			if read.Archived {
 				w.Archived = str(read.Path)
@@ -131,14 +132,6 @@ func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable) {
 		return strings.Compare(a.Slug, b.Slug)
 	})
 	return works, bad
-}
-
-// frontErr is an error when the front matter is broken or absent.
-func frontErr(has bool, err error) error {
-	if err == nil && !has {
-		return errors.New("no front matter")
-	}
-	return err
 }
 
 // str is nil for the empty string.

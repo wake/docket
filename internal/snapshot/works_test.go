@@ -92,6 +92,15 @@ func TestWorksUnreadableFrontMatter(t *testing.T) {
 	}
 }
 
+func TestWorksNoFrontMatter(t *testing.T) {
+	in := in1()
+	in.Files[wt]["openspec/changes/add-x/proposal.md"] = []byte("# Just text\n")
+	ws, bad := Works(in)
+	if ws[0].Title != nil || ws[0].Kind != nil || ws[0].Source != nil || len(bad) != 0 {
+		t.Fatalf("%+v %v", ws[0], bad)
+	}
+}
+
 func TestWorksOtherSchema(t *testing.T) {
 	in := in1()
 	in.Files[wt]["openspec/changes/add-x/.openspec.yaml"] = []byte("schema: spec-driven\ncreated: 2026-11-08\n")

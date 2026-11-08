@@ -3,6 +3,8 @@ package snapshot
 import (
 	"encoding/json"
 	"reflect"
+
+	"github.com/wake/docket/internal/specdoc"
 )
 
 // The types below are the JSON of the result in design.md, Output. A pointer
@@ -142,30 +144,12 @@ type Document struct {
 
 // DeltaEntry is one delta spec of a change.
 type DeltaEntry struct {
-	Capability string        `json:"capability"`
-	Path       string        `json:"path"`
-	Added      []Requirement `json:"added"`
-	Modified   []Requirement `json:"modified"`
-	Removed    []Removal     `json:"removed"`
-	Renamed    []Rename      `json:"renamed"`
-}
-
-// Requirement is an added or modified requirement and its scenarios.
-type Requirement struct {
-	Name      string   `json:"name"`
-	Scenarios []string `json:"scenarios"`
-}
-
-// Removal is a removed requirement and its reason.
-type Removal struct {
-	Name   string `json:"name"`
-	Reason string `json:"reason"`
-}
-
-// Rename is a renamed requirement.
-type Rename struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+	Capability string                `json:"capability"`
+	Path       string                `json:"path"`
+	Added      []specdoc.Requirement `json:"added"`
+	Modified   []specdoc.Requirement `json:"modified"`
+	Removed    []specdoc.Removed     `json:"removed"`
+	Renamed    []specdoc.Renamed     `json:"renamed"`
 }
 
 // IdeaEntry is one idea on the default branch tip.
