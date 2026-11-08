@@ -70,6 +70,7 @@ Once a project is set up, the agent loads the docket skill when development work
 | `dkt conflicts` | Finds active changes that touch the same requirement |
 | `dkt status` | Names the next idea or issue to work on from `docket/order.md` |
 | `dkt domains` | Shows the capabilities in the domain tree of `docket/domains.md`, and those not in it |
+| `dkt snapshot` | Reports the whole project in one read: works, ideas, issues, the order, specs and the domain tree |
 | `dkt projects` | Adds, lists, removes or ignores the Docket projects in this machine's index |
 
 Run `dkt --help` for the arguments. Every command takes `--json`.
