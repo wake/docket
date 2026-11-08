@@ -6,8 +6,128 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/scan"
 )
+
+const dir = "openspec/changes/add-x/"
+
+func stageIn(files map[string]string, commits []gitx.Commit, wtCommit string, def bool) WorksInput {
+	f := Files{}
+	for k, v := range files {
+		f[k] = []byte(v)
+	}
+	return WorksInput{
+		Changes: []scan.Use{{Slug: "add-x", Path: "openspec/changes/add-x", Source: wt}},
+		Places:  map[string]Place{wt: {Kind: "worktree", Commit: wtCommit, Default: def}},
+		Files:   map[string]Files{wt: f},
+		Graph:   NewGraph(commits),
+		Tip:     wtCommit,
+	}
+}
+
+const planMd = "## Tasks\n\n### Task 1: One\n\n- [ ] **Step 1: a**\n- [x] **Step 2: b**\n\n### Task 2: Two\n\n- [x] **Step 1: a**\n- [ ] **Step 2: b**\n- [ ] **Step 3: c**\n"
+
+func TestTasksFromReadFrom(t *testing.T) {
+	in := stageIn(map[string]string{dir + "plan.md": planMd, dir + ".openspec.yaml": "schema: docket\n"},
+		[]gitx.Commit{c("c2", "2", []string{"c1"}, "Change", "add-x/1"), c("c1", "1", nil)}, "c2", false)
+	ws, _ := Works(in)
+	ts := ws[0].Tasks
+	if len(ts) != 2 || ts[0].State != "done" || !reflect.DeepEqual(ts[0].Commits, []string{"c2"}) || ts[1].State != "pending" || ts[1].Ticked != 1 || ts[1].Steps != 3 || ws[0].Progress != (Progress{1, 2}) {
+		t.Fatalf("%+v %+v", ts, ws[0].Progress)
+	}
+	in.Places[wt] = Place{Kind: "worktree", Commit: "c1"}
+	if ws, _ = Works(in); ws[0].Tasks[0].State != "pending" || len(ws[0].Tasks[0].Commits) != 0 {
+		t.Fatalf("%+v", ws[0].Tasks[0])
+	}
+}
+
+func TestStagesChange(t *testing.T) {
+	files := map[string]string{dir + "proposal.md": "---\ntitle: X\n---\n", dir + "plan.md": planMd, dir + ".openspec.yaml": "schema: docket\n"}
+	ws, _ := Works(stageIn(files, []gitx.Commit{c("c1", "1", nil, "Change", "add-x")}, "c1", false))
+	if !reflect.DeepEqual(ws[0].Stages, []string{"proposal", "plan"}) || ws[0].Phase != "plan" {
+		t.Fatalf("%v", ws[0].Stages)
+	}
+	ws, _ = Works(stageIn(files, []gitx.Commit{c("c1", "1", nil, "Change", "add-x/1")}, "c1", false))
+	if !reflect.DeepEqual(ws[0].Stages, []string{"proposal", "plan", "dev"}) {
+		t.Fatalf("%v", ws[0].Stages)
+	}
+	ws, _ = Works(stageIn(files, []gitx.Commit{c("c1", "1", nil, "Change", "add-x/a")}, "c1", false))
+	if ws[0].Phase != "plan" {
+		t.Fatalf("%v", ws[0].Stages)
+	}
+	in := stageIn(files, []gitx.Commit{c("c1", "1", nil, "Change", "add-x/1")}, "c1", true)
+	in.Changes[0].Archived = true
+	ws, _ = Works(in)
+	if !reflect.DeepEqual(ws[0].Stages, []string{"proposal", "plan", "dev", "merged", "archived"}) || ws[0].Phase != "archived" {
+		t.Fatalf("%v", ws[0].Stages)
+	}
+}
+
+func TestStagesDoneNotMerged(t *testing.T) {
+	files := map[string]string{dir + "plan.md": "### Task 1: One\n\n- [ ] **Step 1: a**\n", dir + ".openspec.yaml": "schema: docket\n"}
+	ws, _ := Works(stageIn(files, []gitx.Commit{c("c1", "1", nil, "Change", "add-x/1")}, "c1", false))
+	if ws[0].Phase != "dev" || ws[0].Progress != (Progress{1, 1}) || ws[0].Merged {
+		t.Fatalf("%+v", ws[0])
+	}
+}
+
+func TestStagesRecord(t *testing.T) {
+	p := "docket/records/2026-11-06-r.md"
+	mk := func(def bool, tr ...string) WorkEntry {
+		in := WorksInput{
+			Records: []scan.Use{{Slug: "2026-11-06-r", Path: p, Source: wt}},
+			Places:  map[string]Place{wt: {Kind: "worktree", Commit: "c1", Default: def}},
+			Files:   map[string]Files{wt: {p: []byte("---\ntitle: R\n---\n")}},
+			Graph:   NewGraph([]gitx.Commit{c("c1", "1", nil, tr...)}), Tip: "c1",
+		}
+		ws, _ := Works(in)
+		return ws[0]
+	}
+	if w := mk(false, "Record", "2026-11-06-r"); !reflect.DeepEqual(w.Stages, []string{"record", "dev"}) {
+		t.Fatalf("%v", w.Stages)
+	}
+	if w := mk(true); !reflect.DeepEqual(w.Stages, []string{"record", "merged"}) || w.Merge != nil {
+		t.Fatalf("%v", w.Stages)
+	}
+}
+
+func TestMergeOfWork(t *testing.T) {
+	files := map[string]string{dir + "proposal.md": "x", dir + ".openspec.yaml": "schema: docket\n"}
+	cs := []gitx.Commit{c("m", "3", []string{"b"}), c("b", "2", []string{"a"}, "Change", "add-x"), c("a", "1", nil)}
+	in := stageIn(files, cs, "m", true)
+	in.Tags = []gitx.Tag{{Name: "v1", Commit: "m", Time: "T"}}
+	w, _ := Works(in)
+	if w[0].Merge == nil || w[0].Merge.Commit != "b" || w[0].Release == nil || w[0].Release.Tag != "v1" || w[0].LastCommit == nil || w[0].LastCommit.Commit != "b" {
+		t.Fatalf("%+v", w[0])
+	}
+	w, _ = Works(stageIn(files, []gitx.Commit{c("m", "3", nil)}, "m", true))
+	if !w[0].Merged || w[0].Merge != nil || w[0].Release != nil {
+		t.Fatalf("%+v", w[0])
+	}
+}
+
+func TestDocumentsAndDeltas(t *testing.T) {
+	d := "## ADDED Requirements\n### Requirement: R\nbody\n#### Scenario: S\n- **WHEN** a\n"
+	files := map[string]string{dir + "proposal.md": "x", dir + "design.md": "x", dir + "plan.md": "x", dir + "notes.md": "x",
+		dir + "specs/booking/spec.md": d, dir + "specs/auth/spec.md": d}
+	w, _ := Works(stageIn(files, nil, "", false))
+	kinds := map[string]string{}
+	for _, x := range w[0].Documents {
+		kinds[x.Path] = x.Kind
+		if x.Source != wt {
+			t.Fatalf("%+v", x)
+		}
+	}
+	want := map[string]string{dir + "proposal.md": "proposal", dir + "design.md": "design", dir + "plan.md": "plan", dir + "notes.md": "other", dir + "specs/booking/spec.md": "spec-delta", dir + "specs/auth/spec.md": "spec-delta"}
+	if !reflect.DeepEqual(kinds, want) {
+		t.Fatalf("%v", kinds)
+	}
+	ds := w[0].Deltas
+	if len(ds) != 2 || ds[0].Capability != "auth" || ds[1].Capability != "booking" || ds[1].Path != dir+"specs/booking/spec.md" || len(ds[0].Added) != 1 || ds[0].Removed == nil {
+		t.Fatalf("%+v", ds)
+	}
+}
 
 const wt = "/w/app"
 
