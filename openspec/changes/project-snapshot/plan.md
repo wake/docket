@@ -28,11 +28,13 @@
 - A delta written with CRLF line endings, a BOM, headings in code blocks or comments: read as OpenSpec reads them. Pinned in Task 1 (`TestParseDeltaEdges`).
 - A slug that is a prefix of another (`add-x` and `add-x-2`): trailers of one never count for the other. Pinned in Task 3 (`TestNamesPrefixSlug`).
 
-## Revision 1 (2026-11-08): rulings from the task reviews of Tasks 3 and 4
+## Revision 1 (2026-11-08): rulings from the reviews of Tasks 3 and 4 and of the first pull request
 
-The task reviewers, in fresh contexts, found two costs the plan had not pinned, and the controller ruled on them; no requirement changed.
+The task reviewers, in fresh contexts, and the pre-merge review of the first pull request (an attack on the other model and a spec check in a fresh context) found costs and gaps the plan had not pinned, and the controller ruled on them; no requirement changed. Not taken from the attack: a tag on another tag stays left out (rare; peeling it needs another git run), and a fence marker inside an HTML comment stays as `markdown.FenceMask` and `BlankComments` treat it for every reader (`change.ParsePlan`, `dkt lint`), a change of its own.
 
-- Task 3: `Merge` and `Release` walked the history once per work, which breaks the one-second target on long histories. They now mark each commit once per tip and per tag list, cached on the `Graph` (9d2d3ee, bc0d8a5, `TestMergeLongHistory`, `TestMergeOlderAttribution`). A malformed task list names the work with no task (`TestNamesMalformed`), so a change's `dev` uses `len(tasks) > 0`.
+- Task 3: `Merge` and `Release` walked the history once per work, which breaks the one-second target on long histories. They now mark each commit once per tip and per tag list, cached on the `Graph` (9d2d3ee, bc0d8a5, `TestMergeLongHistory`, `TestMergeOlderAttribution`). A malformed task list names the work with no task (`TestNamesMalformed`), so a change's `dev` uses `len(tasks) > 0`. From the pre-merge review of the first pull request: commit times are compared as instants, not strings (7aa28b0, `TestOffsetOrder`); trailer keys are matched without regard to case, as git matches them (`TestNamesKeyCase`); `Reachable` is memoized per `from` set.
+- Task 4, from the same review: several `Wanted` of one source are merged into that source's `Files` (`TestReadTwoWantedOneSource`), and the tests run git only through `testutil`'s environment.
+- Task 8: `History` also runs over every tag's commit, in the same single run, so `Release` sees a tag no location reaches.
 - Task 4: `ls-tree` ran once per wanted path; `gitx.Git.TreeFiles` became variadic, `TreeFiles(commit string, dirs ...string)`, so one run per commit lists every path (0d5b523). This touches `internal/gitx/refs.go`, outside the task's Files block; its two callers pass one dir and are unchanged. A symbolic link inside one wanted path now costs that path only, `<source>:<path>`, while a missing worktree, or a link at or above `openspec/changes` or `docket/records`, still costs the whole source (`TestReadLinkPerPath`).
 
 ## Reuse
@@ -410,7 +412,7 @@ Commit "Report ideas, the order and issues with their states" with the trailer `
 **Interfaces:**
 - Produces, in package `snapshot`:
   - `func Specs(files Files) []Spec`, `func DomainTree(tree []byte, found bool, capabilities []string) (Domains, []domain.Problem)`: from the tip's files.
-  - `func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error)`: runs `scan.Changes`, `scan.Records`, `scan.Issues`, `Worktrees`, `Refs`, `DefaultBranch`, `History` (over every location's commit and the tip), `Tags`, `AddedDates(tip, "docket/ideas")`, one `Read`, then `Works`, `Backlog`, `Specs` and `DomainTree`. Domain problems are returned as `idea.Problem` with the domain rule names.
+  - `func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error)`: runs `scan.Changes`, `scan.Records`, `scan.Issues`, `Worktrees`, `Refs`, `DefaultBranch`, `Tags`, `History` (in one run over every location's commit, the tip and every tag's commit, so that `Release` sees a tag whose commit no location reaches), `AddedDates(tip, "docket/ideas")`, one `Read`, then `Works`, `Backlog`, `Specs` and `DomainTree`. Domain problems are returned as `idea.Problem` with the domain rule names.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -425,6 +427,8 @@ On real repositories from `testutil.NewRepo`:
 - `TestSnapshotNoOpenSpec`: `DOCKET_OPENSPEC` pointing at nothing and an active change with a delta: its `deltas` are reported.
 - `TestSnapshotUnmountedWorktree`: a worktree whose directory was removed, another holding `add-x`: the first in unreadable, `add-x` reported.
 - `TestSnapshotOffline`: the `origin` remote's URL is a path that does not exist, and `refs/remotes/origin/main` holds a change: `Collect` reports it, with no error.
+- `TestSnapshotTaskCommitOnWorktreeHead`: a commit naming Task 1 exists only as a linked worktree's HEAD, which is `read_from`: Task 1 lists it and is `done`.
+- `TestSnapshotTagOutsideLocations`: a tag on a commit that is merged into `main` and also a tag `v0.9.0` on a commit no location reaches but which reaches the merge: `release` is the oldest-created of them.
 - `TestSnapshotWritesNothing`: the repository's `git status --porcelain` and its files' modification times are unchanged after `Collect`.
 
 - [ ] **Step 2: Run them and see them fail**
