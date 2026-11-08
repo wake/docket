@@ -57,11 +57,11 @@ type TreeFile struct {
 	Link bool
 }
 
-// TreeFiles lists every blob under dir in commit's tree, recursively, with
-// full-tree paths in git's order. Submodules are left out; a missing dir gives
-// an empty slice.
-func (g Git) TreeFiles(commit, dir string) ([]TreeFile, error) {
-	out, err := g.output("ls-tree", "-r", "-z", "--full-tree", commit, "--", dir) // no trailing slash: dir itself may be a link
+// TreeFiles lists every blob under dirs in commit's tree, recursively, with
+// full-tree paths in git's order, in one git run. Submodules are left out; a
+// missing dir gives no files.
+func (g Git) TreeFiles(commit string, dirs ...string) ([]TreeFile, error) {
+	out, err := g.output(append([]string{"ls-tree", "-r", "-z", "--full-tree", commit, "--"}, dirs...)...) // no trailing slash: a dir itself may be a link
 	if err != nil {
 		return nil, err
 	}
