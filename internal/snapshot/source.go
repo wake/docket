@@ -63,6 +63,12 @@ func Read(g gitx.Git, want []Wanted) (map[string]Files, []scan.Unreadable, error
 				}
 			}
 		}
+		if len(dirs) == 0 { // no path means no files, not the whole tree
+			for _, w := range ws {
+				out[w.Source] = Files{}
+			}
+			continue
+		}
 		tree, err := g.TreeFiles(commit, dirs...)
 		var xe *gitx.ExitError
 		if errors.As(err, &xe) { // such as a commit that is not one

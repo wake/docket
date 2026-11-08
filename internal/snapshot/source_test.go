@@ -160,6 +160,27 @@ func TestReadLinkPerPath(t *testing.T) {
 	}
 }
 
+func TestReadFolderBoundary(t *testing.T) {
+	dir, g := newRepo(t)
+	a, b := "openspec/changes/add-x", "openspec/changes/add-x-2"
+	write(t, dir, a+"/proposal.md", "a")
+	write(t, dir, b+"/proposal.md", "b")
+	git(t, dir, "add", ".")
+	git(t, dir, "commit", "-q", "-m", "two")
+	sha := git(t, dir, "rev-parse", "HEAD")
+	got, un, err := Read(g, []Wanted{
+		{Source: "a", Commit: sha, Paths: []string{a}},
+		{Source: "b", Commit: sha, Paths: []string{b}},
+		{Source: "none", Commit: sha},
+	})
+	if err != nil || len(un) != 0 {
+		t.Fatalf("%v %v", err, un)
+	}
+	if len(got["a"]) != 1 || string(got["a"][a+"/proposal.md"]) != "a" || len(got["b"]) != 1 || string(got["b"][b+"/proposal.md"]) != "b" || len(got["none"]) != 0 {
+		t.Fatalf("got %v", got)
+	}
+}
+
 func TestReadFile(t *testing.T) {
 	dir, g := newRepo(t)
 	rec := "docket/records/r.md"
