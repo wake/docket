@@ -2,7 +2,6 @@ package gitx
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -109,18 +108,18 @@ func TestAddedSince(t *testing.T) {
 	}
 }
 
-// fakeGit puts a git first on PATH that logs its arguments, one line per run,
-// and returns g using it and the log's path.
-func fakeGit(t *testing.T, r *testutil.Repo) (Git, string) {
+// fakeGit returns a Git on r that logs its runs, and a function giving the log
+// as text, one line per run.
+func fakeGit(t *testing.T, r *testutil.Repo) (Git, func() string) {
 	t.Helper()
-	bin := t.TempDir()
-	real, _ := exec.LookPath("git")
-	log := filepath.Join(bin, "log")
-	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
+	env, runs := testutil.CountGit(t, r.Env)
+	return Git{Dir: r.Dir, Env: env}, func() string {
+		l := runs()
+		if len(l) == 0 {
+			return ""
+		}
+		return strings.Join(l, "\n") + "\n"
 	}
-	return Git{Dir: r.Dir, Env: append(append([]string(nil), r.Env...), "PATH="+bin+":"+os.Getenv("PATH"))}, log
 }
 
 func TestReadBlobsAt(t *testing.T) {
@@ -136,7 +135,7 @@ func TestReadBlobsAt(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}
-	if b, _ := os.ReadFile(log); strings.Count(string(b), "cat-file") != 1 || strings.Count(string(b), "\n") != 1 {
+	if b := log(); strings.Count(b, "cat-file") != 1 || strings.Count(b, "\n") != 1 {
 		t.Errorf("runs:\n%s", b)
 	}
 }
@@ -157,7 +156,7 @@ func TestDefaultBranchIn(t *testing.T) {
 	if err != nil || ok != wantOK || db != want || db != (DefaultBranch{"trunk", c}) {
 		t.Errorf("got %v %v %v", db, ok, err)
 	}
-	if b, _ := os.ReadFile(log); strings.Contains(string(b), "for-each-ref") {
+	if b := log(); strings.Contains(b, "for-each-ref") {
 		t.Errorf("listed refs:\n%s", b)
 	}
 	if db, ok, err := g.DefaultBranchIn(nil); err != nil || ok {

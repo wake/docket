@@ -2,7 +2,6 @@ package scan
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -373,21 +372,9 @@ func TestRefReadFailureIsUnreadable(t *testing.T) {
 // the arguments of every git run so far, one line each.
 func counted(t *testing.T, g gitx.Git) (gitx.Git, func() []string) {
 	t.Helper()
-	real, err := exec.LookPath("git")
-	if err != nil {
-		t.Fatal(err)
-	}
-	bin := realPath(t, t.TempDir())
-	log := filepath.Join(bin, "log")
-	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	g.Env = append(slices.Clone(g.Env), "PATH="+bin+":"+os.Getenv("PATH")) // the last PATH wins
-	return g, func() []string {
-		b, _ := os.ReadFile(log)
-		return strings.Split(strings.TrimSpace(string(b)), "\n")
-	}
+	env, runs := testutil.CountGit(t, g.Env)
+	g.Env = env
+	return g, runs
 }
 
 func TestScanGitRuns(t *testing.T) {

@@ -74,14 +74,8 @@ func TestReadRefAndWorktree(t *testing.T) {
 func TestReadSharesCommits(t *testing.T) {
 	dir, g := newRepo(t)
 	sha := git(t, dir, "rev-parse", "main")
-	real, _ := exec.LookPath("git")
-	bin, _ := filepath.EvalSymlinks(t.TempDir())
-	log := filepath.Join(bin, "log")
-	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	g.Env = append(g.Env, "PATH="+bin+":"+os.Getenv("PATH")) // the last PATH wins
+	env, runs := testutil.CountGit(t, g.Env)
+	g.Env = env
 	var want []Wanted
 	for _, s := range []string{"a", "b", "c"} {
 		want = append(want, Wanted{Source: s, Commit: sha, Paths: []string{folder, "docket/records/r.md"}})
@@ -90,9 +84,9 @@ func TestReadSharesCommits(t *testing.T) {
 	if err != nil || len(un) != 0 || len(got) != 3 || len(got["c"]) != 3 {
 		t.Fatalf("got %v %v %v", got, un, err)
 	}
-	b, _ := os.ReadFile(log)
+	b := strings.Join(runs(), "\n")
 	var tree, cat int
-	for _, l := range strings.Split(string(b), "\n") {
+	for _, l := range runs() {
 		if strings.Contains(l, "ls-tree") {
 			tree++
 		}
@@ -224,18 +218,11 @@ func TestReadFile(t *testing.T) {
 // using it and a function that gives the first word of each run so far.
 func countingGit(t *testing.T, g gitx.Git) (gitx.Git, func() []string) {
 	t.Helper()
-	real, _ := exec.LookPath("git")
-	bin, _ := filepath.EvalSymlinks(t.TempDir())
-	log := filepath.Join(bin, "log")
-	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	g.Env = append(append([]string(nil), g.Env...), "PATH="+bin+":"+os.Getenv("PATH")) // the last PATH wins
+	env, lines := testutil.CountGit(t, g.Env)
+	g.Env = env
 	return g, func() []string {
-		b, _ := os.ReadFile(log)
 		var words []string
-		for _, l := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		for _, l := range lines() {
 			if f := strings.Fields(l); len(f) > 0 {
 				words = append(words, f[0])
 			}

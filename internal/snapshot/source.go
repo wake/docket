@@ -29,9 +29,9 @@ const linkReason = " is a symbolic link; Docket does not read through it"
 
 // Read reads every file under each Wanted path, keyed by Source. A ref costs
 // one ls-tree per distinct commit that trees (the listings by commit, which may
-// be nil) lacks, and all of them share one cat-file. A link under a path lists "<source>:<path>" as unreadable and
-// leaves that path out; a source that cannot be read at all is listed by its
-// name and has no entry. The error is for git failing as a whole.
+// be nil) lacks, and all of them share one cat-file. A link under a path lists
+// "<source>:<path>" as unreadable and leaves that path out; a source that
+// cannot be read at all is listed by its name and has no entry. The error is for git failing as a whole.
 func Read(g gitx.Git, want []Wanted, trees map[string][]gitx.TreeFile) (map[string]Files, []scan.Unreadable, error) {
 	out := map[string]Files{}
 	var bad []scan.Unreadable
