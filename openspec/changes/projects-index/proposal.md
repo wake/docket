@@ -37,6 +37,7 @@ Nothing on a machine knows which repositories use Docket. A tool that works acro
 
 ### Modified Capabilities
 - `cli-output`: the index is the only place outside the repository that a command writes to, so "writes nothing" elsewhere in the specs means nothing in the repository.
+- `setup-inspection`: `dkt inspect`, which promises to change no file outside the repository either, makes the same one exception.
 
 ## Impact
 

@@ -74,6 +74,10 @@ A project SHALL be identified by the path of its repository's main worktree, the
 - **WHEN** the index holds one ignored entry and one that is not, and a user runs `dkt projects ls --json`
 - **THEN** `result.projects` holds both, with `ignored` true on the first
 
+#### Scenario: Path that cannot be checked
+- **WHEN** an entry's path is inside a folder dkt may not search, and a user runs `dkt projects ls --json`
+- **THEN** that entry is listed with `missing` false, `unreadable` names its path, and dkt exits with 3
+
 #### Scenario: Empty index
 - **WHEN** there is no index file and a user runs `dkt projects ls --json`
 - **THEN** `result.projects` is an empty array, no file is written, and dkt exits with 0
@@ -137,6 +141,10 @@ After any command other than `dkt projects` has run with a repository identified
 - **WHEN** a user runs `dkt init --tools claude` in a repository without Docket
 - **THEN** once it has written `docket/workflow.md`, the index holds the project
 
+#### Scenario: Failing command registers
+- **WHEN** a user runs `dkt sync add-none` in a Docket project not in the index, and it exits with 1 because there is no such change
+- **THEN** the index holds the project
+
 #### Scenario: Status in a repository without Docket
 - **WHEN** a user runs `dkt status` in a git repository that has no `docket/workflow.md`
 - **THEN** the index is not written
@@ -153,7 +161,7 @@ The settings SHALL be the file `docket/config.json` under `$XDG_CONFIG_HOME` whe
 - **THEN** the index holds the project
 
 ### Requirement: Registration does not fail the command
-When automatic registration cannot complete, because the settings or the index cannot be read or do not have their form, neither `HOME` nor the variable for a file is set, or the index cannot be written, dkt SHALL print one warning line naming the file and the reason to standard error and SHALL NOT register. The command's standard output and exit code SHALL be what they would be without registration.
+When automatic registration cannot complete, because the settings or the index cannot be read or do not have their form, neither `HOME` nor the variable for a file is set, or the index cannot be written, dkt SHALL print one warning line to standard error, naming the file, or the variables when there is no file, and the reason, and SHALL NOT register. The command's standard output and exit code SHALL be what they would be without registration.
 
 #### Scenario: Settings that are not JSON
 - **WHEN** the settings file holds `{` and a user runs `dkt status --json` in a Docket project
@@ -162,3 +170,7 @@ When automatic registration cannot complete, because the settings or the index c
 #### Scenario: Index that cannot be written
 - **WHEN** the index's folder cannot be created and a user runs `dkt status --json` in a Docket project not in the index
 - **THEN** standard error holds a warning naming the index, and the exit code is as without registration
+
+#### Scenario: Broken index left alone
+- **WHEN** the index holds `not json` and a user runs `dkt status --json` in a Docket project
+- **THEN** standard error holds a warning naming the index, the file still holds `not json`, and standard output and the exit code are as without registration

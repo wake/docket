@@ -8,17 +8,17 @@
 
 **Tech Stack:** Go 1.24, standard library only.
 
-**Spec:** `openspec/changes/projects-index/proposal.md`, `design.md`, `specs/project-index/spec.md`, `specs/cli-output/spec.md`.
+**Spec:** `openspec/changes/projects-index/proposal.md`, `design.md`, `specs/project-index/spec.md`, `specs/cli-output/spec.md`, `specs/setup-inspection/spec.md`.
 
 ## Global Constraints
 
 - Index: `$XDG_STATE_HOME/docket/projects.json` when `XDG_STATE_HOME` is absolute, else `$HOME/.local/state/docket/projects.json`. Settings: `$XDG_CONFIG_HOME/docket/config.json` when absolute, else `$HOME/.config/docket/config.json`.
-- Index file: `{"projects": [{"path", "origin", "added", "ignored"}]}`, `origin` a string or null, `added` RFC 3339 UTC to the second; written sorted by path, indented two spaces, ending in a newline, mode `0600`, folders `0755`, through `safefile.Install`.
+- Index file: `{"projects": [{"path", "origin", "added", "ignored"}]}`, `origin` a string or null, `added` RFC 3339 UTC to the second (always written by `projects.Stamp`, and read back only with a `Z` offset); written sorted by path, indented two spaces, ending in a newline, mode `0600`, folders `0755`, through `safefile.Install`.
 - Settings: only `projects.autoRegister` (boolean, default true). dkt never writes the settings.
 - Rules: `not-a-repository`, `not-a-project`, `not-in-index` (exit 1); `no-home` (exit 4); an unreadable index is listed in `unreadable` (exit 3), and never written over.
 - Results: `add`, `rm`, `ignore` give `{"state", "project"}`; states `added`, `exists`, `unignored`, `removed`, `ignored`. `ls` gives `{"projects": [...]}`, each entry with `path`, `origin`, `added`, `ignored`, `missing`; never null.
 - The envelope's `command` is `projects`. Text output: `<state> <path>` for `add`, `rm`, `ignore`; for `ls` one line per entry, the path then `missing` and `ignored` when they apply, joined by two spaces.
-- Registration warning: one line `dkt: project index: <reason naming the file>` on standard error; stdout and the exit code stay as without it.
+- Registration warning: one line `dkt: project index: <reason>` on standard error, the reason naming the file, or `HOME` and the XDG variable when no location can be formed; stdout and the exit code stay as without it.
 - No new dependency; no network; OpenSpec is not run. Commits carry `Change: projects-index/<N>` in the last paragraph, with no other trailer.
 - `gofmt -l .` prints nothing, `go vet ./...` and `go test ./...` pass after every task.
 
@@ -41,10 +41,10 @@
 | Read without following a link | internal/safefile/safefile.go:ReadNoFollow | reuse | a link at the index is refused | `rg -n "func ReadNoFollow" internal/safefile/` |
 | A value from an environment list | internal/openspec/runner.go:envValue | new | unexported, and importing `openspec` for a lookup would tie the index to the OpenSpec runner; the same seven lines, last value wins | `rg -n "func envValue" internal/` |
 | Result, findings, unreadable, exit codes | internal/cli/envelope.go:Outcome, Finding, Unreadable, UsageError, EnvError | reuse | every command's shape | `rg -n "type Outcome" internal/cli/` |
-| Identifying the repository without failing | internal/cli/run.go:identify | reuse | as `bestEffortRepo` does for `--version` | `rg -n "func bestEffortRepo" internal/cli/` |
+| Identifying the repository without failing | internal/cli/run.go:identify | reuse | as `bestEffortRepo` does for `--version` | `rg -n 'func (identify\|bestEffortRepo)' internal/cli/run.go` |
 | A command that needs no repository | internal/cli/command.go:Command | extend | a field `NoRepo` | `rg -n "type Command struct" internal/cli/` |
 | Registering the command | internal/cli/command.go:commands | extend | one more entry | `rg -n "var commands" internal/cli/` |
-| Clock | internal/cli/command.go:Context.Now | reuse | tests fix it through `Options.Now` | `rg -n "Now " internal/cli/run.go` |
+| Clock | internal/cli/command.go:Context.Now | reuse | tests fix it through `Options.Now` | `rg -n 'type Context struct\|Now +func\(\) time\.Time' internal/cli/command.go` |
 | Test repositories and environment | internal/testutil/repo.go:NewRepo, Env | reuse | each test gets its own `HOME` | `rg -n "func Env" internal/testutil/` |
 | Init in a test | internal/cli/cmd_init_test.go:doInit | reuse | runs `dkt init` with a fake OpenSpec | `rg -n "func doInit" internal/cli/` |
 | The index and settings | none | new | dkt keeps no file outside the repository today | `rg -n "XDG\|\.local/state" internal/` |
@@ -71,6 +71,7 @@
   - `func (x *Index) Find(path string) int`: the entry's position, or -1.
   - `func (x *Index) Save(path string) error`: sorts by path and replaces the file.
   - `func AutoRegister(settings string) (bool, error)`: true when the file or the key is missing.
+  - `func Stamp(t time.Time) string`: `t` in UTC, truncated to the second, as `time.RFC3339`; every `added` dkt writes comes from it.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -79,7 +80,8 @@ In `internal/projects/files_test.go`:
 - `TestIndexPath`: table over env lists. `XDG_STATE_HOME=/s` gives `/s/docket/projects.json`; `HOME=/h` only gives `/h/.local/state/docket/projects.json`; `XDG_STATE_HOME=state` with `HOME=/h` gives the `HOME` one; `XDG_STATE_HOME=/s` without `HOME` gives `/s/...`; an empty list gives `errors.Is(err, ErrNoHome)`. A later duplicate key wins.
 - `TestSettingsPath`: the same table with `XDG_CONFIG_HOME`, `.config` and `config.json`.
 - `TestLoadMissing`: `Load` of a path that does not exist returns `Projects` of length 0, not nil, and no error.
-- `TestLoadInvalid`: each of `not json`, `{}`, `{"projects":"x"}`, an entry with `"path":"rel"`, an entry with `"added":"yesterday"`, an entry with `"ignored":"no"` gives an error containing the file's path.
+- `TestLoadInvalid`: each of `not json`, `{}`, `{"projects":"x"}`, an entry with `"path":"rel"`, an entry with `"added":"yesterday"`, an entry with `"added":"2026-11-08T17:10:11+08:00"`, an entry with `"ignored":"no"` gives an error containing the file's path.
+- `TestStamp`: `Stamp` of `2026-11-08T17:10:11.5+08:00` is `"2026-11-08T09:10:11Z"`.
 - `TestLoadLink`: the index is a symbolic link to a valid index; `Load` returns an error.
 - `TestSaveRoundTrip`: `Save` to `<tmp>/a/b/projects.json` creates the folders; entries given as `/w/b`, `/w/a` are written as `/w/a`, `/w/b`; the file ends with `"\n"`, is indented two spaces, and `mode & 0o077 == 0`; `Load` gives back equal entries, with a null origin kept null.
 - `TestAutoRegister`: a missing file, `{}` and `{"projects":{}}` give true; `{"projects":{"autoRegister":false}}` gives false; `{` and `{"projects":{"autoRegister":"no"}}` give an error containing the path.
@@ -91,7 +93,7 @@ Expected: FAIL, the package does not build.
 
 - [ ] **Step 3: Implement `internal/projects/files.go`**
 
-`Load` reads with `safefile.ReadNoFollow`, decodes, and checks the form: `projects` present and an array, each `path` absolute, each `added` parsed by `time.Parse(time.RFC3339, ...)`. `Save` sorts by path, `os.MkdirAll(dir, 0o755)`, `json.MarshalIndent(x, "", "  ")` plus a newline, then `safefile.Install(path, data, 0o600, false, path)`.
+`Load` reads with `safefile.ReadNoFollow`, decodes, and checks the form: `projects` present and an array, each `path` absolute, each `added` parsed by `time.Parse(time.RFC3339, ...)` and ending in `Z`. `Save` sorts by path, `os.MkdirAll(dir, 0o755)`, `json.MarshalIndent(x, "", "  ")` plus a newline, then `safefile.Install(path, data, 0o600, false, path)`.
 
 - [ ] **Step 4: Run them and see them pass**
 
@@ -155,7 +157,7 @@ Commit "Find the project of a directory" with the trailer `Change: projects-inde
 
 ### Task 3: `dkt projects add` and `ls`
 
-**Scenarios:** project-index#index-under-the-state-home, project-index#index-that-is-not-json, project-index#new-project, project-index#project-already-in-the-index, project-index#ignored-project-added, project-index#repository-without-docket, project-index#not-a-repository, project-index#project-on-an-unmounted-disk, project-index#ignored-entries-listed, project-index#empty-index, project-index#unknown-subcommand, project-index#list-outside-a-repository, project-index#no-home
+**Scenarios:** project-index#index-under-the-state-home, project-index#index-that-is-not-json, project-index#new-project, project-index#project-already-in-the-index, project-index#ignored-project-added, project-index#repository-without-docket, project-index#not-a-repository, project-index#project-on-an-unmounted-disk, project-index#ignored-entries-listed, project-index#path-that-cannot-be-checked, project-index#empty-index, project-index#unknown-subcommand, project-index#list-outside-a-repository, project-index#no-home
 
 **Review:** judgment
 
@@ -178,7 +180,7 @@ Commit "Find the project of a directory" with the trailer `Change: projects-inde
 
 - [ ] **Step 1: Write the failing tests**
 
-In `internal/cli/cmd_projects_test.go`, with a helper `prRun(t, env []string, dir string, args ...string) (code int, out projectsOut, stdout, stderr string)` that runs `projects <args> --json` with `Options.Now` fixed at `2026-11-08T09:10:11Z`, and a helper writing a Docket repository (`docket/workflow.md` committed):
+In `internal/cli/cmd_projects_test.go`, with a helper `prRun(t, env []string, dir string, args ...string) (code int, out projectsOut, stdout, stderr string)` that runs `projects <args> --json` with `Options.Now` fixed at `2026-11-08T17:10:11.5+08:00`, so that `added` must read `2026-11-08T09:10:11Z`, and a helper writing a Docket repository (`docket/workflow.md` committed):
 
 - `TestProjectsAddNew`: exit 0, `state` `added`, `project.path` the repository, `ignored` false, `added` `2026-11-08T09:10:11Z`; the index under `HOME/.local/state/docket/` holds that entry.
 - `TestProjectsAddUnderStateHome`: with `XDG_STATE_HOME=<tmp>/s`, the entry is in `<tmp>/s/docket/projects.json`.
@@ -188,6 +190,7 @@ In `internal/cli/cmd_projects_test.go`, with a helper `prRun(t, env []string, di
 - `TestProjectsAddNotRepository`: `add <plain folder>`: exit 1, `not-a-repository`.
 - `TestProjectsUnreadableIndex`: the index holds `not json`; `add` exits 3, `unreadable[0].source` is the index path, the file still holds `not json`.
 - `TestProjectsLs`: an index with an ignored entry for an existing folder and an entry for a path that does not exist: both listed, sorted by path, `missing` true only on the second, `ignored` true only on the first; the index bytes are unchanged; the text output is exactly those two lines in the Global Constraints form.
+- `TestProjectsLsUncheckable`: skipped as root (`skipRoot` in `cmd_domains_test.go`); an entry `<tmp>/locked/app` with `<tmp>/locked` at mode `0o000` (restored in `t.Cleanup`): the entry is listed with `missing` false, `unreadable` names `<tmp>/locked/app`, exit 3.
 - `TestProjectsLsEmpty`: no index: stdout holds `"projects":[]`, exit 0, no file created.
 - `TestProjectsLsOutsideRepo`: run in a plain folder: `repo` is null, exit 0.
 - `TestProjectsUsage`: `projects`, `projects prune`, `projects ls x`, `projects add a b`, `projects rm`: each exits 2 with the finding `usage`.
@@ -200,7 +203,7 @@ Expected: FAIL, `projectsCommand` is not defined.
 
 - [ ] **Step 3: Add `Command.NoRepo` and the command**
 
-In `runCommand`, when `cmd.NoRepo`, ignore `identify`'s error and keep `ctx.Repo` nil. `add` uses `absArg` on its path or `c.Dir`, then `projects.Locate`: `ErrNotRepository` is a finding `not-a-repository`, `gitx.ErrGitMissing` an `EnvError{Rule: "git-missing"}`, `Docket` false a finding `not-a-project`. A `Load` error is an `Unreadable{Source: <index path>, Reason}`. `ls` stats each path with `os.Lstat`: `fs.ErrNotExist` sets `missing`; any other error adds an `Unreadable` and leaves `missing` false.
+In `runCommand`, when `cmd.NoRepo`, ignore `identify`'s error and keep `ctx.Repo` nil. A new entry's `added` is `projects.Stamp(c.Now())`. `add` uses `absArg` on its path or `c.Dir`, then `projects.Locate`: `ErrNotRepository` is a finding `not-a-repository`, `gitx.ErrGitMissing` an `EnvError{Rule: "git-missing"}`, `Docket` false a finding `not-a-project`. A `Load` error is an `Unreadable{Source: <index path>, Reason}`. `ls` stats each path with `os.Lstat`: `fs.ErrNotExist` sets `missing`; any other error adds an `Unreadable` and leaves `missing` false.
 
 - [ ] **Step 4: Add the README row**
 
@@ -263,7 +266,7 @@ Commit "Add dkt projects rm and ignore" with the trailer `Change: projects-index
 
 ### Task 5: Automatic registration
 
-**Scenarios:** project-index#first-command-in-a-project, project-index#project-already-registered, project-index#init-registers-the-project, project-index#status-in-a-repository-without-docket, project-index#registration-turned-off, project-index#no-settings-file, project-index#settings-that-are-not-json, project-index#index-that-cannot-be-written, project-index#ignore-before-registering, cli-output#inspect-in-a-new-project
+**Scenarios:** project-index#first-command-in-a-project, project-index#project-already-registered, project-index#init-registers-the-project, project-index#failing-command-registers, project-index#status-in-a-repository-without-docket, project-index#registration-turned-off, project-index#no-settings-file, project-index#settings-that-are-not-json, project-index#index-that-cannot-be-written, project-index#broken-index-left-alone, project-index#ignore-before-registering, cli-output#inspect-in-a-new-project, setup-inspection#nothing-written, setup-inspection#clean-setup
 
 **Review:** judgment
 
@@ -271,6 +274,7 @@ Commit "Add dkt projects rm and ignore" with the trailer `Change: projects-index
 - Create: `internal/projects/register.go`
 - Create: `internal/cli/register_test.go`
 - Modify: `internal/cli/run.go`
+- Modify: `internal/cli/cmd_inspect_test.go` (`TestInspectNothingWritten`)
 - Modify: `README.md`
 
 **Interfaces:**
@@ -292,8 +296,11 @@ In `internal/cli/register_test.go`, each test with its own `testutil.Env`; "the 
 - `TestRegisterNotForProjects`: `projects rm <repo>` run inside the registered repository leaves no entry for it.
 - `TestRegisterBadSettings`: the settings hold `{`: stderr has one line starting `dkt: project index:` and naming the settings path; no index file; code and stdout the same as without registration.
 - `TestRegisterUnwritable`: `XDG_STATE_HOME` set to a folder under a regular file: stderr names the index path; code the same as without registration.
-- `TestRegisterNoHome`: an environment with only `PATH` and the git variables of `testutil.Env` but no `HOME`: stderr has the warning, the code is the same as without registration.
+- `TestRegisterBadIndex`: the index holds `not json`: stderr has one warning line naming the index path, the file still holds `not json`, code and stdout the same as without registration.
+- `TestRegisterFailingCommand`: `sync add-none --json` in a Docket repository exits 1, and the index holds the repository.
+- `TestRegisterNoHome`: an environment with only `PATH` and the git variables of `testutil.Env` but no `HOME`: stderr has one warning line containing `HOME`, the code is the same as without registration.
 - `TestInspectInNewProject`: `inspect --json` in a committed Docket repository: `git status --porcelain` prints nothing afterwards, and the index holds the repository.
+- In `TestInspectNothingWritten` (a repository where `dkt init` never ran), also compare `snapshot` of the `HOME` of `r.Env` before and after: unchanged.
 
 - [ ] **Step 2: Run them and see them fail**
 
@@ -302,7 +309,7 @@ Expected: FAIL, the index is never written by other commands.
 
 - [ ] **Step 3: Implement `Register` and call it**
 
-`Register`, in this order: `SettingsPath`, `AutoRegister` (false: return nil); `IndexPath`, `Load`; an entry for `root`: return; `IsDocket(root)` false: return; `MainWorktree(g)`, an entry for it: return; `RemoteURL("origin")`; append the entry with `now.UTC()` to the second; `Save`. In `runCommand`, after `cmd.Run` and before `finish`, when `!cmd.NoRepo && ctx.Repo != nil`, call it with `ctx.Repo.Root`, `ctx.Git`, `ctx.Env`, `ctx.Now()`, and print `dkt: project index: <err>` on `o.Stderr` when it fails.
+`Register`, in this order: `SettingsPath`, `AutoRegister` (false: return nil); `IndexPath`, `Load`; an entry for `root`: return; `IsDocket(root)` false: return; `MainWorktree(g)`, an entry for it: return; `RemoteURL("origin")`; append the entry with `Stamp(now)`; `Save`. In `runCommand`, after `cmd.Run` and before `finish`, when `!cmd.NoRepo && ctx.Repo != nil`, call it with `ctx.Repo.Root`, `ctx.Git`, `ctx.Env`, `ctx.Now()`, and print `dkt: project index: <err>` on `o.Stderr` when it fails.
 
 - [ ] **Step 4: Run the whole suite**
 

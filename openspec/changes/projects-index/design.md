@@ -2,7 +2,7 @@
 
 ## Context
 
-See `proposal.md` - Why. Today every command resolves the repository in `runCommand` (`internal/cli/run.go`) before it runs, and fails with `no-repository` outside one; only `--version` identifies the repository on a best-effort basis. Nothing in dkt writes outside the repository, and several specs say a command "writes nothing" (`setup-inspection`, `domain-tree`, `plan-sync --check`).
+See `proposal.md` - Why. Today every command resolves the repository in `runCommand` (`internal/cli/run.go`) before it runs, and fails with `no-repository` outside one; only `--version` identifies the repository on a best-effort basis. Nothing in dkt writes outside the repository, and several specs say a command "writes nothing" (`domain-tree`, `plan-sync --check`); `setup-inspection` says outright that `dkt inspect` changes no file outside the repository either, so it gets the same exception spelled out.
 
 ## Goals / Non-Goals
 
