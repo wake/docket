@@ -64,15 +64,18 @@ A work's fields SHALL be read from one location, named in `read_from`: the first
 - **THEN** `read_from` is the first location holding the archived folder, and `archived` is that folder
 
 ### Requirement: Work metadata
-`title`, `kind` and `source` SHALL come from the front matter of the change's `proposal.md` or of the record, and SHALL be null when it cannot be read. `schema` SHALL be the change's schema as `change-metadata` defines it, and `docket` for a record. `created` SHALL be the `created` date in a change's `.openspec.yaml`, or the date in a record's slug, and null when there is none.
+`title`, `kind` and `source` SHALL come from the front matter of the change's `proposal.md` or of the record. `schema` SHALL be the change's schema as `change-metadata` defines it, and `docket` for a record. `created` SHALL be the `created` date in a change's `.openspec.yaml`, or the date in a record's slug, and null when there is none.
 
 #### Scenario: Record metadata
 - **WHEN** `docket/records/2026-11-06-fix-x.md` has the title `Fix X`, kind `fix` and source `review of #40`
 - **THEN** its work has `type` `record`, `slug` `2026-11-06-fix-x`, those three values, `schema` `docket` and `created` `2026-11-06`
 
+### Requirement: Unreadable work front matter
+When the front matter of a change's `proposal.md` or of a record cannot be read, its `title`, `kind` and `source` SHALL be null, and that file SHALL be listed in `unreadable` with its source, as `ideas` lists it, since which idea or issue the work takes depends on it.
+
 #### Scenario: Unreadable front matter
 - **WHEN** a change's `proposal.md` starts with `---` and has no closing line
-- **THEN** its `title`, `kind` and `source` are null, and no finding is reported for it
+- **THEN** its `title`, `kind` and `source` are null, `unreadable` lists that `proposal.md` with its source, the rest is reported, and dkt exits with 3
 
 ### Requirement: Tasks reported
 `tasks` SHALL list the `### Task N:` sections of a change's `plan.md`, or of a record's `## Tasks`, in file order, each with `number`, `name`, `steps` and `ticked` counted as `plan-sync` counts them, and `commits`: the commits whose `Change` or `Record` trailer names that task, oldest first, reachable from the commit of `read_from`. A change without `plan.md` and a record without `## Tasks` SHALL have an empty array, and a change of another schema null.
@@ -199,6 +202,10 @@ For a change, `deltas` SHALL list each `specs/<capability>/spec.md` of the chang
 - **WHEN** the order lists `b.md`, which needs `a.md`, and nothing names `a.md`
 - **THEN** `b.md` is `queued` with `waiting_on` `["docket/ideas/a.md"]`
 
+#### Scenario: Need taken but not met
+- **WHEN** `b.md` needs `a.md`, and only an unmerged branch holds a change whose `source` is `a.md`
+- **THEN** `a.md` is `taken`, and `b.md` still has `waiting_on` `["docket/ideas/a.md"]`
+
 ### Requirement: Idea date
 An idea's `date` SHALL be the date, in its own offset, of the oldest commit in the history of the default branch tip that added the idea's file, and null when there is none.
 
@@ -215,7 +222,11 @@ An idea's `date` SHALL be the date, in its own offset, of the oldest commit in t
 
 #### Scenario: Issue with a handler
 - **WHEN** a record on a branch has `source: "docket/issues/2026-11-01-fix-x.md"`
-- **THEN** that issue's `handlers` holds the record with `merged` false
+- **THEN** that issue's `handlers` holds the record with `merged` false, the record's `documents` hold the issue with `kind` `issue`, and its `proposed` is `2026-11-01`
+
+#### Scenario: Issue read from its first location
+- **WHEN** a linked worktree holds an issue with an edited title, and the default branch holds it with the old title
+- **THEN** the issue's `title` is the edited one
 
 ### Requirement: Issue state
 An issue's `state` SHALL be `open` when it has no handler, `done` when every handler is merged, and `in-progress` otherwise.
@@ -240,11 +251,19 @@ An issue's `state` SHALL be `open` when it has no handler, `done` when every han
 - **THEN** `specs` holds the capability `payments/refund` with both names in order
 
 ### Requirement: Domain tree reported
-`result.domains` SHALL hold `found`, `nodes` and `unclassified` for `docket/domains.md` on the tip, read as `domain-tree` defines. A node SHALL have `name`, `capabilities` (the capability paths it lists) and `children`. `unclassified` SHALL hold, sorted, the capabilities of `specs` and of the deltas of active changes that no node holds.
+`result.domains` SHALL hold `found`, `nodes` and `unclassified` for `docket/domains.md` on the tip, read as `domain-tree` defines. A node SHALL have `name`, `capabilities` (the capability paths it lists) and `children`. `unclassified` SHALL hold, sorted, the capabilities of `specs` and of the deltas of active changes that no node holds. When the tree has `domain-format` or `domain-duplicate`, `nodes` SHALL be empty and every capability unclassified, while the rest of `result` is reported.
 
 #### Scenario: Tree with a new capability
 - **WHEN** the tree lists `booking` under `Users`, and an active change adds a delta for `refund`
 - **THEN** `nodes` holds `Users` with `["booking"]`, and `unclassified` holds `refund`
+
+#### Scenario: Tree that cannot be used
+- **WHEN** the tree has a line that is not an item, and the tip holds the main spec `booking`
+- **THEN** the findings hold `domain-format`, `nodes` is empty, `unclassified` holds `booking`, `works` is still reported, and dkt exits with 1
+
+#### Scenario: Stale capability in the tree
+- **WHEN** the tree lists `gone` under `Users`, and no main spec or delta holds `gone`
+- **THEN** the findings hold `domain-unknown`, and `Users` still lists `gone`
 
 ### Requirement: Problems and unreadable sources
 `dkt snapshot` SHALL report the findings `dkt status` and `dkt domains` would report about the tip's order, ideas, issues and domain tree, and still output the result. Sources it cannot read SHALL be listed in `unreadable` as `workspace-scan` and `cli-output` define, and the rest SHALL be reported. It SHALL exit with 3 when anything is unreadable, else 1 when there is a finding, else 0.
@@ -252,6 +271,10 @@ An issue's `state` SHALL be `open` when it has no handler, `done` when every han
 #### Scenario: Unmounted worktree
 - **WHEN** a listed worktree's directory is missing and another worktree holds `add-x`
 - **THEN** `unreadable` lists the missing worktree, `works` holds `add-x`, and dkt exits with 3
+
+#### Scenario: Ref whose tree cannot be read
+- **WHEN** a remote-tracking ref points at an object that is not a commit, and a branch holds `add-x`
+- **THEN** `unreadable` lists that ref, `works` holds `add-x`, and dkt exits with 3
 
 #### Scenario: Idea without a title
 - **WHEN** an idea in the order has front matter without `title`

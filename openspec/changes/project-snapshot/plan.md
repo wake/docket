@@ -16,7 +16,7 @@
 - Stage names: a change `proposal`, `design`, `plan`, `dev`, `merged`, `archived`; a record `record`, `dev`, `merged`. Task states `done`, `pending`. Idea states `queued`, `pool`, `dropped`, `taken`. Issue states `open`, `in-progress`, `done`. Location kinds `worktree`, `branch`, `remote-branch`. Document kinds `proposal`, `design`, `plan`, `spec-delta`, `record`, `idea`, `issue`, `other`.
 - Read-only: nothing in the repository is written (the project index registration of every command is not this change's). No network. OpenSpec is never run.
 - Findings reuse the rule names of `dkt status` and `dkt domains`: `order-format`, `order-item`, `idea-front-matter`, `idea-needs`, `issue-front-matter`, `domain-format`, `domain-duplicate`, `domain-unknown`. Exit 3 when anything is unreadable, else 1 with a finding, else 0.
-- git is run a bounded number of times, not once per work: `for-each-ref` twice (refs, tags), `worktree list` once, `log` twice (history, idea dates), `ls-tree` and `cat-file --batch` once per distinct commit read.
+- git is started a number of times bounded by the refs and worktrees, never once per work: the three scans of `workspace-scan` as they are; `for-each-ref` once for tags; `log` twice (history, idea dates); for the files of works, `ls-tree` and `cat-file --batch` once per distinct commit read.
 - No new dependency. Commits carry `Change: project-snapshot/<N>` in the last paragraph, with no other trailer. `gofmt -l .` prints nothing, `go vet ./...` and `go test ./...` pass after every task.
 - Two pull requests, one after the other (`docket/workflow.md`, Splitting pull requests: product code and tests run far past 1000 lines): the first holds Tasks 1 to 4, which nothing calls yet; the second Tasks 5 to 9 and the archive. The second is opened only once the first is merged.
 
@@ -49,7 +49,7 @@
 | Ideas, order, issues front matter | internal/idea/idea.go:Parse, ParseItem, ParseOrder | reuse | the readers `dkt status` uses | `rg -n "func (Parse\|ParseItem\|ParseOrder)" internal/idea/` |
 | Order and idea findings | internal/cli/cmd_status.go:runStatus | new | the checks are inline in the command; Task 7 moves them into `idea.Check`, which both call | `rg -n "order-item\|idea-needs" internal/` |
 | Domain tree | internal/domain/parse.go:Parse | reuse | `domain.Load` reads an `fs.FS` of the worktree, the snapshot reads the tip's blob | `rg -n "func Parse\|func Load" internal/domain/` |
-| Headings outside code and comments | internal/markdown/markdown.go:Lines, FenceMask, BlankComments | reuse | as `ParsePlan` masks them | `rg -n "func (Lines\|FenceMask\|BlankComments)" internal/markdown/` |
+| Headings outside code and comments | internal/markdown/markdown.go:Lines, FenceMask, BlankComments, Headings | reuse | as `ParsePlan` finds headings: level, closing hashes and whitespace handled | `rg -n 'func Headings\|markdown\.Headings' internal/markdown internal/change` |
 | Delta and main spec headings | none | new | `dkt lint` and `dkt conflicts` read deltas through OpenSpec, which the spec forbids here | `rg -n "ADDED Requirements" internal/ --glob '!*_test.go'` |
 | Reading worktree files without following links | internal/safefile/safefile.go:ReadNoFollow; internal/safepath:Check | reuse | as the scans refuse links | `rg -n "func (ReadNoFollow\|Check)" internal/safefile/ internal/safepath/` |
 | Result envelope and findings | internal/cli/envelope.go:Outcome, Finding, Unreadable | reuse | every command's shape | `rg -n "type Outcome" internal/cli/` |
@@ -80,7 +80,7 @@
 - [ ] **Step 1: Write the failing tests**
 
 - `TestParseDelta`: a delta with `## ADDED Requirements` holding `### Requirement: Join when full` with `#### Scenario: Full slot` and `#### Scenario: Slot frees up`; `## MODIFIED Requirements` with `### Requirement: Cancel` and one scenario; `## REMOVED Requirements` with `### Requirement: Walk-in mark` and a line `**Reason**: Walk-ins moved to paper.`; `## RENAMED Requirements` with `- FROM: \`### Requirement: Party limit\`` and `- TO: \`### Requirement: Group size limit\``. The result equals those four groups exactly, the reason being `Walk-ins moved to paper.`.
-- `TestParseDeltaEdges`: CRLF line endings and a BOM give the same result; `### Requirement: Example` inside a fenced block and inside `<!-- -->` is not reported; a `#### Scenario:` before any requirement is ignored; a requirement under no operation heading is ignored; names are trimmed.
+- `TestParseDeltaEdges`: CRLF line endings and a BOM give the same result; `### Requirement: Example` inside a fenced block and inside `<!-- -->` is not reported; `### Requirement: Join when full ###` (closing hashes) gives `Join when full`; a `#### Scenario:` before any requirement is ignored; a requirement under no operation heading is ignored; names are trimmed.
 - `TestRequirements`: a main spec with two requirements, one more in a code block: the two names in file order; an empty file gives an empty, non-nil slice.
 
 - [ ] **Step 2: Run them and see them fail**
@@ -90,7 +90,7 @@ Expected: FAIL, the package does not build.
 
 - [ ] **Step 3: Implement `internal/specdoc/specdoc.go`**
 
-Lines through `markdown.Lines`, masked with `markdown.FenceMask` and `markdown.BlankComments` as `change.ParsePlan` does; headings matched after trimming. A removed requirement's reason is the text after `**Reason**:` on the first such line under it. A rename pairs each `FROM:` with the next `TO:`, taking the name after `### Requirement:` inside the backticks.
+Lines through `markdown.Lines`, masked with `markdown.FenceMask` and `markdown.BlankComments`, headings found with `markdown.Headings`, all as `change.ParsePlan` does; a heading's text is matched against `ADDED Requirements` and the others, `Requirement:` and `Scenario:`. A removed requirement's reason is the text after `**Reason**:` on the first such line under it. A rename pairs each `FROM:` with the next `TO:`, taking the name after `### Requirement:` inside the backticks.
 
 - [ ] **Step 4: Run them and see them pass**
 
@@ -226,7 +226,7 @@ Commit "Find the merge, the release and the commits that name a work" with the t
 
 - `TestReadRefAndWorktree`: a change folder committed on a branch and edited, uncommitted, in a linked worktree: the branch's entry holds the committed text, the worktree's the edited one, both with every file under the folder.
 - `TestReadSharesCommits`: three refs on one commit: the result has all three sources, and git is run for that commit once (count the runs through a fake `git` on the PATH that logs and calls the real one).
-- `TestReadUnreadable`: a worktree whose directory was removed, and a worktree whose `openspec/changes` is a link: both in the unreadable list with reasons, the rest read.
+- `TestReadUnreadable`: a worktree whose directory was removed, a worktree whose `openspec/changes` is a link, and a `Wanted` whose `Commit` is a blob (`git hash-object -w`): all three in the unreadable list with reasons, the rest read, and no error.
 - `TestReadFile`: a `Wanted` naming a single file (a record) reads that file only.
 
 - [ ] **Step 2: Run them and see them fail**
@@ -249,7 +249,7 @@ Commit "Read the files of every location once per commit" with the trailer `Chan
 
 ### Task 5: Works, locations and the copy read
 
-**Scenarios:** project-snapshot#one-change-in-three-locations, project-snapshot#archived-change, project-snapshot#detached-worktree, project-snapshot#default-ref-marked, project-snapshot#worktree-read-first, project-snapshot#archived-copy-wins, project-snapshot#record-metadata, project-snapshot#unreadable-front-matter, project-snapshot#other-schema
+**Scenarios:** project-snapshot#one-change-in-three-locations, project-snapshot#archived-change, project-snapshot#detached-worktree, project-snapshot#default-ref-marked, project-snapshot#worktree-read-first, project-snapshot#archived-copy-wins, project-snapshot#record-metadata, project-snapshot#unreadable-front-matter, project-snapshot#other-schema, project-snapshot#snapshot-of-an-empty-project
 
 **Review:** judgment
 
@@ -264,7 +264,7 @@ Commit "Read the files of every location once per commit" with the trailer `Chan
   - The result types: `Result`, `Branch`, `WorkEntry`, `Location`, `Task`, `Progress`, `Document`, `DeltaEntry`, `IdeaEntry`, `IssueEntry`, `OrderItem`, `Spec`, `Domains`, `Node`, `WorkRef`, `Handler`, with the JSON names of `design.md` Output.
   - `type Place struct { Kind, Branch, Commit, Time string; Default bool }`: what a location adds to a use; `Branch` and `Commit` empty for null.
   - `type WorksInput struct { Changes, Records []scan.Use; Places map[string]Place; Files map[string]Files; Graph *Graph; Tip string; Tags []gitx.Tag; Dates map[string]string }`: `Places` and `Files` keyed by source; `Dates` holds the dates of ideas and issues by path, for `proposed`.
-  - `func Works(in WorksInput) []WorkEntry`: every field of a work except `position` and the source document's entry, which Task 7 fills, sorted as `design.md` says.
+  - `func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable)`: every field of a work except `position` and the source document's entry, which Task 7 fills, sorted as `design.md` says; a front matter that cannot be read is returned as unreadable, `<source>:<path>`, with the reason.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -273,7 +273,8 @@ With `WorksInput` built from literal uses, places and files:
 - `TestWorksCopyRead`: the worktree's title differs from the branch's: `read_from` the worktree and its title; then with an archived copy on the default ref: `read_from` that location and `archived` its folder.
 - `TestWorksDetachedAndDefault`: a detached worktree has `branch` null; only the default ref's location has `default` true.
 - `TestWorksRecord`: a record `2026-11-06-fix-x` with title, kind and source: `type` `record`, `schema` `docket`, `created` `2026-11-06`, `deltas` empty.
-- `TestWorksUnreadableFrontMatter`: an unclosed front matter: `title`, `kind`, `source` null.
+- `TestWorksUnreadableFrontMatter`: an unclosed front matter: `title`, `kind`, `source` null, and the unreadable list names `<source>:openspec/changes/add-x/proposal.md`.
+- `TestResultJSON`: marshal a `Result` built from zero values and one from a full work (including one of another schema): every array field encodes as `[]`, never `null`; `tasks` of the other-schema work and every nullable scalar or object field encode as `null`; the key names equal those of `design.md` Output (compare the decoded key sets against a literal list per object).
 - `TestWorksOtherSchema`: `.openspec.yaml` with `schema: spec-driven`: `schema` `spec-driven`, `tasks` null.
 - `TestWorksSorted`: by `created`, then `type`, then `slug`, a null `created` last.
 
@@ -339,7 +340,7 @@ Commit "Report the tasks, stages, documents and deltas of a work" with the trail
 
 ### Task 7: Ideas, the order and issues
 
-**Scenarios:** project-snapshot#positions-skip-other-lines, project-snapshot#idea-in-the-pool, project-snapshot#taken-idea, project-snapshot#queued-idea-waiting, project-snapshot#idea-added-and-edited-later, project-snapshot#idea-moved, project-snapshot#issue-with-a-handler, project-snapshot#open-issue, project-snapshot#one-handler-merged-of-two, project-snapshot#every-handler-merged, project-snapshot#proposed-date-from-an-idea, project-snapshot#change-from-an-idea, project-snapshot#idea-without-a-title
+**Scenarios:** project-snapshot#positions-skip-other-lines, project-snapshot#idea-in-the-pool, project-snapshot#taken-idea, project-snapshot#queued-idea-waiting, project-snapshot#idea-added-and-edited-later, project-snapshot#idea-moved, project-snapshot#issue-with-a-handler, project-snapshot#open-issue, project-snapshot#one-handler-merged-of-two, project-snapshot#every-handler-merged, project-snapshot#proposed-date-from-an-idea, project-snapshot#change-from-an-idea, project-snapshot#idea-without-a-title, project-snapshot#need-taken-but-not-met, project-snapshot#issue-read-from-its-first-location
 
 **Review:** judgment
 
@@ -361,8 +362,11 @@ Move the checks into `idea.Check` and call it from `runStatus`; `go test ./inter
 
 - `TestOrderPositions`: an order with a heading, a blank line, `- docket/ideas/a.md`, a comment and `- docket/issues/2026-11-01-fix-x.md`: positions 1 and 2.
 - `TestIdeaStates`: one idea dropped, one named by a change on a branch (`taken`, `taken_by` that change), one in the order needing an idea nothing names (`queued`, `waiting_on` that path), one in neither (`pool`, `position` null).
+- `TestNeedTakenNotMet`: `b.md` needs `a.md`, and only an unmerged branch holds a change naming `a.md`: `a.md` is `taken`, `b.md` keeps `waiting_on` `["docket/ideas/a.md"]`; once the default ref's own copy names it, `waiting_on` is empty. A need is met only as `ideas` says (dropped, or named by the tip's own copy), never by `state == taken`.
 - `TestIdeaDates`: `date` from `Dates`, null when absent.
 - `TestIssueStates`: no handler `open`; a merged record and an unmerged change `in-progress`; every handler merged `done`; `date` from the slug; `locations` as for a work.
+- `TestIssueAsSource`: a record whose `source` is `docket/issues/2026-11-01-fix-x.md`: its `proposed` is `2026-11-01`, its `documents` start with `{kind: issue, path, source: <the issue's first location>}`.
+- `TestIssueFirstLocation`: a worktree's copy of an issue with an edited title and the default ref's with the old: the issue's `title` is the worktree's.
 - `TestProposed`: a work whose `source` is an idea dated 2026-11-04 gets `proposed` `2026-11-04`; a work with free-text `source` gets its `created`.
 - `TestSourceDocument`: a change whose `source` is an idea on the tip gets a document `{kind: idea, path, source: <default ref>}` first in `documents`; a source naming an idea that does not exist adds nothing.
 - `TestBacklogProblems`: an idea in the order without `title` gives `idea-front-matter`; the other ideas are still listed.
@@ -387,7 +391,7 @@ Commit "Report ideas, the order and issues with their states" with the trailer `
 
 ### Task 8: The tip, and putting it together
 
-**Scenarios:** project-snapshot#snapshot-of-an-empty-project, project-snapshot#snapshot-offline, project-snapshot#no-openspec-needed, project-snapshot#tip-from-the-remote-tracking-ref, project-snapshot#no-default-branch, project-snapshot#nested-capability, project-snapshot#tree-with-a-new-capability, project-snapshot#unmounted-worktree
+**Scenarios:** project-snapshot#snapshot-of-an-empty-project, project-snapshot#snapshot-offline, project-snapshot#no-openspec-needed, project-snapshot#tip-from-the-remote-tracking-ref, project-snapshot#no-default-branch, project-snapshot#nested-capability, project-snapshot#tree-with-a-new-capability, project-snapshot#tree-that-cannot-be-used, project-snapshot#stale-capability-in-the-tree, project-snapshot#unmounted-worktree, project-snapshot#ref-whose-tree-cannot-be-read
 
 **Review:** judgment
 
@@ -409,6 +413,8 @@ On real repositories from `testutil.NewRepo`:
 - `TestSnapshotNoDefaultBranch`: only a branch `trunk` and no `origin/HEAD`: `default_branch` null, `ideas`, `order`, `specs` and `domains.nodes` empty, works still reported.
 - `TestSnapshotSpecs`: `openspec/specs/payments/refund/spec.md` with two requirements: listed with its title and both names.
 - `TestSnapshotDomains`: a tree listing `booking` under `Users` and an active change adding `refund`: the node holds `["booking"]`, `unclassified` holds `refund`.
+- `TestSnapshotDomainProblems`: a tree with a paragraph line: problem `domain-format`, `nodes` empty, `unclassified` holds every capability, `works` still filled; a tree listing `gone`, held by nothing: problem `domain-unknown`, and the node still lists `gone`.
+- `TestSnapshotRefNotACommit`: `git update-ref refs/remotes/origin/bad <blob>` and a branch holding `add-x`: `refs/remotes/origin/bad` is unreadable, `add-x` is reported, and `Collect` returns no error.
 - `TestSnapshotNoOpenSpec`: `DOCKET_OPENSPEC` pointing at nothing and an active change with a delta: its `deltas` are reported.
 - `TestSnapshotUnmountedWorktree`: a worktree whose directory was removed, another holding `add-x`: the first in unreadable, `add-x` reported.
 - `TestSnapshotOffline`: the `origin` remote's URL is a path that does not exist, and `refs/remotes/origin/main` holds a change: `Collect` reports it, with no error.
