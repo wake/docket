@@ -30,6 +30,10 @@
 - Running in a linked worktree whose main worktree is registered: nothing is written. Pinned in Task 5 (`TestRegisterFromLinkedWorktree`).
 - macOS temporary folders under `/var`, which git reports as `/private/var`: tests compare against `filepath.EvalSymlinks` of the folder, as the entries hold what git reports.
 
+## Revision 1 (2026-11-08): a missing git in `rm` and `ignore`
+
+Task 4's implementer reported that `pathArg`, as the plan gave its signature, had no way to return an error, so with no git on the PATH `rm` and `ignore` fell back to the raw path and named a different entry than `add` would. The controller ruled that `pathArg` returns `gitx.ErrGitMissing`, which both report as `git-missing` (exit 4), as `add` does; any other `Locate` error still falls back to the path. Commit 1d93184, tested by `TestProjectsRmGitMissing`.
+
 ## Reuse
 
 | Need | Existing (path:symbol) | Decision | Reason | Evidence |
@@ -73,7 +77,7 @@
   - `func AutoRegister(settings string) (bool, error)`: true when the file or the key is missing.
   - `func Stamp(t time.Time) string`: `t` in UTC, truncated to the second, as `time.RFC3339`; every `added` dkt writes comes from it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `internal/projects/files_test.go`:
 
@@ -86,21 +90,21 @@ In `internal/projects/files_test.go`:
 - `TestSaveRoundTrip`: `Save` to `<tmp>/a/b/projects.json` creates the folders; entries given as `/w/b`, `/w/a` are written as `/w/a`, `/w/b`; the file ends with `"\n"`, is indented two spaces, and `mode & 0o077 == 0`; `Load` gives back equal entries, with a null origin kept null.
 - `TestAutoRegister`: a missing file, `{}` and `{"projects":{}}` give true; `{"projects":{"autoRegister":false}}` gives false; `{` and `{"projects":{"autoRegister":"no"}}` give an error containing the path.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/projects/`
 Expected: FAIL, the package does not build.
 
-- [ ] **Step 3: Implement `internal/projects/files.go`**
+- [x] **Step 3: Implement `internal/projects/files.go`**
 
 `Load` reads with `safefile.ReadNoFollow`, decodes, and checks the form: `projects` present and an array, each `path` absolute, each `added` parsed by `time.Parse(time.RFC3339, ...)` and ending in `Z`. `Save` sorts by path, `os.MkdirAll(dir, 0o755)`, `json.MarshalIndent(x, "", "  ")` plus a newline, then `safefile.Install(path, data, 0o600, false, path)`.
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `go test ./internal/projects/ && go vet ./... && gofmt -l .`
 Expected: PASS, nothing printed by `gofmt`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 `git add internal/projects/` and commit "Read and write the project index and its settings" with the trailer `Change: projects-index/1`.
 
@@ -125,7 +129,7 @@ Expected: PASS, nothing printed by `gofmt`.
   - `func IsDocket(worktree string) bool`: `os.Lstat` of `docket/workflow.md` is a regular file.
   - `func MainWorktree(g gitx.Git) (string, error)`: the first entry of `g.Worktrees()`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `internal/projects/locate_test.go`, with real repositories from `testutil.NewRepo` and paths compared after `filepath.EvalSymlinks`:
 
@@ -135,21 +139,21 @@ In `internal/projects/locate_test.go`, with real repositories from `testutil.New
 - `TestLocateNotRepository`: a plain temporary folder, a path that does not exist, and a regular file each give `errors.Is(err, ErrNotRepository)`.
 - `TestIsDocket`: false with no file, with `docket/workflow.md` as a folder, and as a link to a regular file; true for a regular file.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/projects/ -run 'Locate|IsDocket'`
 Expected: FAIL, `Locate` is not defined.
 
-- [ ] **Step 3: Implement `internal/projects/locate.go`**
+- [x] **Step 3: Implement `internal/projects/locate.go`**
 
 `Locate` stats `dir` first, then `Toplevel`, `MainWorktree` and `RemoteURL("origin")` on a `gitx.Git` whose `Dir` is the top level.
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `go test ./internal/projects/ && go vet ./... && gofmt -l .`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit "Find the project of a directory" with the trailer `Change: projects-index/2`.
 
@@ -178,7 +182,7 @@ Commit "Find the project of a directory" with the trailer `Change: projects-inde
   - `func projectsEnv(c *Context) (index string, err error)`: `IndexPath(c.Env)`, with `ErrNoHome` as `EnvError{Rule: "no-home"}`.
   - `func absArg(c *Context, arg string) string`: `arg` made absolute against `c.Dir` and cleaned.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `internal/cli/cmd_projects_test.go`, with a helper `prRun(t, env []string, dir string, args ...string) (code int, out projectsOut, stdout, stderr string)` that runs `projects <args> --json` with `Options.Now` fixed at `2026-11-08T17:10:11.5+08:00`, so that `added` must read `2026-11-08T09:10:11Z`, and a helper writing a Docket repository (`docket/workflow.md` committed):
 
@@ -196,25 +200,25 @@ In `internal/cli/cmd_projects_test.go`, with a helper `prRun(t, env []string, di
 - `TestProjectsUsage`: `projects`, `projects prune`, `projects ls x`, `projects add a b`, `projects rm`: each exits 2 with the finding `usage`.
 - `TestProjectsNoHome`: an environment with only `PATH`: `ls` exits 4 with `no-home`.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/cli/ -run TestProjects`
 Expected: FAIL, `projectsCommand` is not defined.
 
-- [ ] **Step 3: Add `Command.NoRepo` and the command**
+- [x] **Step 3: Add `Command.NoRepo` and the command**
 
 In `runCommand`, when `cmd.NoRepo`, ignore `identify`'s error and keep `ctx.Repo` nil. A new entry's `added` is `projects.Stamp(c.Now())`. `add` uses `absArg` on its path or `c.Dir`, then `projects.Locate`: `ErrNotRepository` is a finding `not-a-repository`, `gitx.ErrGitMissing` an `EnvError{Rule: "git-missing"}`, `Docket` false a finding `not-a-project`. A `Load` error is an `Unreadable{Source: <index path>, Reason}`. `ls` stats each path with `os.Lstat`: `fs.ErrNotExist` sets `missing`; any other error adds an `Unreadable` and leaves `missing` false.
 
-- [ ] **Step 4: Add the README row**
+- [x] **Step 4: Add the README row**
 
 After `dkt domains` in the command table: `| \`dkt projects\` | Adds, lists, removes or ignores the Docket projects in this machine's index |`.
 
-- [ ] **Step 5: Run the tests and see them pass**
+- [x] **Step 5: Run the tests and see them pass**
 
 Run: `go test ./internal/cli/ -run TestProjects && go vet ./... && gofmt -l .`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Commit "Add dkt projects add and ls" with the trailer `Change: projects-index/3`.
 
@@ -234,7 +238,7 @@ Commit "Add dkt projects add and ls" with the trailer `Change: projects-index/3`
 - Consumes: Task 3's `absArg`, `projectState`, `prRun`.
 - Produces: `func pathArg(c *Context, arg string) (path string, origin *string)`: the project path and origin when `projects.Locate(absArg(c, arg))` succeeds, else `absArg(c, arg)` and nil.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestProjectsRm`: a registered repository; `rm <repo>` gives `removed`, `project` the removed entry, and the index no longer holds it.
 - `TestProjectsRmSubdirectory`: `rm <repo>/internal` removes the repository's entry.
@@ -244,21 +248,21 @@ Commit "Add dkt projects add and ls" with the trailer `Change: projects-index/3`
 - `TestProjectsIgnoreNew`: a Docket repository with an origin, not in the index: `ignore <repo>` adds an entry with `ignored` true, that origin and the fixed time.
 - `TestProjectsIgnoreNotRepository`: `ignore <plain folder>` adds an entry with that path and a null origin.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/cli/ -run 'TestProjects(Rm|Ignore)'`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `rm` and `ignore` in `internal/cli/cmd_projects.go`**
+- [x] **Step 3: Implement `rm` and `ignore` in `internal/cli/cmd_projects.go`**
 
 Both use `pathArg`, then `Find`; only a change in the index is saved.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `go test ./internal/cli/ -run TestProjects && go vet ./... && gofmt -l .`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit "Add dkt projects rm and ignore" with the trailer `Change: projects-index/4`.
 
@@ -281,7 +285,7 @@ Commit "Add dkt projects rm and ignore" with the trailer `Change: projects-index
 - Consumes: Tasks 1 and 2.
 - Produces, in package `projects`: `func Register(root string, g gitx.Git, env []string, now time.Time) error`: nil when it added the project or had nothing to do; otherwise an error whose message names the file it could not read or write.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `internal/cli/register_test.go`, each test with its own `testutil.Env`; "the same as without registration" means the exit code and stdout equal those of the same run in a fresh environment whose settings hold `{"projects":{"autoRegister":false}}`:
 
@@ -302,25 +306,25 @@ In `internal/cli/register_test.go`, each test with its own `testutil.Env`; "the 
 - `TestInspectInNewProject`: `inspect --json` in a committed Docket repository: `git status --porcelain` prints nothing afterwards, and the index holds the repository.
 - In `TestInspectNothingWritten` (a repository where `dkt init` never ran), also compare `snapshot` of the `HOME` of `r.Env` before and after: unchanged.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/cli/ -run 'TestRegister|TestInspectInNewProject'`
 Expected: FAIL, the index is never written by other commands.
 
-- [ ] **Step 3: Implement `Register` and call it**
+- [x] **Step 3: Implement `Register` and call it**
 
 `Register`, in this order: `SettingsPath`, `AutoRegister` (false: return nil); `IndexPath`, `Load`; an entry for `root`: return; `IsDocket(root)` false: return; `MainWorktree(g)`, an entry for it: return; `RemoteURL("origin")`; append the entry with `Stamp(now)`; `Save`. In `runCommand`, after `cmd.Run` and before `finish`, when `!cmd.NoRepo && ctx.Repo != nil`, call it with `ctx.Repo.Root`, `ctx.Git`, `ctx.Env`, `ctx.Now()`, and print `dkt: project index: <err>` on `o.Stderr` when it fails.
 
-- [ ] **Step 4: Run the whole suite**
+- [x] **Step 4: Run the whole suite**
 
 Run: `go test ./...`
 Expected: PASS. An existing test that now fails builds its own environment without `HOME` and checks stderr: give it the `HOME` of `testutil.Env`, and do not change what it asserts. Report each such test.
 
-- [ ] **Step 5: Say it in the README**
+- [x] **Step 5: Say it in the README**
 
 Change the `dkt inspect` row to "writes nothing in the project", and add after the sentence under the table: "Every command run in a Docket project also adds it to this machine's project index, which `dkt projects ls` lists; set `projects.autoRegister` to `false` in `~/.config/docket/config.json` to stop that."
 
-- [ ] **Step 6: Check and commit**
+- [x] **Step 6: Check and commit**
 
 Run: `gofmt -l . && go vet ./... && go test ./...`
 Expected: nothing printed by `gofmt`, PASS.
