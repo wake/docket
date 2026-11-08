@@ -111,7 +111,7 @@ A change's `stages` SHALL list, in this order, those it has reached: `proposal` 
 - **WHEN** every task of an unmerged change has a commit
 - **THEN** its `phase` is `dev` and its `progress` is full
 
-#### Scenario: Archived change
+#### Scenario: Stages of an archived change
 - **WHEN** the tip holds `add-x` archived and its tasks have commits
 - **THEN** its `stages` end with `merged` and `archived`
 
@@ -129,7 +129,7 @@ A record's `stages` SHALL list, in this order, those it has reached: `record` al
 ### Requirement: Proposed date
 A work's `proposed` SHALL be the `date` of the idea, or of the issue, that its `source` names, and its `created` otherwise.
 
-#### Scenario: Change from an idea
+#### Scenario: Proposed date from an idea
 - **WHEN** `add-x` was created on 2026-11-08 with the `source` of an idea dated 2026-11-04
 - **THEN** its `proposed` is `2026-11-04`
 
