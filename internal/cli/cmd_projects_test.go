@@ -340,11 +340,63 @@ func TestProjectsIgnoreRegistered(t *testing.T) {
 	if code != 0 || m.Result.State != "ignored" || !m.Result.Project.Ignored {
 		t.Fatalf("%d %s", code, raw)
 	}
-	before, _ := os.ReadFile(prIndexPath(r.Env))
+	idx := prIndexPath(r.Env)
+	old := time.Now().Add(-time.Hour).Truncate(time.Second)
+	if err := os.Chtimes(idx, old, old); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.ReadFile(idx)
 	code, m, raw, _ = prRun(t, r.Env, r.Dir, "ignore", r.Dir)
-	after, _ := os.ReadFile(prIndexPath(r.Env))
-	if code != 0 || m.Result.State != "exists" || !bytes.Equal(before, after) {
+	after, _ := os.ReadFile(idx)
+	fi, _ := os.Stat(idx)
+	if code != 0 || m.Result.State != "exists" || !bytes.Equal(before, after) || !fi.ModTime().Equal(old) {
 		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsRmUnreadableIndex(t *testing.T) {
+	env := testutil.Env(t)
+	dir := t.TempDir()
+	idx := prWrite(t, env, "not json")
+	for _, verb := range []string{"rm", "ignore"} {
+		code, m, raw, _ := prRun(t, env, dir, verb, dir)
+		data, _ := os.ReadFile(idx)
+		if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != idx || string(data) != "not json" {
+			t.Fatalf("%s: %d %s", verb, code, raw)
+		}
+	}
+}
+
+func TestProjectsRmSecondEntry(t *testing.T) {
+	env := testutil.Env(t)
+	tmp := t.TempDir()
+	a, b := filepath.Join(tmp, "a"), filepath.Join(tmp, "b")
+	idx := prWrite(t, env, `{"projects":[`+prEntry(a, false)+`,`+prEntry(b, false)+`]}`)
+	code, m, raw, _ := prRun(t, env, tmp, "rm", b)
+	data, _ := os.ReadFile(idx)
+	if code != 0 || m.Result.Project.Path != b || !strings.Contains(string(data), a) || strings.Contains(string(data), b) {
+		t.Fatalf("%d %s %s", code, raw, data)
+	}
+}
+
+func TestProjectsIgnoreSubdirectory(t *testing.T) {
+	r := prRepo(t, true)
+	r.Commit("sub", map[string]string{"internal/x.go": "x"})
+	code, m, raw, _ := prRun(t, r.Env, r.Dir, "ignore", filepath.Join(r.Dir, "internal"))
+	if code != 0 || m.Result.State != "ignored" || m.Result.Project.Path != prReal(t, r.Dir) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsRmText(t *testing.T) {
+	env := testutil.Env(t)
+	tmp := t.TempDir()
+	a := filepath.Join(tmp, "a")
+	prWrite(t, env, `{"projects":[`+prEntry(a, false)+`]}`)
+	var out bytes.Buffer
+	Run(Options{Args: []string{"projects", "rm", a}, Dir: tmp, Env: env, Stdout: &out, Stderr: &bytes.Buffer{}})
+	if want := "removed " + a + "\n"; out.String() != want {
+		t.Fatalf("%q want %q", out.String(), want)
 	}
 }
 
