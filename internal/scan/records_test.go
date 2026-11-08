@@ -37,9 +37,9 @@ func TestRecordsOtherWorktree(t *testing.T) {
 // Scenario: Record only on a branch
 func TestRecordsOnBranch(t *testing.T) {
 	r := newRepo(t)
-	commitRef(r, "refs/heads/f", map[string]string{recordPath: "x"})
+	c := commitRef(r, "refs/heads/f", map[string]string{recordPath: "x"})
 	inv := recordsOK(t, r)
-	want := Use{Slug: "2026-11-06-fix-x", Path: recordPath, Source: "refs/heads/f"}
+	want := Use{Slug: "2026-11-06-fix-x", Path: recordPath, Source: "refs/heads/f", Commit: c}
 	if !slices.Contains(inv.Uses, want) || len(inv.Unreadable) != 0 {
 		t.Errorf("got %+v", inv)
 	}
@@ -159,9 +159,9 @@ func issuesOK(t *testing.T, r *testutil.Repo) Inventory {
 // Scenario: Issue only on a branch
 func TestIssuesOnBranch(t *testing.T) {
 	r := newRepo(t)
-	commitRef(r, "refs/remotes/origin/fix-y", map[string]string{issuePath: "x"})
+	c := commitRef(r, "refs/remotes/origin/fix-y", map[string]string{issuePath: "x"})
 	inv := issuesOK(t, r)
-	want := Use{Slug: "2026-11-06-lint-timeout", Path: issuePath, Source: "refs/remotes/origin/fix-y"}
+	want := Use{Slug: "2026-11-06-lint-timeout", Path: issuePath, Source: "refs/remotes/origin/fix-y", Commit: c}
 	if !slices.Contains(inv.Uses, want) || len(inv.Unreadable) != 0 {
 		t.Errorf("got %+v", inv)
 	}

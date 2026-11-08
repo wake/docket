@@ -61,7 +61,11 @@ func Dated(g gitx.Git, dir string) (Inventory, error) {
 			inv.Unreadable = append(inv.Unreadable, Unreadable{Source: r.Name, Reason: res.err.Error()})
 			continue
 		}
-		inv.Uses = append(inv.Uses, recordUses(res.paths, r.Name)...)
+		uses := recordUses(res.paths, r.Name)
+		for i := range uses {
+			uses[i].Commit = r.Commit
+		}
+		inv.Uses = append(inv.Uses, uses...)
 	}
 	return inv, nil
 }

@@ -185,6 +185,22 @@ func TestSnapshotUnmountedWorktree(t *testing.T) {
 	}
 }
 
+func TestSnapshotRecordOnBranch(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("base", nil)
+	r.Git("checkout", "-q", "-b", "fix")
+	r.Commit("work", map[string]string{
+		"docket/records/2026-11-06-fix-x.md":    "---\ntitle: Fix X\nkind: fix\nsource: s\n---\n\nDone\n",
+		"docket/issues/2026-11-06-lint-slow.md": "---\ntitle: Slow\nsource: s\n---\n\nBody\n",
+	})
+	r.Git("checkout", "-q", "main")
+	res, _, un := collect(t, r)
+	w := hasWork(res, "2026-11-06-fix-x")
+	if w == nil || len(w.Locations) != 1 || w.Locations[0].Source != "refs/heads/fix" || len(un) != 0 || len(res.Issues) != 1 {
+		t.Fatalf("%+v %v %+v", w, un, res.Issues)
+	}
+}
+
 func TestSnapshotOffline(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("base", nil)
