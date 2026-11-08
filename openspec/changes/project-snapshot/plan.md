@@ -43,6 +43,15 @@ Task 9's run in this repository found two things. First, every record and issue 
 
 From the review of Task 10, two differences from the separate scans are kept. A change folder on a ref that holds nothing but a submodule is no longer found there, since `ls-tree -r` lists no folder and `TreeFiles` leaves gitlinks out; such a folder has no file Docket reads. And an unreadable ref's reason now names the one `ls-tree -r` that failed, with all its paths, in each of the three inventories; no spec pins the text.
 
+## Revision 3 (2026-11-08): rulings from the pre-merge review of the second pull request
+
+The attack on the other model and the spec check in a fresh context found results that differed from the spec; each is fixed in the task that owns the code, with a test. No requirement changed.
+
+- Task 8: when the scan lists the default ref unreadable, `Collect` reads no tip and runs no `AddedDates` on it; the works of other locations are still reported (`TestSnapshotDefaultRefUnreadable`). This replaces the ruling made at Task 8's review, which let such a ref fail the snapshot. The tip's files are wanted one by one from the listing, so a link costs only itself, and a link that is a folder (`docket/ideas`, a capability under `openspec/specs`) is listed unreadable. Only `docket/ideas/<name>.md` is an idea, and `proposed` takes the date of an idea the tip still holds. `TestSnapshotDefaultAndDetachedPlaces`, `TestSnapshotIdeaDates`, `TestSnapshotUnreadableFrontMatter` and `TestSnapshotNoOpenSpec` pin through `Collect` what had been pinned only on hand-built inputs.
+- Task 7: `waiting_on` is empty for a `taken` or `dropped` idea. The order's findings read the tip's copy of an issue, as `dkt status` does, while the issue's entry is still read from its first location. An item listed twice keeps its first position.
+- Task 6: every copy's front matter that cannot be read is listed, not only the copy read, as `ideas` lists it. A task with no steps is `done`, as `dkt sync --check` reads it.
+- Not taken: an issue file whose slug has no date gets a `date` that is not a date (`dkt issue` always writes a dated slug), and an idea whose front matter parses but is malformed shows no title.
+
 
 ## Reuse
 
