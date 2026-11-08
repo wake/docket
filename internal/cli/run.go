@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/wake/docket/internal/gitx"
@@ -108,9 +109,10 @@ func runCommand(o Options, cmd Command, args []string, asJSON bool) int {
 		out.Findings = append(out.Findings, errorFinding(err))
 		fmt.Fprintf(o.Stderr, "dkt %s: %v\n", cmd.Name, err)
 	}
-	if !cmd.NoRepo && ctx.Repo != nil {
+	if !cmd.NoRepo && ctx.Repo != nil && !asUsage(err) {
 		if rerr := projects.Register(ctx.Repo.Root, ctx.Git, ctx.Env, ctx.Now()); rerr != nil {
-			fmt.Fprintf(o.Stderr, "dkt: project index: %v\n", rerr)
+			msg := strings.Join(strings.Fields(rerr.Error()), " ")
+			fmt.Fprintf(o.Stderr, "dkt: project index: %s\n", msg)
 		}
 	}
 	return finish(o, cmd.Name, ctx.JSON, out, ctx.Repo, err)

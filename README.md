@@ -74,7 +74,7 @@ Once a project is set up, the agent loads the docket skill when development work
 
 Run `dkt --help` for the arguments. Every command takes `--json`.
 
-Every command run in a Docket project also adds it to this machine's project index, which `dkt projects ls` lists; set `projects.autoRegister` to `false` in `~/.config/docket/config.json` to stop that.
+Every command run in a Docket project, apart from `dkt projects` and a usage error, also adds it to this machine's project index (`$XDG_STATE_HOME/docket/projects.json`, else `~/.local/state/docket/projects.json`), which `dkt projects ls` lists; `dkt projects ignore` keeps one project out, and `{"projects": {"autoRegister": false}}` in `$XDG_CONFIG_HOME/docket/config.json` (else `~/.config/docket/config.json`) stops it for all.
 
 ## Developing Docket
 

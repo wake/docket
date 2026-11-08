@@ -117,6 +117,19 @@ func TestRegisterFromLinkedWorktree(t *testing.T) {
 	}
 }
 
+func TestRegisterFromLinkedWorktreeFirst(t *testing.T) {
+	r := prRepo(t, true)
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "-q", "-b", "other", wt)
+	regRun(t, r.Env, wt, "status", "--json")
+	idx := regIndex(t, r.Env)
+	main, _ := filepath.EvalSymlinks(r.Dir)
+	linked, _ := filepath.EvalSymlinks(wt)
+	if strings.Count(idx, `"path"`) != 1 || !strings.Contains(idx, main) || strings.Contains(idx, linked) {
+		t.Errorf("index %q", idx)
+	}
+}
+
 func TestRegisterIgnoredKept(t *testing.T) {
 	r := prRepo(t, true)
 	prRun(t, r.Env, r.Dir, "ignore", r.Dir)
@@ -234,6 +247,39 @@ func TestRegisterNoHome(t *testing.T) {
 	regSame(t, code, out, r.Dir, "status", "--json")
 	w := regWarnings(errs)
 	if len(w) != 1 || !strings.Contains(w[0], "HOME") {
+		t.Errorf("warnings %v", w)
+	}
+}
+
+func TestRegisterNotAfterCommandUsageError(t *testing.T) {
+	r := prRepo(t, true)
+	code, _, _ := regRun(t, r.Env, r.Dir, "new", "add-x", "--json")
+	if code != 2 || regIndex(t, r.Env) != "" {
+		t.Errorf("code=%d index %q", code, regIndex(t, r.Env))
+	}
+}
+
+func TestRegisterNoDocketNoWarning(t *testing.T) {
+	r := prRepo(t, false)
+	regSettings(t, r.Env, "{")
+	_, _, errs := regRun(t, r.Env, r.Dir, "status", "--json")
+	if w := regWarnings(errs); len(w) != 0 || regIndex(t, r.Env) != "" {
+		t.Errorf("warnings %v index %q", w, regIndex(t, r.Env))
+	}
+}
+
+func TestRegisterNoStateHome(t *testing.T) {
+	r := prRepo(t, true)
+	var env []string
+	for _, kv := range r.Env {
+		if !strings.HasPrefix(kv, "HOME=") {
+			env = append(env, kv)
+		}
+	}
+	env = append(env, "XDG_CONFIG_HOME="+t.TempDir())
+	_, _, errs := regRun(t, env, r.Dir, "status", "--json")
+	w := regWarnings(errs)
+	if len(w) != 1 || !strings.Contains(w[0], "XDG_STATE_HOME") {
 		t.Errorf("warnings %v", w)
 	}
 }
