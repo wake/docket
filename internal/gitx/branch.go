@@ -10,12 +10,17 @@ type DefaultBranch struct{ Name, Commit string }
 // origin or locally. Its commit is the remote-tracking one when present. The
 // bool is false when there is none.
 func (g Git) DefaultBranch() (DefaultBranch, bool, error) {
-	const remote = "refs/remotes/origin/"
-	target, _, err := g.runOptional("symbolic-ref", "-q", remote+"HEAD")
+	refs, err := g.Refs()
 	if err != nil {
 		return DefaultBranch{}, false, err
 	}
-	refs, err := g.Refs()
+	return g.DefaultBranchIn(refs)
+}
+
+// DefaultBranchIn is DefaultBranch for refs the caller has listed already.
+func (g Git) DefaultBranchIn(refs []Ref) (DefaultBranch, bool, error) {
+	const remote = "refs/remotes/origin/"
+	target, _, err := g.runOptional("symbolic-ref", "-q", remote+"HEAD")
 	if err != nil {
 		return DefaultBranch{}, false, err
 	}

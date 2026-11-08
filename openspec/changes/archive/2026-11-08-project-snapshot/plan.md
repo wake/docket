@@ -16,7 +16,7 @@
 - Stage names: a change `proposal`, `design`, `plan`, `dev`, `merged`, `archived`; a record `record`, `dev`, `merged`. Task states `done`, `pending`. Idea states `queued`, `pool`, `dropped`, `taken`. Issue states `open`, `in-progress`, `done`. Location kinds `worktree`, `branch`, `remote-branch`. Document kinds `proposal`, `design`, `plan`, `spec-delta`, `record`, `idea`, `issue`, `other`.
 - Read-only: nothing in the repository is written (the project index registration of every command is not this change's). No network. OpenSpec is never run.
 - Findings reuse the rule names of `dkt status` and `dkt domains`: `order-format`, `order-item`, `idea-front-matter`, `idea-needs`, `issue-front-matter`, `domain-format`, `domain-duplicate`, `domain-unknown`. Exit 3 when anything is unreadable, else 1 with a finding, else 0.
-- git is started a number of times bounded by the refs and worktrees, never once per work: the three scans of `workspace-scan` as they are; `for-each-ref` once for tags; `log` twice (history, idea dates); for the files of works, `ls-tree` and `cat-file --batch` once per distinct commit read.
+- git is started a number of times bounded by the refs and worktrees, never once per work: the three scans of `workspace-scan` as they are; `for-each-ref` once for tags; `log` twice (history, idea dates); for the files of works, `ls-tree` and `cat-file --batch` once per distinct commit read. From Task 10 (Revision 2): the worktrees and refs are listed once, one `ls-tree -r` per distinct ref commit serves the three scans and the files of works together, and one `cat-file --batch` reads every commit's files.
 - No new dependency. Commits carry `Change: project-snapshot/<N>` in the last paragraph, with no other trailer. `gofmt -l .` prints nothing, `go vet ./...` and `go test ./...` pass after every task.
 - Two pull requests, one after the other (`docket/workflow.md`, Splitting pull requests: product code and tests run far past 1000 lines): the first holds Tasks 1 to 4, which nothing calls yet; the second Tasks 5 to 9 and the archive. The second is opened only once the first is merged.
 
@@ -36,6 +36,22 @@ The task reviewers, in fresh contexts, and the pre-merge review of the first pul
 - Task 4, from the same review: several `Wanted` of one source are merged into that source's `Files` (`TestReadTwoWantedOneSource`), and the tests run git only through `testutil`'s environment.
 - Task 8: `History` also runs over every tag's commit, in the same single run, so `Release` sees a tag no location reaches.
 - Task 4: `ls-tree` ran once per wanted path; `gitx.Git.TreeFiles` became variadic, `TreeFiles(commit string, dirs ...string)`, so one run per commit lists every path (0d5b523). This touches `internal/gitx/refs.go`, outside the task's Files block; its two callers pass one dir and are unchanged. A symbolic link inside one wanted path now costs that path only, `<source>:<path>`, while a missing worktree, or a link at or above `openspec/changes` or `docket/records`, still costs the whole source (`TestReadLinkPerPath`).
+
+## Revision 2 (2026-11-08): the measurement of Task 9
+
+Task 9's run in this repository found two things. First, every record and issue on a ref was reported unreadable: `scan.Dated` left `Use.Commit` empty for a ref use, against the field's own comment, so `snapshot.Read` took the ref for a worktree (`idea.FindWork` had worked around it by looking the commit up); `scan.Dated` now sets it, pinned by `TestRecordsOnBranch`, `TestIssuesOnBranch` and `TestSnapshotRecordOnBranch` (04c345d, inside Task 9). Second, the command took 2.2 to 2.6 s against the target of about one second: it started git 42 times on 4 worktrees and 7 refs, and on macOS each git run costs about 44 ms through `/usr/bin/git` (25 ms for the git it forwards to), so the time is the number of runs. Of the 42, the three scans, `Collect` and `DefaultBranch` listed the worktrees and refs 9 times; the scans read each of the 5 ref commits 3 times; and `Read` listed and read 4 of those commits again, one `cat-file` each. The design left merging the scans until a measurement showed the need; Task 10 does it, and the constraint on git runs above is amended. No requirement or field changes.
+
+From the review of Task 10, two differences from the separate scans are kept. A change folder on a ref that holds nothing but a submodule is no longer found there, since `ls-tree -r` lists no folder and `TreeFiles` leaves gitlinks out; such a folder has no file Docket reads. And an unreadable ref's reason now names the one `ls-tree -r` that failed, with all its paths, in each of the three inventories; no spec pins the text.
+
+## Revision 3 (2026-11-08): rulings from the pre-merge review of the second pull request
+
+The attack on the other model and the spec check in a fresh context found results that differed from the spec; each is fixed in the task that owns the code, with a test. No requirement changed.
+
+- Task 8: when the scan lists the default ref unreadable, `Collect` reads no tip and runs no `AddedDates` on it; the works of other locations are still reported (`TestSnapshotDefaultRefUnreadable`). This replaces the ruling made at Task 8's review, which let such a ref fail the snapshot. The tip's files are wanted one by one from the listing, so a link costs only itself, and a link that is a folder (`docket/ideas`, a capability under `openspec/specs`) is listed unreadable. Only `docket/ideas/<name>.md` is an idea, and `proposed` takes the date of an idea the tip still holds. `TestSnapshotDefaultAndDetachedPlaces`, `TestSnapshotIdeaDates`, `TestSnapshotUnreadableFrontMatter` and `TestSnapshotNoOpenSpec` pin through `Collect` what had been pinned only on hand-built inputs.
+- Task 7: `waiting_on` is empty for a `taken` or `dropped` idea. The order's findings read the tip's copy of an issue, as `dkt status` does, while the issue's entry is still read from its first location. An item listed twice keeps its first position.
+- Task 6: every copy's front matter that cannot be read is listed, not only the copy read, as `ideas` lists it. A task with no steps is `done`, as `dkt sync --check` reads it.
+- Not taken: an issue file whose slug has no date gets a `date` that is not a date (`dkt issue` always writes a dated slug), and an idea whose front matter parses but is malformed shows no title.
+
 
 ## Reuse
 
@@ -275,7 +291,7 @@ Commit "Read the files of every location once per commit" with the trailer `Chan
   - `type WorksInput struct { Changes, Records []scan.Use; Places map[string]Place; Files map[string]Files; Graph *Graph; Tip string; Tags []gitx.Tag; Dates map[string]string }`: `Places` and `Files` keyed by source; `Dates` holds the dates of ideas and issues by path, for `proposed`.
   - `func Works(in WorksInput) ([]WorkEntry, []scan.Unreadable)`: every field of a work except `position` and the source document's entry, which Task 7 fills, sorted as `design.md` says; a front matter that cannot be read is returned as unreadable, `<source>:<path>`, with the reason.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 With `WorksInput` built from literal uses, places and files:
 - `TestWorksOneEntry`: `add-x` in a worktree, a branch and a remote branch: one entry, three locations in that order with their kinds, branches, commits and times.
@@ -287,19 +303,19 @@ With `WorksInput` built from literal uses, places and files:
 - `TestWorksOtherSchema`: `.openspec.yaml` with `schema: spec-driven`: `schema` `spec-driven`, `tasks` null.
 - `TestWorksSorted`: by `created`, then `type`, then `slug`, a null `created` last.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/snapshot/ -run TestWorks`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement the types and `Works`**
+- [x] **Step 3: Implement the types and `Works`**
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `gofmt -l . && go vet ./... && go test ./internal/snapshot/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit "Report each work once, with its locations and the copy read" with the trailer `Change: project-snapshot/5`.
 
@@ -319,7 +335,7 @@ Commit "Report each work once, with its locations and the copy read" with the tr
 - Consumes: `specdoc.ParseDelta` (Task 1), `Graph.TaskCommits`, `Graph.Merge`, `Graph.Release`, `Graph.Last` (Task 3).
 - Produces: the fields `tasks`, `progress`, `stages`, `phase`, `merged`, `merge`, `release`, `last_commit`, `documents` (the work's own files) and `deltas` of `WorkEntry`, filled by `Works`. `merged` is true when a location with `Default` holds the work.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestTasksFromReadFrom`: a commit naming Task 1, reachable only from the worktree `read_from`: Task 1 lists it, `state` `done`; a task with one of three steps ticked and no commit: `pending`; `progress` `{1, 2}`.
 - `TestStagesChange`: a proposal and a plan with tasks, no delta, no design: `["proposal", "plan"]`, `phase` `plan`; add a commit `Change: add-x`: still no `dev`; add `Change: add-x/1`: `dev`; on the default ref and archived: ends `merged`, `archived`.
@@ -329,19 +345,19 @@ Commit "Report each work once, with its locations and the copy read" with the tr
 - `TestDocuments`: a folder with `proposal.md`, `design.md`, `plan.md`, `specs/booking/spec.md` and `notes.md`: kinds `proposal`, `design`, `plan`, `spec-delta`, `other`, each with `source` `read_from`.
 - `TestDeltas`: two capabilities, sorted, each with its path and the four groups from `specdoc`.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/snapshot/ -run 'TestTasks|TestStages|TestMergeOfWork|TestDocuments|TestDeltas'`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement them in `Works`**
+- [x] **Step 3: Implement them in `Works`**
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `gofmt -l . && go vet ./... && go test ./internal/snapshot/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit "Report the tasks, stages, documents and deltas of a work" with the trailer `Change: project-snapshot/6`.
 
@@ -363,11 +379,11 @@ Commit "Report the tasks, stages, documents and deltas of a work" with the trail
 - Produces, in package `idea`: `type Problem struct{ Rule, File string; Line int; Message string }` and `func Check(order []byte, read func(paths []string) (map[string][]byte, error)) (lines []Line, items map[string]Idea, problems []Problem, err error)`: the checks `runStatus` makes today (`order-format`, `order-item`, `idea-front-matter`, `issue-front-matter`, `idea-needs`), with the same messages. A structural move: `dkt status` output must not change.
 - Produces, in package `snapshot`: `type BacklogInput struct { Order []byte; Ideas map[string][]byte; Issues []scan.Use; IssueFiles map[string]Files; Dates map[string]string; Works []WorkEntry; Places map[string]Place }` and `func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []OrderItem, problems []idea.Problem)`, which also sets each work's `position` and adds its source idea or issue to its `documents`.
 
-- [ ] **Step 1: Move the checks (structural commit)**
+- [x] **Step 1: Move the checks (structural commit)**
 
 Move the checks into `idea.Check` and call it from `runStatus`; `go test ./internal/cli/ -run TestStatus` and `go test ./internal/idea/` pass unchanged. Commit "Move the order checks of dkt status into the idea package" with the trailer `Change: project-snapshot/7`.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 - `TestOrderPositions`: an order with a heading, a blank line, `- docket/ideas/a.md`, a comment and `- docket/issues/2026-11-01-fix-x.md`: positions 1 and 2.
 - `TestIdeaStates`: one idea dropped, one named by a change on a branch (`taken`, `taken_by` that change), one in the order needing an idea nothing names (`queued`, `waiting_on` that path), one in neither (`pool`, `position` null).
@@ -380,19 +396,19 @@ Move the checks into `idea.Check` and call it from `runStatus`; `go test ./inter
 - `TestSourceDocument`: a change whose `source` is an idea on the tip gets a document `{kind: idea, path, source: <default ref>}` first in `documents`; a source naming an idea that does not exist adds nothing.
 - `TestBacklogProblems`: an idea in the order without `title` gives `idea-front-matter`; the other ideas are still listed.
 
-- [ ] **Step 3: Run them and see them fail**
+- [x] **Step 3: Run them and see them fail**
 
 Run: `go test ./internal/snapshot/ -run 'TestOrder|TestIdea|TestIssue|TestProposed|TestBacklog'`
 Expected: FAIL.
 
-- [ ] **Step 4: Implement `Backlog`**
+- [x] **Step 4: Implement `Backlog`**
 
-- [ ] **Step 5: Run them and see them pass**
+- [x] **Step 5: Run them and see them pass**
 
 Run: `gofmt -l . && go vet ./... && go test ./internal/snapshot/ ./internal/idea/ && go test ./internal/cli/ -run TestStatus`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Commit "Report ideas, the order and issues with their states" with the trailer `Change: project-snapshot/7`.
 
@@ -414,7 +430,7 @@ Commit "Report ideas, the order and issues with their states" with the trailer `
   - `func Specs(files Files) []Spec`, `func DomainTree(tree []byte, found bool, capabilities []string) (Domains, []domain.Problem)`: from the tip's files.
   - `func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error)`: runs `scan.Changes`, `scan.Records`, `scan.Issues`, `Worktrees`, `Refs`, `DefaultBranch`, `Tags`, `History` (in one run over every location's commit, the tip and every tag's commit, so that `Release` sees a tag whose commit no location reaches), `AddedDates(tip, "docket/ideas")`, one `Read`, then `Works`, `Backlog`, `Specs` and `DomainTree`. Domain problems are returned as `idea.Problem` with the domain rule names.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 On real repositories from `testutil.NewRepo`:
 - `TestSnapshotEmpty`: one commit with a README: every array empty, `domains.found` false.
@@ -431,19 +447,19 @@ On real repositories from `testutil.NewRepo`:
 - `TestSnapshotTagOutsideLocations`: a tag on a commit that is merged into `main` and also a tag `v0.9.0` on a commit no location reaches but which reaches the merge: `release` is the oldest-created of them.
 - `TestSnapshotWritesNothing`: the repository's `git status --porcelain` and its files' modification times are unchanged after `Collect`.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/snapshot/ -run TestSnapshot`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `tip.go` and `snapshot.go`**
+- [x] **Step 3: Implement `tip.go` and `snapshot.go`**
 
-- [ ] **Step 4: Run them and see them pass**
+- [x] **Step 4: Run them and see them pass**
 
 Run: `gofmt -l . && go vet ./... && go test ./internal/snapshot/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Commit "Put the snapshot together from one round of reads" with the trailer `Change: project-snapshot/8`.
 
@@ -465,7 +481,7 @@ Commit "Put the snapshot together from one round of reads" with the trailer `Cha
 - Consumes: `snapshot.Collect` (Task 8).
 - Produces: `func snapshotCommand() Command`: `Name: "snapshot"`, `Args: 0`, `Usage: "snapshot [--json]"`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 - `TestSnapshotCommand`: in a repository with one change: `snapshot --json` exits 0, `command` is `snapshot`, `result.works[0].slug` is the change.
 - `TestSnapshotCommandFindings`: an idea in the order without `title`: exit 1, the finding `idea-front-matter`, `result` still present.
@@ -474,22 +490,75 @@ Commit "Put the snapshot together from one round of reads" with the trailer `Cha
 - `TestSnapshotText`: one change `add-x` titled `Add X` whose `phase` is `plan`: the output is `change add-x  plan  Add X` then `0 ideas, 0 issues, 0 specs`.
 - The other `cli-output` scenarios of Repository required are pinned by existing tests; `go test ./internal/cli/` shows they still pass.
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `go test ./internal/cli/ -run TestSnapshot`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement the command and the README row**
+- [x] **Step 3: Implement the command and the README row**
 
 The README row, after `dkt domains`: `| \`dkt snapshot\` | Reports the whole project in one read: works, ideas, issues, the order, specs and the domain tree |`.
 
-- [ ] **Step 4: Measure**
+- [x] **Step 4: Measure**
 
 Run `time dkt snapshot --json > /dev/null` three times in this repository with the build of this branch, and count git runs with `GIT_TRACE=1 dkt snapshot --json 2>&1 >/dev/null | grep -c 'trace: exec\|built-in: git'`. Record both in the pull request; the target is about one second.
 
-- [ ] **Step 5: Run the whole suite and commit**
+- [x] **Step 5: Run the whole suite and commit**
 
 Run: `gofmt -l . && go vet ./... && go test ./...`
 Expected: PASS.
 
 Commit "Add dkt snapshot" with the trailer `Change: project-snapshot/9`.
+
+---
+
+### Task 10: One listing per commit
+
+Added by Revision 2.
+
+**Scenarios:** none
+
+**Review:** judgment
+
+**Files:**
+- Modify: `internal/scan/scan.go`, `internal/scan/records.go` (one pass for the three scans)
+- Modify: `internal/scan/scan_test.go`
+- Modify: `internal/gitx/blobs.go`, `internal/gitx/branch.go`
+- Modify: `internal/gitx/blobs_test.go`, `internal/gitx/branch_test.go`
+- Modify: `internal/snapshot/source.go`, `internal/snapshot/source_test.go`
+- Modify: `internal/snapshot/snapshot.go`, `internal/snapshot/snapshot_test.go`
+
+**Interfaces:**
+- Consumes: `gitx.Git.Worktrees`, `Refs`, `TreeFiles`; `scan.Inventory`.
+- Produces:
+  - In package `scan`: `type Workspace struct { Changes, Records, Issues Inventory; Worktrees []gitx.Worktree; Refs []gitx.Ref; Trees map[string][]gitx.TreeFile }` and `func Scan(g gitx.Git, extra ...string) (Workspace, error)`. It lists the worktrees and the refs once and runs `TreeFiles(commit, "openspec/changes", "docket/records", "docket/issues", extra...)` once per distinct ref commit; `Trees` holds that listing by commit. A commit whose listing fails is not in `Trees`, and each of the three inventories lists every ref on it as unreadable, as the scans do now. The change folders of a ref are the direct subfolders of `openspec/changes` and `openspec/changes/archive` that its listing has a file under, which is what `ls-tree -d` gives, since git stores no empty folder. `Changes`, `Records` and `Issues` become `Scan(g)` and the one field, so the uses are worked out in one place.
+  - In package `gitx`: `func (g Git) ReadBlobsAt(names map[string][]string) (map[string]map[string][]byte, error)`, commit → paths → contents, with one `cat-file --batch` for every commit; `ReadBlobs(commit, paths)` becomes a call of it. `func (g Git) DefaultBranchIn(refs []Ref) (DefaultBranch, bool, error)`: `DefaultBranch` without its own `Refs` run; `DefaultBranch` becomes `Refs` and a call of it.
+  - In package `snapshot`: `Read(g gitx.Git, want []Wanted, trees map[string][]gitx.TreeFile)`. A ref's files come from `trees[commit]`; `TreeFiles` runs only for a commit that is not there. One `ReadBlobsAt` reads every commit's files. `Collect` uses `scan.Scan(g, <the tip's paths>)`, its `Worktrees` and `Refs`, and `DefaultBranchIn`.
+
+- [x] **Step 1: Write the failing tests**
+
+- `TestScanGitRuns` (scan): two refs on two commits and one on the first again: `Scan` starts git exactly 4 times (one `worktree list`, one `for-each-ref`, two `ls-tree`), and gives the same three inventories as `Changes`, `Records` and `Issues` on the same repository. Count the runs with a fake `git` on the PATH, as `TestReadSharesCommits` does.
+- `TestScanUnreadableRef` (scan): a ref on a blob: all three inventories list it, and the other refs are scanned.
+- `TestReadBlobsAt` (gitx): two commits, a path in each, a missing path and a folder: one run, each file under its commit, the missing path and the folder left out.
+- `TestDefaultBranchIn` (gitx): the same answers as `DefaultBranch` for the cases its tests cover, with no `for-each-ref` run.
+- `TestReadFromTrees` (snapshot): a `Wanted` on a commit that `trees` holds starts no `ls-tree`; one that it lacks starts one.
+- `TestSnapshotGitRuns` (snapshot): `main`, two branches on distinct commits, a tag, a linked worktree, a change on a branch and a record on another: `Collect` starts git exactly C + 7 times, C the number of distinct ref commits (one `worktree list`, one `for-each-ref` for the refs, one `symbolic-ref`, one `for-each-ref` for tags, C `ls-tree`, two `log`, one `cat-file`).
+- The existing scan, snapshot and cli tests still pass unchanged.
+
+- [x] **Step 2: Run them and see them fail**
+
+Run: `go test ./internal/scan/ ./internal/gitx/ ./internal/snapshot/ -run 'TestScanGitRuns|TestScanUnreadableRef|TestReadBlobsAt|TestDefaultBranchIn|TestReadFromTrees|TestSnapshotGitRuns'`
+Expected: FAIL.
+
+- [x] **Step 3: Implement**
+
+- [x] **Step 4: Measure again**
+
+As Task 9's Step 4, with a fake `git` on the PATH to count runs (`GIT_TRACE` does not reach them). Record the times, the count, and the number of worktrees and refs.
+
+- [x] **Step 5: Run the whole suite and commit**
+
+Run: `gofmt -l . && go vet ./... && go test ./...`
+Expected: PASS.
+
+Commit "List each commit once for the whole snapshot" with the trailer `Change: project-snapshot/10`.

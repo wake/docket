@@ -13,15 +13,32 @@ import (
 // ReadBlobs reads the files at paths in commit with one git call. A path that
 // is missing, is not a file, or holds a newline is left out of the result.
 func (g Git) ReadBlobs(commit string, paths []string) (map[string][]byte, error) {
-	got := map[string][]byte{}
-	var asked []string
+	all, err := g.ReadBlobsAt(map[string][]string{commit: paths})
+	return all[commit], err
+}
+
+// ReadBlobsAt reads the files of several commits (commit to paths) with one
+// git call, and returns them by commit and path. A path that is missing, is
+// not a file, or holds a newline is left out; every commit asked has an entry.
+func (g Git) ReadBlobsAt(names map[string][]string) (map[string]map[string][]byte, error) {
+	got := map[string]map[string][]byte{}
+	commits := make([]string, 0, len(names))
+	for c := range names {
+		commits = append(commits, c)
+		got[c] = map[string][]byte{}
+	}
+	sort.Strings(commits)
+	type ask struct{ commit, path string }
+	var asked []ask
 	var in strings.Builder
-	for _, p := range paths {
-		if strings.Contains(p, "\n") {
-			continue // cat-file --batch reads one name per line
+	for _, c := range commits {
+		for _, p := range names[c] {
+			if strings.Contains(p, "\n") {
+				continue // cat-file --batch reads one name per line
+			}
+			asked = append(asked, ask{c, p})
+			in.WriteString(c + ":" + p + "\n")
 		}
-		asked = append(asked, p)
-		in.WriteString(commit + ":" + p + "\n")
 	}
 	if len(asked) == 0 {
 		return got, nil
@@ -31,7 +48,8 @@ func (g Git) ReadBlobs(commit string, paths []string) (map[string][]byte, error)
 		return nil, err
 	}
 	rd := bufio.NewReader(bytes.NewReader(out))
-	for _, p := range asked {
+	for _, a := range asked {
+		p := a.path
 		line, err := rd.ReadString('\n')
 		if err != nil {
 			return nil, fmt.Errorf("git cat-file: short output at %q: %w", p, err)
@@ -52,7 +70,7 @@ func (g Git) ReadBlobs(commit string, paths []string) (map[string][]byte, error)
 			return nil, fmt.Errorf("git cat-file: short body at %q: %w", p, err)
 		}
 		if f[1] == "blob" {
-			got[p] = body[:size]
+			got[a.commit][p] = body[:size]
 		}
 	}
 	return got, nil

@@ -59,7 +59,7 @@ func TestReadRefAndWorktree(t *testing.T) {
 	got, un, err := Read(g, []Wanted{
 		{Source: "main", Commit: git(t, dir, "rev-parse", "main"), Paths: []string{folder}},
 		{Source: wt, Paths: []string{folder}},
-	})
+	}, nil)
 	if err != nil || len(un) != 0 {
 		t.Fatalf("err %v unreadable %v", err, un)
 	}
@@ -74,25 +74,19 @@ func TestReadRefAndWorktree(t *testing.T) {
 func TestReadSharesCommits(t *testing.T) {
 	dir, g := newRepo(t)
 	sha := git(t, dir, "rev-parse", "main")
-	real, _ := exec.LookPath("git")
-	bin, _ := filepath.EvalSymlinks(t.TempDir())
-	log := filepath.Join(bin, "log")
-	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	g.Env = append(g.Env, "PATH="+bin+":"+os.Getenv("PATH")) // the last PATH wins
+	env, runs := testutil.CountGit(t, g.Env)
+	g.Env = env
 	var want []Wanted
 	for _, s := range []string{"a", "b", "c"} {
 		want = append(want, Wanted{Source: s, Commit: sha, Paths: []string{folder, "docket/records/r.md"}})
 	}
-	got, un, err := Read(g, want)
+	got, un, err := Read(g, want, nil)
 	if err != nil || len(un) != 0 || len(got) != 3 || len(got["c"]) != 3 {
 		t.Fatalf("got %v %v %v", got, un, err)
 	}
-	b, _ := os.ReadFile(log)
+	b := strings.Join(runs(), "\n")
 	var tree, cat int
-	for _, l := range strings.Split(string(b), "\n") {
+	for _, l := range runs() {
 		if strings.Contains(l, "ls-tree") {
 			tree++
 		}
@@ -125,7 +119,7 @@ func TestReadUnreadable(t *testing.T) {
 		{Source: linked, Paths: []string{folder}},
 		{Source: "blob", Commit: blob, Paths: []string{folder}},
 		{Source: dir, Paths: []string{folder}},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +148,7 @@ func TestReadLinkPerPath(t *testing.T) {
 	got, un, err := Read(g, []Wanted{
 		{Source: "ref", Commit: sha, Paths: []string{folder, y}},
 		{Source: dir, Paths: []string{folder, y}},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +172,7 @@ func TestReadFolderBoundary(t *testing.T) {
 		{Source: "a", Commit: sha, Paths: []string{a}},
 		{Source: "b", Commit: sha, Paths: []string{b}},
 		{Source: "none", Commit: sha},
-	})
+	}, nil)
 	if err != nil || len(un) != 0 {
 		t.Fatalf("%v %v", err, un)
 	}
@@ -196,7 +190,7 @@ func TestReadTwoWantedOneSource(t *testing.T) {
 		{Source: "ref", Commit: sha, Paths: []string{rec}},
 		{Source: dir, Paths: []string{folder}},
 		{Source: dir, Paths: []string{rec}},
-	})
+	}, nil)
 	if err != nil || len(un) != 0 {
 		t.Fatalf("%v %v", err, un)
 	}
@@ -211,11 +205,53 @@ func TestReadFile(t *testing.T) {
 	got, un, err := Read(g, []Wanted{
 		{Source: "main", Commit: git(t, dir, "rev-parse", "main"), Paths: []string{rec}},
 		{Source: dir, Paths: []string{rec}},
-	})
+	}, nil)
 	if err != nil || len(un) != 0 {
 		t.Fatalf("%v %v", err, un)
 	}
 	if len(got["main"]) != 1 || string(got["main"][rec]) != "record" || len(got[dir]) != 1 {
 		t.Fatalf("got %v", got)
+	}
+}
+
+// countingGit puts a git first on PATH that logs its arguments, and returns g
+// using it and a function that gives the first word of each run so far.
+func countingGit(t *testing.T, g gitx.Git) (gitx.Git, func() []string) {
+	t.Helper()
+	env, lines := testutil.CountGit(t, g.Env)
+	g.Env = env
+	return g, func() []string {
+		var words []string
+		for _, l := range lines() {
+			if f := strings.Fields(l); len(f) > 0 {
+				words = append(words, f[0])
+			}
+		}
+		return words
+	}
+}
+
+func TestReadFromTrees(t *testing.T) {
+	dir, g := newRepo(t)
+	sha := git(t, dir, "rev-parse", "main")
+	listed, err := g.TreeFiles(sha, folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Wanted{{Source: "main", Commit: sha, Paths: []string{folder}}}
+	cg, runs := countingGit(t, g)
+	got, un, err := Read(cg, want, map[string][]gitx.TreeFile{sha: listed})
+	if err != nil || len(un) != 0 || len(got["main"]) != 2 {
+		t.Fatalf("%v %v %v", got, un, err)
+	}
+	if r := runs(); len(r) != 1 || r[0] != "cat-file" {
+		t.Fatalf("runs %v", r)
+	}
+	cg, runs = countingGit(t, g)
+	if got, _, err = Read(cg, want, map[string][]gitx.TreeFile{}); err != nil || len(got["main"]) != 2 {
+		t.Fatalf("%v %v", got, err)
+	}
+	if r := runs(); len(r) != 2 || r[0] != "ls-tree" || r[1] != "cat-file" {
+		t.Fatalf("runs %v", r)
 	}
 }

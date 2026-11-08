@@ -9,6 +9,34 @@ import (
 	"testing"
 )
 
+// CountGit returns env with a fake git first on PATH, and a function that gives
+// the arguments of every git run so far, one line per run. The fake logs and
+// then runs the real git.
+func CountGit(t testing.TB, env []string) (withFake []string, runs func() []string) {
+	t.Helper()
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin, _ := filepath.EvalSymlinks(t.TempDir())
+	log := filepath.Join(bin, "log")
+	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	withFake = append(append([]string(nil), env...), "PATH="+bin+":"+os.Getenv("PATH")) // the last PATH wins
+	return withFake, func() []string {
+		b, _ := os.ReadFile(log)
+		var lines []string
+		for _, l := range strings.Split(string(b), "\n") {
+			if l != "" {
+				lines = append(lines, l)
+			}
+		}
+		return lines
+	}
+}
+
 // Env returns an allowlisted environment (PATH, TMPDIR and SYSTEMROOT from the
 // process, no inherited GIT_* variable) plus a temporary HOME and a git
 // configuration that is independent of the machine running the tests.
