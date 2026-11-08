@@ -85,6 +85,50 @@ A work's fields SHALL be read from one location, named in `read_from`: the first
 - **WHEN** a change's `.openspec.yaml` has `schema: spec-driven`
 - **THEN** its `tasks` is null
 
+### Requirement: Task state and progress
+Each task's `state` SHALL be `done` when a commit in its `commits` names it or every step is ticked, and `pending` otherwise. A work's `progress` SHALL be `{done, total}`: the number of its tasks that are done, and the number of its tasks, both 0 when it has none.
+
+#### Scenario: Task with a commit and no ticks
+- **WHEN** Task 1 has three unticked steps and a commit carries `Change: add-x/1`
+- **THEN** Task 1's `state` is `done`
+
+#### Scenario: Task ticked in part
+- **WHEN** Task 2 has one of three steps ticked and no commit names it
+- **THEN** Task 2's `state` is `pending`, and with Task 1 done, `progress` is `{done: 1, total: 2}`
+
+### Requirement: Stages of a change
+A change's `stages` SHALL list, in this order, those it has reached: `proposal` when the folder of `read_from` has `proposal.md`; `design` when it has a `specs/**/spec.md` or `design.md`; `plan` when its plan has a task; `dev` when a commit reachable from any location's commit carries `Change: <slug>/<N>`; `merged` when `merged` is true; `archived` when `archived` is not null. `phase` SHALL be the last of them.
+
+#### Scenario: Change without design
+- **WHEN** a change has `proposal.md` and a `plan.md` with tasks, no delta spec and no `design.md`, and no commit names a task
+- **THEN** its `stages` are `["proposal", "plan"]` and its `phase` is `plan`
+
+#### Scenario: Bare trailer is not dev
+- **WHEN** the only commit for `add-x` carries `Change: add-x`
+- **THEN** its `stages` do not hold `dev`
+
+#### Scenario: Done but not merged
+- **WHEN** every task of an unmerged change has a commit
+- **THEN** its `phase` is `dev` and its `progress` is full
+
+#### Scenario: Archived change
+- **WHEN** the tip holds `add-x` archived and its tasks have commits
+- **THEN** its `stages` end with `merged` and `archived`
+
+### Requirement: Stages of a record
+A record's `stages` SHALL list, in this order, those it has reached: `record` always; `dev` when a commit reachable from any location's commit carries its `Record` trailer, with or without a task; `merged` when `merged` is true. `phase` SHALL be the last of them.
+
+#### Scenario: Record with a bare trailer
+- **WHEN** a record without tasks is on a branch, and a commit there carries `Record: 2026-11-06-fix-x`
+- **THEN** its `stages` are `["record", "dev"]`
+
+### Requirement: Proposed date
+A work's `proposed` SHALL be the `date` of the idea, or of the issue, that its `source` names, and its `created` otherwise.
+
+#### Scenario: Change from an idea
+- **WHEN** `add-x` was created on 2026-11-08 with the `source` of an idea dated 2026-11-04
+- **THEN** its `proposed` is `2026-11-04`
+
 ### Requirement: Documents
 `documents` SHALL list each file in the change folder of `read_from`, with `kind` `proposal`, `design`, `plan` or `spec-delta` for `proposal.md`, `design.md`, `plan.md` and `specs/**/spec.md`, and `other` for the rest; for a record, the record file with `kind` `record`; and, when `source` is the path of an idea or an issue that is found, that file with `kind` `idea` or `issue`. Each document SHALL carry the `source` it is read from.
 
@@ -137,7 +181,7 @@ For a change, `deltas` SHALL list each `specs/<capability>/spec.md` of the chang
 - **THEN** `order` holds `a.md` at position 1 and the issue at position 2
 
 ### Requirement: Ideas reported
-`result.ideas` SHALL list every idea on the tip, sorted by path, with `path`, `title`, `needs`, `dropped`, `state`, `waiting_on`, `position` and `taken_by`. `state` SHALL be `dropped` when it is dropped, `taken` when a change or record names it as `ideas` defines, and otherwise `queued` when the order lists it and `pool` when it does not. `waiting_on` SHALL hold its needs that are not met, empty for `dropped` and `taken`.
+`result.ideas` SHALL list every idea on the tip, sorted by path, with `path`, `title`, `needs`, `dropped`, `date`, `state`, `waiting_on`, `position` and `taken_by`. `state` SHALL be `dropped` when it is dropped, `taken` when a change or record names it as `ideas` defines, and otherwise `queued` when the order lists it and `pool` when it does not. `waiting_on` SHALL hold its needs that are not met, empty for `dropped` and `taken`.
 
 #### Scenario: Idea in the pool
 - **WHEN** an idea is not dropped, no work names it and the order does not list it
@@ -151,12 +195,38 @@ For a change, `deltas` SHALL list each `specs/<capability>/spec.md` of the chang
 - **WHEN** the order lists `b.md`, which needs `a.md`, and nothing names `a.md`
 - **THEN** `b.md` is `queued` with `waiting_on` `["docket/ideas/a.md"]`
 
+### Requirement: Idea date
+An idea's `date` SHALL be the date, in its own offset, of the oldest commit in the history of the default branch tip that added the idea's file, and null when there is none.
+
+#### Scenario: Idea added and edited later
+- **WHEN** `docket/ideas/a.md` was added by a commit of 2026-11-04 and edited by one of 2026-11-06
+- **THEN** its `date` is `2026-11-04`
+
+#### Scenario: Idea moved
+- **WHEN** an idea was renamed from `docket/ideas/a.md` to `docket/ideas/b.md` by a commit of 2026-11-07
+- **THEN** the `date` of `b.md` is `2026-11-07`
+
 ### Requirement: Issues reported
-`result.issues` SHALL list every issue found as `workspace-scan` defines, sorted by slug, with `slug`, `path`, `title` and `source` from its front matter read from its first location, `date` from its slug, `position`, `locations` as for a work, and `handlers`: each change or record whose `source` is its path, with `type`, `slug` and `merged`.
+`result.issues` SHALL list every issue found as `workspace-scan` defines, sorted by slug, with `slug`, `path`, `title` and `source` from its front matter read from its first location, `date` from its slug, `state`, `position`, `locations` as for a work, and `handlers`: each change or record whose `source` is its path, with `type`, `slug` and `merged`.
 
 #### Scenario: Issue with a handler
 - **WHEN** a record on a branch has `source: "docket/issues/2026-11-01-fix-x.md"`
 - **THEN** that issue's `handlers` holds the record with `merged` false
+
+### Requirement: Issue state
+An issue's `state` SHALL be `open` when it has no handler, `done` when every handler is merged, and `in-progress` otherwise.
+
+#### Scenario: Open issue
+- **WHEN** no change or record names an issue
+- **THEN** its `state` is `open`
+
+#### Scenario: One handler merged of two
+- **WHEN** an issue has a merged record and an unmerged change as handlers
+- **THEN** its `state` is `in-progress`
+
+#### Scenario: Every handler merged
+- **WHEN** every handler of an issue is merged
+- **THEN** its `state` is `done`
 
 ### Requirement: Main specs reported
 `result.specs` SHALL list every `openspec/specs/<capability>/spec.md` on the tip, sorted by capability, with `capability`, `path`, `title` as `change-metadata` defines a main spec's title, and `requirements`: the names of its `### Requirement:` headings outside fenced code and HTML comments, in file order.
@@ -187,5 +257,5 @@ For a change, `deltas` SHALL list each `specs/<capability>/spec.md` of the chang
 Without `--json`, `dkt snapshot` SHALL print one line per work, `<type> <slug>  <phase>  <title>`, and then one line with the numbers of ideas, issues and specs.
 
 #### Scenario: Text output
-- **WHEN** a project has one change `add-x` titled `Add X` in phase `ready`, and no idea, issue or spec
-- **THEN** the output is `change add-x  ready  Add X` and `0 ideas, 0 issues, 0 specs`
+- **WHEN** a project has one change `add-x` titled `Add X` whose `phase` is `plan`, and no idea, issue or spec
+- **THEN** the output is `change add-x  plan  Add X` and `0 ideas, 0 issues, 0 specs`

@@ -15,7 +15,7 @@ See `proposal.md` - Why. What dkt already has:
 
 **Goals:**
 
-- One run gives a viewer every Docket fact it shows, with no inference left to it: phases, states, positions and merges are decided here.
+- One run gives a viewer every Docket fact it shows, with no inference left to it: stages, states, positions and merges are decided here.
 - About one second on a repository the size of this one.
 - A source that cannot be read costs only what it holds.
 
@@ -62,7 +62,9 @@ See `proposal.md` - Why. What dkt already has:
 | `position` | integer or null | The `position` of the order item its `source` names; null when it names none. |
 | `read_from` | string | The location the fields of this work were read from (see Copy read). |
 | `archived` | string or null | The archive folder, such as `openspec/changes/archive/2026-11-08-add-x`; null for an active change and for a record. |
-| `phase` | string or null | `design`, `ready`, `in-progress` or `done` (see Phase); null for a change of another schema. |
+| `stages` | array of string | The stages of its chain it has reached, in chain order (see Stages): for a change some of `proposal`, `design`, `plan`, `dev`, `merged`, `archived`; for a record some of `record`, `dev`, `merged`. |
+| `phase` | string | The last entry of `stages`. |
+| `progress` | object | `{done, total}`: how many of its `tasks` are done, out of how many; `{0, 0}` without tasks. |
 | `merged` | boolean | The default branch tip holds the work, active or archived. |
 | `merge` | object or null | `{commit, time, subject}`: the commit of the default branch that brought it in (see Merge). |
 | `release` | object or null | `{tag, time}`: the first tag that contains `merge`. |
@@ -94,7 +96,7 @@ See `proposal.md` - Why. What dkt already has:
 | `steps` | integer | Its `- [ ]` and `- [x]` steps, as `plan-sync` counts them. |
 | `ticked` | integer | The steps ticked in the file. |
 | `commits` | array of string | Commits naming it, oldest first, reachable from the commit of `read_from`. |
-| `state` | `"done"`, `"started"` or `"pending"` | See Phase. |
+| `state` | `"done"` or `"pending"` | `done` when a commit in `commits` names it or every step is ticked. |
 
 ### document
 
@@ -181,7 +183,7 @@ Abridged: one change in progress in a linked worktree, one archived change, one 
       "source": "Maintainer request: classify specs in a tree for viewing", "schema": "docket",
       "created": "2026-11-07", "proposed": "2026-11-07", "position": null,
       "read_from": "/w/docket", "archived": "openspec/changes/archive/2026-11-07-add-domain-tree",
-      "phase": "done", "merged": true,
+      "stages": ["proposal", "design", "plan", "dev", "merged", "archived"], "phase": "archived", "progress": {"done": 1, "total": 1}, "merged": true,
       "merge": {"commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", "time": "2026-11-07T21:40:11+08:00", "subject": "Merge pull request #106 from wake/worktree-add-domain-tree"},
       "release": {"tag": "v0.18.0", "time": "2026-11-07T22:05:00+08:00"},
       "last_commit": {"commit": "0f1e2d3c4b5a69788796a5b4c3d2e1f0a9b8c7d6", "time": "2026-11-07T21:30:52+08:00"},
@@ -209,7 +211,7 @@ Abridged: one change in progress in a linked worktree, one archived change, one 
       "source": "docket/ideas/dkt-projects-index.md", "schema": "docket",
       "created": "2026-11-08", "proposed": "2026-11-08", "position": null,
       "read_from": "/w/docket/.claude/worktrees/projects-index", "archived": null,
-      "phase": "in-progress", "merged": false, "merge": null, "release": null,
+      "stages": ["proposal", "design", "plan", "dev"], "phase": "dev", "progress": {"done": 1, "total": 3}, "merged": false, "merge": null, "release": null,
       "last_commit": {"commit": "13c8503aa0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5", "time": "2026-11-08T11:02:44+08:00"},
       "locations": [
         {"source": "/w/docket/.claude/worktrees/projects-index", "kind": "worktree", "branch": "worktree-projects-index", "default": false, "commit": "13c8503aa0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5", "time": "2026-11-08T11:02:44+08:00", "path": "openspec/changes/projects-index", "archived": false},
@@ -217,7 +219,7 @@ Abridged: one change in progress in a linked worktree, one archived change, one 
       ],
       "tasks": [
         {"number": 1, "name": "The index and settings files", "steps": 5, "ticked": 0, "commits": ["b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9"], "state": "done"},
-        {"number": 2, "name": "The project of a directory", "steps": 5, "ticked": 1, "commits": [], "state": "started"},
+        {"number": 2, "name": "The project of a directory", "steps": 5, "ticked": 1, "commits": [], "state": "pending"},
         {"number": 3, "name": "dkt projects add and ls", "steps": 6, "ticked": 0, "commits": [], "state": "pending"}
       ],
       "documents": [
@@ -261,11 +263,13 @@ Without `--json`, the command prints one line per work (`<type> <slug>  <phase> 
 
 **Copy read.** A work found in several locations is reported once, its fields read from one copy, named in `read_from`: the first location, in `workspace-scan` order (worktrees as `git worktree list` gives them, then local branches, then remote-tracking branches), that holds it archived; when none does, the first that holds it. Archiving is the last step of a change, so an archived copy is never older than an active one. A worktree comes first because it holds uncommitted edits. An issue is read from its first location in the same order.
 
-**Phase.** A task is `done` when a commit reachable from `read_from` names it, or every step is ticked: `dkt sync` ticks every step of a task a commit names, so a task with a commit counts as ticked whether or not sync has run. It is `started` when some step is ticked and no commit names it, and `pending` otherwise. A change is `design` until its plan has a task; then `ready` while every task is pending, `done` when every task is done, and `in-progress` otherwise. A record with tasks follows the same rules. A record without tasks is `in-progress` until the default branch tip holds it, then `done`: it is opened when the work starts, and has nothing else to measure. *(Proposed; see Open questions.)*
+**Stages, not a judged phase.** The maintainer chose a chain of stages over a judged phase such as "in progress". Each stage is a fact a reader can check, and `stages` lists the ones reached, so a stage that was skipped (a change without design) shows as missing between reached ones, and a viewer greys the rest without inferring anything. For a change: `proposal` when the folder of `read_from` has `proposal.md`; `design` when it has a delta spec or `design.md`; `plan` when its plan has a task; `dev` when a commit reachable from any location carries `Change: <slug>/<N>`, naming a task; `merged` when the default branch tip holds it; `archived` when `archived` is set. For a record: `record` always; `dev` when any commit reachable from any location carries its `Record` trailer, with or without a task; `merged` as for a change. `phase` is the last stage reached. Whether someone is working on it now, and where, is not a stage: a viewer sees it from `locations` and `last_commit`.
 
-**Idea date.** The date of the oldest commit, in the history of the default branch tip, that added the idea's file (`git log --diff-filter=A`), in that commit's own offset. It needs no new field in an idea and works for every idea already written. An idea moved to a new name gets the date of the move. *(Proposed; see Open questions.)*
+**Tasks are done or pending.** A task is `done` when a commit reachable from `read_from` names it, or every step is ticked: `dkt sync` ticks every step of a task a commit names, so a task with a commit counts as ticked whether or not sync has run. Otherwise it is `pending`. `progress` counts them, so a change whose tasks are all done but which is not merged reads as `dev` with a full `progress`.
 
-**Issue state.** `open` with no handler, `in-progress` while some handler is not merged, `done` when every handler is merged. A handler is a change or record whose `source` is the issue's path, as `ideas` defines it. *(Proposed; see Open questions.)*
+**Idea date.** The date of the oldest commit, in the history of the default branch tip, that added the idea's file (`git log --diff-filter=A`), in that commit's own offset. It needs no new field in an idea and works for every idea already written. An idea moved to a new name gets the date of the move.
+
+**Issue state.** `open` with no handler, `in-progress` while some handler is not merged, `done` when every handler is merged. A handler is a change or record whose `source` is the issue's path, as `ideas` defines it.
 
 **Merge.** dkt reads the first-parent history of the default branch tip once, with each commit's parents and trailers, plus the trailers of the commits each merge brought in. A work's `merge` is the newest first-parent commit that brought in a commit whose `Change:` or `Record:` trailer names the work, with or without a task: a merge commit for a merge, or the commit itself for a rebase. `merged` is separate: it says only that the tip holds the work, so a work without trailers is still merged.
 
@@ -288,12 +292,12 @@ Without `--json`, the command prints one line per work (`<type> <slug>  <phase> 
 
 None. A new read-only command.
 
-## Open Questions
+## Settled Questions
 
-These change the spec, so they are settled before the plan:
+Five questions in the first draft changed the spec; the maintainer answered them on 2026-11-08, through the team lead:
 
-1. **Phase of a record without tasks**: proposed `in-progress` until merged, then `done`. The alternative is `null`, leaving the viewer only `merged`.
-2. **Phase of a change whose plan has no task**: proposed `design`. The alternative is `ready`.
-3. **When a task counts as started**: proposed as above: a commit naming it makes it `done`, a ticked step without a commit makes it `started`.
-4. **State of an issue whose handlers are all merged**: proposed `done`.
-5. **Where an idea's date comes from**: proposed the commit that added it on the default branch. The alternative is a `date` in the idea's front matter, which needs an `ideas` spec change and a value in every idea.
+1. to 3. The phase of a record without tasks, of a change whose plan has no task, and when a task counts as started: replaced by the chain of stages under Stages, with tasks only `done` or `pending` and `progress` given apart. The idea a work came from is shown by its `source`, not as a stage, and `release` stays its own field.
+4. An issue whose handlers are all merged is `done`.
+5. An idea's date is the date of the commit that added it on the default branch.
+
+The maintainer will adjust these once real output can be looked at.
