@@ -75,6 +75,41 @@ func TestLocateNotRepository(t *testing.T) {
 	}
 }
 
+func TestLocateDocketFollowsTheWorktree(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{"a.txt": "x"})
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", wt, "-b", "b")
+	wf := filepath.Join(wt, "docket", "workflow.md")
+	if err := os.MkdirAll(filepath.Dir(wf), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(wf, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Locate(wt, r.Env)
+	if err != nil || !p.Docket || real(t, p.Path) != real(t, r.Dir) {
+		t.Fatalf("linked: %+v, %v", p, err)
+	}
+	if p, err = Locate(r.Dir, r.Env); err != nil || p.Docket {
+		t.Fatalf("main: %+v, %v", p, err)
+	}
+}
+
+func TestLocateBrokenRepository(t *testing.T) {
+	r := testutil.NewRepo(t)
+	d := t.TempDir()
+	gitdir := "gitdir: " + filepath.Join(d, "missing") + "\n"
+	if err := os.WriteFile(filepath.Join(d, ".git"), []byte(gitdir), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Locate(d, r.Env)
+	// Toplevel keeps the git failure here (a .git marker exists), so it is not ErrNotRepository.
+	if err == nil || errors.Is(err, ErrNotRepository) || p != (Project{}) {
+		t.Fatalf("got %+v, %v", p, err)
+	}
+}
+
 func TestIsDocket(t *testing.T) {
 	d := t.TempDir()
 	if IsDocket(d) {
