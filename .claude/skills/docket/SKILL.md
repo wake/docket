@@ -97,9 +97,10 @@ off (such as `//nolint`) is a check setting.
 - **Order**: `docket/order.md` lists the ideas and issues to work on next,
   in order, one per line, as `- docket/ideas/<name>.md` or
   `- docket/issues/<slug>.md`. Blank lines and lines starting with `#` are
-  ignored, and a line may stay once its work is done. An issue in another tool is listed by the path of its card. `dkt status` reads the order, the ideas and
-  the issues on the default branch, so an edit counts only once it is
-  merged.
+  ignored, and a line may stay once its work is done. An issue in another
+  tool is listed by the path of its card. `dkt status` reads the order, the
+  ideas and the issues on the default branch, so an edit counts only once
+  it is merged.
   To pick up the next piece of work, run `dkt status --json` and do the one
   `result.next` names. When `unreadable` lists anything, report it to the
   user and let them decide whether to go on with the work. When
