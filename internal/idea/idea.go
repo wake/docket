@@ -18,7 +18,7 @@ const (
 )
 
 // Idea is the front matter of an idea file. An issue in the order is an Idea
-// with only Title set, so Next treats it as never dropped and needing nothing.
+// with Title and Dropped set, so Next treats it as needing nothing.
 type Idea struct {
 	Title   string
 	Dropped bool
@@ -72,8 +72,8 @@ func Parse(b []byte) (Idea, error) {
 	return id, nil
 }
 
-// ParseItem reads an item of the order. An issue's title is all it reads: the
-// rest of an issue is dkt lint's.
+// ParseItem reads an item of the order. An issue's title and dropped are all it
+// reads: the rest of an issue is dkt lint's.
 func ParseItem(path string, b []byte) (Idea, error) {
 	if !strings.HasPrefix(path, issue.Dir+"/") {
 		return Parse(b)
@@ -85,11 +85,21 @@ func ParseItem(path string, b []byte) (Idea, error) {
 	if !ok {
 		return Idea{}, fmt.Errorf("no front matter (form: title: <title>)")
 	}
-	if f, found := fm.Fields["title"]; !found || !change.ValidLine(f.Value) {
+	t, found := fm.Fields["title"]
+	if !found || !change.ValidLine(t.Value) {
 		return Idea{}, fmt.Errorf("title is missing or empty")
-	} else {
-		return Idea{Title: f.Value}, nil
 	}
+	id := Idea{Title: t.Value}
+	if f, found := fm.Fields["dropped"]; found {
+		switch f.Value {
+		case "true":
+			id.Dropped = true
+		case "false":
+		default:
+			return Idea{}, fmt.Errorf("line %d: dropped must be true or false", f.Line)
+		}
+	}
+	return id, nil
 }
 
 // Line is one entry of the order and its 1-based line number.

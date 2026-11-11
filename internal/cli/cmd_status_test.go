@@ -511,6 +511,13 @@ func TestStatusIssueWithDroppedOrNeeds(t *testing.T) {
 	r := stIssueRepo(t, "# Order\n\n- "+issX+"\n", map[string]string{
 		"docket/issues/2026-11-01-fix-x.md": stIdea("Fix X", "dropped: true\n", "needs: [docket/ideas/a.md]\n")})
 	code, m, raw := stRun(t, r, r.Dir)
+	stNext(t, code, m, raw, 0, "", "none-left")
+}
+
+func TestStatusIssueWithNeeds(t *testing.T) {
+	r := stIssueRepo(t, "# Order\n\n- "+issX+"\n", map[string]string{
+		"docket/issues/2026-11-01-fix-x.md": stIdea("Fix X", "needs: [docket/ideas/a.md]\n")})
+	code, m, raw := stRun(t, r, r.Dir)
 	stNext(t, code, m, raw, 0, issX, "")
 }
 
