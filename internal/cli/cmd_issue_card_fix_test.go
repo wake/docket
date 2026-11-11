@@ -57,3 +57,37 @@ func TestIssueCardConcurrent(t *testing.T) {
 		t.Fatalf("codes %v taken %v files %d", codes, taken, len(entries))
 	}
 }
+
+func TestIssueCardNoDocketFolder(t *testing.T) {
+	r := recordRepo(t)
+	code, _, raw := doIssue(t, r, r.Dir, "x", "--title", "X", "--source", "x", "--external", cardURL, "--external-id", "#1")
+	if code != 0 {
+		t.Fatalf("code=%d %s", code, raw)
+	}
+	entries, _ := os.ReadDir(filepath.Join(r.Dir, "docket/issues"))
+	if len(entries) != 1 {
+		t.Errorf("files %d", len(entries))
+	}
+}
+
+func TestIssueCardTakenWritesNothing(t *testing.T) {
+	r := recordRepo(t)
+	r.Write("docket/issues/2026-10-29-login.md", "---\ntitle: \"T\"\nexternal: \""+cardURL+"\"\n---\n")
+	list := func() []string {
+		var names []string
+		filepath.WalkDir(r.Dir, func(p string, d os.DirEntry, _ error) error {
+			if d.IsDir() && d.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			names = append(names, p)
+			return nil
+		})
+		return names
+	}
+	before := list()
+	code, m, raw := doIssue(t, r, r.Dir, "x", "--title", "X", "--source", "x", "--external", cardURL, "--external-id", "#1")
+	after := list()
+	if code != 1 || !hasRuleIn(m.Findings, "external-taken") || len(before) != len(after) {
+		t.Errorf("code=%d %s before %v after %v", code, raw, before, after)
+	}
+}

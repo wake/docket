@@ -102,10 +102,8 @@ func runIssue(c *Context, name, source, title, external, externalID string, card
 	var content []byte
 	if card {
 		// The check and the write go under one lock, so two runs cannot both pass the check.
-		if err := os.MkdirAll(filepath.Join(root, "docket"), 0o755); err != nil {
-			return Outcome{}, err
-		}
-		unlock, err := lockDir(root, "docket")
+		// The repository root is locked because it always exists, so a refusal creates nothing.
+		unlock, err := lockDir(root, ".")
 		if err != nil {
 			return Outcome{}, err
 		}
