@@ -50,13 +50,15 @@ func issueCommand() Command {
 				return Outcome{Result: map[string]string{"template": string(tpl)},
 					Human: []string{strings.TrimSuffix(string(tpl), "\n")}}, nil
 			}
-			return runIssue(c, args[0], source, title, external, externalID)
+			given := map[string]bool{} // an empty value is still a flag given
+			flags.Visit(func(f *flag.Flag) { given[f.Name] = true })
+			return runIssue(c, args[0], source, title, external, externalID, given["external"] || given["external-id"])
 		},
 	}
 }
 
 // runIssue is the body of dkt issue.
-func runIssue(c *Context, name, source, title, external, externalID string) (Outcome, error) {
+func runIssue(c *Context, name, source, title, external, externalID string, card bool) (Outcome, error) {
 	root := c.Repo.Root
 	switch {
 	case !change.ValidLine(source):
@@ -67,7 +69,6 @@ func runIssue(c *Context, name, source, title, external, externalID string) (Out
 	if msg, tooLong := change.TitleTooLong(title); tooLong {
 		return Outcome{}, UsageError{Msg: "issue needs --title: " + msg}
 	}
-	card := external != "" || externalID != ""
 	switch {
 	case card && !change.ValidLine(external):
 		return Outcome{}, UsageError{Msg: "issue needs --external with --external-id: one line of text that is not blank"}
@@ -100,6 +101,15 @@ func runIssue(c *Context, name, source, title, external, externalID string) (Out
 
 	var content []byte
 	if card {
+		// The check and the write go under one lock, so two runs cannot both pass the check.
+		if err := os.MkdirAll(filepath.Join(root, "docket"), 0o755); err != nil {
+			return Outcome{}, err
+		}
+		unlock, err := lockDir(root, "docket")
+		if err != nil {
+			return Outcome{}, err
+		}
+		defer unlock()
 		if out, done, err := externalTaken(root, external); done {
 			return out, err
 		}
@@ -138,8 +148,10 @@ func externalTaken(root, external string) (out Outcome, done bool, err error) {
 			out.Unreadable = append(out.Unreadable, Unreadable{Source: rel, Reason: err.Error()})
 			continue
 		}
-		// A file whose front matter does not parse cannot hold the address.
-		if fm, ok, err := change.ReadFrontMatter(b); err == nil && ok && taken == "" && fm.Fields["external"].Value == external {
+		fm, ok, err := change.ReadFrontMatter(b)
+		if err != nil { // it may hold the address, so it is as good as unreadable
+			out.Unreadable = append(out.Unreadable, Unreadable{Source: rel, Reason: err.Error()})
+		} else if ok && taken == "" && fm.Fields["external"].Value == external {
 			taken = rel
 		}
 	}
