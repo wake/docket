@@ -328,7 +328,7 @@ func TestResultJSON(t *testing.T) {
 		t.Fatalf("%s", b)
 	}
 	if !reflect.DeepEqual(keys(r.Ideas[0]), sorted("path", "title", "needs", "dropped", "date", "state", "waiting_on", "position", "taken_by")) ||
-		!reflect.DeepEqual(keys(r.Issues[0]), sorted("slug", "path", "title", "source", "date", "state", "position", "handlers", "locations")) ||
+		!reflect.DeepEqual(keys(r.Issues[0]), sorted("slug", "path", "title", "source", "external", "external_id", "dropped", "unsynced", "date", "state", "position", "handlers", "locations")) ||
 		!reflect.DeepEqual(keys(r.Specs[0]), sorted("capability", "title", "path", "requirements")) ||
 		!reflect.DeepEqual(keys(r.Domains.Nodes[0]), sorted("name", "capabilities", "children")) ||
 		r.Issues[0]["handlers"] == nil || r.Ideas[0]["needs"] == nil || r.Ideas[0]["title"] != nil {

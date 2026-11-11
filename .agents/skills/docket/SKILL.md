@@ -86,20 +86,21 @@ off (such as `//nolint`) is a check setting.
 - **Issue**: a request whose expected behavior the specs already settle,
   but that is put off for now, such as a bug found outside the work at
   hand, an optimization, a missing test, or a request from someone else.
-  When the project's `AGENTS.md` has a `## Issues` section, open the issue
-  in the tool it names, with the sections from `dkt issue template`, and file
-  it only once the user agrees. Otherwise run
-  `dkt issue <name> --title "<one line>" --source "<where it was found>"`
-  and fill its sections, then run `dkt lint` and fix what it reports.
+  Run `dkt issue <name> --title "<one line>" --source "<where it was found>"`
+  and fill its sections, then run `dkt lint` and fix what it reports. When
+  the project's `AGENTS.md` has a `## Issues` section, the issue is opened
+  in the tool it names instead; see "Issues in another tool".
   When you cannot find where the expected behavior is settled, the request
   is an idea.
+  When an issue will not be handled, add `dropped: true` to its front
+  matter and a last section, `## Dropped`, saying why.
 - **Order**: `docket/order.md` lists the ideas and issues to work on next,
   in order, one per line, as `- docket/ideas/<name>.md` or
   `- docket/issues/<slug>.md`. Blank lines and lines starting with `#` are
-  ignored, and a line may stay once its work is done. Issues kept in the
-  project's tool are not listed. `dkt status` reads the order, the ideas and
-  the issues on the default branch, so an edit counts only once it is
-  merged.
+  ignored, and a line may stay once its work is done. An issue in another
+  tool is listed by the path of its card. `dkt status` reads the order, the
+  ideas and the issues on the default branch, so an edit counts only once
+  it is merged.
   To pick up the next piece of work, run `dkt status --json` and do the one
   `result.next` names. When `unreadable` lists anything, report it to the
   user and let them decide whether to go on with the work. When
@@ -119,8 +120,53 @@ with the rest and has to wait, write that part as a new idea and list the
 original idea in its `needs`.
 
 When the work handles an issue or takes up an idea, `--source` holds only
-its path (`docket/issues/<slug>.md`, `docket/ideas/<name>.md`), or the
-issue's address in the project's tool.
+its path (`docket/issues/<slug>.md`, `docket/ideas/<name>.md`); for an
+issue in another tool, the path of its card.
+
+## Issues in another tool
+
+When the project's `AGENTS.md` has a `## Issues` section, an issue's
+content is kept in the tool it names, and Docket stands for it with a card:
+an issue file in `docket/issues/` whose front matter adds `external` (the
+issue's address) and `external-id` (the number people use, such as `#92`),
+with no body (a dropped card adds the `## Dropped` section saying why). A
+card's state and handlers come from the changes and records that take it,
+as for any issue. Read and write the tool with the tool `## Issues` names;
+below, syncing means reading the issue's content, comments and last update
+time.
+
+- **Making a card**: check that no card has the address, run
+  `dkt issue <name> --external <address> --external-id <number> --title "<the tool's title>" --source "<source>"`,
+  then run `dkt lint`. A new card is not added to the order on its own.
+- **A new issue**: with the sections from `dkt issue template`, open it in
+  the tool only once the user agrees, then make its card, with `--source`
+  saying where it was found. When it cannot be opened, write a local issue
+  with its sections and `unsynced: [open]`; once it can be opened, open it,
+  add `external` and `external-id`, empty the body and remove `open`.
+- **An issue already in the tool**: only make its card, with its address
+  as `--source`; no proposal or record is written now.
+- **The user asks to sync**: the user says which issues. Those without a
+  card get one, as above. For those with a card, update `title` when the
+  tool's title changed, and list for the user those the tool has closed
+  that are not done, marking them `dropped` only once the user agrees. These
+  edits are a direct merge of their own.
+- **Before work starts**: sync before brainstorming or the record. Update
+  the card when the tool's title changed; when the tool has closed the
+  issue, stop and ask the user. Sum up the content and comments read, with
+  the tool's last update time as read, in the proposal or the record. Edits
+  to the card go into the work's first commit.
+- **Before the pull request**: sync again, and add to the proposal or the
+  record what was added since work started.
+
+When the tool can be written to, leave a comment at these points: when a
+change or record takes the card (which work), when its pull request is
+opened (the pull request's address), when it is merged (the merge commit;
+whether to close the issue as well follows `## Issues`), and when the card
+is dropped (the reason). Make only the writes `## Issues` allows, and ask
+the user before any other. When a comment cannot be written, add its point
+(`taken`, `pr`, `merged`, `dropped`) to the card's `unsynced`; once it can
+be written, write it from the local data as it is then, and remove the
+point. After editing an existing card, run `dkt lint <slug>` naming it.
 
 ## Domain tree
 

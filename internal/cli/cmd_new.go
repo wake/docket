@@ -17,13 +17,15 @@ import (
 )
 
 type newResult struct {
-	Slug      string   `json:"slug"`
-	Requested string   `json:"requested"`
-	Path      string   `json:"path"` // openspec/changes/<slug>
-	Title     string   `json:"title"`
-	Kind      string   `json:"kind,omitempty"`
-	Source    string   `json:"source"`
-	Used      []newUse `json:"used"` // never null
+	Slug       string   `json:"slug"`
+	Requested  string   `json:"requested"`
+	Path       string   `json:"path"` // openspec/changes/<slug>
+	Title      string   `json:"title"`
+	Kind       string   `json:"kind,omitempty"`
+	Source     string   `json:"source"`
+	External   string   `json:"external,omitempty"`
+	ExternalID string   `json:"external_id,omitempty"`
+	Used       []newUse `json:"used"` // never null
 }
 
 type newUse struct {
@@ -44,11 +46,11 @@ func refuse(err error) (Outcome, error) {
 	return Outcome{}, err
 }
 
-// lockOpenSpec takes an exclusive lock on <root>/openspec, blocking until it
-// is free, so two runs of dkt new cannot interleave. The returned function
+// lockDir takes an exclusive lock on <root>/<rel>, blocking until it is free,
+// so two runs that write under it cannot interleave. The returned function
 // releases it.
-func lockOpenSpec(root string) (func(), error) {
-	f, err := os.Open(filepath.Join(root, "openspec"))
+func lockDir(root, rel string) (func(), error) {
+	f, err := os.Open(filepath.Join(root, rel))
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +96,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	if err != nil {
 		return Outcome{}, err
 	}
-	unlock, err := lockOpenSpec(root)
+	unlock, err := lockDir(root, "openspec")
 	if err != nil {
 		return Outcome{}, err
 	}

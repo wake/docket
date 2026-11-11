@@ -175,15 +175,19 @@ type IdeaEntry struct {
 
 // IssueEntry is one issue.
 type IssueEntry struct {
-	Slug      string     `json:"slug"`
-	Path      string     `json:"path"`
-	Title     *string    `json:"title"`
-	Source    *string    `json:"source"`
-	Date      string     `json:"date"`
-	State     string     `json:"state"`
-	Position  *int       `json:"position"`
-	Handlers  []Handler  `json:"handlers"`
-	Locations []Location `json:"locations"`
+	Slug       string     `json:"slug"`
+	Path       string     `json:"path"`
+	Title      *string    `json:"title"`
+	Source     *string    `json:"source"`
+	External   *string    `json:"external"`
+	ExternalID *string    `json:"external_id"`
+	Dropped    bool       `json:"dropped"`
+	Unsynced   []string   `json:"unsynced"`
+	Date       string     `json:"date"`
+	State      string     `json:"state"`
+	Position   *int       `json:"position"`
+	Handlers   []Handler  `json:"handlers"`
+	Locations  []Location `json:"locations"`
 }
 
 // WorkRef names a work.

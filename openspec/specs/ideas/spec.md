@@ -13,7 +13,7 @@ An idea SHALL be a file `docket/ideas/<name>.md` whose front matter has `title` 
 - **THEN** both are ideas, and neither is reported as a problem by `dkt status`
 
 ### Requirement: Order file
-`docket/order.md` SHALL list the work to do next, in order, one item per line: `- docket/ideas/<name>.md` for an idea, `- docket/issues/<slug>.md` for an issue. Blank lines and lines starting with `#` SHALL be ignored. A line MAY stay when its item is done. An issue kept in another tool SHALL NOT be listed.
+`docket/order.md` SHALL list the work to do next, in order, one item per line: `- docket/ideas/<name>.md` for an idea, `- docket/issues/<slug>.md` for an issue. Blank lines and lines starting with `#` SHALL be ignored. A line MAY stay when its item is done. An issue kept in another tool SHALL be listed by the path of its card, as `issues` defines, and not by its address.
 
 #### Scenario: Order read
 - **WHEN** `docket/order.md` holds `# Order`, a blank line, `- docket/ideas/a.md` and `- docket/ideas/b.md`
@@ -22,6 +22,10 @@ An idea SHALL be a file `docket/ideas/<name>.md` whose front matter has `title` 
 #### Scenario: Issue in the order
 - **WHEN** `docket/order.md` holds `- docket/issues/2026-11-01-fix-x.md` and `- docket/ideas/a.md`
 - **THEN** the order is that issue, then that idea
+
+#### Scenario: Card in the order
+- **WHEN** `docket/order.md` holds `- docket/issues/2026-11-12-login-loop.md`, a card with the title `Login loops`, and nothing has been done on it
+- **THEN** `result.next` is that path with the title `Login loops`
 
 ### Requirement: Read from the default branch tip
 `dkt status` SHALL read `docket/order.md`, the ideas and the issues from the tip of the default branch, as `default-branch` defines it, and not from any worktree. It SHALL write nothing, SHALL NOT contact a remote, and SHALL NOT need the OpenSpec CLI.
@@ -39,7 +43,7 @@ An idea SHALL be a file `docket/ideas/<name>.md` whose front matter has `title` 
 - **THEN** dkt answers as usual and exits with 0
 
 ### Requirement: Next item
-`result.next` SHALL be the first item in the order that is still to do, with its `path` and the `title` from its front matter, or null when there is none. An idea SHALL be still to do when it is not dropped, no change or record names it, and every idea it needs is met. An issue SHALL be still to do when no change or record names it.
+`result.next` SHALL be the first item in the order that is still to do, with its `path` and the `title` from its front matter, or null when there is none. An idea SHALL be still to do when it is not dropped, no change or record names it, and every idea it needs is met. An issue SHALL be still to do when it is not dropped and no change or record names it.
 
 #### Scenario: First idea next
 - **WHEN** the order names `docket/ideas/a.md`, then `docket/ideas/b.md`, and nothing has been done on either
@@ -61,9 +65,21 @@ An idea SHALL be a file `docket/ideas/<name>.md` whose front matter has `title` 
 - **WHEN** a record whose `source` is `docket/issues/2026-11-01-fix-x.md` exists, and the order names that issue, then an idea with nothing done on it
 - **THEN** `result.next` is the idea
 
+#### Scenario: Dropped issue skipped
+- **WHEN** the first issue in the order has `dropped: true`, and the second item has nothing done on it
+- **THEN** `result.next` is the second item
+
 #### Scenario: Issue with dropped or needs
 - **WHEN** an issue in the order has `dropped: true` and `needs: [docket/ideas/a.md]` in its front matter, and nothing has been done on it
-- **THEN** both keys are ignored, and the issue can be next
+- **THEN** `needs` is ignored, and the issue is not next because it is dropped
+
+#### Scenario: Issue with needs
+- **WHEN** an issue in the order has `needs: [docket/ideas/a.md]` in its front matter, and nothing has been done on it
+- **THEN** the key is ignored, and the issue can be next
+
+#### Scenario: Work named by an address
+- **WHEN** a change has `source: "https://git.example.com/app/issues/92"`, and the order names the card whose `external` is that address
+- **THEN** the card is not taken, and it can be next
 
 ### Requirement: Work that names an item
 A change or record SHALL name an idea or an issue when the `source` in its front matter is exactly its path: the `proposal.md` of a change, active or archived, or a record file. Changes and records SHALL be found as `workspace-scan` defines: in every worktree, local branch and remote-tracking branch. One is enough for the item to be taken.
@@ -169,10 +185,14 @@ When `result.next` is null, `result.reason` SHALL say why: `no-order` when there
 - **THEN** the findings hold `idea-front-matter` for that idea's file and dkt exits with 1
 
 ### Requirement: Problems in an issue
-`dkt status` SHALL report `issue-front-matter` for an issue in the order whose front matter is missing, cannot be read, or has no `title`, naming the issue's file. It SHALL NOT check the rest of the issue: that is `dkt lint`'s.
+`dkt status` SHALL report `issue-front-matter` for an issue in the order whose front matter is missing, cannot be read, has no `title`, or has a `dropped` other than `true` or `false`, naming the issue's file. It SHALL NOT check the rest of the issue: that is `dkt lint`'s.
 
 #### Scenario: Issue without a title
 - **WHEN** an issue in the order has front matter without `title`
+- **THEN** the findings hold `issue-front-matter` for that file and dkt exits with 1
+
+#### Scenario: Issue dropped that is not a boolean
+- **WHEN** an issue in the order has `dropped: yes`
 - **THEN** the findings hold `issue-front-matter` for that file and dkt exits with 1
 
 ### Requirement: A problem stops the answer

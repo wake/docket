@@ -89,7 +89,7 @@ func TestParseOrderIssue(t *testing.T) {
 
 func TestParseItem(t *testing.T) {
 	const is = "docket/issues/x.md"
-	got, err := ParseItem(is, []byte("---\ntitle: Fix X\nsource: s\ndropped: true\nneeds: [docket/ideas/a.md]\n---\n"))
+	got, err := ParseItem(is, []byte("---\ntitle: Fix X\nsource: s\nneeds: [docket/ideas/a.md]\n---\n"))
 	if err != nil || !reflect.DeepEqual(got, Idea{Title: "Fix X"}) {
 		t.Fatalf("got %+v %v", got, err)
 	}
@@ -142,5 +142,52 @@ func TestNext(t *testing.T) {
 				t.Fatalf("got %q %v, want %q %v", next, waiting, tc.next, tc.waiting)
 			}
 		})
+	}
+}
+
+func TestParseItemIssueDropped(t *testing.T) {
+	const is = "docket/issues/x.md"
+	got, err := ParseItem(is, []byte("---\ntitle: Fix X\ndropped: true\nneeds: [docket/ideas/a.md]\n---\n"))
+	if err != nil || !reflect.DeepEqual(got, Idea{Title: "Fix X", Dropped: true}) {
+		t.Fatalf("got %+v %v", got, err)
+	}
+	_, err = ParseItem(is, []byte("---\ntitle: Fix X\ndropped: yes\n---\n"))
+	if err == nil || !strings.Contains(err.Error(), "true or false") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestNextDroppedIssue(t *testing.T) {
+	const i, a = "docket/issues/x.md", "docket/ideas/a.md"
+	lines := []Line{{1, i}, {2, a}}
+	got, _ := Next(lines, map[string]Idea{i: {Title: "X", Dropped: true}, a: {Title: "A"}}, nil)
+	if got != a {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestNextAddressDoesNotTake(t *testing.T) {
+	const c = "docket/issues/2026-11-12-login-loop.md"
+	got, _ := Next([]Line{{1, c}}, map[string]Idea{c: {Title: "Login loops"}},
+		map[string]Work{"https://git.example.com/app/issues/92": {Any: true}})
+	if got != c {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestCheckCard(t *testing.T) {
+	const c = "docket/issues/2026-11-12-login-loop.md"
+	card := "---\ntitle: Login loops\nexternal: gitea\nexternal-id: https://git.example.com/app/issues/92\n---\n"
+	_, items, problems, err := Check([]byte("- "+c+"\n"), func(paths []string) (map[string][]byte, error) {
+		m := map[string][]byte{}
+		for _, p := range paths {
+			if p == c {
+				m[p] = []byte(card)
+			}
+		}
+		return m, nil
+	})
+	if err != nil || len(problems) != 0 || items[c].Title != "Login loops" {
+		t.Fatalf("got %+v %v %v", items, problems, err)
 	}
 }

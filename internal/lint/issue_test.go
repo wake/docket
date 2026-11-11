@@ -156,3 +156,101 @@ func TestNamedNeitherMessage(t *testing.T) {
 		t.Fatalf("%+v", rep.Findings)
 	}
 }
+
+const card = "---\ntitle: T\nsource: s\nexternal: \"https://x/1\"\nexternal-id: \"#1\"\n---\n"
+
+func withField(base, field string) string {
+	return strings.Replace(base, "\n---\n", "\n"+field+"\n---\n", 1)
+}
+
+func TestCardClean(t *testing.T) {
+	for _, c := range []string{card, card + "\n<!-- note -->\n", withField(card, "unsynced: []")} {
+		if rep := lintIss(t, c); len(rep.Findings) != 0 {
+			t.Errorf("%q: %+v", c, rep.Findings)
+		}
+	}
+}
+
+func TestCardFrontMatter(t *testing.T) {
+	only(t, lintIss(t, strings.Replace(card, "external-id: \"#1\"\n", "", 1)), "issue-front-matter", "external-id")
+	only(t, lintIss(t, strings.Replace(card, "\"#1\"", "#1", 1)), "issue-front-matter", "quote")
+	only(t, lintIss(t, strings.Replace(card, "\"https://x/1\"", "\"\"", 1)), "issue-front-matter", "external")
+	only(t, lintIss(t, withField(card, "dropped: yes")), "issue-front-matter", "dropped")
+}
+
+func TestExternalIDWithoutAddress(t *testing.T) {
+	rep := lintIss(t, withField(issFront, "external-id: \"#1\""))
+	if !has(rep, "issue-front-matter", issPath, -1, "external") || count(rep, "issue-section") != 4 || len(rep.Findings) != 5 {
+		t.Errorf("%+v", rep.Findings)
+	}
+}
+
+func TestCardContent(t *testing.T) {
+	rep := lintIss(t, card+"\n## Current\nc\n")
+	only(t, rep, "issue-section", "Current")
+	if !strings.Contains(rep.Findings[0].Message, "other tool") {
+		t.Error(rep.Findings[0].Message)
+	}
+	only(t, lintIss(t, card+"\nloose text\n"), "issue-section", "outside")
+}
+
+func TestIssueDropped(t *testing.T) {
+	dropped := withField(card, "dropped: true")
+	if rep := lintIss(t, dropped+"\n## Dropped\nClosed in the tracker as a duplicate.\n"); len(rep.Findings) != 0 {
+		t.Errorf("%+v", rep.Findings)
+	}
+	only(t, lintIss(t, withField(issFront, "dropped: true")+issSections), "issue-section", "Dropped")
+	only(t, lintIss(t, dropped+"\n## Dropped\n<!-- why -->\n"), "issue-section", "Dropped")
+	only(t, lintIss(t, card+"\n## Dropped\nwhy\n"), "issue-section", "Dropped")
+}
+
+func TestIssueUnsynced(t *testing.T) {
+	if rep := lintIss(t, withField(card, "unsynced: [taken, pr]")); len(rep.Findings) != 0 {
+		t.Errorf("%+v", rep.Findings)
+	}
+	if rep := lintIss(t, withField(issFront, "unsynced: [open]")+issSections); len(rep.Findings) != 0 {
+		t.Errorf("%+v", rep.Findings)
+	}
+	only(t, lintIss(t, withField(card, "unsynced: [open]")), "issue-unsynced", "open")
+	only(t, lintIss(t, withField(issFront, "unsynced: [taken]")+issSections), "issue-unsynced", "taken")
+	only(t, lintIss(t, withField(card, "unsynced: [later]")), "issue-unsynced", "later")
+	only(t, lintIss(t, withField(card, "unsynced:\n  - taken")), "issue-front-matter", "")
+}
+
+const otherPath = "docket/issues/2026-11-01-other.md"
+
+func TestCardDuplicate(t *testing.T) {
+	for ext, dup := range map[string]bool{"https://x/1": true, "https://x/1/": false} {
+		in, _ := repo(t, map[string]string{issPath: card, otherPath: strings.Replace(card, "https://x/1", ext, 1)})
+		in.IssueTemplate = issTemplate(t)
+		in.Issues = []string{issPath}
+		rep := run(t, in)
+		if dup && (!has(rep, "issue-external", issPath, -1, "2026-11-01-other") || len(rep.Findings) != 1) || !dup && len(rep.Findings) != 0 {
+			t.Errorf("%s: %+v", ext, rep.Findings)
+		}
+	}
+}
+
+func TestCardDuplicateUnreadable(t *testing.T) {
+	skipRoot(t)
+	dir := t.TempDir()
+	for p, c := range map[string]string{issPath: card, otherPath: card} {
+		full := filepath.Join(dir, filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(filepath.Join(dir, filepath.FromSlash(otherPath)), 0); err != nil {
+		t.Fatal(err)
+	}
+	in, _ := open(t, dir)
+	in.IssueTemplate = issTemplate(t)
+	in.Issues = []string{issPath}
+	rep := run(t, in)
+	if count(rep, "issue-external") != 0 || len(rep.Unreadable) != 1 || rep.Unreadable[0].Source != otherPath {
+		t.Fatalf("%+v", rep)
+	}
+}
