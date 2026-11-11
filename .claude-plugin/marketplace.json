@@ -5,7 +5,7 @@
     {
       "name": "docket",
       "description": "An SDD development workflow that combines superpowers and OpenSpec",
-      "source": { "source": "github", "repo": "wake/docket", "ref": "v0.21.0" }
+      "source": { "source": "github", "repo": "wake/docket", "ref": "v0.22.0" }
     }
   ]
 }
