@@ -23,6 +23,8 @@ type recordOut struct {
 	Unreadable []Unreadable
 	Result     struct {
 		Slug, Requested, Path, Title, Kind, Source string
+		External                                   string `json:"external"`
+		ExternalID                                 string `json:"external_id"`
 		Used                                       []struct {
 			Path    string
 			Sources []string

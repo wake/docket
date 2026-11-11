@@ -17,13 +17,15 @@ import (
 )
 
 type newResult struct {
-	Slug      string   `json:"slug"`
-	Requested string   `json:"requested"`
-	Path      string   `json:"path"` // openspec/changes/<slug>
-	Title     string   `json:"title"`
-	Kind      string   `json:"kind,omitempty"`
-	Source    string   `json:"source"`
-	Used      []newUse `json:"used"` // never null
+	Slug       string   `json:"slug"`
+	Requested  string   `json:"requested"`
+	Path       string   `json:"path"` // openspec/changes/<slug>
+	Title      string   `json:"title"`
+	Kind       string   `json:"kind,omitempty"`
+	Source     string   `json:"source"`
+	External   string   `json:"external,omitempty"`
+	ExternalID string   `json:"external_id,omitempty"`
+	Used       []newUse `json:"used"` // never null
 }
 
 type newUse struct {

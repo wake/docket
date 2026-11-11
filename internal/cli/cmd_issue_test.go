@@ -45,6 +45,9 @@ func TestIssueWritten(t *testing.T) { // Issue written
 	if strings.Contains(raw, `"kind"`) || !strings.Contains(raw, `"used":[]`) {
 		t.Errorf("kind present or used not an empty list: %s", raw)
 	}
+	if strings.Contains(raw, `"external"`) {
+		t.Errorf("external present: %s", raw)
+	}
 	tpl, err := docket.Shipped.ReadFile("shipped/issue/template.md")
 	if err != nil {
 		t.Fatal(err)
@@ -247,4 +250,77 @@ func TestIssueTemplateWithFlag(t *testing.T) { // Template with a flag
 			t.Errorf("%s: docket/ was created", name)
 		}
 	}
+}
+
+const cardURL = "https://git.example.com/app/issues/92"
+
+func TestIssueCard(t *testing.T) { // Card from an address
+	r := recordRepo(t)
+	code, m, raw := doIssue(t, r, r.Dir, "login-loop", "--title", "Login loops", "--source", cardURL, "--external", cardURL, "--external-id", "#92")
+	if code != 0 || len(m.Findings) != 0 {
+		t.Fatalf("code=%d %s", code, raw)
+	}
+	want := "---\ntitle: \"Login loops\"\nsource: \"" + cardURL + "\"\nexternal: \"" + cardURL + "\"\nexternal-id: \"#92\"\n---\n"
+	if got := readFile(t, r, m.Result.Path); got != want {
+		t.Errorf("file %q", got)
+	}
+	if !strings.Contains(raw, `"external_id":"#92"`) || m.Result.External != cardURL {
+		t.Errorf("%s", raw)
+	}
+}
+
+func TestIssueCardFlags(t *testing.T) { // Address without its number, Blank external number
+	base := []string{"login-loop", "--title", "X", "--source", "x"}
+	for name, c := range map[string]struct {
+		args []string
+		want string
+	}{
+		"only external":    {[]string{"--external", cardURL}, "--external-id"},
+		"only external-id": {[]string{"--external-id", "#92"}, "--external"},
+		"blank id":         {[]string{"--external", cardURL, "--external-id", " "}, "--external-id"},
+		"line break":       {[]string{"--external", "a\nb", "--external-id", "#92"}, "--external"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := recordRepo(t)
+			code, _, raw := doIssue(t, r, r.Dir, append(append([]string{}, base...), c.args...)...)
+			if code != 2 || !strings.Contains(raw, c.want) {
+				t.Errorf("code=%d %s", code, raw)
+			}
+			gone(t, r, "docket")
+		})
+	}
+}
+
+func TestIssueCardTaken(t *testing.T) { // Address already carded
+	r := recordRepo(t)
+	const old = "docket/issues/2026-10-29-login.md"
+	r.Write(old, "---\ntitle: \"L\"\nsource: \"x\"\nexternal: \""+cardURL+"\"\nexternal-id: \"#92\"\n---\n")
+	args := func(addr string) []string {
+		return []string{"login-loop", "--title", "X", "--source", "x", "--external", addr, "--external-id", "#92"}
+	}
+	code, m, raw := doIssue(t, r, r.Dir, args(cardURL)...)
+	if code != 1 || !hasRuleIn(m.Findings, "external-taken") || !strings.Contains(raw, old) {
+		t.Errorf("code=%d %s", code, raw)
+	}
+	gone(t, r, "docket/issues/2026-10-30-login-loop.md")
+	if code, _, raw = doIssue(t, r, r.Dir, args(cardURL+"/")...); code != 0 {
+		t.Errorf("code=%d %s", code, raw)
+	}
+}
+
+func TestIssueCardUnreadable(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads anything")
+	}
+	r := recordRepo(t)
+	const bad = "docket/issues/2026-10-29-login.md"
+	r.Write(bad, "x\n")
+	if err := os.Chmod(filepath.Join(r.Dir, bad), 0); err != nil {
+		t.Fatal(err)
+	}
+	code, m, raw := doIssue(t, r, r.Dir, "login-loop", "--title", "X", "--source", "x", "--external", cardURL, "--external-id", "#92")
+	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != bad {
+		t.Errorf("code=%d %s", code, raw)
+	}
+	gone(t, r, "docket/issues/2026-10-30-login-loop.md")
 }
