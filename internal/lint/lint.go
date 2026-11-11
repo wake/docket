@@ -105,6 +105,8 @@ type state struct {
 	knownDone bool
 
 	listings map[string]*listing // by folder
+
+	externals map[string]string // the external of each issue file read to compare, by path; "" when it has none
 }
 
 // listing is every regular .md file directly under a dated folder, linted or
