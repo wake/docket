@@ -150,6 +150,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	// made by this run, unless a link appeared on its path.
 	// It removes only what OpenSpec is known to write (and proposal.md when
 	// this run created it), so a file another process added is never deleted.
+	// shortcut: it removes by name through the root, so a folder another process swapped in at that path, holding those names, goes too; compare folder identity if untrusted concurrent processes ever matter.
 	cleanup := func(err error, ownProposal bool) error {
 		if lerr := safepath.Check(root, "openspec/changes/"+chosen); lerr != nil {
 			return errors.Join(err, fmt.Errorf("left in place: %w", lerr))

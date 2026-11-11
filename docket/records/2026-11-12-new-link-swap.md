@@ -18,4 +18,4 @@ A parent folder swapped for a symbolic link between the check and the open sent 
 
 ## Review
 
-The review is pending.
+Codex adversarial review (another model) raised two points, both present before this fix and outside it: OpenSpec, a subprocess, still writes by path, so `openspec/changes` swapped for a link while it runs can send its write outside (closing it means staging OpenSpec's output, against "OpenSpec still creates the change folder"); and cleanup removes by name, so a plain folder swapped in at that path with the same names is removed, as `dkt record` already accepts (a `shortcut:` comment now says so). Both go to a separate idea; `safefile.Install` goes to a separate issue.
