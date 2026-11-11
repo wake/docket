@@ -23,10 +23,10 @@ var writeRecordFile = func(f *os.File, b []byte) error {
 	return err
 }
 
-// openRecordFile creates the record through root, which does not leave the
+// openNewFile creates the record or the proposal through root, which does not leave the
 // repository even when a folder on the path became a link after the checks;
 // tests replace it to make that happen.
-var openRecordFile = func(root *os.Root, rel string) (*os.File, error) {
+var openNewFile = func(root *os.Root, rel string) (*os.File, error) {
 	return root.OpenFile(rel, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
 }
 
@@ -108,7 +108,7 @@ func writeDated(root, folder, slug string, content []byte, uses []scan.Use) (res
 				return res, Outcome{}, cleanupDated(root, folder, dir, "", made, err)
 			}
 		}
-		f, err := openRecordFile(dir, filepath.FromSlash(rel))
+		f, err := openNewFile(dir, filepath.FromSlash(rel))
 		if errors.Is(err, fs.ErrExist) {
 			continue // another run or a file the scan could not see took this slug
 		}

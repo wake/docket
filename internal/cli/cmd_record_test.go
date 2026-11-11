@@ -384,9 +384,9 @@ func TestRecordFolderSwappedAfterTheChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	outside := t.TempDir()
-	real := openRecordFile
-	t.Cleanup(func() { openRecordFile = real })
-	openRecordFile = func(root *os.Root, rel string) (*os.File, error) {
+	real := openNewFile
+	t.Cleanup(func() { openNewFile = real })
+	openNewFile = func(root *os.Root, rel string) (*os.File, error) {
 		if err := os.Rename(folder, folder+"-moved"); err != nil {
 			t.Error(err)
 		}
