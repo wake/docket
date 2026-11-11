@@ -12,6 +12,7 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/issue"
+	"github.com/wake/docket/internal/markdown"
 	"github.com/wake/docket/internal/record"
 )
 
@@ -176,10 +177,7 @@ func lintDated(r *state, d dated, slug string, known map[string]string) {
 	if d.prefix == "issue" {
 		r.checkExternalDup(c, slug, file, p)
 	}
-	// An issue whose front matter cannot be read may be a card, so its sections wait.
-	if d.prefix != "issue" || p.FrontErr == nil {
-		checkDatedSections(r, d, c, file, p)
-	}
+	checkDatedSections(r, d, c, file, p)
 	if size := p.Size(d.sections); size > d.limit {
 		r.add(c, d.prefix+"-too-long", file, 0, "the four sections hold %d bytes; the limit is %d", size, d.limit)
 	}
@@ -234,6 +232,20 @@ func checkDatedFront(r *state, d dated, c *loaded, file string, p record.Parsed)
 func isCard(p record.Parsed) bool {
 	_, ok := p.Front.Fields["external"]
 	return ok
+}
+
+// isCardRaw is isCard for an issue whose front matter does not parse: a line
+// of it starting with `external:` makes it a card.
+func isCardRaw(raw []byte) bool {
+	for _, l := range markdown.Lines(raw)[1:] {
+		if l == "---" {
+			break
+		}
+		if strings.HasPrefix(l, "external:") {
+			return true
+		}
+	}
+	return false
 }
 
 // checkIssueFront applies the rules of the fields only an issue has.
@@ -297,8 +309,10 @@ func (r *state) checkExternalDup(c *loaded, slug, file string, p record.Parsed) 
 			b, err := fs.ReadFile(r.in.Root, pth)
 			if err != nil {
 				r.unreadable(pth, err)
-			} else if fm, ok, err := change.ReadFrontMatter(b); err == nil && ok {
-				v = fm.Fields["external"].Value // a file whose front matter does not parse holds no address
+			} else if fm, ok, err := change.ReadFrontMatter(b); err != nil {
+				r.unreadable(pth, err) // it may hold the address
+			} else if ok {
+				v = fm.Fields["external"].Value
 			}
 			if r.externals == nil {
 				r.externals = map[string]string{}
@@ -316,7 +330,7 @@ func checkDatedSections(r *state, d dated, c *loaded, file string, p record.Pars
 	rule := d.prefix + "-section"
 	canon := append(slices.Clone(d.sections), d.after...)
 	required := d.sections
-	card := d.prefix == "issue" && isCard(p)
+	card := d.prefix == "issue" && (isCard(p) || p.FrontErr != nil && isCardRaw(c.Files[file]))
 	if card {
 		required = nil // its content is kept in the other tool
 	}
