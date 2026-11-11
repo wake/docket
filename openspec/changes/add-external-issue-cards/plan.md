@@ -68,15 +68,15 @@
 **Interfaces:**
 - Produces: `newResult.External string` (`json:"external,omitempty"`) and `newResult.ExternalID string` (`json:"external_id,omitempty"`); the `--external` and `--external-id` flags.
 
-- [ ] **Step 1: Write the failing tests** in `internal/cli/cmd_issue_test.go`, using `doIssue` and `recordRepo` (the run date is 2026-10-30):
+- [x] **Step 1: Write the failing tests** in `internal/cli/cmd_issue_test.go`, using `doIssue` and `recordRepo` (the run date is 2026-10-30):
   - `TestIssueCard`: `login-loop --title "Login loops" --source https://git.example.com/app/issues/92 --external https://git.example.com/app/issues/92 --external-id "#92"` exits 0; the file is exactly `---\ntitle: "Login loops"\nsource: "https://git.example.com/app/issues/92"\nexternal: "https://git.example.com/app/issues/92"\nexternal-id: "#92"\n---\n`; the JSON has `"external_id":"#92"`. `TestIssueWritten` additionally asserts the raw JSON has no `"external"` key.
   - `TestIssueCardFlags`, table-driven, each exits 2 and writes nothing: only `--external` (message names `--external-id`), only `--external-id` (message names `--external`), `--external-id " "`, `--external` with a line break.
   - `TestIssueCardTaken`: with `docket/issues/2026-10-29-login.md` holding `external: "https://git.example.com/app/issues/92"` in the worktree, the same `--external` exits 1 with finding `external-taken` whose message names `docket/issues/2026-10-29-login.md`, and no new file exists. The same run with `.../issues/92/` exits 0.
   - `TestIssueCardUnreadable`: an issue file in `docket/issues/` with mode 0 (skip when running as root) makes `--external` exit 3 with that path in `unreadable`, nothing written.
-- [ ] **Step 2: Run** `go test ./internal/cli -run 'TestIssue'` and see the new tests fail.
-- [ ] **Step 3: Implement** in `runIssue(c *Context, name, source, title, external, externalID string) (Outcome, error)`: the flag pair check after the title checks (usage errors, exit 2); before writing a card, read each regular `*.md` directly under `docket/issues/` of the worktree with `safefile.ReadNoFollow`, parse its front matter with `change.ReadFrontMatter`, and report `external-taken` on an exact match or list unreadable files and stop; the card's content is the front matter with the two quoted lines and nothing after it.
-- [ ] **Step 4: Run** `go test ./internal/cli` and see it pass.
-- [ ] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/1`.
+- [x] **Step 2: Run** `go test ./internal/cli -run 'TestIssue'` and see the new tests fail.
+- [x] **Step 3: Implement** in `runIssue(c *Context, name, source, title, external, externalID string) (Outcome, error)`: the flag pair check after the title checks (usage errors, exit 2); before writing a card, read each regular `*.md` directly under `docket/issues/` of the worktree with `safefile.ReadNoFollow`, parse its front matter with `change.ReadFrontMatter`, and report `external-taken` on an exact match or list unreadable files and stop; the card's content is the front matter with the two quoted lines and nothing after it.
+- [x] **Step 4: Run** `go test ./internal/cli` and see it pass.
+- [x] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/1`.
 
 ### Task 2: dkt lint checks cards, dropped issues and unsynced steps
 
@@ -93,7 +93,7 @@
 **Interfaces:**
 - Produces: `issue.Steps = []string{"open", "taken", "pr", "merged", "dropped"}`; `issue.UnsyncedForm = "unsynced: [<step>, <step>]"`; `issue.DroppedSection = "Dropped"`; `func issue.ParseUnsynced(v string) ([]string, error)`, which returns the steps in the order written (an empty slice for `[]`) and an error, naming the form, for a value not in brackets, an unknown step or a repeated one.
 
-- [ ] **Step 1: Write the failing tests.** `internal/issue/unsynced_test.go`: `TestParseUnsynced` with `[taken, pr]` giving `["taken", "pr"]`, `[]` giving `[]`, and errors for `taken`, `[later]`, `[pr, pr]`. In `internal/lint/issue_test.go`, using `lintIss` and `only` with `card := "---\ntitle: T\nsource: s\nexternal: \"https://x/1\"\nexternal-id: \"#1\"\n---\n"`:
+- [x] **Step 1: Write the failing tests.** `internal/issue/unsynced_test.go`: `TestParseUnsynced` with `[taken, pr]` giving `["taken", "pr"]`, `[]` giving `[]`, and errors for `taken`, `[later]`, `[pr, pr]`. In `internal/lint/issue_test.go`, using `lintIss` and `only` with `card := "---\ntitle: T\nsource: s\nexternal: \"https://x/1\"\nexternal-id: \"#1\"\n---\n"`:
   - `TestCardClean`: `card` alone, `card+"\n<!-- note -->\n"`, and `card` with `unsynced: []` each give no finding.
   - `TestCardFrontMatter`: without `external-id` gives only `issue-front-matter` naming `external-id`; `external-id: #1` unquoted gives only `issue-front-matter` whose message says to quote it; `external: ""` with `external-id` and no sections gives only `issue-front-matter` (no section finding); `dropped: yes` gives only `issue-front-matter`.
   - `TestExternalIDWithoutAddress`: `issFront` plus `external-id: "#1"` and no sections gives `issue-front-matter` naming `external` and the four `issue-section` findings of a local issue.
@@ -102,10 +102,10 @@
   - `TestIssueUnsynced`: `unsynced: [taken, pr]` on a card gives none; `unsynced: [open]` on a local issue with the four sections gives none; `unsynced: [open]` on a card, `unsynced: [taken]` on a local issue, and `unsynced: [later]` each give only `issue-unsynced`; `unsynced:` followed by an indented `- taken` gives `issue-front-matter`.
   - `TestCardDuplicate`: with `repo` holding a second card at `docket/issues/2026-11-01-other.md` with the same `external`, linting only `issPath` gives `issue-external` on `issPath` naming the other file; with `https://x/1/` in the other, none.
   - `TestCardDuplicateUnreadable`: when the other issue cannot be read (mode 0; skip as root), the report lists it in `Unreadable` and holds no `issue-external`.
-- [ ] **Step 2: Run** `go test ./internal/issue ./internal/lint -run 'Unsynced|Card|IssueDropped|IssueUnsynced'` and see them fail.
-- [ ] **Step 3: Implement** `ParseUnsynced` in `internal/issue/issue.go`; in `internal/lint/record.go` add `Dropped` to `issueKind.after`, and in the issue rules: the card fields and `dropped` in `checkDatedFront` (an empty `external-id` read from a value starting with `#` gets the quoting hint), the card branch in `checkDatedSections` (no required section, only `## Dropped` allowed, text outside it reported), the `dropped`/`## Dropped` pairing, `unsynced` through `ParseUnsynced` with the card rule for `open`, and the duplicate check: read the front matter of each other file in `r.list(issue.Dir)`, report one that cannot be read through `r.unreadable`, and read each file once per run. Record rules stay unchanged; gate the new rules on `d.prefix == "issue"` or a field of `dated`, whichever keeps `lintDated` readable.
-- [ ] **Step 4: Run** `go test ./internal/issue ./internal/lint` and see them pass.
-- [ ] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/2`.
+- [x] **Step 2: Run** `go test ./internal/issue ./internal/lint -run 'Unsynced|Card|IssueDropped|IssueUnsynced'` and see them fail.
+- [x] **Step 3: Implement** `ParseUnsynced` in `internal/issue/issue.go`; in `internal/lint/record.go` add `Dropped` to `issueKind.after`, and in the issue rules: the card fields and `dropped` in `checkDatedFront` (an empty `external-id` read from a value starting with `#` gets the quoting hint), the card branch in `checkDatedSections` (no required section, only `## Dropped` allowed, text outside it reported), the `dropped`/`## Dropped` pairing, `unsynced` through `ParseUnsynced` with the card rule for `open`, and the duplicate check: read the front matter of each other file in `r.list(issue.Dir)`, report one that cannot be read through `r.unreadable`, and read each file once per run. Record rules stay unchanged; gate the new rules on `d.prefix == "issue"` or a field of `dated`, whichever keeps `lintDated` readable.
+- [x] **Step 4: Run** `go test ./internal/issue ./internal/lint` and see them pass.
+- [x] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/2`.
 
 ### Task 3: dkt status skips dropped issues
 
@@ -121,11 +121,11 @@
 **Interfaces:**
 - Produces: `ParseItem` returns `Idea{Title, Dropped}` for an issue; `Needs` stays nil.
 
-- [ ] **Step 1: Write the failing tests** in `internal/idea/idea_test.go`: `TestParseItemIssueDropped` (`dropped: true` gives `Dropped` true; `dropped: yes` gives an error mentioning `true or false`; `needs: [docket/ideas/a.md]` is ignored); `TestNextDroppedIssue` (an order of a dropped issue then an idea gives the idea); `TestNextAddressDoesNotTake` (a work map keyed by `https://git.example.com/app/issues/92` leaves the card at `docket/issues/2026-11-12-login-loop.md` next); `TestCheckCard` (through `Check`, an order naming a card with title `Login loops` holds it in `items` with that title and no problem).
-- [ ] **Step 2: Run** `go test ./internal/idea` and see the dropped tests fail.
-- [ ] **Step 3: Implement** the `dropped` read in `ParseItem`, with the same values and error as `Parse`, and update the comment on `Idea`.
-- [ ] **Step 4: Run** `go test ./internal/idea ./internal/cli -run 'Status|Next|Parse|Check'` and see them pass.
-- [ ] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/3`.
+- [x] **Step 1: Write the failing tests** in `internal/idea/idea_test.go`: `TestParseItemIssueDropped` (`dropped: true` gives `Dropped` true; `dropped: yes` gives an error mentioning `true or false`; `needs: [docket/ideas/a.md]` is ignored); `TestNextDroppedIssue` (an order of a dropped issue then an idea gives the idea); `TestNextAddressDoesNotTake` (a work map keyed by `https://git.example.com/app/issues/92` leaves the card at `docket/issues/2026-11-12-login-loop.md` next); `TestCheckCard` (through `Check`, an order naming a card with title `Login loops` holds it in `items` with that title and no problem).
+- [x] **Step 2: Run** `go test ./internal/idea` and see the dropped tests fail.
+- [x] **Step 3: Implement** the `dropped` read in `ParseItem`, with the same values and error as `Parse`, and update the comment on `Idea`.
+- [x] **Step 4: Run** `go test ./internal/idea ./internal/cli -run 'Status|Next|Parse|Check'` and see them pass.
+- [x] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/3`.
 
 ### Task 4: dkt snapshot reports card fields and dropped issues
 
@@ -142,11 +142,11 @@
 - Consumes: `issue.ParseUnsynced` (Task 2).
 - Produces: `IssueEntry.External *string` (`json:"external"`), `IssueEntry.ExternalID *string` (`json:"external_id"`), `IssueEntry.Dropped bool` (`json:"dropped"`), `IssueEntry.Unsynced []string` (`json:"unsynced"`, never null).
 
-- [ ] **Step 1: Write the failing tests** in `internal/snapshot/backlog_test.go`, with `issueIn` and a card file `---\ntitle: Fix X\nexternal: "https://git.example.com/app/issues/92"\nexternal-id: "#92"\nunsynced: [taken]\n---\n`: `TestCardEntry` (those values, `Dropped` false, `Unsynced` `["taken"]`); `TestLocalIssueEntry` (`issueFile` gives nil `External` and `ExternalID`, `Unsynced` `[]`, and JSON `"unsynced":[]`); `TestDroppedIssueState` (`dropped: true` with an unmerged handler gives `State` `dropped` and keeps the handler; `dropped: yes` gives `Dropped` false and `State` `open`); `TestUnsyncedBadForm` (`unsynced: later` gives `[]`). `TestIssueStates` keeps passing.
-- [ ] **Step 2: Run** `go test ./internal/snapshot -run 'Issue|Card|Unsynced'` and see the new tests fail.
-- [ ] **Step 3: Implement** the four fields in `IssueEntry` and their reading in `Backlog` from the first location's front matter; `dropped` set `State` to `dropped` before the handler states.
-- [ ] **Step 4: Run** `go test ./internal/snapshot ./internal/cli -run 'Snapshot|Issue'` and see them pass.
-- [ ] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/4`.
+- [x] **Step 1: Write the failing tests** in `internal/snapshot/backlog_test.go`, with `issueIn` and a card file `---\ntitle: Fix X\nexternal: "https://git.example.com/app/issues/92"\nexternal-id: "#92"\nunsynced: [taken]\n---\n`: `TestCardEntry` (those values, `Dropped` false, `Unsynced` `["taken"]`); `TestLocalIssueEntry` (`issueFile` gives nil `External` and `ExternalID`, `Unsynced` `[]`, and JSON `"unsynced":[]`); `TestDroppedIssueState` (`dropped: true` with an unmerged handler gives `State` `dropped` and keeps the handler; `dropped: yes` gives `Dropped` false and `State` `open`); `TestUnsyncedBadForm` (`unsynced: later` gives `[]`). `TestIssueStates` keeps passing.
+- [x] **Step 2: Run** `go test ./internal/snapshot -run 'Issue|Card|Unsynced'` and see the new tests fail.
+- [x] **Step 3: Implement** the four fields in `IssueEntry` and their reading in `Backlog` from the first location's front matter; `dropped` set `State` to `dropped` before the handler states.
+- [x] **Step 4: Run** `go test ./internal/snapshot ./internal/cli -run 'Snapshot|Issue'` and see them pass.
+- [x] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/4`.
 
 ### Task 5: The skill and the proposal template describe cards
 
@@ -160,7 +160,7 @@
 - Modify: `.claude/skills/docket/SKILL.md`, `.agents/skills/docket/SKILL.md`, `openspec/schemas/docket/templates/proposal.md` (by `dkt init --force`)
 - Modify: `internal/setup/history.go`
 
-- [ ] **Step 1: Draft in Traditional Chinese** the new text of "Ideas, issues and the order" in `shipped/skill/SKILL.md` (the five cases, making a card, the notes and `unsynced`, `--source` holding the card's path) and the `source:` line of the proposal template, as design.md "The flow, in the skill" says; put the draft on the prompt page as a pending prompt for the maintainer to edit.
-- [ ] **Step 2: Wait** for the maintainer to save the edited draft, then translate it into English in the two shipped files; nothing else of the files changes.
-- [ ] **Step 3: Run** `go run ./cmd/dkt init --force` in the worktree (not `dkt`, which in this repository is the build of `main` and embeds the old shipped files), and `go test ./internal/setup -run TestEarlierHoldsShippedFiles`; add the hashes it asks for to `internal/setup/history.go`, and run `go test ./...` to pass.
-- [ ] **Step 4: Commit** with the trailer `Change: add-external-issue-cards/5`.
+- [x] **Step 1: Draft in Traditional Chinese** the new text of "Ideas, issues and the order" in `shipped/skill/SKILL.md` (the five cases, making a card, the notes and `unsynced`, `--source` holding the card's path) and the `source:` line of the proposal template, as design.md "The flow, in the skill" says; put the draft on the prompt page as a pending prompt for the maintainer to edit.
+- [x] **Step 2: Wait** for the maintainer to save the edited draft, then translate it into English in the two shipped files; nothing else of the files changes.
+- [x] **Step 3: Run** `go run ./cmd/dkt init --force` in the worktree (not `dkt`, which in this repository is the build of `main` and embeds the old shipped files), and `go test ./internal/setup -run TestEarlierHoldsShippedFiles`; add the hashes it asks for to `internal/setup/history.go`, and run `go test ./...` to pass.
+- [x] **Step 4: Commit** with the trailer `Change: add-external-issue-cards/5`.
