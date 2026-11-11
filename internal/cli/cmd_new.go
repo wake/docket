@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -139,7 +140,12 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	if err := safepath.Check(root, proposal(chosen)); err != nil {
 		return refuse(err)
 	}
-	dir := filepath.Join(root, "openspec/changes", chosen)
+	rootDir, err := os.OpenRoot(root) // writes and removals go through it, so a link swapped in after the checks cannot lead out
+	if err != nil {
+		return Outcome{}, err
+	}
+	defer rootDir.Close()
+	dir := "openspec/changes/" + chosen
 	// The lock is held and the folder did not exist, so what is there now was
 	// made by this run, unless a link appeared on its path.
 	// It removes only what OpenSpec is known to write (and proposal.md when
@@ -153,7 +159,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 			names = []string{"proposal.md", ".openspec.yaml", ""}
 		}
 		for _, n := range names {
-			rerr := os.Remove(filepath.Join(dir, n))
+			rerr := rootDir.Remove(filepath.FromSlash(path.Join(dir, n)))
 			switch {
 			case rerr == nil || errors.Is(rerr, fs.ErrNotExist):
 			case n == "" && errors.Is(rerr, syscall.ENOTEMPTY):
@@ -176,7 +182,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 		// A link appeared while OpenSpec ran; removing now could follow it out.
 		return refuse(err)
 	}
-	f, err := os.OpenFile(filepath.Join(root, proposal(chosen)), os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+	f, err := openNewFile(rootDir, filepath.FromSlash(proposal(chosen)))
 	if err != nil {
 		return Outcome{}, cleanup(err, false)
 	}
