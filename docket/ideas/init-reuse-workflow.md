@@ -1,22 +1,23 @@
 ---
-title: Offer another project's workflow when setting up a project
+title: Use the user's other workflows when setting up a project
 ---
 
-When docket-init sets up a project, `dkt init` writes `docket/workflow.md` from the template, and the agent then fits it to the user's instructions and habits found in its context. A user who already runs Docket in other projects has usually tuned these steps there (reviewers, verification, merging, the tools they name), and today redoes the same integration in every new project, or copies the file by hand.
+When docket-init sets up a project, `dkt init` writes `docket/workflow.md` from the template, and the agent then fits it to the user's instructions and habits found in its context. A user who already runs Docket in other projects has usually tuned these steps there (reviewers, verification, merging, the tools they name), and today none of that is looked at when a new project is set up.
 
-The project index already knows those projects: `dkt projects ls --json` lists every registered one, with `added`, `ignored` and `missing`.
+The project index already knows those projects: `dkt projects ls --json` lists every registered one, with `ignored` and `missing`.
 
-Directions:
+## Settled (maintainer, 2026-11-11)
 
-- docket-init: when `dkt init` reports `docket/workflow.md` as created, list the other registered projects that are neither ignored nor missing and have a `docket/workflow.md`, and ask the user whether to start from one of them instead of the template. Read another project's files only once the user agrees, as with user-level files today.
-- Show the main points of the chosen file and where it differs from the template, as the integration step does now, and leave out what belongs only to the source project (its own tools, hosts, names) before writing: the new project may be public when the source is not.
-- It is a one-time copy: from then on the new project owns its file, and nothing keeps the two in step, as there is no user-level workflow file by design.
+- Only `docket/workflow.md` is covered.
+- The template stays the standard: the new file starts from it and keeps every step, as the integration step does now.
+- The other projects' `docket/workflow.md` files, when there are any, are references beside the user's instructions. Section by section, the agent compares them with the template and, where they differ, offers the ways those projects do the step, naming which projects do it which way; the user decides each.
+- docket-init lists the other registered projects that are neither ignored nor missing and have a `docket/workflow.md`, and reads them only once the user agrees, as with user-level files today.
+- What belongs only to a source project (its own tools, hosts, names) is pointed out and not carried over unless the user chooses it: the new project may be public when the source is not.
+- Nothing is copied whole or kept in step: the result is the new project's own file, as there is no user-level workflow file by design.
 - When `docket/workflow.md` already existed before `dkt init`, nothing changes: it holds the project's shared steps.
 
-Open:
+## Open
 
-- What else can be offered besides `docket/workflow.md`: the `## Issues` section of `AGENTS.md` (where issues are filed), OpenSpec's `context` and `rules` in `openspec/config.yaml`. `docket/domains.md` and the specs belong to their project and are not offered.
-- A source whose `template` value differs from the template `dkt init` installs: offer only sources at the same version, or copy one and bring it up to date with docket-doctor.
-- With several candidates, how to order them: by `added`, by a shared origin host, or just by path.
-- Whether the user's instructions from context are still integrated on top of the copied file, or only their differences from it are shown.
-- Whether dkt helps, for example `dkt init --workflow-from <path>`, which would check the template version and refuse symbolic links, or the agent copies the file itself.
+- A reference written for an older `template` version: compare only the sections whose headings match the current template, and say which ones were left out.
+- How to present many differences without showing whole files: per section, the template's step and each variant with the projects that use it.
+- Whether dkt needs anything; probably not, since the agent only reads files the index points to.
