@@ -116,6 +116,7 @@
 **Files:**
 - Modify: `internal/idea/idea.go`
 - Test: `internal/idea/idea_test.go`
+- Test: `internal/cli/cmd_status_test.go` (`TestStatusIssueWithDroppedOrNeeds` asserted the old behavior)
 
 **Interfaces:**
 - Produces: `ParseItem` returns `Idea{Title, Dropped}` for an issue; `Needs` stays nil.
