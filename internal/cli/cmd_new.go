@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -139,11 +140,17 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	if err := safepath.Check(root, proposal(chosen)); err != nil {
 		return refuse(err)
 	}
-	dir := filepath.Join(root, "openspec/changes", chosen)
+	rootDir, err := os.OpenRoot(root) // writes and removals go through it, so a link swapped in after the checks cannot lead out
+	if err != nil {
+		return Outcome{}, err
+	}
+	defer rootDir.Close()
+	dir := "openspec/changes/" + chosen
 	// The lock is held and the folder did not exist, so what is there now was
 	// made by this run, unless a link appeared on its path.
 	// It removes only what OpenSpec is known to write (and proposal.md when
 	// this run created it), so a file another process added is never deleted.
+	// shortcut: it removes by name through the root, so a folder another process swapped in at that path, holding those names, goes too; compare folder identity if untrusted concurrent processes ever matter.
 	cleanup := func(err error, ownProposal bool) error {
 		if lerr := safepath.Check(root, "openspec/changes/"+chosen); lerr != nil {
 			return errors.Join(err, fmt.Errorf("left in place: %w", lerr))
@@ -153,7 +160,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 			names = []string{"proposal.md", ".openspec.yaml", ""}
 		}
 		for _, n := range names {
-			rerr := os.Remove(filepath.Join(dir, n))
+			rerr := rootDir.Remove(filepath.FromSlash(path.Join(dir, n)))
 			switch {
 			case rerr == nil || errors.Is(rerr, fs.ErrNotExist):
 			case n == "" && errors.Is(rerr, syscall.ENOTEMPTY):
@@ -176,7 +183,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 		// A link appeared while OpenSpec ran; removing now could follow it out.
 		return refuse(err)
 	}
-	f, err := os.OpenFile(filepath.Join(root, proposal(chosen)), os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+	f, err := openNewFile(rootDir, filepath.FromSlash(proposal(chosen)))
 	if err != nil {
 		return Outcome{}, cleanup(err, false)
 	}

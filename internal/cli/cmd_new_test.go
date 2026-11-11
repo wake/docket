@@ -439,3 +439,57 @@ func TestNewFailureLeavesLinkedFolder(t *testing.T) { // cleanup never removes t
 		t.Errorf("target changed: %q %v", b, err)
 	}
 }
+
+// swapFolder replaces dir by a link to outside, as another process could between the checks and the use.
+func swapFolder(t *testing.T, dir, outside string) {
+	t.Helper()
+	if err := os.Rename(dir, dir+"-moved"); err != nil {
+		t.Error(err)
+	}
+	if err := os.Symlink(outside, dir); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestNewFolderSwappedAfterTheChecks(t *testing.T) {
+	e := newProject(t)
+	dir := filepath.Join(e.r.Dir, "openspec/changes/add-x")
+	outside := t.TempDir()
+	real := openNewFile
+	t.Cleanup(func() { openNewFile = real })
+	openNewFile = func(root *os.Root, rel string) (*os.File, error) {
+		swapFolder(t, dir, outside)
+		return real(root, rel)
+	}
+	if code, _, raw, _ := e.doNew(t, e.r.Dir, nil, okArgs...); code == 0 {
+		t.Errorf("wrote through the link: %s", raw)
+	}
+	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
+		t.Errorf("outside the repository: %v %v", entries, err)
+	}
+}
+
+func TestNewCleanupAfterFolderSwapped(t *testing.T) {
+	e := newProject(t)
+	dir := filepath.Join(e.r.Dir, "openspec/changes/add-x")
+	outside := t.TempDir()
+	keep := filepath.Join(outside, "proposal.md")
+	os.WriteFile(keep, []byte("k"), 0o644)
+	real := openNewFile
+	t.Cleanup(func() { openNewFile = real })
+	openNewFile = func(root *os.Root, rel string) (*os.File, error) {
+		f, err := real(root, rel)
+		if err == nil {
+			f.Close() // the write fails
+			swapFolder(t, dir, outside)
+		}
+		return f, err
+	}
+	code, _, raw, _ := e.doNew(t, e.r.Dir, nil, okArgs...)
+	if code == 0 || !strings.Contains(raw, "left in place") {
+		t.Errorf("%d %s", code, raw)
+	}
+	if b, err := os.ReadFile(keep); err != nil || string(b) != "k" {
+		t.Errorf("outside file changed: %q %v", b, err)
+	}
+}
