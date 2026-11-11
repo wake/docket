@@ -1,7 +1,9 @@
 package snapshot
 
 import (
+	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/scan"
@@ -175,6 +177,47 @@ func TestIssueFirstLocation(t *testing.T) {
 	_, is, _, _ := Backlog(in)
 	if *is[0].Title != "New title" || len(is[0].Locations) != 2 {
 		t.Fatalf("%+v", is[0])
+	}
+}
+
+func issueWith(front string, works ...WorkEntry) IssueEntry {
+	in := issueIn(works...)
+	in.IssueFiles = map[string]Files{mainRef: {issueX: []byte("---\ntitle: Fix X\n" + front + "---\n")}}
+	_, is, _, _ := Backlog(in)
+	return is[0]
+}
+
+func TestCardEntry(t *testing.T) {
+	e := issueWith("external: \"https://git.example.com/app/issues/92\"\nexternal-id: \"#92\"\nunsynced: [taken]\n")
+	if e.External == nil || *e.External != "https://git.example.com/app/issues/92" || e.ExternalID == nil || *e.ExternalID != "#92" ||
+		e.Dropped || !reflect.DeepEqual(e.Unsynced, []string{"taken"}) {
+		t.Fatalf("%+v", e)
+	}
+}
+
+func TestLocalIssueEntry(t *testing.T) {
+	_, is, _, _ := Backlog(issueIn())
+	e := is[0]
+	b, _ := json.Marshal(e)
+	if e.External != nil || e.ExternalID != nil || e.Dropped || !strings.Contains(string(b), `"unsynced":[]`) {
+		t.Fatalf("%+v %s", e, b)
+	}
+}
+
+func TestDroppedIssueState(t *testing.T) {
+	e := issueWith("dropped: true\n", work("one", issueX, false, featRef))
+	if e.State != "dropped" || !e.Dropped || len(e.Handlers) != 1 {
+		t.Fatalf("%+v", e)
+	}
+	e = issueWith("dropped: yes\n")
+	if e.Dropped || e.State != "open" {
+		t.Fatalf("%+v", e)
+	}
+}
+
+func TestUnsyncedBadForm(t *testing.T) {
+	if e := issueWith("unsynced: later\n"); e.Unsynced == nil || len(e.Unsynced) != 0 {
+		t.Fatalf("%#v", e.Unsynced)
 	}
 }
 

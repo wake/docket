@@ -6,6 +6,7 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/idea"
+	"github.com/wake/docket/internal/issue"
 	"github.com/wake/docket/internal/scan"
 )
 
@@ -132,7 +133,16 @@ func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []O
 			fm = f
 		}
 		e := IssueEntry{Slug: g.slug, Path: g.path, Title: field(fm, "title"), Source: field(fm, "source"),
+			External: field(fm, "external"), ExternalID: field(fm, "external-id"), Unsynced: []string{},
 			Date: g.date(), State: "open", Handlers: []Handler{}, Locations: []Location{}}
+		if v := field(fm, "dropped"); v != nil && *v == "true" {
+			e.Dropped = true
+		}
+		if v := field(fm, "unsynced"); v != nil {
+			if steps, err := issue.ParseUnsynced(*v); err == nil {
+				e.Unsynced = steps
+			}
+		}
 		if n, ok := position[g.path]; ok {
 			e.Position = &n
 		}
@@ -150,7 +160,10 @@ func Backlog(in BacklogInput) (ideas []IdeaEntry, issues []IssueEntry, order []O
 				}
 			}
 		}
-		if len(e.Handlers) > 0 {
+		switch {
+		case e.Dropped:
+			e.State = "dropped"
+		case len(e.Handlers) > 0:
 			e.State = "in-progress"
 			if merged == len(e.Handlers) {
 				e.State = "done"
