@@ -1,7 +1,7 @@
 ---
 title: <one line of text>
 kind: <feature|change-request|baseline>
-source: <where the request came from; idea - `docket/ideas/<name>.md`; issue - `docket/issues/<slug>.md`, or its URL or path in the project's own tool; anything else - free text>
+source: <where the request came from; idea - `docket/ideas/<name>.md`; issue - `docket/issues/<slug>.md`, also the path of its card for an issue in another tool; anything else - free text>
 specs:
   <new-capability-path>: <name of the new capability>
 ---
