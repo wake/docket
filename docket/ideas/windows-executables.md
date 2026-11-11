@@ -7,7 +7,7 @@ The first releases ship macOS and Linux only. The maintainer chose that on 2026-
 ## What does not build
 
 - `syscall.O_NOFOLLOW`: `Install` and `ReadNoFollow` in `internal/safefile/safefile.go`, `internal/cli/cmd_new.go`, `internal/cli/cmd_record.go`.
-- `syscall.Flock`, `LOCK_EX`, `LOCK_UN`: `lockOpenSpec` in `internal/cli/cmd_new.go`, which locks the `openspec` directory so that two runs of `dkt new` cannot interleave.
+- `syscall.Flock`, `LOCK_EX`, `LOCK_UN`: `lockDir` in `internal/cli/cmd_new.go`, which `dkt new` uses to lock the `openspec` directory, and `dkt issue` the repository root when it writes a card, so that two runs cannot interleave (since #128).
 
 These need a port, not only a build fix. The specs require the no-follow reads and the refusal of symbolic links (`change-creation`, `records`, `project-setup`, `plan-sync`), so a flag of 0 would drop that protection without saying so. The lock needs another way to hold off a second run.
 
