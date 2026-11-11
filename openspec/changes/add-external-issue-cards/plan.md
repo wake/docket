@@ -27,6 +27,8 @@
 - Two addresses that differ only by a trailing `/` are two cards: `dkt issue` writes the second (Task 1).
 - `dkt issue --external` while `docket/issues/` holds an issue it cannot read: `unreadable` lists it, exit 3, nothing written (Task 1).
 - `unsynced: []` is valid: no lint finding, and the snapshot reports `[]` (Tasks 2 and 4).
+- A card whose `external` is blank, or that has `external-id` but no `external`, is still judged by the `external` key alone: a blank `external` gets only `issue-front-matter`, never the four missing sections; `external-id` without `external` is a local issue missing its sections (Task 2).
+- Another issue in `docket/issues/` that lint cannot read while checking duplicates: it is listed in `unreadable`, and the issue being linted gets no false `issue-external` (Task 2).
 
 ## Reuse
 
@@ -43,7 +45,7 @@
 | Sections after the required ones | internal/lint/record.go:dated.after | reuse | `Dropped` in `issueKind.after` | `rg -n "after " internal/lint/record.go` |
 | Issues in the worktree | internal/lint/record.go:(*state).list | reuse | duplicate address in lint | `rg -n "func \(r \*state\) list" internal/lint` |
 | Parse a record or issue | internal/record/parse.go:Parse | reuse | sections, outside text, comments blanked | `rg -n "func Parse" internal/record` |
-| One-line list of steps | internal/idea/idea.go:Parse | new | `needs` checks idea paths; a step list needs its own vocabulary, and a shared reader would restructure idea parsing for one caller | `rg -n "NeedsForm" internal/` |
+| One-line list of steps | internal/idea/idea.go:Parse | new | the bracket reading of `needs` is inline in `Parse`, mixed with its idea-path check; `issue.ParseUnsynced` serves lint and the snapshot with its own vocabulary, and extracting a shared reader would be a structural change to idea parsing for about five lines | `rg -n 'NeedsForm\|strings.Split\(inner' internal/idea` |
 | Issue `dropped` for dkt status | internal/idea/idea.go:ParseItem | extend | read `dropped` as Parse does | `rg -n "func ParseItem" internal/idea` |
 | Skip dropped items | internal/idea/idea.go:Next | reuse | already skips `Dropped` | `rg -n "func Next" internal/idea` |
 | Issue entry of the snapshot | internal/snapshot/result.go:IssueEntry | extend | four fields | `rg -n "type IssueEntry" internal/snapshot` |
@@ -93,13 +95,15 @@
 
 - [ ] **Step 1: Write the failing tests.** `internal/issue/unsynced_test.go`: `TestParseUnsynced` with `[taken, pr]` giving `["taken", "pr"]`, `[]` giving `[]`, and errors for `taken`, `[later]`, `[pr, pr]`. In `internal/lint/issue_test.go`, using `lintIss` and `only` with `card := "---\ntitle: T\nsource: s\nexternal: \"https://x/1\"\nexternal-id: \"#1\"\n---\n"`:
   - `TestCardClean`: `card` alone, `card+"\n<!-- note -->\n"`, and `card` with `unsynced: []` each give no finding.
-  - `TestCardFrontMatter`: without `external-id` gives only `issue-front-matter` naming `external-id`; `external-id: #1` unquoted gives only `issue-front-matter` whose message says to quote it; `dropped: yes` gives only `issue-front-matter`.
+  - `TestCardFrontMatter`: without `external-id` gives only `issue-front-matter` naming `external-id`; `external-id: #1` unquoted gives only `issue-front-matter` whose message says to quote it; `external: ""` with `external-id` and no sections gives only `issue-front-matter` (no section finding); `dropped: yes` gives only `issue-front-matter`.
+  - `TestExternalIDWithoutAddress`: `issFront` plus `external-id: "#1"` and no sections gives `issue-front-matter` naming `external` and the four `issue-section` findings of a local issue.
   - `TestCardContent`: `card+"\n## Current\nc\n"` gives only `issue-section` naming `Current` with `other tool` in the message; `card+"\nloose text\n"` gives only `issue-section`.
   - `TestIssueDropped`: a card with `dropped: true` and `## Dropped\nClosed in the tracker as a duplicate.\n` gives none; a local issue with `dropped: true` and the four sections but no `## Dropped` gives only `issue-section` naming `Dropped`; `## Dropped` with only a comment gives `issue-section`; `## Dropped` without `dropped: true` gives `issue-section`.
   - `TestIssueUnsynced`: `unsynced: [taken, pr]` on a card gives none; `unsynced: [open]` on a local issue with the four sections gives none; `unsynced: [open]` on a card, `unsynced: [taken]` on a local issue, and `unsynced: [later]` each give only `issue-unsynced`; `unsynced:` followed by an indented `- taken` gives `issue-front-matter`.
   - `TestCardDuplicate`: with `repo` holding a second card at `docket/issues/2026-11-01-other.md` with the same `external`, linting only `issPath` gives `issue-external` on `issPath` naming the other file; with `https://x/1/` in the other, none.
+  - `TestCardDuplicateUnreadable`: when the other issue cannot be read (mode 0; skip as root), the report lists it in `Unreadable` and holds no `issue-external`.
 - [ ] **Step 2: Run** `go test ./internal/issue ./internal/lint -run 'Unsynced|Card|IssueDropped|IssueUnsynced'` and see them fail.
-- [ ] **Step 3: Implement** `ParseUnsynced` in `internal/issue/issue.go`; in `internal/lint/record.go` add `Dropped` to `issueKind.after`, and in the issue rules: the card fields and `dropped` in `checkDatedFront` (an empty `external-id` read from a value starting with `#` gets the quoting hint), the card branch in `checkDatedSections` (no required section, only `## Dropped` allowed, text outside it reported), the `dropped`/`## Dropped` pairing, `unsynced` through `ParseUnsynced` with the card rule for `open`, and the duplicate check against the other files of `r.list(issue.Dir)`. Record rules stay unchanged; gate the new rules on `d.prefix == "issue"` or a field of `dated`, whichever keeps `lintDated` readable.
+- [ ] **Step 3: Implement** `ParseUnsynced` in `internal/issue/issue.go`; in `internal/lint/record.go` add `Dropped` to `issueKind.after`, and in the issue rules: the card fields and `dropped` in `checkDatedFront` (an empty `external-id` read from a value starting with `#` gets the quoting hint), the card branch in `checkDatedSections` (no required section, only `## Dropped` allowed, text outside it reported), the `dropped`/`## Dropped` pairing, `unsynced` through `ParseUnsynced` with the card rule for `open`, and the duplicate check: read the front matter of each other file in `r.list(issue.Dir)`, report one that cannot be read through `r.unreadable`, and read each file once per run. Record rules stay unchanged; gate the new rules on `d.prefix == "issue"` or a field of `dated`, whichever keeps `lintDated` readable.
 - [ ] **Step 4: Run** `go test ./internal/issue ./internal/lint` and see them pass.
 - [ ] **Step 5: Commit** with the trailer `Change: add-external-issue-cards/2`.
 
@@ -157,5 +161,5 @@
 
 - [ ] **Step 1: Draft in Traditional Chinese** the new text of "Ideas, issues and the order" in `shipped/skill/SKILL.md` (the five cases, making a card, the notes and `unsynced`, `--source` holding the card's path) and the `source:` line of the proposal template, as design.md "The flow, in the skill" says; put the draft on the prompt page as a pending prompt for the maintainer to edit.
 - [ ] **Step 2: Wait** for the maintainer to save the edited draft, then translate it into English in the two shipped files; nothing else of the files changes.
-- [ ] **Step 3: Run** `dkt init --force` in the worktree, and `go test ./internal/setup -run TestEarlierHoldsShippedFiles`; add the hashes it asks for to `internal/setup/history.go`, and run `go test ./...` to pass.
+- [ ] **Step 3: Run** `go run ./cmd/dkt init --force` in the worktree (not `dkt`, which in this repository is the build of `main` and embeds the old shipped files), and `go test ./internal/setup -run TestEarlierHoldsShippedFiles`; add the hashes it asks for to `internal/setup/history.go`, and run `go test ./...` to pass.
 - [ ] **Step 4: Commit** with the trailer `Change: add-external-issue-cards/5`.
