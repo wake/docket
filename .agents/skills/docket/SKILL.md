@@ -129,10 +129,11 @@ When the project's `AGENTS.md` has a `## Issues` section, an issue's
 content is kept in the tool it names, and Docket stands for it with a card:
 an issue file in `docket/issues/` whose front matter adds `external` (the
 issue's address) and `external-id` (the number people use, such as `#92`),
-with no body. A card's state and handlers come from the changes and records
-that take it, as for any issue. Read and write the tool with the tool
-`## Issues` names; below, syncing means reading the issue's content,
-comments and last update time.
+with no body (a dropped card adds the `## Dropped` section saying why). A
+card's state and handlers come from the changes and records that take it,
+as for any issue. Read and write the tool with the tool `## Issues` names;
+below, syncing means reading the issue's content, comments and last update
+time.
 
 - **Making a card**: check that no card has the address, run
   `dkt issue <name> --external <address> --external-id <number> --title "<the tool's title>" --source "<source>"`,
@@ -151,8 +152,8 @@ comments and last update time.
   edits are a direct merge of their own.
 - **Before work starts**: sync before brainstorming or the record. Update
   the card when the tool's title changed; when the tool has closed the
-  issue, stop and ask the user. Put the content and comments read, with the
-  tool's last update time as read, into the proposal or the record. Edits
+  issue, stop and ask the user. Sum up the content and comments read, with
+  the tool's last update time as read, in the proposal or the record. Edits
   to the card go into the work's first commit.
 - **Before the pull request**: sync again, and add to the proposal or the
   record what was added since work started.
