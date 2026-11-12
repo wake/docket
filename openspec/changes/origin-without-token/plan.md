@@ -167,28 +167,28 @@ with the trailer `Change: origin-without-token/2`.
 
 This fixes what project-index's "Origin recorded" already requires for entries stored before Task 1.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add `TestLoadRemovesUserInfo` to `internal/projects/files_test.go`: with the `write` helper, an index holding two entries, `/w/a` with `origin` `https://user:p%zz@example.com/org/app.git` and `/w/b` with `origin` null (both `added` `2026-11-08T09:10:11Z`, `ignored` false). After `Load`, `/w/a`'s `Origin` is `https://example.com/org/app.git` and `/w/b`'s is nil. Then `Save` to a new path and read the file back: it does not contain `p%zz`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `go test ./internal/projects/ -run TestLoadRemovesUserInfo -v`
 Expected: FAIL, the origin still holds `user:p%zz@`.
 
-- [ ] **Step 3: In `Load` (`internal/projects/files.go`), replace each non-nil `Origin` with `withoutUserInfo` of it, after the checks**
+- [x] **Step 3: In `Load` (`internal/projects/files.go`), replace each non-nil `Origin` with `withoutUserInfo` of it, after the checks**
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `go test ./internal/projects/ -v`
 Expected: PASS
 
-- [ ] **Step 5: Run the full checks**
+- [x] **Step 5: Run the full checks**
 
 Run: `gofmt -l .`, `go vet ./...`, `go test ./...`
 Expected: no output from gofmt, vet clean, all tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/projects/files.go internal/projects/files_test.go
