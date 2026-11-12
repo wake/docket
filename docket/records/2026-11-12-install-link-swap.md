@@ -14,8 +14,8 @@ A parent folder swapped for a link after the checks sent the write and rename ou
 
 ## Verification
 
-`TestWriteFolderSwappedAfterDecide`, `TestWriteFailureAfterFolderMoved`, `TestSyncFolderSwappedAfterTheRead`, `TestNewFolderSwappedForLinkInside` and `TestRecordFolderSwappedForLinkInside` failed on the code before (by path, then `os.Root` alone) and pass after; gofmt, go vet and go test pass. Not exercised: a swap between `OpenDir`'s check and open, and `dkt init` turning the error into `symlink-refused`.
+`TestWriteFolderSwappedAfterDecide`, `TestWriteFailureAfterFolderMoved`, `TestSyncFolderSwappedAfterTheRead`, `TestNewFolderSwappedForLinkInside` and `TestRecordFolderSwappedForLinkInside` failed on the code before and pass after; gofmt, go vet and go test pass. Not exercised: a swap between `OpenDir`'s check and open, and `dkt init` turning the error into `symlink-refused`.
 
 ## Review
 
-Codex adversarial review (another model) of the first version, which wrote through `os.Root` alone: it still followed a relative link inside the repository (fixed with `OpenDir`, which also covers `dkt new` and `dkt record`), and the removal on failure resolved the path again, leaving the temporary file in a moved folder (fixed: it removes in the opened folder).
+Codex (another model), first on `os.Root` alone: it followed a relative link inside the repository, and the removal on failure left the temporary file in a moved folder; both fixed with `OpenDir`. Then on the fix: new and record did not report `symlink-refused` (fixed); a link to the checked folder moved away passes, which is kept and documented, as it equals a move after the open.

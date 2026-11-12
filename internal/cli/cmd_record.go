@@ -91,6 +91,11 @@ func runRecord(c *Context, name, kind, source, title string) (Outcome, error) {
 // suffixed slug, and returns the result without title, kind and source. A
 // result with no Slug means nothing was written: out and err say why.
 func writeDated(root, folder, slug string, content []byte, uses []scan.Use) (res newResult, out Outcome, err error) {
+	defer func() {
+		if err != nil {
+			out, err = refuse(err) // a folder swapped for a link during the run
+		}
+	}()
 	dir, err := os.OpenRoot(root)
 	if err != nil {
 		return res, Outcome{}, err

@@ -11,8 +11,10 @@ import (
 // OpenDir opens the folder rel (slash-separated, "." for root itself) inside
 // root one name at a time and returns it, refusing a link at any name with a
 // *SymlinkError. With mkdir it makes the folders that are missing. Each folder
-// it opens is the one it checked, so a name swapped for a link meanwhile is
-// refused as well.
+// it opens is the one it checked, so a name swapped meanwhile for a link to
+// another folder is refused as well. A link to the very folder checked, moved
+// away, is let through: the write then lands in that folder, as it would had
+// the folder been moved just after the open, which no open can prevent.
 func OpenDir(root *os.Root, rel string, mkdir bool) (*os.Root, error) {
 	cur, err := root.OpenRoot(".")
 	if err != nil {

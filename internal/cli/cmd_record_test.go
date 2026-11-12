@@ -420,8 +420,8 @@ func TestRecordFolderSwappedForLinkInside(t *testing.T) {
 		}
 		return real(root, rel)
 	}
-	if code, _, raw := doRecord(t, r, r.Dir, recArgs...); code == 0 {
-		t.Errorf("wrote through the link: %s", raw)
+	if code, _, raw := doRecord(t, r, r.Dir, recArgs...); code != 1 || !strings.Contains(raw, "symlink-refused") {
+		t.Errorf("%d %s", code, raw)
 	}
 	if entries, err := os.ReadDir(folder + "-moved"); err != nil || len(entries) != 0 {
 		t.Errorf("wrote through the link: %v %v", entries, err)
