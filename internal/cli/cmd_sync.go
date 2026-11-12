@@ -190,17 +190,25 @@ func syncFile(a syncFileArgs) (Outcome, error) {
 		if err != nil {
 			return Outcome{}, err
 		}
-		root, err := os.OpenRoot(a.Root) // a folder swapped for a link since the read cannot lead the write out
+		root, err := os.OpenRoot(a.Root)
 		if err != nil {
 			return Outcome{}, err
 		}
 		defer root.Close()
-		name := filepath.FromSlash(plan)
-		fi, err := root.Stat(name)
+		dir, err := safepath.OpenDir(root, path.Dir(plan), false) // refuses a folder swapped for a link since the read
+		if err != nil {
+			return refuse(err)
+		}
+		defer dir.Close()
+		name := path.Base(plan)
+		fi, err := dir.Lstat(name)
 		if err != nil {
 			return Outcome{}, err
 		}
-		if err := safefile.InstallIn(root, name, ticked, fi.Mode().Perm(), true, plan); err != nil {
+		if fi.Mode()&fs.ModeSymlink != 0 {
+			return refuse(&safepath.SymlinkError{Path: plan})
+		}
+		if err := safefile.InstallIn(dir, name, ticked, fi.Mode().Perm(), true, plan); err != nil {
 			return Outcome{}, err
 		}
 	}
