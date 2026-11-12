@@ -403,6 +403,31 @@ func TestRecordFolderSwappedAfterTheChecks(t *testing.T) {
 	}
 }
 
+func TestRecordFolderSwappedForLinkInside(t *testing.T) {
+	r := recordRepo(t)
+	folder := filepath.Join(r.Dir, "docket/records")
+	if err := os.MkdirAll(folder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	real := openNewFile
+	t.Cleanup(func() { openNewFile = real })
+	openNewFile = func(root *os.Root, rel string) (*os.File, error) {
+		if err := os.Rename(folder, folder+"-moved"); err != nil {
+			t.Error(err)
+		}
+		if err := os.Symlink("records-moved", folder); err != nil { // stays inside the repository
+			t.Error(err)
+		}
+		return real(root, rel)
+	}
+	if code, _, raw := doRecord(t, r, r.Dir, recArgs...); code != 1 || !strings.Contains(raw, "symlink-refused") {
+		t.Errorf("%d %s", code, raw)
+	}
+	if entries, err := os.ReadDir(folder + "-moved"); err != nil || len(entries) != 0 {
+		t.Errorf("wrote through the link: %v %v", entries, err)
+	}
+}
+
 func TestRecordDefaultClock(t *testing.T) {
 	r := recordRepo(t)
 	before := time.Now().Format("2006-01-02")

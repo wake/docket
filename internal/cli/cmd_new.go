@@ -185,7 +185,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	}
 	f, err := openNewFile(rootDir, filepath.FromSlash(proposal(chosen)))
 	if err != nil {
-		return Outcome{}, cleanup(err, false)
+		return refuse(cleanup(err, false)) // a folder swapped for a link gives symlink-refused
 	}
 	_, err = f.Write(change.FrontMatter(title, kind, source))
 	if cerr := f.Close(); err == nil {

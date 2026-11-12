@@ -13,6 +13,7 @@ import (
 
 	docket "github.com/wake/docket"
 	"github.com/wake/docket/internal/safefile"
+	"github.com/wake/docket/internal/safepath"
 )
 
 func shipped(t *testing.T) fs.FS {
@@ -284,13 +285,69 @@ func TestWriteModes(t *testing.T) {
 	}
 }
 
+func TestWriteFolderSwappedAfterDecide(t *testing.T) {
+	for _, inside := range []bool{false, true} {
+		root := t.TempDir()
+		put(t, root, ".claude/skills/docket/SKILL.md", "mine")
+		ds, _ := decideT(t, root, true)
+		target := t.TempDir()
+		link := target
+		if inside { // a relative link that stays inside the repository, which os.Root alone would follow
+			target, link = filepath.Join(root, "elsewhere"), "../elsewhere"
+		}
+		put(t, target, "docket/SKILL.md", "theirs")
+		if err := os.RemoveAll(filepath.Join(root, ".claude/skills")); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(link, filepath.Join(root, ".claude/skills")); err != nil {
+			t.Fatal(err)
+		}
+		var se *safepath.SymlinkError
+		if err := Write(root, ds); !errors.As(err, &se) || se.Path != ".claude/skills" {
+			t.Errorf("inside %v: err = %v, want a link at .claude/skills", inside, err)
+		}
+		if got := get(t, target, "docket/SKILL.md"); got != "theirs" {
+			t.Errorf("inside %v: wrote through the link", inside)
+		}
+		if entries, _ := os.ReadDir(filepath.Join(target, "docket")); len(entries) != 1 {
+			t.Errorf("inside %v: left %d files through the link", inside, len(entries))
+		}
+	}
+}
+
+func TestWriteFailureAfterFolderMoved(t *testing.T) {
+	root := t.TempDir()
+	put(t, root, ".claude/skills/docket/SKILL.md", "mine")
+	all, _ := decideT(t, root, true)
+	ds := []Decision{*find(all, ".claude/skills/docket/SKILL.md")} // so the hook runs on this file's rename
+	dir := filepath.Join(root, ".claude/skills/docket")
+	moved := filepath.Join(root, "moved")
+	old := safefile.Rename
+	defer func() { safefile.Rename = old }()
+	safefile.Rename = func(*os.Root, string, string) error {
+		if err := os.Rename(dir, moved); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return errors.New("boom")
+	}
+	if err := Write(root, ds); err == nil {
+		t.Fatal("want error")
+	}
+	if entries, _ := os.ReadDir(moved); len(entries) != 1 {
+		t.Errorf("left the temporary file in the moved folder: %d files", len(entries))
+	}
+}
+
 func TestWriteFailureKeepsOldFile(t *testing.T) {
 	root := t.TempDir()
 	put(t, root, ".claude/skills/docket/SKILL.md", "mine")
 	ds, _ := decideT(t, root, true)
 	old := safefile.Rename
 	defer func() { safefile.Rename = old }()
-	safefile.Rename = func(string, string) error { return errors.New("boom") }
+	safefile.Rename = func(*os.Root, string, string) error { return errors.New("boom") }
 	if err := Write(root, ds); err == nil {
 		t.Fatal("want error")
 	}

@@ -469,6 +469,23 @@ func TestNewFolderSwappedAfterTheChecks(t *testing.T) {
 	}
 }
 
+func TestNewFolderSwappedForLinkInside(t *testing.T) {
+	e := newProject(t)
+	dir := filepath.Join(e.r.Dir, "openspec/changes/add-x")
+	real := openNewFile
+	t.Cleanup(func() { openNewFile = real })
+	openNewFile = func(root *os.Root, rel string) (*os.File, error) {
+		swapFolder(t, dir, "add-x-moved") // a relative link to the moved folder, inside the repository
+		return real(root, rel)
+	}
+	if code, _, raw, _ := e.doNew(t, e.r.Dir, nil, okArgs...); code != 1 || !strings.Contains(raw, "symlink-refused") {
+		t.Errorf("%d %s", code, raw)
+	}
+	if _, err := os.Lstat(filepath.Join(dir+"-moved", "proposal.md")); err == nil {
+		t.Error("wrote proposal.md through the link")
+	}
+}
+
 func TestNewCleanupAfterFolderSwapped(t *testing.T) {
 	e := newProject(t)
 	dir := filepath.Join(e.r.Dir, "openspec/changes/add-x")

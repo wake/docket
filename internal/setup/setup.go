@@ -202,33 +202,42 @@ func decide(root string, t target, force bool) (Decision, *Problem) {
 // Write carries out the decisions whose Action is create, update or overwrite,
 // never following a link, and returns the first error. The decisions must
 // come from a Decide run just before: Write re-checks nothing beyond not
-// following the final link.
+// following the final link. Each file is written in its folder as opened by
+// safepath.OpenDir, so a folder swapped for a link after Decide gives a
+// *safepath.SymlinkError instead.
 func Write(root string, ds []Decision) error {
+	dir, err := os.OpenRoot(root)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
 	for _, d := range ds {
 		if d.Action != ActionCreate && d.Action != ActionUpdate && d.Action != ActionOverwrite {
 			continue
 		}
-		if err := write(root, d); err != nil {
+		if err := write(dir, d); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func write(root string, d Decision) error {
-	dst := filepath.Join(root, filepath.FromSlash(d.Path))
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+func write(root *os.Root, d Decision) error {
+	dir, err := safepath.OpenDir(root, path.Dir(d.Path), true)
+	if err != nil {
 		return fmt.Errorf("write %s: %w", d.Path, err)
 	}
+	defer dir.Close()
+	name := path.Base(d.Path)
 	if d.existed {
-		info, err := os.Lstat(dst)
+		info, err := dir.Lstat(name)
 		if err != nil {
 			return fmt.Errorf("write %s: %w", d.Path, err)
 		}
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("write %s: not a regular file", d.Path)
 		}
-		return safefile.Install(dst, d.data, info.Mode().Perm(), true, d.Path)
+		return safefile.InstallIn(dir, name, d.data, info.Mode().Perm(), true, d.Path)
 	}
-	return safefile.Install(dst, d.data, 0o644, false, d.Path)
+	return safefile.InstallIn(dir, name, d.data, 0o644, false, d.Path)
 }

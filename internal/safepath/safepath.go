@@ -1,9 +1,9 @@
 // Package safepath refuses to write through symbolic links.
 //
-// It guards against links that are part of the repository's content, such as
-// a committed link from a schema file to AGENTS.md. It does not defend against
-// a process that swaps a path for a link while Docket runs: such a process
-// already acts with the user's rights.
+// Check guards against links that are part of the repository's content, such
+// as a committed link from a schema file to AGENTS.md. OpenDir also refuses a
+// folder swapped for a link while Docket runs, so a write made in the folder
+// it returns does not pass through one.
 package safepath
 
 import (

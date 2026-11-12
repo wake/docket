@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/testutil"
 )
 
@@ -289,6 +291,43 @@ func TestSyncLinkedPlanRefused(t *testing.T) { // Linked plan refused
 		b, _ := os.ReadFile(target)
 		if code != 1 || ruleList(m.Findings) != "symlink-refused" || string(b) != plan4 || m.Result != nil {
 			t.Fatalf("%v: %d %s", args, code, raw)
+		}
+	}
+}
+
+func TestSyncFolderSwappedAfterTheRead(t *testing.T) {
+	for _, inside := range []bool{false, true} {
+		r := syncRepo(t, plan4)
+		sha := trail(r, "add-x/1")
+		target := t.TempDir()
+		link := target
+		if inside { // a relative link that stays inside the repository, which os.Root alone would follow
+			target, link = filepath.Join(r.Dir, "elsewhere"), "../../elsewhere"
+		}
+		if err := os.MkdirAll(target, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(target, "plan.md"), []byte(plan4), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		dir := filepath.Clean(filepath.Join(r.Dir, syncDir))
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(link, dir); err != nil {
+			t.Fatal(err)
+		}
+		out, err := syncFile(syncFileArgs{Slug: "add-x", File: syncDir + "plan.md", Root: r.Dir,
+			Src: []byte(plan4), Plan: change.ParsePlan([]byte(plan4)), Key: "Change",
+			Commits: []gitx.Trailers{{SHA: sha, Values: []string{"add-x/1"}}}, Finding: "add-x"})
+		if err != nil || ruleList(out.Findings) != "symlink-refused" {
+			t.Errorf("inside %v: %v %v", inside, out.Findings, err)
+		}
+		if b, _ := os.ReadFile(filepath.Join(target, "plan.md")); string(b) != plan4 {
+			t.Errorf("inside %v: wrote through the link:\n%s", inside, b)
+		}
+		if entries, _ := os.ReadDir(target); len(entries) != 1 {
+			t.Errorf("inside %v: left %d files through the link", inside, len(entries))
 		}
 	}
 }

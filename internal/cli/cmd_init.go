@@ -115,7 +115,7 @@ func runInit(c *Context, tools string, force bool) (Outcome, error) {
 	}
 
 	if err := setup.Write(root, ds); err != nil {
-		return Outcome{}, err
+		return refuse(err) // a folder swapped for a link after Decide
 	}
 	var dpaths []string
 	var created []string // Docket paths created in this run

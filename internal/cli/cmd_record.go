@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -23,11 +24,17 @@ var writeRecordFile = func(f *os.File, b []byte) error {
 	return err
 }
 
-// openNewFile creates the record or the proposal through root, which does not leave the
-// repository even when a folder on the path became a link after the checks;
-// tests replace it to make that happen.
+// openNewFile creates the record or the proposal in its folder as opened by
+// safepath.OpenDir, which refuses a folder on the path that became a link
+// after the checks; tests replace it to make that happen.
 var openNewFile = func(root *os.Root, rel string) (*os.File, error) {
-	return root.OpenFile(rel, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+	rel = filepath.ToSlash(rel)
+	dir, err := safepath.OpenDir(root, path.Dir(rel), false)
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+	return dir.OpenFile(path.Base(rel), os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
 }
 
 // runRecord is the body of dkt record.
@@ -84,6 +91,11 @@ func runRecord(c *Context, name, kind, source, title string) (Outcome, error) {
 // suffixed slug, and returns the result without title, kind and source. A
 // result with no Slug means nothing was written: out and err say why.
 func writeDated(root, folder, slug string, content []byte, uses []scan.Use) (res newResult, out Outcome, err error) {
+	defer func() {
+		if err != nil {
+			out, err = refuse(err) // a folder swapped for a link during the run
+		}
+	}()
 	dir, err := os.OpenRoot(root)
 	if err != nil {
 		return res, Outcome{}, err

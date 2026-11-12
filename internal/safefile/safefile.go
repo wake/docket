@@ -13,14 +13,26 @@ import (
 	"syscall"
 )
 
-// Rename is os.Rename; tests replace it to make the last step fail.
-var Rename = os.Rename
+// Rename is root.Rename; tests replace it to make the last step fail.
+var Rename = func(root *os.Root, oldname, newname string) error { return root.Rename(oldname, newname) }
 
 // Install writes data to a temporary file beside dst and renames it over dst,
 // so a failed write leaves dst as it was (or missing). An existing file's
 // permission bits are kept exactly (keepMode); a new file gets perm subject
 // to the umask.
-func Install(dst string, data []byte, perm os.FileMode, keepMode bool, rel string) (err error) {
+func Install(dst string, data []byte, perm os.FileMode, keepMode bool, rel string) error {
+	root, err := os.OpenRoot(filepath.Dir(dst))
+	if err != nil {
+		return fmt.Errorf("write %s: %w", rel, err)
+	}
+	defer root.Close()
+	return InstallIn(root, filepath.Base(dst), data, perm, keepMode, rel)
+}
+
+// InstallIn is Install for name inside root: the temporary file, the rename
+// and the removal on failure all go through root, so a folder on the way that
+// became a link after the caller's checks cannot lead them out of it.
+func InstallIn(root *os.Root, name string, data []byte, perm os.FileMode, keepMode bool, rel string) (err error) {
 	var f *os.File
 	var tmp string
 	for try := 0; try < 10; try++ {
@@ -28,9 +40,9 @@ func Install(dst string, data []byte, perm os.FileMode, keepMode bool, rel strin
 		if _, err = rand.Read(rnd[:]); err != nil {
 			return fmt.Errorf("write %s: %w", rel, err)
 		}
-		tmp = filepath.Join(filepath.Dir(dst), "."+filepath.Base(dst)+".docket-tmp-"+hex.EncodeToString(rnd[:]))
+		tmp = filepath.Join(filepath.Dir(name), "."+filepath.Base(name)+".docket-tmp-"+hex.EncodeToString(rnd[:]))
 		// a new file gets perm as is, so the kernel applies the umask
-		f, err = os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, perm)
+		f, err = root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, perm)
 		if !errors.Is(err, fs.ErrExist) {
 			break
 		}
@@ -40,7 +52,7 @@ func Install(dst string, data []byte, perm os.FileMode, keepMode bool, rel strin
 	}
 	defer func() {
 		if err != nil {
-			os.Remove(tmp)
+			root.Remove(tmp)
 		}
 	}()
 	if keepMode {
@@ -53,7 +65,7 @@ func Install(dst string, data []byte, perm os.FileMode, keepMode bool, rel strin
 		err = cerr
 	}
 	if err == nil {
-		err = Rename(tmp, dst)
+		err = Rename(root, tmp, name)
 	}
 	if err != nil {
 		return fmt.Errorf("write %s: %w", rel, err)
