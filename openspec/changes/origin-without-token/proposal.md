@@ -11,7 +11,7 @@ Every command's JSON envelope prints `repo.origin` as git has it, so a remote su
 ## What Changes
 
 - `repo.origin` in the envelope of every command drops the user information of an `http` or `https` URL, as the project index does. Any other URL is printed as it is.
-- The removal no longer depends on the URL parsing cleanly. Today an `http` or `https` URL that does not parse, such as one with an invalid percent escape anywhere in it or a space in its password, keeps its user information in the project index; it loses it, in `repo.origin` and in the index alike, and the rest of the URL is kept as it is.
+- The removal no longer depends on the URL parsing cleanly. Today an `http` or `https` URL that does not parse, such as one with an invalid percent escape anywhere in it or a space in its password, keeps its user information in the project index; it loses it, in `repo.origin` and in the index alike, and the rest of the URL is kept as it is. An entry the index already holds with such a URL loses it when the index is read, so `dkt projects ls` never prints it, and the next write of the index stores it without.
 - **BREAKING** for a script that read a token back out of `repo.origin`: it no longer can.
 
 ## Non-Goals

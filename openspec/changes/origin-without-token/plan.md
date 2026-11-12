@@ -36,6 +36,11 @@
 | Read the origin for the envelope | internal/cli/run.go:identify | extend | It is the only place `repo.origin` is set | `rg -n "Origin = " internal/cli/` |
 | Map a git error while identifying | internal/cli/run.go:identifyError | reuse | Same error rule as today | `rg -n "func identifyError" internal/cli/` |
 | A repository with a remote in tests | internal/testutil/repo.go:NewRepo | reuse | Both test files already use it (`docketRepo` wraps it in `locate_test.go`) | `rg -n "func NewRepo" internal/testutil/` |
+| Clean the entries the index already holds | internal/projects/files.go:Load | extend | Every reader of the index and every later `Save` goes through it | `rg -n "projects.Load\|Load\(" internal --glob '*.go'` |
+
+## Revision 1 (2026-11-13): clean the entries the index already holds
+
+The codex pre-merge review (job review-mwdxi0s6-jomq2h, high) found that an entry stored before this change from an `http` or `https` URL that did not parse keeps its token, and `dkt projects ls --json` prints it. That breaks project-index's "Origin recorded" ("never stored or printed"). Task 3 is added; the proposal and design say so.
 
 ---
 
@@ -146,3 +151,48 @@ git commit -m "Print repo.origin without the user information of an http or http
 ```
 
 with the trailer `Change: origin-without-token/2`.
+
+### Task 3: Clean the entries the index already holds
+
+**Scenarios:** none
+
+**Review:** checks
+
+**Files:**
+- Modify: `internal/projects/files.go`
+- Modify: `internal/projects/files_test.go`
+
+**Interfaces:**
+- Consumes: `withoutUserInfo(raw string) string` from Task 1 (same package).
+
+This fixes what project-index's "Origin recorded" already requires for entries stored before Task 1.
+
+- [ ] **Step 1: Write the failing test**
+
+Add `TestLoadRemovesUserInfo` to `internal/projects/files_test.go`: with the `write` helper, an index holding two entries, `/w/a` with `origin` `https://user:p%zz@example.com/org/app.git` and `/w/b` with `origin` null (both `added` `2026-11-08T09:10:11Z`, `ignored` false). After `Load`, `/w/a`'s `Origin` is `https://example.com/org/app.git` and `/w/b`'s is nil. Then `Save` to a new path and read the file back: it does not contain `p%zz`.
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `go test ./internal/projects/ -run TestLoadRemovesUserInfo -v`
+Expected: FAIL, the origin still holds `user:p%zz@`.
+
+- [ ] **Step 3: In `Load` (`internal/projects/files.go`), replace each non-nil `Origin` with `withoutUserInfo` of it, after the checks**
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `go test ./internal/projects/ -v`
+Expected: PASS
+
+- [ ] **Step 5: Run the full checks**
+
+Run: `gofmt -l .`, `go vet ./...`, `go test ./...`
+Expected: no output from gofmt, vet clean, all tests pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add internal/projects/files.go internal/projects/files_test.go
+git commit -m "Remove the user information from the origins the index already holds"
+```
+
+with the trailer `Change: origin-without-token/3`.

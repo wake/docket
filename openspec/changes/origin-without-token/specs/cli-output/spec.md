@@ -16,7 +16,7 @@ Inside a git repository, `repo` SHALL hold the path of the repository root, the 
 - **THEN** `repo.origin` is `https://example.com/org/app.git`
 
 #### Scenario: Token in a URL that is not well formed
-- **WHEN** the `origin` remote is `https://user:p%zz@example.com/org/app.git`
+- **WHEN** the `origin` remote is `https://user:p%zz@example.com/org/app.git` and a user runs any command with `--json`
 - **THEN** `repo.origin` is `https://example.com/org/app.git`
 
 #### Scenario: SSH remote kept

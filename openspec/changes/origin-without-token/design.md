@@ -9,7 +9,7 @@
 - The user information goes whether or not the URL is well formed.
 
 **Non-Goals:**
-- Rewriting index entries written before this change (see Risks).
+- Writing the index from a command that only reads it, to clean an old entry on disk at once (see Risks).
 
 ## Decisions
 
@@ -29,7 +29,13 @@ Alternatives:
 - Keep `url.Parse` and add a fallback for when it fails. Rejected: two paths for one rule, and `u.String()` may also re-encode other parts of the URL.
 - Redact rather than remove (`https://***@host`). Rejected: the index already removes, and a placeholder looks like a login name.
 
+### `Load` cleans the entries it reads
+
+`projects.Load` applies the same removal to every entry's `origin`, so an entry stored before this change from a URL that did not parse never reaches `dkt projects ls` or any other reader, and the next `Save` stores it clean. Found in the pre-merge review.
+
+Alternative: clean only in `dkt projects ls`. Rejected: every reader and every later write goes through `Load`.
+
 ## Risks / Trade-offs
 
-- [An index entry stored before this change from a URL that did not parse still holds the token] → It is rare (the URL must also be malformed). The release notes say to run `dkt projects rm <path>` and then `dkt projects add <path>` for such an entry.
+- [Until the index is next written, the file on disk still holds such an old token] → It is rare (the URL must also have been malformed). The release notes say that any command that writes the index, such as `dkt projects add` in another project, stores it clean.
 - [A script compared `repo.origin` with git's own value] → They differ only when the URL holds user information; the proposal marks this as breaking.
