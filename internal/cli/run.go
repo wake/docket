@@ -186,11 +186,11 @@ func identify(c *Context) (*Repo, error) {
 	} else if ok {
 		r.Branch = &name
 	}
-	if url, ok, err := c.Git.RemoteURL("origin"); err != nil {
+	origin, err := projects.Origin(c.Git)
+	if err != nil {
 		return nil, identifyError(err)
-	} else if ok {
-		r.Origin = &url
 	}
+	r.Origin = origin
 	return r, nil
 }
 

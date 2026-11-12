@@ -3,9 +3,9 @@ package projects
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wake/docket/internal/gitx"
 )
@@ -66,15 +66,27 @@ func ProjectPath(g gitx.Git, worktree string) (string, error) {
 	return wts[0].Path, nil
 }
 
-// Origin returns the URL of the origin remote, or nil; an http or https URL loses its credentials.
+// Origin returns the URL of the origin remote, or nil. An http or https URL loses its user
+// information by its place in the string, so a URL that does not parse loses it too.
 func Origin(g gitx.Git) (*string, error) {
 	raw, ok, err := g.RemoteURL("origin")
 	if err != nil || !ok {
 		return nil, err
 	}
-	if u, err := url.Parse(raw); err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-		u.User = nil
-		raw = u.String()
-	}
+	raw = withoutUserInfo(raw)
 	return &raw, nil
+}
+
+// withoutUserInfo is not net/url: that fails on some URLs and re-encodes others.
+func withoutUserInfo(raw string) string {
+	scheme, rest, found := strings.Cut(raw, "://")
+	if !found || !(strings.EqualFold(scheme, "http") || strings.EqualFold(scheme, "https")) {
+		return raw
+	}
+	end := strings.IndexAny(rest, "/?#")
+	if end < 0 {
+		end = len(rest)
+	}
+	at := strings.LastIndex(rest[:end], "@")
+	return scheme + "://" + rest[at+1:]
 }

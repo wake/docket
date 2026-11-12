@@ -37,6 +37,16 @@ func TestOrigin(t *testing.T) {
 		{"http://u:p@example.com/app", "http://example.com/app"},
 		{"git@example.com:org/app.git", "git@example.com:org/app.git"},
 		{"ssh://git@example.com/app.git", "ssh://git@example.com/app.git"},
+		{"https://user:p%zz@example.com/org/app.git", "https://example.com/org/app.git"},
+		{"https://tok@example.com/a%zz.git", "https://example.com/a%zz.git"},
+		{"https://user:p ss@example.com/app.git", "https://example.com/app.git"},
+		{"https://tok@example.com/a b.git", "https://example.com/a b.git"},
+		{"https://user:p@ss@example.com/app.git", "https://example.com/app.git"},
+		{"HTTPS://tok@example.com/app.git", "HTTPS://example.com/app.git"},
+		{"https://tok@example.com", "https://example.com"},
+		{"https://example.com/path@x", "https://example.com/path@x"},
+		{"https://example.com?q=a@b", "https://example.com?q=a@b"},
+		{"ftp://u:p@example.com/app.git", "ftp://u:p@example.com/app.git"},
 	} {
 		r := docketRepo(t)
 		r.Git("remote", "add", "origin", c.in)

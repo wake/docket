@@ -3,7 +3,10 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
@@ -120,5 +123,45 @@ func TestRepoGitMissing(t *testing.T) {
 	code, raw := versionRepo(t, r.Dir, env)
 	if code != 0 || string(raw) != "null" {
 		t.Errorf("code = %d, repo = %s", code, raw)
+	}
+}
+
+func TestRepoOriginWithoutUserInfo(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"https://x-access-token:secret@example.com/org/app.git", "https://example.com/org/app.git"},
+		{"https://user:p%zz@example.com/org/app.git", "https://example.com/org/app.git"},
+		{"ssh://git@example.com/org/app.git", "ssh://git@example.com/org/app.git"},
+		{"git@example.com:org/app.git", "git@example.com:org/app.git"},
+	} {
+		r := testutil.NewRepo(t)
+		r.Commit("one", map[string]string{"a": "1"})
+		r.Git("remote", "add", "origin", c.in)
+		if got := identified(t, r).Origin; got == nil || *got != c.want {
+			t.Errorf("origin of %q = %v, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestRepoOriginReadFails(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("one", map[string]string{"a": "1"})
+	real, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	script := "#!/bin/sh\nfor a in \"$@\"; do [ \"$a\" = remote.origin.url ] && exit 3; done\nexec '" + real + "' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := append(append([]string{}, r.Env...), "PATH="+bin+":"+os.Getenv("PATH"))
+	var out bytes.Buffer
+	code := Run(Options{Args: []string{"domains", "--json"}, Dir: r.Dir, Env: env, Stdout: &out, Stderr: &bytes.Buffer{}})
+	var m domainsOut
+	if err := json.Unmarshal(out.Bytes(), &m); err != nil {
+		t.Fatalf("%q: %v", out.String(), err)
+	}
+	if code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "no-repository" || !strings.HasPrefix(m.Findings[0].Message, "cannot identify the repository") {
+		t.Errorf("code=%d out=%q", code, out.String())
 	}
 }
