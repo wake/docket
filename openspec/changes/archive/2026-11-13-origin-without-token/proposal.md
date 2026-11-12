@@ -29,7 +29,7 @@ None.
 
 ### Modified Capabilities
 
-- `cli-output`: Repository identity prints the origin URL without the user information of an `http` or `https` URL.
+- `cli-output`: a new requirement, Origin without user information, has `repo.origin` drop the user information of an `http` or `https` URL; Repository identity is unchanged.
 
 ## Impact
 

@@ -46,6 +46,21 @@ Inside a git repository, `repo` SHALL hold the path of the repository root, the 
 - **WHEN** a user runs `dkt --version --json` outside any git repository
 - **THEN** the command exits with 0 and `repo` is null
 
+### Requirement: Origin without user information
+When the URL of the `origin` remote has the scheme `http` or `https`, `repo.origin` SHALL hold it with its user information removed, so that a token in the URL is never printed; the rest of the URL, and any other URL, SHALL be printed as it is.
+
+#### Scenario: Token in the origin URL
+- **WHEN** the `origin` remote is `https://x-access-token:secret@example.com/org/app.git` and a user runs any command with `--json`
+- **THEN** `repo.origin` is `https://example.com/org/app.git`
+
+#### Scenario: Token in a URL that is not well formed
+- **WHEN** the `origin` remote is `https://user:p%zz@example.com/org/app.git` and a user runs any command with `--json`
+- **THEN** `repo.origin` is `https://example.com/org/app.git`
+
+#### Scenario: SSH remote kept
+- **WHEN** the `origin` remote is `ssh://git@example.com/org/app.git` or `git@example.com:org/app.git`
+- **THEN** `repo.origin` is that URL as it is
+
 ### Requirement: Version
 `dkt --version` SHALL print one line `dkt <version>` and exit with 0; with `--json`, the version goes in `result.version`. The version SHALL be the one stamped at build time; for a build by `go install` at a module version, it is that module version; for a build from a working tree, it is `dev`. The envelope's `version` field SHALL hold the same version.
 

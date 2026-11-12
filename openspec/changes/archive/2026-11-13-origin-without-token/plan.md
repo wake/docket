@@ -42,6 +42,10 @@
 
 The codex pre-merge review (job review-mwdxi0s6-jomq2h, high) found that an entry stored before this change from an `http` or `https` URL that did not parse keeps its token, and `dkt projects ls --json` prints it. That breaks project-index's "Origin recorded" ("never stored or printed"). Task 3 is added; the proposal and design say so.
 
+## Revision 2 (2026-11-13): the rule is its own requirement
+
+At archive time, `openspec validate --specs --strict` found Repository identity over 500 characters with the rule added to it. The rule moved, word for word, into a new requirement, Origin without user information, with the same three scenarios; Repository identity is left as it was. No behavior or test changes; Task 2 claims the three scenarios.
+
 ---
 
 ### Task 1: Remove the user information by its place in the URL
@@ -98,7 +102,7 @@ with the trailer `Change: origin-without-token/1`.
 
 ### Task 2: Print `repo.origin` without the user information
 
-**Scenarios:** cli-output#detached-head, cli-output#no-origin-remote, cli-output#token-in-the-origin-url, cli-output#token-in-a-url-that-is-not-well-formed, cli-output#ssh-remote-kept, cli-output#no-commits-yet, cli-output#outside-a-repository
+**Scenarios:** cli-output#token-in-the-origin-url, cli-output#token-in-a-url-that-is-not-well-formed, cli-output#ssh-remote-kept
 
 **Review:** checks
 
@@ -109,7 +113,7 @@ with the trailer `Change: origin-without-token/1`.
 **Interfaces:**
 - Consumes: `projects.Origin(g gitx.Git) (*string, error)` from Task 1.
 
-The scenarios Detached HEAD, No origin remote, No commits yet and Outside a repository are unchanged and stay covered by `TestRepoDetachedHead`, `TestRepoNoOrigin`, `TestRepoNoCommits` and `TestRepoOutsideRepository`.
+Repository identity is unchanged; its scenarios stay covered by `TestRepoDetachedHead`, `TestRepoNoOrigin`, `TestRepoNoCommits` and `TestRepoOutsideRepository`.
 
 - [x] **Step 1: Write the failing test**
 
