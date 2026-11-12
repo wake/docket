@@ -21,6 +21,8 @@
 ## Review Focus
 
 - A URL that `net/url` rejects (`https://user:p%zz@example.com/org/app.git`, `https://tok@example.com/a%zz.git`, a space in the password): the user information goes and the rest stays byte for byte. Tested in Task 1.
+- A URL that `net/url` accepts but `u.String()` would re-encode (`https://tok@example.com/a b.git`): the rest stays byte for byte, so an implementation that keeps `url.Parse` for well-formed input fails. Tested in Task 1.
+- An error while reading the origin: still reported as `no-repository`, as `identifyError` does today. Tested in Task 2.
 - An `@` after the authority (`https://example.com/path@x`): the URL is unchanged. Tested in Task 1.
 - A password with a raw `@` (`https://user:p@ss@example.com/app.git`): all of the user information goes. Tested in Task 1.
 - An upper-case scheme (`HTTPS://tok@example.com/app.git`): the user information goes and the scheme keeps its case. Tested in Task 1.
@@ -30,7 +32,7 @@
 
 | Need | Existing (path:symbol) | Decision | Reason | Evidence |
 |---|---|---|---|---|
-| Read the origin URL without its user information | internal/projects/locate.go:Origin | extend | The index already applies the rule; it only needs to stop depending on `url.Parse` | `rg -n "func Origin" internal/` |
+| Read the origin URL without its user information | internal/projects/locate.go:Origin | extend | The index already applies the rule through it (`register.go:50`, `locate.go:42`); it only needs to stop depending on `url.Parse` | `rg -n 'projects\.Origin\|Origin\(' internal --glob '*.go'` |
 | Read the origin for the envelope | internal/cli/run.go:identify | extend | It is the only place `repo.origin` is set | `rg -n "Origin = " internal/cli/` |
 | Map a git error while identifying | internal/cli/run.go:identifyError | reuse | Same error rule as today | `rg -n "func identifyError" internal/cli/` |
 | A repository with a remote in tests | internal/testutil/repo.go:NewRepo | reuse | Both test files already use it (`docketRepo` wraps it in `locate_test.go`) | `rg -n "func NewRepo" internal/testutil/` |
@@ -58,6 +60,7 @@ Add these rows to the table in `TestOrigin` (`internal/projects/locate_test.go`)
 | `https://user:p%zz@example.com/org/app.git` | `https://example.com/org/app.git` |
 | `https://tok@example.com/a%zz.git` | `https://example.com/a%zz.git` |
 | `https://user:p ss@example.com/app.git` | `https://example.com/app.git` |
+| `https://tok@example.com/a b.git` | `https://example.com/a b.git` |
 | `https://user:p@ss@example.com/app.git` | `https://example.com/app.git` |
 | `HTTPS://tok@example.com/app.git` | `HTTPS://example.com/app.git` |
 | `https://tok@example.com` | `https://example.com` |
@@ -68,7 +71,7 @@ Add these rows to the table in `TestOrigin` (`internal/projects/locate_test.go`)
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `go test ./internal/projects/ -run TestOrigin -v`
-Expected: FAIL on the rows `url.Parse` rejects (the first three) and on the upper-case scheme row.
+Expected: FAIL on the rows `url.Parse` rejects (the first three), on the `a b.git` row (re-encoded to `a%20b.git`) and on the upper-case scheme row.
 
 - [ ] **Step 3: Implement `withoutUserInfo(raw string) string` in `internal/projects/locate.go`**
 
@@ -114,10 +117,12 @@ Add `TestRepoOriginWithoutUserInfo` to `internal/cli/repo_test.go`: for each row
 | `ssh://git@example.com/org/app.git` | `ssh://git@example.com/org/app.git` |
 | `git@example.com:org/app.git` | `git@example.com:org/app.git` |
 
-- [ ] **Step 2: Run the test to verify it fails**
+Add `TestRepoOriginReadFails` to the same file: in a `testutil.NewRepo` with one commit, put a `git` script first on PATH (as `internal/testutil/repo.go` does) that exits 3 when its arguments include `remote.origin.url` and otherwise runs the real git (`exec.LookPath("git")` before PATH changes). `dkt domains --json` in that repository must exit 4 with one finding, rule `no-repository`, whose message starts with `cannot identify the repository`. This test passes before the change too; it guards the error mapping Step 3 rewrites.
 
-Run: `go test ./internal/cli/ -run TestRepoOriginWithoutUserInfo -v`
-Expected: FAIL on the two `https` rows.
+- [ ] **Step 2: Run the tests to verify the new one fails**
+
+Run: `go test ./internal/cli/ -run 'TestRepoOrigin' -v`
+Expected: `TestRepoOriginWithoutUserInfo` FAILS on the two `https` rows; `TestRepoOriginReadFails` passes.
 
 - [ ] **Step 3: Take the origin through `projects.Origin` in `identify` (`internal/cli/run.go`)**
 
