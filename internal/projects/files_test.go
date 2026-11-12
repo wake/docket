@@ -56,6 +56,33 @@ func write(t *testing.T, s string) string {
 	return p
 }
 
+func TestLoadRemovesUserInfo(t *testing.T) {
+	p := write(t, `{"projects":[
+{"path":"/w/a","origin":"https://user:p%zz@example.com/org/app.git","added":"2026-11-08T09:10:11Z","ignored":false},
+{"path":"/w/b","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`)
+	x, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o := x.Projects[0].Origin; o == nil || *o != "https://example.com/org/app.git" {
+		t.Fatalf("origin = %v", o)
+	}
+	if x.Projects[1].Origin != nil {
+		t.Fatalf("origin = %v, want nil", x.Projects[1].Origin)
+	}
+	out := filepath.Join(t.TempDir(), "out.json")
+	if err := x.Save(out); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "p%zz") {
+		t.Fatalf("saved file keeps the token: %s", b)
+	}
+}
+
 func TestLoadInvalid(t *testing.T) {
 	for _, s := range []string{
 		"not json", "{}", `{"projects":"x"}`,

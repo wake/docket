@@ -104,6 +104,10 @@ func Load(path string) (*Index, error) {
 		if _, err := time.Parse(time.RFC3339, e.Added); err != nil || !strings.HasSuffix(e.Added, "Z") {
 			return nil, fmt.Errorf("read %s: added %q is not an RFC 3339 UTC time", path, e.Added)
 		}
+		if e.Origin != nil {
+			o := withoutUserInfo(*e.Origin)
+			x.Projects[i].Origin = &o
+		}
 	}
 	return &x, nil
 }
