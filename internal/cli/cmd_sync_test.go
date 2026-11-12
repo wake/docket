@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/testutil"
 )
 
@@ -290,6 +292,34 @@ func TestSyncLinkedPlanRefused(t *testing.T) { // Linked plan refused
 		if code != 1 || ruleList(m.Findings) != "symlink-refused" || string(b) != plan4 || m.Result != nil {
 			t.Fatalf("%v: %d %s", args, code, raw)
 		}
+	}
+}
+
+func TestSyncFolderSwappedAfterTheRead(t *testing.T) {
+	r := syncRepo(t, plan4)
+	sha := trail(r, "add-x/1")
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "plan.md"), []byte(plan4), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(r.Dir, syncDir)
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Clean(dir)); err != nil {
+		t.Fatal(err)
+	}
+	_, err := syncFile(syncFileArgs{Slug: "add-x", File: syncDir + "plan.md", Root: r.Dir,
+		Src: []byte(plan4), Plan: change.ParsePlan([]byte(plan4)), Key: "Change",
+		Commits: []gitx.Trailers{{SHA: sha, Values: []string{"add-x/1"}}}, Finding: "add-x"})
+	if err == nil {
+		t.Error("want error")
+	}
+	if b, _ := os.ReadFile(filepath.Join(outside, "plan.md")); string(b) != plan4 {
+		t.Errorf("wrote outside the repository:\n%s", b)
+	}
+	if entries, _ := os.ReadDir(outside); len(entries) != 1 {
+		t.Errorf("left %d files outside the repository", len(entries))
 	}
 }
 

@@ -77,7 +77,7 @@ func runSync(c *Context, slug string, check bool) (Outcome, error) {
 			return Outcome{}, err
 		}
 	}
-	return syncFile(syncFileArgs{Slug: slug, File: plan, Path: planPath, Src: src, Plan: change.ParsePlan(src),
+	return syncFile(syncFileArgs{Slug: slug, File: plan, Root: root, Src: src, Plan: change.ParsePlan(src),
 		Key: "Change", Commits: commits, Finding: slug, Check: check})
 }
 
@@ -101,12 +101,12 @@ func syncRecord(c *Context, slug string, check bool) (Outcome, error) {
 			return Outcome{}, err
 		}
 	}
-	return syncFile(syncFileArgs{Slug: slug, File: rel, Path: file, Src: src, Plan: record.Parse(src).Tasks,
+	return syncFile(syncFileArgs{Slug: slug, File: rel, Root: c.Repo.Root, Src: src, Plan: record.Parse(src).Tasks,
 		Key: "Record", Commits: commits, Check: check})
 }
 
 type syncFileArgs struct {
-	Slug, File, Path string // File is the repository-relative path, Path the one on disk
+	Slug, File, Root string // File is the path relative to Root, the repository root
 	Src              []byte
 	Plan             change.Plan
 	Key              string // the trailer key: Change or Record
@@ -117,7 +117,7 @@ type syncFileArgs struct {
 
 // syncFile ticks the tasks that the commits' trailers name and reports.
 func syncFile(a syncFileArgs) (Outcome, error) {
-	slug, plan, planPath, src, p, check := a.Slug, a.File, a.Path, a.Src, a.Plan, a.Check
+	slug, plan, src, p, check := a.Slug, a.File, a.Src, a.Plan, a.Check
 	res := syncResult{Slug: slug, Check: check, Tasks: []syncTask{}}
 	for _, t := range p.Tasks {
 		res.Tasks = append(res.Tasks, syncTask{Number: t.Number, Name: t.Name, Commits: []string{}, Steps: len(t.Steps)})
@@ -190,11 +190,17 @@ func syncFile(a syncFileArgs) (Outcome, error) {
 		if err != nil {
 			return Outcome{}, err
 		}
-		fi, err := os.Stat(planPath)
+		root, err := os.OpenRoot(a.Root) // a folder swapped for a link since the read cannot lead the write out
 		if err != nil {
 			return Outcome{}, err
 		}
-		if err := safefile.Install(planPath, ticked, fi.Mode().Perm(), true, plan); err != nil {
+		defer root.Close()
+		name := filepath.FromSlash(plan)
+		fi, err := root.Stat(name)
+		if err != nil {
+			return Outcome{}, err
+		}
+		if err := safefile.InstallIn(root, name, ticked, fi.Mode().Perm(), true, plan); err != nil {
 			return Outcome{}, err
 		}
 	}

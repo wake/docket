@@ -284,13 +284,36 @@ func TestWriteModes(t *testing.T) {
 	}
 }
 
+func TestWriteFolderSwappedAfterDecide(t *testing.T) {
+	root := t.TempDir()
+	put(t, root, ".claude/skills/docket/SKILL.md", "mine")
+	ds, _ := decideT(t, root, true)
+	outside := t.TempDir()
+	put(t, outside, "docket/SKILL.md", "outside")
+	if err := os.RemoveAll(filepath.Join(root, ".claude/skills")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, ".claude/skills")); err != nil {
+		t.Fatal(err)
+	}
+	if err := Write(root, ds); err == nil {
+		t.Error("want error")
+	}
+	if got := get(t, outside, "docket/SKILL.md"); got != "outside" {
+		t.Error("wrote outside the repository")
+	}
+	if entries, _ := os.ReadDir(filepath.Join(outside, "docket")); len(entries) != 1 {
+		t.Errorf("left %d files outside the repository", len(entries))
+	}
+}
+
 func TestWriteFailureKeepsOldFile(t *testing.T) {
 	root := t.TempDir()
 	put(t, root, ".claude/skills/docket/SKILL.md", "mine")
 	ds, _ := decideT(t, root, true)
 	old := safefile.Rename
 	defer func() { safefile.Rename = old }()
-	safefile.Rename = func(string, string) error { return errors.New("boom") }
+	safefile.Rename = func(*os.Root, string, string) error { return errors.New("boom") }
 	if err := Write(root, ds); err == nil {
 		t.Fatal("want error")
 	}
