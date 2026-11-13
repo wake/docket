@@ -216,6 +216,13 @@ func checkPlaceholders(r *state, c *loaded) {
 	}
 }
 
+// checkFenceInComments reports each fence marker inside an HTML comment whose code runs past it.
+func checkFenceInComments(r *state, c *loaded, name string) {
+	for _, i := range markdown.FencesInComments(markdown.Lines(c.Files[name])) {
+		r.add(c, "fence-in-comment", name, i+1, "fence marker inside an HTML comment: dkt and OpenSpec read the lines after the comment as code; close the code inside the comment or remove the marker")
+	}
+}
+
 func checkPlaceholderFile(r *state, c *loaded, name string, known map[string]string) {
 	lines := markdown.Lines(c.Files[name])
 	mask := markdown.FenceMask(lines)

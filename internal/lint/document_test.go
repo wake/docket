@@ -252,3 +252,29 @@ func TestMainSpecTitles(t *testing.T) {
 		t.Errorf("%v", rep.Findings)
 	}
 }
+
+func TestFenceInComment(t *testing.T) {
+	tests := []struct {
+		name  string
+		files map[string]string
+		file  string
+		line  int
+		n     int
+	}{
+		{"marker left in plan", map[string]string{"proposal.md": goodProposal, "plan.md": "<!--\n```\n-->\n### Task 2: Real\n"}, "openspec/changes/add-x/plan.md", 2, 1},
+		{"whole block in design", map[string]string{"proposal.md": goodProposal, "design.md": "<!--\n```\nx\n```\n-->\n"}, "", 0, 0},
+		{"comment marker in fenced code", map[string]string{"proposal.md": goodProposal + "\n```\n<!--\n```\n"}, "", 0, 0},
+		{"nested file", map[string]string{"proposal.md": goodProposal, "deep/more.md": "<!--\n~~~\n-->\n"}, "openspec/changes/add-x/deep/more.md", 2, 1},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rep := lintX(t, tc.files)
+			if got := count(rep, "fence-in-comment"); got != tc.n {
+				t.Fatalf("count = %d: %+v", got, rep.Findings)
+			}
+			if tc.n > 0 && !has(rep, "fence-in-comment", tc.file, tc.line, "") {
+				t.Errorf("%+v", rep.Findings)
+			}
+		})
+	}
+}
