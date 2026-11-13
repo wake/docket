@@ -278,3 +278,19 @@ func TestFenceInComment(t *testing.T) {
 		})
 	}
 }
+
+func TestMainSpecFenceInComment(t *testing.T) {
+	in, _ := repo(t, map[string]string{
+		"openspec/specs/orders/spec.md": "# Orders Specification\n<!--\n```\n-->\n### Requirement: Persist orders\n",
+	})
+	rep := run(t, in)
+	if !has(rep, "fence-in-comment", "openspec/specs/orders/spec.md", 3, "") || count(rep, "fence-in-comment") != 1 {
+		t.Errorf("%v", rep.Findings)
+	}
+	fnd, _, _ := SpecTitles(in.Root)
+	for _, f := range fnd {
+		if f.Rule == "fence-in-comment" {
+			t.Errorf("SpecTitles reported %v", f)
+		}
+	}
+}
