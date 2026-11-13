@@ -217,3 +217,55 @@ func backtickRun(s string, i int) int {
 	}
 	return n
 }
+
+// FencesInComments returns the index of each fence line that opens code inside
+// an HTML comment and is still open when the comment closes, in file order.
+// FenceMask reads such a marker as code that runs past the comment.
+func FencesInComments(lines []string) []int {
+	var out []int
+	var code, inner fence // real code, and code opened inside the current comment
+	codeOpen, innerOpen, inComment := false, false, false
+	at := 0
+	for i, l := range lines {
+		if !inComment {
+			if codeOpen {
+				codeOpen = !code.closedBy(l)
+				continue
+			}
+			if code, codeOpen = openFence(l); codeOpen {
+				continue
+			}
+		} else if innerOpen {
+			innerOpen = !inner.closedBy(l)
+		} else if inner, innerOpen = openFence(l); innerOpen {
+			at = i
+		}
+		for p := 0; p < len(l); {
+			if !inComment {
+				k := strings.Index(l[p:], "<!--")
+				if k < 0 {
+					break
+				}
+				p += k + 4
+				inComment = true
+				continue
+			}
+			j, k := strings.Index(l[p:], "-->"), strings.Index(l[p:], "--!>")
+			switch {
+			case j >= 0 && (k < 0 || j < k):
+				p += j + 3
+			case k >= 0:
+				p += k + 4
+			default:
+				p = len(l)
+				continue
+			}
+			inComment = false
+			if innerOpen {
+				out = append(out, at)
+				innerOpen = false
+			}
+		}
+	}
+	return out
+}
