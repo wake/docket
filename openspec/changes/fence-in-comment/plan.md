@@ -195,43 +195,43 @@ git commit -m "Report fence markers inside HTML comments in dkt lint"
 - Consumes: `markdown.FencesInComments` from Task 1; `checkFenceInComments` and its message from Task 2.
 - Produces: `func walkSpecs(root fs.FS, each func(p string, b []byte)) ([]Unreadable, int)` in package `lint`: calls `each` for every regular `spec.md` under `openspec/specs/` it reads, and returns what it could not read and how many specs it found, as `SpecTitles` does today.
 
-- [ ] **Step 1: Move the walk of `SpecTitles` into `walkSpecs` (structural commit)**
+- [x] **Step 1: Move the walk of `SpecTitles` into `walkSpecs` (structural commit)**
 
 `SpecTitles` keeps its signature and result, calling `walkSpecs` with its title check; the message text of `fence-in-comment` moves into a constant both callers use.
 
-- [ ] **Step 2: Run the tests that cover it**
+- [x] **Step 2: Run the tests that cover it**
 
 Run: `go test ./internal/lint/ ./internal/cli/ -run 'SpecTitles|MainSpec|EveryActiveChange|NoChangesDirectory'`
 Expected: PASS.
 
-- [ ] **Step 3: Commit the structural change**
+- [x] **Step 3: Commit the structural change**
 
 ```bash
 git add internal/lint/document.go internal/lint/lint.go
 git commit -m "Walk the main specs in one helper"
 ```
 
-- [ ] **Step 4: Write the failing test `TestMainSpecFenceInComment`**
+- [x] **Step 4: Write the failing test `TestMainSpecFenceInComment`**
 
 In `document_test.go`, a repository from `repo` with `openspec/specs/orders/spec.md` = the lines `# Orders Specification`, a comment opener, a line of three backticks, a comment closer and `### Requirement: Persist orders`:
 - linted with no change named: `has(rep, "fence-in-comment", "openspec/specs/orders/spec.md", 3, "")` and `count(rep, "fence-in-comment") == 1`;
 - `SpecTitles(in.Root)` on the same repository returns no `fence-in-comment` finding, since `dkt inspect` uses it.
 
-- [ ] **Step 5: Run it to see it fail**
+- [x] **Step 5: Run it to see it fail**
 
 Run: `go test ./internal/lint/ -run TestMainSpecFenceInComment`
 Expected: FAIL, no `fence-in-comment` finding.
 
-- [ ] **Step 6: Apply the rule to each main spec in `Run`**
+- [x] **Step 6: Apply the rule to each main spec in `Run`**
 
 Where `Run` calls `SpecTitles` today, call `walkSpecs` once with a function that adds the title finding and, for each index from `markdown.FencesInComments(markdown.Lines(b))`, a `fence-in-comment` finding with `File: p` and `Line: i+1`.
 
-- [ ] **Step 7: Run the lint and cli tests and the full suite**
+- [x] **Step 7: Run the lint and cli tests and the full suite**
 
 Run: `gofmt -l . && go vet ./... && go test ./...`
 Expected: PASS, `gofmt -l` prints nothing.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add internal/lint/
