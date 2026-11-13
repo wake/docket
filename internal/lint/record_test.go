@@ -284,3 +284,10 @@ func TestLintRecordTrailerNotARegularFile(t *testing.T) {
 		t.Errorf("%+v", rep.Findings)
 	}
 }
+
+func TestLintRecordFenceInComment(t *testing.T) {
+	rep := lintRec(t, recFront+"## What\nw\n\n## Why\ny\n<!--\n~~~\n-->\n\n## Verification\nv\n\n## Review\nr\n")
+	if !has(rep, "fence-in-comment", recPath, 12, "") || count(rep, "fence-in-comment") != 1 {
+		t.Errorf("%+v", rep.Findings)
+	}
+}

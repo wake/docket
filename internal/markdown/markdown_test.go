@@ -142,3 +142,40 @@ func TestCodeSpansShorterRunDoesNotClose(t *testing.T) {
 		t.Fatalf("CodeSpans = %v, want %v", got, want)
 	}
 }
+
+func TestFencesInComments(t *testing.T) {
+	b3, b4 := "```", "````"
+	tests := []struct {
+		name  string
+		lines []string
+		want  []int
+	}{
+		{"marker left", []string{"<!--", b3, "-->", "### Task 2: Real"}, []int{1}},
+		{"tildes", []string{"<!--", "~~~", "-->"}, []int{1}},
+		{"indented marker", []string{"<!--", "  " + b3, "-->"}, []int{1}},
+		{"whole block", []string{"<!--", b3, "x", b3, "-->"}, nil},
+		{"comment marker in code", []string{b3, "<!--", b3, "### H"}, nil},
+		{"opener holds comment marker", []string{b3 + " <!--", "x", b3, "y"}, nil},
+		{"marker closes comment", []string{"<!--", b3 + " -->", "b"}, []int{1}},
+		{"comment opened mid-line", []string{"text <!-- note", b3, "-->"}, []int{1}},
+		{"comment closed before fence", []string{"<!-- a -->", b3, "x", b3}, nil},
+		{"unclosed comment", []string{"<!--", b3, "x"}, nil},
+		{"shorter run does not close", []string{"<!--", b4, b3, "-->"}, []int{1}},
+		{"other character does not close", []string{"<!--", b3, "~~~", "-->"}, []int{1}},
+		{"longer run closes", []string{"<!--", b3, b4, "-->"}, nil},
+		{"closer with text does not close", []string{"<!--", b3, b3 + " x", "-->"}, []int{1}},
+		// In document order line 3 opens code, so lines 4 to 6 are code, not a comment.
+		{"code after a reported comment", []string{"<!--", b3, "-->", b3, "<!--", "~~~", "-->"}, []int{1}},
+		{"bang close", []string{"<!--", b3, "--!>"}, []int{1}},
+		{"two comments", []string{"<!--", b3, "-->", "<!--", "~~~", "-->"}, []int{1, 4}},
+		{"reopened on one line", []string{"<!-- a --> <!--", b3, "-->"}, []int{1}},
+		{"no comment", []string{"a", b3, "x", b3}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := FencesInComments(tt.lines); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("FencesInComments = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -254,3 +254,10 @@ func TestCardDuplicateUnreadable(t *testing.T) {
 		t.Fatalf("%+v", rep)
 	}
 }
+
+func TestLintIssueFenceInComment(t *testing.T) {
+	rep := lintIss(t, issFront+"## Current\nc\n<!--\n~~~\n-->\n\n## Expected\ne\n\n## Unchanged\nu\n\n## Evidence\nv\n")
+	if !has(rep, "fence-in-comment", issPath, 8, "") || count(rep, "fence-in-comment") != 1 {
+		t.Errorf("%+v", rep.Findings)
+	}
+}

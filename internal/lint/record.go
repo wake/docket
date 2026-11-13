@@ -184,6 +184,7 @@ func lintDated(r *state, d dated, slug string, known map[string]string) {
 	if len(known) > 0 {
 		checkPlaceholderFile(r, c, file, known)
 	}
+	checkFenceInComments(r, c, file)
 	if d.taskHeadings {
 		checkTaskHeadings(r, c, file, p.Tasks)
 	}

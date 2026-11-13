@@ -42,24 +42,44 @@ func Trim(s string) string {
 var fenceOpen = regexp.MustCompile("^" + Space + "*(`{3,}|~{3,})")
 var fenceClose = regexp.MustCompile("^" + Space + "*(`{3,}|~{3,})" + Space + "*$")
 
+// fence is an open fenced code block: its character and the length of its opener.
+type fence struct {
+	marker byte
+	length int
+}
+
+// openFence reports the fence a line opens, under the fence rule of OpenSpec 1.14.3.
+func openFence(line string) (fence, bool) {
+	m := fenceOpen.FindStringSubmatch(line)
+	if m == nil {
+		return fence{}, false
+	}
+	return fence{m[1][0], len(m[1])}, true
+}
+
+// closedBy reports whether line closes f: the same character, at least as long.
+func (f fence) closedBy(line string) bool {
+	m := fenceClose.FindStringSubmatch(line)
+	return m != nil && m[1][0] == f.marker && len(m[1]) >= f.length
+}
+
 // FenceMask reports, for every line, whether it belongs to a fenced code
 // block; the fence lines themselves are included. An unclosed fence runs to
 // the end. It follows the fence rule of OpenSpec 1.14.3.
 func FenceMask(lines []string) []bool {
 	mask := make([]bool, len(lines))
-	var marker byte
-	var length int
+	var f fence
+	open := false
 	for i, line := range lines {
-		if length == 0 {
-			if m := fenceOpen.FindStringSubmatch(line); m != nil {
-				marker, length = m[1][0], len(m[1])
+		if !open {
+			if f, open = openFence(line); open {
 				mask[i] = true
 			}
 			continue
 		}
 		mask[i] = true
-		if m := fenceClose.FindStringSubmatch(line); m != nil && m[1][0] == marker && len(m[1]) >= length {
-			length = 0
+		if f.closedBy(line) {
+			open = false
 		}
 	}
 	return mask
@@ -196,4 +216,56 @@ func backtickRun(s string, i int) int {
 		n++
 	}
 	return n
+}
+
+// FencesInComments returns the index of each fence line that opens code inside
+// an HTML comment and is still open when the comment closes, in file order.
+// FenceMask reads such a marker as code that runs past the comment.
+func FencesInComments(lines []string) []int {
+	var out []int
+	var code, inner fence // real code, and code opened inside the current comment
+	codeOpen, innerOpen, inComment := false, false, false
+	at := 0
+	for i, l := range lines {
+		if !inComment {
+			if codeOpen {
+				codeOpen = !code.closedBy(l)
+				continue
+			}
+			if code, codeOpen = openFence(l); codeOpen {
+				continue
+			}
+		} else if innerOpen {
+			innerOpen = !inner.closedBy(l)
+		} else if inner, innerOpen = openFence(l); innerOpen {
+			at = i
+		}
+		for p := 0; p < len(l); {
+			if !inComment {
+				k := strings.Index(l[p:], "<!--")
+				if k < 0 {
+					break
+				}
+				p += k + 4
+				inComment = true
+				continue
+			}
+			j, k := strings.Index(l[p:], "-->"), strings.Index(l[p:], "--!>")
+			switch {
+			case j >= 0 && (k < 0 || j < k):
+				p += j + 3
+			case k >= 0:
+				p += k + 4
+			default:
+				p = len(l)
+				continue
+			}
+			inComment = false
+			if innerOpen {
+				out = append(out, at)
+				innerOpen = false
+			}
+		}
+	}
+	return out
 }

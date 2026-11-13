@@ -107,10 +107,25 @@ func checkSections(r *state, c *loaded) {
 	}
 }
 
-// SpecTitles reports main specs without a title, the sources it could not
-// read and the number of main specs it found.
-func SpecTitles(root fs.FS) ([]Finding, []Unreadable, int) {
-	var findings []Finding
+const fenceInCommentMessage = "fence marker inside an HTML comment: dkt and OpenSpec read the lines after the comment as code; close the code inside the comment or remove the marker"
+
+// specTitleFinding returns the title finding for the main spec at p, if any.
+func specTitleFinding(p string, b []byte) []Finding {
+	first := ""
+	if lines := markdown.Lines(b); len(lines) > 0 {
+		first = lines[0]
+	}
+	cp := strings.Trim(strings.TrimSuffix(strings.TrimPrefix(p, specsDir), "spec.md"), "/")
+	if _, ok := change.SpecTitle(first, cp); !ok {
+		return []Finding{{Rule: "title-missing", File: p, Line: 1,
+			Message: "main spec has no title: its first line must be `# <name> Specification`, the name differing from " + cp}}
+	}
+	return nil
+}
+
+// walkSpecs calls each with every main spec it reads and returns the sources
+// it could not read and the number of main specs it found.
+func walkSpecs(root fs.FS, each func(p string, b []byte)) ([]Unreadable, int) {
 	var bad []Unreadable
 	specs := 0
 	_ = fs.WalkDir(root, specsDir, func(p string, d fs.DirEntry, err error) error {
@@ -132,16 +147,18 @@ func SpecTitles(root fs.FS) ([]Finding, []Unreadable, int) {
 			bad = append(bad, Unreadable{Source: p, Reason: err.Error()})
 			return nil
 		}
-		first := ""
-		if lines := markdown.Lines(b); len(lines) > 0 {
-			first = lines[0]
-		}
-		cp := strings.Trim(strings.TrimSuffix(strings.TrimPrefix(p, specsDir), "spec.md"), "/")
-		if _, ok := change.SpecTitle(first, cp); !ok {
-			findings = append(findings, Finding{Rule: "title-missing", File: p, Line: 1,
-				Message: "main spec has no title: its first line must be `# <name> Specification`, the name differing from " + cp})
-		}
+		each(p, b)
 		return nil
+	})
+	return bad, specs
+}
+
+// SpecTitles reports main specs without a title, the sources it could not
+// read and the number of main specs it found.
+func SpecTitles(root fs.FS) ([]Finding, []Unreadable, int) {
+	var findings []Finding
+	bad, specs := walkSpecs(root, func(p string, b []byte) {
+		findings = append(findings, specTitleFinding(p, b)...)
 	})
 	return findings, bad, specs
 }
@@ -213,6 +230,13 @@ func checkPlaceholders(r *state, c *loaded) {
 	sort.Strings(names)
 	for _, name := range names {
 		checkPlaceholderFile(r, c, name, known)
+	}
+}
+
+// checkFenceInComments reports each fence marker inside an HTML comment whose code runs past it.
+func checkFenceInComments(r *state, c *loaded, name string) {
+	for _, i := range markdown.FencesInComments(markdown.Lines(c.Files[name])) {
+		r.add(c, "fence-in-comment", name, i+1, fenceInCommentMessage)
 	}
 }
 
