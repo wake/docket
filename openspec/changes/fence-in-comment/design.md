@@ -28,6 +28,8 @@ Alternatives considered:
 
 The rule runs on the same files as `placeholder`: each `.md` file of a `docket` change, and each record and issue lint reads. These are the files whose headings, steps and tables dkt reads with the mask. A change of another schema is not checked, as no docket rule is.
 
+It also runs on each main spec, where lint checks their titles: `dkt snapshot` reads their requirements with the same mask, and a main spec can be edited by hand, not only by archiving a delta. The walk over `openspec/specs/` that `SpecTitles` does moves into a helper that calls a function for each spec file it reads; `SpecTitles` keeps its result, so `dkt inspect`, which calls it, is unchanged, and lint walks once, applying both rules to each file.
+
 ## Risks / Trade-offs
 
 - [After a reported marker, the two readings stay out of step, so a marker `FenceMask` would only see later is not reported in the same run] → Each comment this reading finds is checked on its own lines, starting from no open code, so every finding names a marker inside a comment; fixing them and running lint again settles the rest, and a file with no finding is read the same way by both.
