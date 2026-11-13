@@ -18,6 +18,8 @@ The check reads the file once more, in document order: outside a comment, a line
 
 The fence lines are matched with the same expressions `FenceMask` uses, so the check and the readers cannot drift apart.
 
+The comments checked are the ones this reading finds, in document order, as CommonMark reads them; a line this reading finds inside code is not checked, even where `FenceMask` has fallen out of step and reads it inside a comment. Then a file the check passes is read the same way by both: at the start of each comment both are outside code, inside it `FenceMask` follows the same fence lines, and at its end no code is open, so `BlankComments` closes it on the same line. A marker `FenceMask` would only see after an earlier one is not reported, since fixing the earlier one changes what that later line is.
+
 Alternatives considered:
 - Reporting every fence line inside a comment. Simpler, but it would report a code block commented out whole, which hides nothing; a lint finding has to be fixed before archiving, so it should only name a real problem.
 - Comparing the visible lines of both readings. It finds the same cases, but the first difference is often far from the marker that caused it, and the finding should name the marker.
@@ -28,5 +30,5 @@ The rule runs on the same files as `placeholder`: each `.md` file of a `docket` 
 
 ## Risks / Trade-offs
 
-- [After a reported marker, the two readings stay out of step, so a later marker in the same file may be read differently by `FenceMask`] → Each comment is checked on its own lines, starting from no open code, so the later finding still names a marker inside a comment; fixing the first and running lint again settles the rest.
+- [After a reported marker, the two readings stay out of step, so a marker `FenceMask` would only see later is not reported in the same run] → Each comment this reading finds is checked on its own lines, starting from no open code, so every finding names a marker inside a comment; fixing them and running lint again settles the rest, and a file with no finding is read the same way by both.
 - [A comment that only ends at the end of the file never closes, so a marker in it is not reported] → Both readings hide everything after such a marker anyway, so nothing is read differently.

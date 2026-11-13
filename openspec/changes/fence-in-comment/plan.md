@@ -86,6 +86,10 @@ A table test calling `FencesInComments(lines)` and comparing with `reflect.DeepE
 {"unclosed comment", []string{"<!--", b3, "x"}, nil},
 {"shorter run does not close", []string{"<!--", b4, b3, "-->"}, []int{1}},
 {"other character does not close", []string{"<!--", b3, "~~~", "-->"}, []int{1}},
+{"longer run closes", []string{"<!--", b3, b4, "-->"}, nil},
+{"closer with text does not close", []string{"<!--", b3, b3 + " x", "-->"}, []int{1}},
+// In document order line 3 opens code, so lines 4 to 6 are code, not a comment.
+{"code after a reported comment", []string{"<!--", b3, "-->", b3, "<!--", "~~~", "-->"}, []int{1}},
 {"bang close", []string{"<!--", b3, "--!>"}, []int{1}},
 {"two comments", []string{"<!--", b3, "-->", "<!--", "~~~", "-->"}, []int{1, 4}},
 {"reopened on one line", []string{"<!-- a --> <!--", b3, "-->"}, []int{1}},
