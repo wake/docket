@@ -318,15 +318,10 @@ func lintChange(r *state, c *loaded) {
 	}
 	checkSections(r, c)
 	checkPlaceholders(r, c)
-	names := make([]string, 0, len(c.Files))
-	for n := range c.Files {
+	for n := range c.Files { // Run sorts the findings
 		if strings.HasSuffix(n, ".md") {
-			names = append(names, n)
+			checkFenceInComments(r, c, n)
 		}
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		checkFenceInComments(r, c, n)
 	}
 	if c.Has(planFile) {
 		checkPlan(r, c)
