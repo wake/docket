@@ -18,3 +18,4 @@ A regression test with a main spec at `billing/refund` and a delta at `refund` f
 
 ## Review
 
+Codex (gpt-5.6-sol), a different model, reviewed the whole diff and found nothing: the message holds in every case that reaches it, its two ways out match the issue, and nothing else quotes the old text.
