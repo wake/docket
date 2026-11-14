@@ -69,7 +69,7 @@ func checkNewCapabilities(r *state, c *loaded, fm change.Front, readable bool) {
 		}
 		if strings.TrimSpace(names[cp]) == "" {
 			r.add(c, "title-missing", proposalFile, line,
-				"new capability %q has no name: add `%s: <name>` under specs: in the front matter", cp, cp)
+				"capability %q has no main spec at %s and no name: if it is new, add `%s: <name>` under specs: in the front matter; if it exists at another path, move its delta to that path", cp, main, cp)
 		}
 	}
 }

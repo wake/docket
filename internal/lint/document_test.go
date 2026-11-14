@@ -111,6 +111,19 @@ func TestNewCapabilities(t *testing.T) {
 			t.Errorf("%v", rep.Findings)
 		}
 	})
+	t.Run("delta on a mistyped path", func(t *testing.T) { // dkt cannot tell it from a new capability
+		in, _ := repo(t, map[string]string{
+			pf: goodProposal, "openspec/changes/add-x/specs/refund/spec.md": spec,
+			"openspec/specs/billing/refund/spec.md": "# Refund Specification\n",
+		})
+		in.Slugs = []string{"add-x"}
+		rep := run(t, in)
+		if len(rep.Findings) != 1 || !has(rep, "title-missing", pf, 0, "no main spec at openspec/specs/refund/spec.md") ||
+			!has(rep, "title-missing", pf, 0, "refund: <name>") || !has(rep, "title-missing", pf, 0, "another path") ||
+			strings.Contains(rep.Findings[0].Message, "new capability") {
+			t.Errorf("%v", rep.Findings)
+		}
+	})
 	t.Run("no proposal", func(t *testing.T) {
 		rep := lintX(t, map[string]string{"specs/booking/spec.md": spec})
 		if !has(rep, "title-missing", pf, 0, "booking") || count(rep, "proposal-section") != 1 {
