@@ -20,4 +20,4 @@ This repository is developed with Docket's own workflow: follow the docket skill
 
 ## Prompt files
 
-Text agents act on: `AGENTS.md`, `CLAUDE.md`, `skills/`, `shipped/`, `docket/workflow.md`; the copies of `shipped/` that `dkt init` installs (`.claude/skills/docket/`, `.agents/skills/docket/`, `openspec/schemas/docket/` and `operations` in `openspec/config.yaml`); and OpenSpec's `.claude/commands/opsx/` and `.claude/skills/openspec-*/`. When you add, move or remove such a file, update this list in the same pull request.
+Text agents act on: `AGENTS.md`, `CLAUDE.md`, `skills/`, `shipped/`, `docket/workflow.md`; the copies of `shipped/` that `dkt init` installs (`.claude/skills/docket/`, `.agents/skills/docket/`, `openspec/schemas/docket/` and `operations` in `openspec/config.yaml`); and OpenSpec's skills in `.agents/skills/openspec-*/`, which `.claude/skills/openspec-*` link to. When you add, move or remove such a file, update this list in the same pull request.

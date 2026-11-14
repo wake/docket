@@ -53,8 +53,9 @@ this and go on.
   in your context (their global agent instructions, memory, this project's
   `AGENTS.md` and `CLAUDE.md`) conflict with a step of the `docket` skill,
   such as squash merges, nothing extra in commit messages, plans kept
-  outside the change folder, or opening changes with `/opsx:propose`.
-  Quote both.
+  outside the change folder, or opening changes with OpenSpec's
+  `openspec-propose` skill (`/opsx:propose` before OpenSpec 2.0). Quote
+  both.
 - superpowers: whether its skills (brainstorming, writing-plans,
   subagent-driven-development) are available; full review uses them.
 
@@ -138,8 +139,8 @@ it and go on to the next.
 - Changes made with another schema (found by `dkt lint` in step 1): when
   its `tasks.md` has nothing ticked yet, propose converting it by
   `convert.md` in this skill's folder. Otherwise do not propose converting:
-  say it finishes with its own files and is archived with `/opsx:archive`
-  all the same, and offer to draft names for the capabilities it adds,
+  say it finishes with its own files and is archived with OpenSpec's
+  `openspec-archive-change` skill all the same, and offer to draft names for the capabilities it adds,
   under `specs:` in the front matter of its `proposal.md`.
 - Unreadable sources, or no superpowers: say what is wrong; the fix is the
   user's.
