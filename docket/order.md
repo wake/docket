@@ -6,6 +6,8 @@
 - docket/ideas/origin-without-token.md
 - docket/ideas/fence-inside-comment.md
 - docket/issues/2026-11-07-title-missing-wrong-path.md
+- docket/ideas/fence-rule-drift.md
+- docket/ideas/comment-in-code-span.md
 - docket/ideas/domain-tree-upkeep.md
 - docket/ideas/init-reuse-workflow.md
 - docket/ideas/session-activity.md
@@ -13,3 +15,4 @@
 - docket/issues/2026-11-08-findwork-one-scan.md
 - docket/ideas/codex-support.md
 - docket/ideas/windows-executables.md
+- docket/ideas/scenario-test-links.md
