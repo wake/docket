@@ -1,7 +1,7 @@
 ---
 title: "Report a fence marker inside an HTML comment that hides what follows"
 kind: feature
-source: "docket/ideas/fence-in-comment.md"
+source: "docket/ideas/fence-inside-comment.md"
 ---
 
 ## Why
