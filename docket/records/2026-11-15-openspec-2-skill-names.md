@@ -18,4 +18,4 @@ Checked mechanically: the shipped skill and its two installed copies are identic
 
 ## Review
 
-Codex (gpt-5.6-sol), a different model, reviewed the whole diff and found nothing: the wording holds for OpenSpec 1.14 to 2.0, no other reference to the old commands is left, the new hash is recorded for both copies, and dkt handles the linked skill folders.
+Codex (gpt-5.6-sol), a different model, reviewed the whole diff: no findings.
