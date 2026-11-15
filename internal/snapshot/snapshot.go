@@ -162,6 +162,7 @@ func Collect(g gitx.Git) (Result, []idea.Problem, []scan.Unreadable, error) {
 	ideaEntries, issues, order, problems := Backlog(BacklogInput{Order: tip[idea.OrderFile], Ideas: ideas,
 		Issues: invs[2].Uses, IssueFiles: files, Dates: dates, Works: works, Places: places, DefaultRef: defRef})
 	res.Works, res.Ideas, res.Issues, res.Order = works, ideaEntries, issues, order
+	unreadable = append(unreadable, setActivity(g.Env, wts, res.Works)...)
 
 	res.Specs = Specs(tip)
 	var caps []string

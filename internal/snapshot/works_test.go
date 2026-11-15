@@ -311,7 +311,7 @@ func TestResultJSON(t *testing.T) {
 	}
 	json.Unmarshal(b, &r)
 	w := r.Works[0]
-	wantW := sorted("type", "slug", "title", "kind", "source", "schema", "created", "proposed", "position", "read_from", "archived", "stages", "phase", "progress", "merged", "merge", "release", "last_commit", "locations", "tasks", "documents", "deltas")
+	wantW := sorted("type", "slug", "title", "kind", "source", "schema", "created", "proposed", "position", "read_from", "archived", "stages", "phase", "progress", "merged", "merge", "release", "last_commit", "locations", "activity", "tasks", "documents", "deltas")
 	if !reflect.DeepEqual(keys(w), wantW) || w["tasks"] != nil || w["merge"] != nil || w["position"] != nil || w["archived"] != nil {
 		t.Fatalf("%s", b)
 	}

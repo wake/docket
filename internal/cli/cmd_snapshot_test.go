@@ -100,3 +100,29 @@ func TestSnapshotText(t *testing.T) {
 		t.Errorf("%d %q", code, raw)
 	}
 }
+
+func TestSnapshotSessionsFolderUnlistable(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("base", snFiles())
+	state := t.TempDir()
+	dir := filepath.Join(state, "docket", "sessions")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	os.Chmod(dir, 0)
+	defer os.Chmod(dir, 0o700)
+	var out, errb bytes.Buffer
+	env := append(slices.Clone(r.Env), "XDG_STATE_HOME="+state, "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "nope"))
+	code := Run(Options{Args: []string{"snapshot", "--json"}, Dir: r.Dir, Env: env, Stdout: &out, Stderr: &errb})
+	var m snapshotOut
+	if err := json.Unmarshal(out.Bytes(), &m); err != nil {
+		t.Fatalf("%q: %v", out.String(), err)
+	}
+	found := false
+	for _, u := range m.Unreadable {
+		found = found || u.Source == dir
+	}
+	if code != 3 || !found || !strings.Contains(out.String(), `"activity":null`) {
+		t.Errorf("%d %v %s", code, m.Unreadable, out.String())
+	}
+}
