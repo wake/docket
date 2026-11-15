@@ -216,7 +216,7 @@ artifacts:
       `# Implementation Plan`, since the change's title names the work. Write
       the tasks by the rules below, not in that skill's step-by-step format:
       - A task says what to build and how it is accepted, not how to do it:
-        no code to copy, no commands to run, no commit messages; those are
+        no code to copy, no sequence of commands to run, no commit messages; those are
         the implementer's to decide. Write out exactly only what the
         implementer could not work out: an interface other tasks depend on, a
         fixed format or string, an edge case that must be covered.
@@ -256,7 +256,8 @@ artifacts:
         leave it out when there is none.
       - Under each task, `- [ ]` checkboxes list its acceptance items: what
         must hold when the task is done, each one a result that can be
-        checked (a behavior and the test that covers it, a command's output).
+        checked, not a step to perform (a behavior and the test that covers
+        it, what a command prints).
         `dkt sync` ticks the checkboxes of Task N from the commit trailer
         `Change: <change-name>/<N>`; tick by hand only
         a task that was finished without any commit. OpenSpec counts every

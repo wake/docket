@@ -18,3 +18,4 @@ The shipped schema and plan template are identical to the copies installed here;
 
 ## Review
 
+Codex (gpt-5.6-sol), a different model, reviewed the whole diff: one must-fix finding, the plan rules forbade commands while an acceptance item's example was a command's output and "Task review" still spoke of a task's verification steps. Fixed in the three places; a small fix, not reviewed again.

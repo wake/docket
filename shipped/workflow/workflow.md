@@ -41,8 +41,8 @@ Only a task marked `**Review:** judgment` gets its own reviewer, in a fresh
 context. Every other task that changes code gets the mechanical checks
 instead: its new tests are seen failing before the code and passing after,
 and mutating the lines it changed makes a test fail. A task that changes no
-code, such as one that only edits docs, is checked by its own verification
-steps.
+code, such as one that only edits docs, is checked against its acceptance
+items.
 
 ### Pre-merge review
 
