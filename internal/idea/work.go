@@ -21,20 +21,13 @@ const linkReason = " is a symbolic link; Docket does not read through it"
 // record in all sources and keys the result by their exact source value. Work
 // is on the tip only when a copy read from commit tip names the idea.
 func FindWork(g gitx.Git, tip string) (map[string]Work, []scan.Unreadable, error) {
-	changes, err := scan.Changes(g)
+	ws, err := scan.Scan(g)
 	if err != nil {
 		return nil, nil, err
 	}
-	records, err := scan.Records(g)
-	if err != nil {
-		return nil, nil, err
-	}
-	refs, err := g.Refs()
-	if err != nil {
-		return nil, nil, err
-	}
+	changes, records := ws.Changes, ws.Records
 	commits := map[string]string{}
-	for _, r := range refs {
+	for _, r := range ws.Refs {
 		commits[r.Name] = r.Commit
 	}
 	bad := append(append([]scan.Unreadable{}, changes.Unreadable...), records.Unreadable...)
