@@ -33,6 +33,7 @@ specs:
 ### Modified Capabilities
 
 - `project-snapshot`: each work carries its `activity`.
+- `cli-output`: `dkt activity` is an exception to JSON output and exit codes, and its records may be written outside the repository.
 
 ## Impact
 

@@ -50,7 +50,7 @@
 - Create: `internal/activity/activity_test.go`
 
 **Interfaces:**
-- Consumes: `projects.ErrNoHome` as it is.
+- Consumes: `projects.ErrNoHome`, `safefile.Install` (temporary file and rename, not following links) and `safefile.ReadNoFollow`, as they are.
 - Produces: `projects.SessionsDir(env []string) (string, error)`; `activity.Window` (15 minutes); `activity.Record{Session, Dir, State string; Time time.Time}`; `activity.Write(env []string, now time.Time, state string, in io.Reader, wd string) error`, where `in` is the hook input or nil and `wd` the working directory; `activity.Read(env []string, now time.Time) ([]activity.Record, error)`, the records written within the window before `now`, with a nil error and no records when the folder does not exist.
 
 - [ ] `SessionsDir` gives `/s/docket/sessions` for `XDG_STATE_HOME=/s`, `$HOME/.local/state/docket/sessions` when that variable is unset or relative, and `ErrNoHome` with neither.
@@ -60,11 +60,11 @@
 - [ ] A directory reached through a symbolic link is recorded as its target.
 - [ ] Each `Write` removes the files in the folder modified more than 15 minutes before `now`, and keeps one modified 5 minutes before.
 - [ ] An unknown state, no location for the state home, and a folder that cannot be written return an error and write no record.
-- [ ] `Read` returns the records written 14 minutes before `now`, not one written 16 minutes before, skips a file that is not a record, returns nothing when the folder is missing, and returns an error when the folder cannot be listed; it writes and removes nothing.
+- [ ] `Read` returns the records written 14 minutes before `now`, not one written 16 minutes before; it skips, while still returning the other records, a file that is not a record, a file it cannot read, and a symbolic link; it returns nothing when the folder is missing, and an error when the folder cannot be listed; it writes and removes nothing.
 
 ### Task 2: The dkt activity command
 
-**Scenarios:** session-activity#unknown-state, session-activity#folder-that-cannot-be-written, session-activity#no-home
+**Scenarios:** session-activity#unknown-state, session-activity#folder-that-cannot-be-written, session-activity#no-home, cli-output#activity-with-json, cli-output#activity-usage-error, cli-output#json-on-success, cli-output#json-on-failure, cli-output#unknown-command, cli-output#no-command, cli-output#help
 
 **Review:** judgment
 
@@ -83,11 +83,12 @@
 - [ ] With `PATH` empty, so that no git can start, `activity working` still writes the record.
 - [ ] Run inside a Docket project not in the index, `activity working` leaves the index unwritten.
 - [ ] Standard input that is a terminal is not read: `cmd/dkt` passes it only when it is not a character device; and when the working directory cannot be read, `cmd/dkt` still exits with 0 for `activity`.
-- [ ] `dkt --help` lists `activity`.
+- [ ] `dkt --help` lists `activity`, and `dkt activity --help` prints its help and exits with 0; `dkt --json activity working` prints nothing and exits with 0.
+- [ ] The existing tests of JSON output and exit codes for the other commands pass unchanged (`cli-output`'s MODIFIED requirements change only what `dkt activity` does).
 
 ### Task 3: dkt snapshot reports each work's activity
 
-**Scenarios:** project-snapshot#session-working-on-a-change, project-snapshot#session-waiting, project-snapshot#merged-work, project-snapshot#worktree-inside-another, project-snapshot#no-records, project-snapshot#folder-that-cannot-be-listed, session-activity#record-past-the-window
+**Scenarios:** project-snapshot#session-working-on-a-change, project-snapshot#session-waiting, project-snapshot#merged-work, project-snapshot#worktree-inside-another, project-snapshot#worktree-path-through-a-link, project-snapshot#prunable-worktree, project-snapshot#no-records, project-snapshot#folder-that-cannot-be-listed, session-activity#record-past-the-window, cli-output#inspect-in-a-new-project, cli-output#snapshot-leaves-the-session-records
 
 **Review:** judgment
 
@@ -98,14 +99,16 @@
 - Modify: `internal/cli/cmd_snapshot_test.go`
 
 **Interfaces:**
-- Consumes: `activity.Read` and `activity.Record` (Task 1); the worktrees `scan.Scan` lists, as they are.
+- Consumes: `activity.Read` and `activity.Record` (Task 1); the worktrees `scan.Scan` lists, as they are. `snapshot.Collect(g gitx.Git)` keeps its signature: it reads the records with `g.Env` at the current time, and tests write records with times relative to the current time.
 
 - [ ] Every work's JSON holds `activity`, null when the state home has no sessions folder, and nothing is reported about the folder.
 - [ ] A `working` record from 2 minutes ago with a directory in a linked worktree holding the unmerged `add-x` gives `add-x` `working` and every other work null; a `waiting` one gives `waiting`; a `working` and a `waiting` record for the same worktree give `working`.
 - [ ] A record whose directory is a subdirectory of the worktree counts; with the linked worktree inside the main worktree, a record in the linked one counts only for the linked worktree's works.
 - [ ] A merged work, and a work whose only location in that worktree is archived, get null.
 - [ ] A record written 16 minutes ago gives null.
-- [ ] A record whose directory reaches the worktree through a symbolic link counts.
+- [ ] A record whose directory reaches the worktree through a symbolic link counts, and so does a worktree that git reports through a link (a repository under the test's temporary folder, which on macOS is reached through `/var`).
+- [ ] A session in the folder of a prunable worktree, recreated as a plain folder, and a bare repository's path give no activity.
+- [ ] `dkt inspect` in a Docket project not in the index still writes no file in the repository and adds the project to the index, as before.
 - [ ] A sessions folder that cannot be listed is named in `unreadable`, every `activity` is null, and dkt exits with 3; a file in it that is not a record is skipped.
 - [ ] After `dkt snapshot`, the sessions folder's files are byte-for-byte unchanged, a record past the window included.
 
@@ -119,5 +122,7 @@
 - Modify: `skills/docket-init/SKILL.md`
 
 - [ ] A new last step, for Claude Code only: when no hook in the user's `~/.claude/settings.json` already calls `dkt activity`, it offers the hooks, saying that they write a small state file under the state home on every prompt, tool call and turn end of every Claude Code session on the computer, never in a repository, so that `dkt snapshot` can show which works a session is on; it writes the settings only once the user agrees.
-- [ ] The step names the events and states (`UserPromptSubmit` and `PreToolUse` with `working`, `Notification` and `Stop` with `waiting`, `SessionEnd` with `ended`), the command as the absolute path `command -v dkt` gives, keeps the hooks already in the file, and says how to remove the hooks.
+- [ ] The step names the events and states (`UserPromptSubmit` and `PreToolUse` with `working`, `Notification` and `Stop` with `waiting`, `SessionEnd` with `ended`), the command as the absolute path `command -v dkt` gives followed by `2>/dev/null || true`, keeps the settings and hooks already in the file, and says how to remove the hooks.
+- [ ] The step covers its other branches: the user declines (nothing is written); the settings file does not exist (it is created with the hooks alone); it is not valid JSON, or its `hooks` is not an object (nothing is written, and the user is told why); `command -v dkt` finds nothing (the step stops).
+- [ ] The hooks object the step describes, written into a scratch settings file, parses as JSON and has the five events with those commands; the check is done by hand and noted in the pull request.
 - [ ] Every command and field the step names exists in `internal/cli` and `internal/snapshot`.
