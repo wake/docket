@@ -224,7 +224,9 @@ artifacts:
         fixed format or string, an edge case that must be covered.
       - Right after the header, a `## Reuse` table:
         `| Need | Existing (path:symbol) | Decision | Reason |`,
-        one row for every capability the change builds: `extend` when it
+        one row for each named thing the change builds or changes (a
+        function, a type, a command, a file); what one of them does in
+        several parts is still one row. A row is `extend` when it
         builds on something that exists, named in Existing by its path in the
         repository, or as `external: <name>` for a dependency from outside it
         (a CLI, a library); `new` when nothing that exists fits, with Reason
@@ -250,7 +252,9 @@ artifacts:
       - Every task has a `**Review:**` line after its `**Scenarios:**` line:
         `judgment` when the task needs a reviewer's judgment (an error path,
         environment-dependent behavior, a public interface or output format),
-        otherwise `checks`. Only `judgment` tasks get their own reviewer.
+        otherwise `checks`. Only `judgment` tasks get their own reviewer. A
+        plan with a single task writes `checks`: the review of the whole
+        change before merging already reads the same diff.
       - Every task's `**Files:**` block lists every file the task creates or
         modifies, so parallel changes can be compared before they start.
       - What a task gives other tasks or takes from them (exported symbols
@@ -262,7 +266,8 @@ artifacts:
         it, what a command prints). Name every case an item covers, instead
         of saying that a rule applies the same way elsewhere. Each line of
         the header's Review Focus becomes an acceptance item of the task that
-        owns it.
+        owns it, a line saying that something must not happen or change
+        included.
         `dkt sync` ticks the checkboxes of Task N from the commit trailer
         `Change: <change-name>/<N>`; tick by hand only
         a task that was finished without any commit. OpenSpec counts every
