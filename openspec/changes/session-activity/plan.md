@@ -68,7 +68,7 @@ Also from that review, turned down by the author and then decided by a second co
 - [x] An unknown state, no location for the state home, and a folder that cannot be written return an error and write no record.
 - [x] `Read` returns the records written 14 minutes before `now`, not one written 16 minutes before; it skips, while still returning the other records, a file that is not a record, a file it cannot read, and a symbolic link; it returns nothing when the folder is missing, and an error when the folder cannot be listed; it writes and removes nothing.
 - [x] `Read` treats a record whose time is more than 15 minutes ahead of `now` as absent, and returns one a minute ahead.
-- [ ] Removing an old record never removes a newer one written to the same path meanwhile: the old file is first moved aside under a name of its own and removed only when it is still old; a file that turns out to be newer is put back unless a newer one already took its path, and nothing is left under the aside name.
+- [x] Removing an old record never removes a newer one written to the same path meanwhile: the old file is first moved aside under a name of its own and removed only when it is still old; a file that turns out to be newer is put back unless a newer one already took its path, and nothing is left under the aside name.
 
 ### Task 2: The dkt activity command
 
