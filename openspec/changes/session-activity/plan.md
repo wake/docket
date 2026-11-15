@@ -39,6 +39,8 @@
 
 Found by the pre-merge review's attacking reviewer (codex): standard input that is never closed could hold a hook call forever; a record with a time far in the future counted forever; and docket-init skipped its step when any one hook called `dkt activity`, so a partial set was never completed. Tasks 1, 2 and 4 gain an acceptance item or change one for these; the specs gain the scenarios "Input never closed" and "Record from the future".
 
+Also from that review, turned down by the author and then decided by a second codex reviewer (high effort) to be valid: removing an old record by its path after checking its time can remove the record another session has just renamed into that path, which may then stay missing for the whole window when it was a `Stop` hook's `waiting`. Task 1 gains an acceptance item for it.
+
 ---
 
 ### Task 1: Per-session state records
@@ -65,7 +67,8 @@ Found by the pre-merge review's attacking reviewer (codex): standard input that 
 - [x] Each `Write` removes the files in the folder modified more than 15 minutes before `now`, and keeps one modified 5 minutes before.
 - [x] An unknown state, no location for the state home, and a folder that cannot be written return an error and write no record.
 - [x] `Read` returns the records written 14 minutes before `now`, not one written 16 minutes before; it skips, while still returning the other records, a file that is not a record, a file it cannot read, and a symbolic link; it returns nothing when the folder is missing, and an error when the folder cannot be listed; it writes and removes nothing.
-- [ ] `Read` treats a record whose time is more than 15 minutes ahead of `now` as absent, and returns one a minute ahead.
+- [x] `Read` treats a record whose time is more than 15 minutes ahead of `now` as absent, and returns one a minute ahead.
+- [ ] Removing an old record never removes a newer one written to the same path meanwhile: the old file is first moved aside under a name of its own and removed only when it is still old; a file that turns out to be newer is put back unless a newer one already took its path, and nothing is left under the aside name.
 
 ### Task 2: The dkt activity command
 
@@ -90,7 +93,7 @@ Found by the pre-merge review's attacking reviewer (codex): standard input that 
 - [x] Standard input that is a terminal is not read: `cmd/dkt` passes it only when it is not a character device; and when the working directory cannot be read, `cmd/dkt` still exits with 0 for `activity`.
 - [x] `dkt --help` lists `activity`, and `dkt activity --help` prints its help and exits with 0; `dkt --json activity working` prints nothing and exits with 0.
 - [x] The existing tests of JSON output and exit codes for the other commands pass unchanged (`cli-output`'s MODIFIED requirements change only what `dkt activity` does).
-- [ ] With `Stdin` a pipe that holds `{` and is never closed, `activity working` returns 0 within about a second and records the working directory.
+- [x] With `Stdin` a pipe that holds `{` and is never closed, `activity working` returns 0 within about a second and records the working directory.
 
 ### Task 3: dkt snapshot reports each work's activity
 
@@ -127,7 +130,7 @@ Found by the pre-merge review's attacking reviewer (codex): standard input that 
 **Files:**
 - Modify: `skills/docket-init/SKILL.md`
 
-- [ ] A new last step, for Claude Code only: it is skipped when all five hooks in the user's `~/.claude/settings.json` already call `dkt activity`, and offers only the missing ones when some do; it offers the hooks, saying that they write a small state file under the state home on every prompt, tool call and turn end of every Claude Code session on the computer, never in a repository, so that `dkt snapshot` can show which works a session is on; it writes the settings only once the user agrees.
+- [x] A new last step, for Claude Code only: it is skipped when all five hooks in the user's `~/.claude/settings.json` already call `dkt activity`, and offers only the missing ones when some do; it offers the hooks, saying that they write a small state file under the state home on every prompt, tool call and turn end of every Claude Code session on the computer, never in a repository, so that `dkt snapshot` can show which works a session is on; it writes the settings only once the user agrees.
 - [x] The step names the events and states (`UserPromptSubmit` and `PreToolUse` with `working`, `Notification` and `Stop` with `waiting`, `SessionEnd` with `ended`), the command as the absolute path `command -v dkt` gives followed by `2>/dev/null || true`, keeps the settings and hooks already in the file, and says how to remove the hooks.
 - [x] The step covers its other branches: the user declines (nothing is written); the settings file does not exist (it is created with the hooks alone); it is not valid JSON, or its `hooks` is not an object (nothing is written, and the user is told why); `command -v dkt` finds nothing (the step stops).
 - [x] The hooks object the step describes, written into a scratch settings file, parses as JSON and has the five events with those commands; the check is done by hand and noted in the pull request.
