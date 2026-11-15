@@ -212,9 +212,14 @@ artifacts:
       plan.md instead of that skill's default location. There is no tasks.md:
       plan.md is the only task list, and OpenSpec tracks its checkboxes.
 
-      Keep the writing-plans header and task structure, except that the
-      heading is `# Implementation Plan`, since the change's title names the
-      work. Add:
+      Keep the writing-plans header, except that the heading is
+      `# Implementation Plan`, since the change's title names the work. Write
+      the tasks by the rules below, not in that skill's step-by-step format:
+      - A task says what to build and how it is accepted, not how to do it:
+        no code to copy, no sequence of commands to run, no commit messages; those are
+        the implementer's to decide. Write out exactly only what the
+        implementer could not work out: an interface other tasks depend on, a
+        fixed format or string, an edge case that must be covered.
       - Right after the header, a `## Reuse` table:
         `| Need | Existing (path:symbol) | Decision | Reason | Evidence |`,
         one row for every capability the plan needs. Decision is `reuse`,
@@ -246,16 +251,21 @@ artifacts:
         otherwise `checks`. Only `judgment` tasks get their own reviewer.
       - Every task's `**Files:**` block lists every file the task creates or
         modifies, so parallel changes can be compared before they start.
-      - Steps are `- [ ]` checkboxes. `dkt sync` ticks the steps of Task N
-        from the commit trailer `Change: <change-name>/<N>`; tick by hand only
+      - What a task gives other tasks or takes from them (exported symbols
+        with their signatures, formats) goes in an `**Interfaces:**` block;
+        leave it out when there is none.
+      - Under each task, `- [ ]` checkboxes list its acceptance items: what
+        must hold when the task is done, each one a result that can be
+        checked, not a step to perform (a behavior and the test that covers
+        it, what a command prints).
+        `dkt sync` ticks the checkboxes of Task N from the commit trailer
+        `Change: <change-name>/<N>`; tick by hand only
         a task that was finished without any commit. OpenSpec counts every
         `- [ ]` line, including those in code blocks: keep checkboxes out of
         code blocks and examples.
 
-      Before any code is written, have the plan reviewed once together with
-      the proposal, the delta specs and design.md, by the default steps of
-      the `docket` skill (or the user's own instructions where they say how),
-      and fix what the review finds.
+      Before any code is written, have the plan reviewed as "Plan review" in
+      `docket/workflow.md` says.
 
       When requirements change after the plan is approved:
       - Leave completed tasks as written and ticked.
@@ -275,21 +285,11 @@ apply:
   tracks: plan.md
   instruction: |
     Start only after the plan has been reviewed (see the plan instruction).
-    Execute plan.md with superpowers:subagent-driven-development. Review and
-    verify by the default steps of the `docket` skill, or the user's own
-    instructions where they say how. By default: only a task whose
-    `**Review:**` line says `judgment` gets its own reviewer; every task that
-    changes code gets the mechanical checks instead: its new tests fail
-    before the code and pass after, and mutating the lines it changed makes a
-    test fail. A task that changes no code, such as one that only edits docs,
-    is checked by its own verification steps.
-    Give each implementer the Reuse rows that concern its task. Each
-    implementer's report lists every exported symbol it added and, for each,
-    why no existing one fit. Every commit made for Task N carries one trailer
-    line `Change: <change-name>/<N>` in the last paragraph of its message;
-    structural changes and behavior changes go in separate commits.
-
-    Before merging, review the whole change once by the default steps. The
-    change is one pull request, merged with a merge commit or a rebase, never
-    a squash. Run `dkt sync <change-name>` before opening it so plan.md shows
-    every task that has commits as done.
+    Execute, review and verify by the steps of the `docket` skill and the
+    sections of `docket/workflow.md` it names ("Task execution", "Task
+    review", "Pre-merge review"); they are not repeated here.
+    Every commit made for Task N carries one trailer line
+    `Change: <change-name>/<N>` in the last paragraph of its message.
+    Never merge with a squash.
+    Run `dkt sync <change-name>` before opening the pull request, so plan.md
+    shows every task that has commits as done.

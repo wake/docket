@@ -101,6 +101,7 @@ func TestShippedNextStepsAreOneLine(t *testing.T) {
 var workflowTemplates = map[int]string{
 	1: "6642708242c599fe3930bce7873c8feca7234f3ea84e3c5a48f3870fa2453be6",
 	2: "5507117dba6048040272dfc88717a712af277d091768793bf7fac97d0605b37e",
+	3: "3a543b7169bb640e315b65b299b0baa752636f8a59a656423d85ac1d80549e10",
 }
 
 func TestWorkflowTemplatePinned(t *testing.T) {
