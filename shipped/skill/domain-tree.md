@@ -12,3 +12,22 @@ their area themselves, so editing this file touches no spec.
 - After editing this file, run `dkt domains` and fix what it reports.
 - Add, rename or move a node only with the user's agreement; when no node
   fits, suggest one to the user.
+- Once the file lists any item, `dkt lint` reports a capability the tree
+  leaves out as `domain-unlisted`; list it under a node that fits.
+
+## Starting the tree
+
+When the project has no `docket/domains.md` and ten or more main specs, and a
+change adds a capability:
+
+- Run `dkt domains --json` and draft a first tree from the capabilities it
+  lists: nodes named for areas the user will recognize, each capability under
+  one node. Show it to the user as a suggestion.
+- Only once the user agrees, write `docket/domains.md` in the same change, and
+  run `dkt domains` and fix what it reports.
+- When the user does not want a tree, ask whether to record that. If they
+  agree, write a `docket/domains.md` with one comment line and no items, such
+  as `# This project keeps no domain tree.`. A file with no items records that
+  the project keeps no tree: the tree is not suggested again, and `dkt lint`
+  reports no capability as left out. If it is not recorded, the tree is
+  suggested again when a later change adds a capability.
