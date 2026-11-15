@@ -47,6 +47,8 @@ func TestShippedFileSet(t *testing.T) {
 		"shipped/schema/templates/proposal.md",
 		"shipped/schema/templates/spec.md",
 		"shipped/skill/SKILL.md",
+		"shipped/skill/domain-tree.md",
+		"shipped/skill/issues-in-another-tool.md",
 		"shipped/workflow/workflow.md",
 	}
 	sort.Strings(got)
@@ -76,11 +78,13 @@ func TestShippedSchemaTemplatesExist(t *testing.T) {
 
 func TestShippedStarts(t *testing.T) {
 	for path, prefix := range map[string]string{
-		"shipped/skill/SKILL.md":               "---\nname: docket\n",
-		"shipped/schema/templates/proposal.md": "---\n",
-		"shipped/schema/templates/plan.md":     "# Implementation Plan\n",
-		"shipped/config/operations.yaml":       "operations:\n",
-		"shipped/workflow/workflow.md":         "---\ntemplate: ",
+		"shipped/skill/SKILL.md":                  "---\nname: docket\n",
+		"shipped/skill/domain-tree.md":            "# Domain tree\n\n",
+		"shipped/skill/issues-in-another-tool.md": "# Issues in another tool\n\n",
+		"shipped/schema/templates/proposal.md":    "---\n",
+		"shipped/schema/templates/plan.md":        "# Implementation Plan\n",
+		"shipped/config/operations.yaml":          "operations:\n",
+		"shipped/workflow/workflow.md":            "---\ntemplate: ",
 	} {
 		if !strings.HasPrefix(readShipped(t, path), prefix) {
 			t.Errorf("%s does not start with %q", path, prefix)

@@ -70,6 +70,7 @@
 - Create: `.claude/skills/docket/domain-tree.md`
 - Create: `.agents/skills/docket/domain-tree.md`
 - Modify: `internal/setup/history.go`
+- Modify: `shipped_test.go`
 
 - [x] The body of each new file, after its heading, equals the section's text in `SKILL.md` before this task, byte for byte.
 - [x] `SKILL.md` keeps both headings, each with exactly the pointer line in Global Constraints, and is otherwise unchanged.
