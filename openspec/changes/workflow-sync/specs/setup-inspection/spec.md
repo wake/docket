@@ -1,11 +1,7 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
-### Requirement: User template inspected
-`dkt inspect` SHALL report the user template that `user-workflow` locates in `result.user_workflow`, with its `path`, whether it `exists`, its template `version` (0 when it has none or does not exist), the settings' `default` mode (null when unset), the project's `mode`, and `sections`: in `sync` mode the `heading` and `state` of each section compared as `user-workflow` says, otherwise none. When no location can be found, `result.user_workflow` SHALL be null; when only the index has none, the mode SHALL be `independent`. A user template, settings file or index that cannot be read SHALL be listed in `unreadable`.
-
-#### Scenario: User template reported
-- **WHEN** the user template exists with template 3
-- **THEN** `result.user_workflow` has its path, `exists` true and `version` 3
+### Requirement: Workflow modes inspected
+Beside the user template, `result.user_workflow` SHALL hold the settings' `default` mode (null when unset), the project's `mode`, and `sections`: in `sync` mode the `heading` and `state` of each section compared as `user-workflow` says, otherwise none. When the index has no location, the mode SHALL be `independent`. A settings file or index that cannot be read SHALL be listed in `unreadable`.
 
 #### Scenario: Independent project
 - **WHEN** the project's entry has `mode` `independent` and its "Plan review" text differs from the user template's
@@ -18,8 +14,6 @@
 #### Scenario: Index without a location
 - **WHEN** `XDG_CONFIG_HOME` is an absolute path, neither `HOME` nor `XDG_STATE_HOME` is set, and a user runs `dkt inspect --json`
 - **THEN** `result.user_workflow` has the user template's path and `mode` `independent`, and no finding or `unreadable` entry is about the index
-
-## ADDED Requirements
 
 ### Requirement: Section state findings
 In `sync` mode, `dkt inspect` SHALL report `workflow-sync-template-changed`, `workflow-sync-project-changed` or `workflow-sync-conflict` for each section in that state, naming `docket/workflow.md` and the section's heading. An `in-step` section SHALL be no finding.

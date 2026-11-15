@@ -38,6 +38,10 @@
 | docket-init's mode question | `skills/docket-init/SKILL.md` | extend | Step 4 gains the mode once the user template is taken |
 | docket-doctor's section states | `skills/docket-doctor/SKILL.md` | extend | The three findings join its list of problems |
 
+## Revision 1 (2026-11-16): the inspect fields became a requirement of their own
+
+Found by the author while archiving: modifying `setup-inspection`'s "User template inspected" to hold `default`, `mode` and `sections` made its description longer than `openspec validate --strict` allows in a main spec. The delta now leaves that requirement as it was and adds "Workflow modes inspected" with the same text and scenarios; no behavior changes. Task 3 still lists `setup-inspection#user-template-reported`, which stays in the main spec unchanged and is still tested.
+
 ---
 
 ### Task 1: Compare a project's sections with the user template
