@@ -37,7 +37,7 @@ An entry's `synced` SHALL map a section's heading to the SHA-256, in lowercase h
 - **THEN** the entry's `synced` maps "Reviewers" to the SHA-256 of `A reviewer.`
 
 ### Requirement: Section states
-In `sync` mode, each level-three section that both the project's file and the user template have, and that is not project-owned, SHALL have one state: `in-step` when the two texts are the same variant; otherwise `template-changed` when the project's text has the `synced` hash, `project-changed` when the user template's has it, and `conflict` when neither has it or there is none. Sections SHALL be compared only when the two files have the same template version.
+In `sync` mode, each level-three section that both the project's file and the user template have, and that is not project-owned, SHALL have one state: `in-step` when the two texts are the same variant; otherwise `template-changed` when the project's text has the `synced` hash, `project-changed` when the user template's has it, and `conflict` when neither has it or there is none. Sections SHALL be compared only when both files have a template version and it is the same.
 
 #### Scenario: Template changed
 - **WHEN** the `synced` hash of "Plan review" is the project's text, and the user template's text differs
@@ -63,8 +63,12 @@ In `sync` mode, each level-three section that both the project's file and the us
 - **WHEN** a project in `sync` mode has template 3 and the user template has template 2
 - **THEN** no section state is listed
 
+#### Scenario: No template versions
+- **WHEN** a project in `sync` mode and the user template both have no template version
+- **THEN** no section state is listed
+
 ### Requirement: Record the mode
-`dkt workflow mode <sync|independent>`, run in a Docket project, SHALL set the mode on the project's entry in the index, adding the entry as `dkt projects add` would when there is none. With `sync`, `synced` SHALL hold the hash of each `in-step` section and keep the earlier hash of each other compared section; with `independent`, the entry SHALL hold no `synced`. `result` SHALL give the project's `path`, the `mode`, and the `in-step` headings as `synced`.
+`dkt workflow mode <sync|independent>`, run in a Docket project, SHALL set the mode on the project's entry in the index, adding the entry as `dkt projects add` would when there is none. With `sync`, `synced` SHALL hold the hash of each `in-step` section and keep every other earlier hash; with `independent`, the entry SHALL hold no `synced`. `result` SHALL give the project's `path`, the `mode`, and the `in-step` headings as `synced`.
 
 #### Scenario: Sync recorded
 - **WHEN** a user runs `dkt workflow mode sync --json` in a project whose sections all equal the user template's
@@ -73,6 +77,10 @@ In `sync` mode, each level-three section that both the project's file and the us
 #### Scenario: Earlier hash kept
 - **WHEN** the project's "Plan review" differs from the user template's, `synced` holds a hash for it, and a user runs `dkt workflow mode sync`
 - **THEN** that hash is unchanged and "Plan review" is not in `result.synced`
+
+#### Scenario: Hashes kept across a version gap
+- **WHEN** the project has template 3, the user template has template 2, `synced` holds hashes, and a user runs `dkt workflow mode sync --json`
+- **THEN** `synced` is unchanged and `result.synced` is empty
 
 #### Scenario: Independent recorded
 - **WHEN** the entry has `mode` `sync` and `synced`, and a user runs `dkt workflow mode independent`
@@ -86,7 +94,7 @@ In `sync` mode, each level-three section that both the project's file and the us
 `dkt workflow mode` SHALL write nothing and exit with 1 when it runs outside a git repository (`not-a-repository`), in a repository without `docket/workflow.md` (`not-a-project`), with `sync` when the user template does not exist (`user-workflow-missing`), or with `sync` when `project-owned` is invalid (`workflow-project-owned-invalid`). A mode other than `sync` or `independent` SHALL be a usage error.
 
 #### Scenario: No user template
-- **WHEN** the user template does not exist and a user runs `dkt workflow mode sync --json` in a Docket project
+- **WHEN** the user template does not exist and a user runs `dkt workflow mode sync --json` in a Docket project the index already holds
 - **THEN** the findings hold `user-workflow-missing`, the index is not written, and dkt exits with 1
 
 #### Scenario: Unknown mode
@@ -107,3 +115,7 @@ When the index, the user template or the project's `docket/workflow.md` cannot b
 #### Scenario: Mode without a home
 - **WHEN** neither `HOME` nor `XDG_STATE_HOME` is set and a user runs `dkt workflow mode independent --json` in a Docket project
 - **THEN** the findings hold `no-home` and dkt exits with 4
+
+#### Scenario: User template without a home
+- **WHEN** `XDG_STATE_HOME` is an absolute path, neither `HOME` nor `XDG_CONFIG_HOME` is set, and a user runs `dkt workflow mode sync --json` in a Docket project
+- **THEN** the findings hold `no-home`, the index is not written, and dkt exits with 4

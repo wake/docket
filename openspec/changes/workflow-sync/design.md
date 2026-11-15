@@ -22,7 +22,7 @@ Considered: a separate file per project under the state home. Rejected: a second
 
 ### One command records both: `dkt workflow mode <sync|independent>`
 
-docket-init runs it once the user picks a mode; docket-doctor runs `dkt workflow mode sync` again after every write the user agreed to. In `sync` mode it hashes each compared section whose two texts are the same variant and keeps the earlier hash of the others; `independent` drops `synced`, so switching back starts from what the two files share then. dkt checks the texts itself, so a hash is only ever one both files had, whatever the agent did.
+docket-init runs it once the user picks a mode; docket-doctor runs `dkt workflow mode sync` again after every write the user agreed to. In `sync` mode it hashes each compared section whose two texts are the same variant and keeps every other earlier hash, so a version gap, which compares nothing, loses no record; `independent` drops `synced`, so switching back starts from what the two files share then. dkt checks the texts itself, so a hash is only ever one both files had, whatever the agent did.
 
 Considered: a separate `dkt workflow synced <heading>` that records named sections. Rejected: the agent would have to name the right sections, and a hash recorded for texts that differ would hide a change.
 
@@ -41,7 +41,7 @@ A section's text is normalized as `user-workflow`'s Same variant says, which `se
 
 An old hash under texts that are the same again is `in-step`: nothing is to be done, and the next `dkt workflow mode sync` records it. With no hash there is no telling which side moved, so the user decides, as for a conflict.
 
-Only sections both files have at level three, outside `project-owned`, are compared, and only when the two files have the same template version: a version gap is upgraded first, through the existing `workflow-outdated` and `user-workflow-outdated` findings, so that an upgrade does not show up as many changed sections.
+Only sections both files have at level three, outside `project-owned`, are compared, and only when both files have a template version and it is the same: a missing version is reported as unknown and settled first, and a version gap is upgraded first, through the existing `workflow-outdated` and `user-workflow-outdated` findings, so that an upgrade does not show up as many changed sections.
 
 ### Which copy of the project's file
 
