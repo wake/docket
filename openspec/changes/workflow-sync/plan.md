@@ -54,11 +54,11 @@
 - Consumes: `setup.Sections`, `setup.TemplateVersion`, `change.ReadFrontMatter`, as they are.
 - Produces: `setup.ProjectOwned(b []byte) ([]string, error)`: the headings, nil when the field is absent, an error when the value is not a bracketed list. `setup.SectionState{Heading, State, Hash string}` and `setup.CompareSections(user, project []byte, owned []string, synced map[string]string) []setup.SectionState`: the compared sections in the user template's order, never nil; `Hash` is the hash of the shared text for `in-step` and empty otherwise.
 
-- [ ] `ProjectOwned` gives `[Where to work, How to merge]` for `project-owned: [Where to work, How to merge]`, nil with no field or no front matter, an empty list for `[]`, and an error for `project-owned: Where to work`.
-- [ ] `CompareSections` gives `in-step` for texts that are the same variant whether `synced` holds their hash, another hash or none; `template-changed` when the hash is the project's text; `project-changed` when it is the user template's; `conflict` when it is neither or there is none.
-- [ ] Only level-three sections in both files and not in `owned` are compared; a heading in one file only, or in `owned`, gives no state.
-- [ ] Two files with different template versions give no states; so do two files that both have no template version, and one with a version beside one without.
-- [ ] `Hash` of an `in-step` section is the lowercase hexadecimal SHA-256 of its text as `Sections` gives it.
+- [x] `ProjectOwned` gives `[Where to work, How to merge]` for `project-owned: [Where to work, How to merge]`, nil with no field or no front matter, an empty list for `[]`, and an error for `project-owned: Where to work`.
+- [x] `CompareSections` gives `in-step` for texts that are the same variant whether `synced` holds their hash, another hash or none; `template-changed` when the hash is the project's text; `project-changed` when it is the user template's; `conflict` when it is neither or there is none.
+- [x] Only level-three sections in both files and not in `owned` are compared; a heading in one file only, or in `owned`, gives no state.
+- [x] Two files with different template versions give no states; so do two files that both have no template version, and one with a version beside one without.
+- [x] `Hash` of an `in-step` section is the lowercase hexadecimal SHA-256 of its text as `Sections` gives it.
 
 ### Task 2: Mode records in the index and the default in the settings
 
@@ -74,10 +74,10 @@
 **Interfaces:**
 - Produces: `projects.Entry` fields `Mode string` (`json:"mode,omitempty"`) and `Synced map[string]string` (`json:"synced,omitempty"`); `projects.DefaultMode(settings string) (string, error)`: `sync`, `independent`, or empty when the file or key is missing; an error for another value or a file that is not JSON.
 
-- [ ] An index whose entry holds `mode` `sync` and `synced` loads them and saves them unchanged; an entry without them saves without the keys, as before.
-- [ ] An entry with `mode` `always` makes `Load` fail, and `dkt projects ls --json` lists the index in `unreadable` and exits with 3.
-- [ ] Each of `dkt projects add` in another Docket project, `dkt projects ignore` and `dkt projects rm` on another path, and automatic registration of another project (by `dkt status` there) keeps the first entry's `mode` and `synced`.
-- [ ] `DefaultMode` gives `sync` for `{"workflow": {"default": "sync"}}`, empty with no file or no key, and an error for `"always"` and for a file that is not JSON.
+- [x] An index whose entry holds `mode` `sync` and `synced` loads them and saves them unchanged; an entry without them saves without the keys, as before.
+- [x] An entry with `mode` `always` makes `Load` fail, and `dkt projects ls --json` lists the index in `unreadable` and exits with 3.
+- [x] Each of `dkt projects add` in another Docket project, `dkt projects ignore` and `dkt projects rm` on another path, and automatic registration of another project (by `dkt status` there) keeps the first entry's `mode` and `synced`.
+- [x] `DefaultMode` gives `sync` for `{"workflow": {"default": "sync"}}`, empty with no file or no key, and an error for `"always"` and for a file that is not JSON.
 
 ### Task 3: dkt inspect reports the modes and the section states
 
@@ -92,14 +92,14 @@
 **Interfaces:**
 - Consumes: `setup.ProjectOwned`, `setup.CompareSections` (Task 1); `projects.Entry.Mode`, `projects.Entry.Synced`, `projects.DefaultMode` (Task 2); `projects.IndexPath`, `projects.SettingsPath`, `projects.Load`, `projects.ProjectPath` and `readProjectWorkflow` as they are.
 
-- [ ] `result.user_workflow` holds `default` (null when unset), `mode` and `sections` (an empty array, not null, when nothing is compared), beside `path`, `exists` and `version` as before.
-- [ ] A project with no entry, or an entry without `mode`, is `independent`; in `independent` mode `sections` is empty and no section finding is reported even where texts differ.
-- [ ] In `sync` mode each compared section is listed with its state, and each of `template-changed`, `project-changed` and `conflict` gives its finding naming `docket/workflow.md` and the heading, with exit 1; all `in-step` gives no finding and exit 0 when nothing else is found.
-- [ ] A `project-owned` heading is not listed; an invalid `project-owned` gives `workflow-project-owned-invalid` and no sections.
-- [ ] No sections are listed when the user template does not exist, when `docket/workflow.md` does not exist, or when the two template versions differ.
-- [ ] Settings with `workflow.default` `sync` give `default` `sync`; `always` or a settings file that is not JSON lists the settings file in `unreadable`, `default` null, exit 3; an index that cannot be read is listed in `unreadable` and the mode is `independent`.
-- [ ] With neither `HOME` nor `XDG_CONFIG_HOME`, `result.user_workflow` is null, neither the index nor the settings is read, and inspect reports the rest; with an absolute `XDG_CONFIG_HOME` and neither `HOME` nor `XDG_STATE_HOME`, `result.user_workflow` holds the path and `mode` `independent`, and nothing about the index is reported.
-- [ ] In `sync` mode with sections to report, the index file and the project's files are byte-for-byte unchanged after inspect.
+- [x] `result.user_workflow` holds `default` (null when unset), `mode` and `sections` (an empty array, not null, when nothing is compared), beside `path`, `exists` and `version` as before.
+- [x] A project with no entry, or an entry without `mode`, is `independent`; in `independent` mode `sections` is empty and no section finding is reported even where texts differ.
+- [x] In `sync` mode each compared section is listed with its state, and each of `template-changed`, `project-changed` and `conflict` gives its finding naming `docket/workflow.md` and the heading, with exit 1; all `in-step` gives no finding and exit 0 when nothing else is found.
+- [x] A `project-owned` heading is not listed; an invalid `project-owned` gives `workflow-project-owned-invalid` and no sections.
+- [x] No sections are listed when the user template does not exist, when `docket/workflow.md` does not exist, or when the two template versions differ.
+- [x] Settings with `workflow.default` `sync` give `default` `sync`; `always` or a settings file that is not JSON lists the settings file in `unreadable`, `default` null, exit 3; an index that cannot be read is listed in `unreadable` and the mode is `independent`.
+- [x] With neither `HOME` nor `XDG_CONFIG_HOME`, `result.user_workflow` is null, neither the index nor the settings is read, and inspect reports the rest; with an absolute `XDG_CONFIG_HOME` and neither `HOME` nor `XDG_STATE_HOME`, `result.user_workflow` holds the path and `mode` `independent`, and nothing about the index is reported.
+- [x] In `sync` mode with sections to report, the index file and the project's files are byte-for-byte unchanged after inspect.
 
 ### Task 4: dkt workflow mode records the mode and the synced hashes
 
@@ -115,16 +115,16 @@
 **Interfaces:**
 - Consumes: `setup.ProjectOwned`, `setup.CompareSections` (Task 1); `projects.Entry.Mode`, `projects.Entry.Synced` (Task 2); `projects.Locate`, `projects.Load`, `projects.UserWorkflowPath`, `projectsEnv` and `readProjectWorkflow` as they are.
 
-- [ ] `dkt workflow mode sync --json` in a project whose sections equal the user template's sets `mode` `sync`, maps every compared heading to its hash, lists the headings in `result.synced`, gives `result.path` the project path, and exits with 0.
-- [ ] A section whose texts differ keeps its earlier hash, or gets none when it had none, and is not in `result.synced`; a `project-owned` section and a heading in one file only get no new hash; when the two template versions differ, `synced` is unchanged and `result.synced` is empty.
-- [ ] `dkt workflow mode independent` sets `mode` `independent` and removes `synced`.
-- [ ] With no entry for the project, it adds one as `dkt projects add` would (origin, time, `ignored` false) with the mode; an ignored entry stays ignored.
-- [ ] Run in a linked worktree, it reads that worktree's `docket/workflow.md` and writes the entry of the main checkout's path.
-- [ ] With `sync`, a missing user template gives `user-workflow-missing` and an invalid `project-owned` gives `workflow-project-owned-invalid`, both exit 1 with the index not written; outside a repository it gives `not-a-repository` and in one without `docket/workflow.md` `not-a-project`, exit 1.
-- [ ] `dkt workflow mode always`, `dkt workflow mode` and `dkt workflow mode sync extra` are usage errors with exit 2.
-- [ ] An index holding `not json`, or a user template or project file that cannot be read, is listed in `unreadable`, the index is unchanged, and dkt exits with 3.
-- [ ] With neither `HOME` nor `XDG_STATE_HOME`, `independent` and `sync` report `no-home` and exit with 4; with an absolute `XDG_STATE_HOME` and neither `HOME` nor `XDG_CONFIG_HOME`, `sync` reports `no-home`, exits with 4 and writes no index, while `independent` records the mode.
-- [ ] `dkt projects add` reports `not-a-repository` and `not-a-project` exactly as before, through the shared helper.
+- [x] `dkt workflow mode sync --json` in a project whose sections equal the user template's sets `mode` `sync`, maps every compared heading to its hash, lists the headings in `result.synced`, gives `result.path` the project path, and exits with 0.
+- [x] A section whose texts differ keeps its earlier hash, or gets none when it had none, and is not in `result.synced`; a `project-owned` section and a heading in one file only get no new hash; when the two template versions differ, `synced` is unchanged and `result.synced` is empty.
+- [x] `dkt workflow mode independent` sets `mode` `independent` and removes `synced`.
+- [x] With no entry for the project, it adds one as `dkt projects add` would (origin, time, `ignored` false) with the mode; an ignored entry stays ignored.
+- [x] Run in a linked worktree, it reads that worktree's `docket/workflow.md` and writes the entry of the main checkout's path.
+- [x] With `sync`, a missing user template gives `user-workflow-missing` and an invalid `project-owned` gives `workflow-project-owned-invalid`, both exit 1 with the index not written; outside a repository it gives `not-a-repository` and in one without `docket/workflow.md` `not-a-project`, exit 1.
+- [x] `dkt workflow mode always`, `dkt workflow mode` and `dkt workflow mode sync extra` are usage errors with exit 2.
+- [x] An index holding `not json`, or a user template or project file that cannot be read, is listed in `unreadable`, the index is unchanged, and dkt exits with 3.
+- [x] With neither `HOME` nor `XDG_STATE_HOME`, `independent` and `sync` report `no-home` and exit with 4; with an absolute `XDG_STATE_HOME` and neither `HOME` nor `XDG_CONFIG_HOME`, `sync` reports `no-home`, exits with 4 and writes no index, while `independent` records the mode.
+- [x] `dkt projects add` reports `not-a-repository` and `not-a-project` exactly as before, through the shared helper.
 
 ### Task 5: docket-init asks for the mode and docket-doctor resolves the section states
 
@@ -136,7 +136,7 @@
 - Modify: `skills/docket-init/SKILL.md`
 - Modify: `skills/docket-doctor/SKILL.md`
 
-- [ ] In docket-init's step 4, once the user agrees to take a user template of the same version, the agent proposes `result.user_workflow.default` when it is set and otherwise asks for the mode, explaining `sync` and `independent` in a line each, and runs `dkt workflow mode <mode>` only once the user agrees.
-- [ ] docket-doctor lists `workflow-sync-template-changed`, `workflow-sync-project-changed`, `workflow-sync-conflict` and `workflow-project-owned-invalid` with the other problems and resolves them one at a time with the user's agreement: take the user template's section; keep the project's edit and offer to add the heading to `project-owned` or to copy it into the user template; for a conflict, show both and let the user take either text or add the heading to `project-owned`; fix the `project-owned` line. After each agreed write it runs `dkt workflow mode sync`, then `dkt inspect` again.
-- [ ] Neither skill writes `mode`, `synced`, a workflow file or the user template without the user's agreement, and neither changes the settings file.
-- [ ] Every rule and command the two skills name exists in `internal/cli`.
+- [x] In docket-init's step 4, once the user agrees to take a user template of the same version, the agent proposes `result.user_workflow.default` when it is set and otherwise asks for the mode, explaining `sync` and `independent` in a line each, and runs `dkt workflow mode <mode>` only once the user agrees.
+- [x] docket-doctor lists `workflow-sync-template-changed`, `workflow-sync-project-changed`, `workflow-sync-conflict` and `workflow-project-owned-invalid` with the other problems and resolves them one at a time with the user's agreement: take the user template's section; keep the project's edit and offer to add the heading to `project-owned` or to copy it into the user template; for a conflict, show both and let the user take either text or add the heading to `project-owned`; fix the `project-owned` line. After each agreed write it runs `dkt workflow mode sync`, then `dkt inspect` again.
+- [x] Neither skill writes `mode`, `synced`, a workflow file or the user template without the user's agreement, and neither changes the settings file.
+- [x] Every rule and command the two skills name exists in `internal/cli`.
