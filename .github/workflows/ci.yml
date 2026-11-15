@@ -37,8 +37,9 @@ jobs:
       - run: go test ./...
 
   windows:
-    # Only the build and the protections are verified on Windows; the rest of
-    # the suite needs the work in docket/ideas/windows-*.md.
+    # Only the build and the protections, and the test fakes they will need,
+    # are verified on Windows; the rest of the suite needs the work in
+    # docket/ideas/windows-*.md.
     name: 'windows: build and protections only (dkt is not supported on Windows yet)'
     runs-on: windows-latest
     steps:
@@ -51,7 +52,7 @@ jobs:
         env:
           GOARCH: arm64
       - run: go vet ./...
-      - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/
+      - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/ ./internal/testutil/
 
   openspec:
     runs-on: ubuntu-latest
