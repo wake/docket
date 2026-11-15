@@ -1,6 +1,8 @@
 package setup
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"reflect"
@@ -219,5 +221,72 @@ func TestWorkflowShippedWithoutVersion(t *testing.T) {
 	_, _, err := Decide(t.TempDir(), shippedWith(t, "# No front matter\n"), false)
 	if err == nil {
 		t.Error("no error")
+	}
+}
+
+func fmDoc(version int, extra, body string) []byte {
+	return []byte(fmt.Sprintf("---\ntemplate: %d\n%s---\n\n%s", version, extra, body))
+}
+
+func sha(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+func TestProjectOwned(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+		bad  bool
+	}{
+		{"---\nproject-owned: [Where to work, How to merge]\n---\n", []string{"Where to work", "How to merge"}, false},
+		{"# no front matter\n", nil, false},
+		{"---\ntemplate: 1\n---\n", nil, false},
+		{"---\nproject-owned: []\n---\n", []string{}, false},
+		{"---\nproject-owned: Where to work\n---\n", nil, true},
+		{"---\nproject-owned: [a,,b]\n---\n", nil, true},
+	}
+	for _, c := range cases {
+		got, err := ProjectOwned([]byte(c.in))
+		if (err != nil) != c.bad || !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%q: got %#v, %v", c.in, got, err)
+		}
+	}
+}
+
+func TestCompareSections(t *testing.T) {
+	user := fmDoc(2, "", "### A\n\nuser a\n\n### B\n\nsame\n\n### C\n\nuser c\n\n### OnlyUser\n\nx\n")
+	proj := fmDoc(2, "", "### A\n\nproj a\n\n### B\n\nsame  \n\n### C\n\nproj c\n\n### OnlyProj\n\nx\n")
+	states := func(owned []string, synced map[string]string) map[string]SectionState {
+		m := map[string]SectionState{}
+		for _, s := range CompareSections(user, proj, owned, synced) {
+			m[s.Heading] = s
+		}
+		return m
+	}
+	m := states(nil, map[string]string{"A": sha("proj a"), "C": sha("user c"), "B": "old"})
+	if m["A"].State != "template-changed" || m["C"].State != "project-changed" || m["B"].State != "in-step" || m["B"].Hash != sha("same") {
+		t.Errorf("states: %#v", m)
+	}
+	if len(m) != 3 {
+		t.Errorf("only shared sections: %#v", m)
+	}
+	m = states([]string{"C"}, map[string]string{"A": "other"})
+	if m["A"].State != "conflict" || m["A"].Hash != "" || len(m) != 2 {
+		t.Errorf("conflict/owned: %#v", m)
+	}
+	if got := states(nil, nil); got["A"].State != "conflict" {
+		t.Errorf("never synced: %#v", got)
+	}
+	got := CompareSections(user, proj, nil, nil)
+	if len(got) != 3 || got[0].Heading != "A" || got[2].Heading != "C" {
+		t.Errorf("order: %#v", got)
+	}
+	bare := []byte("### A\n\nuser a\n")
+	for name, pair := range map[string][2][]byte{
+		"version gap": {user, fmDoc(3, "", "### A\n\nuser a\n")},
+		"no versions": {bare, bare},
+		"one without": {user, bare},
+	} {
+		if got := CompareSections(pair[0], pair[1], nil, nil); got == nil || len(got) != 0 {
+			t.Errorf("%s: %#v", name, got)
+		}
 	}
 }

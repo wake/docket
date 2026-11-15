@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -45,11 +46,17 @@ func workflowCommand() Command {
 	return Command{
 		Name:   "workflow",
 		Args:   -1,
-		Usage:  "workflow refs [--json]",
+		Usage:  "workflow refs [--json] | workflow mode <sync|independent> [--json]",
 		NoRepo: true,
 		Run: func(c *Context, args []string) (Outcome, error) {
 			if len(args) == 0 {
-				return Outcome{}, UsageError{Msg: "workflow needs a subcommand: refs"}
+				return Outcome{}, UsageError{Msg: "workflow needs a subcommand: refs or mode"}
+			}
+			if args[0] == "mode" {
+				if len(args) != 2 || (args[1] != "sync" && args[1] != "independent") {
+					return Outcome{}, UsageError{Msg: "workflow mode needs one mode: sync or independent"}
+				}
+				return workflowMode(c, args[1])
 			}
 			if args[0] != "refs" {
 				return Outcome{}, UsageError{Msg: "unknown workflow subcommand " + args[0]}
@@ -75,6 +82,79 @@ func readProjectWorkflow(project string) ([]byte, error) {
 	}
 	defer f.Close()
 	return io.ReadAll(f)
+}
+
+// modeResult is the result of dkt workflow mode; Synced is never null.
+type modeResult struct {
+	Path   string   `json:"path"`
+	Mode   string   `json:"mode"`
+	Synced []string `json:"synced"`
+}
+
+// workflowMode records mode on the project's index entry; with sync it also records the
+// hash of each section both files have in step, keeping every earlier hash.
+func workflowMode(c *Context, mode string) (Outcome, error) {
+	idx, err := projectsEnv(c)
+	if err != nil {
+		return Outcome{}, err
+	}
+	x, err := projects.Load(idx)
+	if err != nil {
+		return Outcome{Unreadable: []Unreadable{{Source: idx, Reason: err.Error()}}}, nil
+	}
+	p, refused, err := locateDocket(c, c.Dir)
+	if err != nil || refused != nil {
+		return refusal(refused), err
+	}
+	i := x.Find(p.Path)
+	if i < 0 {
+		x.Projects = append(x.Projects, projects.Entry{Path: p.Path, Origin: p.Origin, Added: projects.Stamp(c.Now())})
+		i = len(x.Projects) - 1
+	}
+	e := &x.Projects[i]
+	e.Mode = mode
+	if mode == "independent" {
+		e.Synced = nil
+	}
+	inStep := []string{}
+	if mode == "sync" {
+		user, err := projects.UserWorkflowPath(c.Env)
+		if errors.Is(err, projects.ErrNoHome) {
+			return Outcome{}, EnvError{Rule: "no-home", Msg: err.Error()}
+		} else if err != nil {
+			return Outcome{}, err
+		}
+		ub, err := os.ReadFile(user) // follows a link: the file is the user's own
+		if errors.Is(err, fs.ErrNotExist) {
+			return Outcome{Findings: []Finding{{Rule: "user-workflow-missing", File: user, Message: user + " does not exist; there is nothing to sync with"}}}, nil
+		}
+		if err != nil {
+			return Outcome{Unreadable: []Unreadable{{Source: user, Reason: err.Error()}}}, nil
+		}
+		pb, err := readProjectWorkflow(p.Worktree)
+		if err != nil {
+			return Outcome{Unreadable: []Unreadable{{Source: filepath.Join(p.Worktree, workflowFile), Reason: err.Error()}}}, nil
+		}
+		owned, err := setup.ProjectOwned(pb)
+		if err != nil {
+			return Outcome{Findings: []Finding{{Rule: "workflow-project-owned-invalid", File: workflowFile, Message: workflowFile + ": " + err.Error()}}}, nil
+		}
+		synced := maps.Clone(e.Synced)
+		if synced == nil {
+			synced = map[string]string{}
+		}
+		for _, s := range setup.CompareSections(ub, pb, owned, e.Synced) {
+			if s.State == "in-step" {
+				synced[s.Heading] = s.Hash
+				inStep = append(inStep, s.Heading)
+			}
+		}
+		e.Synced = synced
+	}
+	if err := x.Save(idx); err != nil {
+		return Outcome{}, err
+	}
+	return Outcome{Result: modeResult{Path: p.Path, Mode: mode, Synced: inStep}, Human: []string{mode + " " + p.Path}}, nil
 }
 
 func workflowRefs(c *Context) (Outcome, error) {

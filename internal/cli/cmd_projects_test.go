@@ -493,3 +493,51 @@ func TestProjectsText(t *testing.T) {
 		t.Fatalf("%q want %q", got, want)
 	}
 }
+
+// A write about one project keeps the mode and synced of another entry.
+func TestProjectsKeepOthersModeSynced(t *testing.T) {
+	r1, r2 := prRepo(t, true), prRepo(t, true)
+	first := `{"path":"` + prReal(t, r1.Dir) + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":false,"mode":"sync","synced":{"Plan review":"ab"}}`
+	idx := prWrite(t, r1.Env, `{"projects":[`+first+`]}`)
+	keeps := func(step string) {
+		t.Helper()
+		data, _ := os.ReadFile(idx)
+		var x struct {
+			Projects []struct {
+				Path, Mode string
+				Synced     map[string]string
+			}
+		}
+		if err := json.Unmarshal(data, &x); err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range x.Projects {
+			if e.Path == prReal(t, r1.Dir) && e.Mode == "sync" && e.Synced["Plan review"] == "ab" {
+				return
+			}
+		}
+		t.Fatalf("%s lost mode and synced: %s", step, data)
+	}
+	for _, step := range [][]string{{"add"}, {"ignore", r2.Dir}, {"rm", r2.Dir}} {
+		if code, _, raw, _ := prRun(t, r1.Env, r2.Dir, step...); code > 1 {
+			t.Fatalf("%v: %d %s", step, code, raw)
+		}
+		keeps(step[0])
+	}
+	// registration by another command in the other project
+	prRun(t, r1.Env, r2.Dir, "rm", r2.Dir)
+	Run(Options{Args: []string{"status", "--json"}, Dir: r2.Dir, Env: r1.Env, Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
+	keeps("status")
+	if data, _ := os.ReadFile(idx); !strings.Contains(string(data), prReal(t, r2.Dir)) {
+		t.Fatalf("status did not register: %s", data)
+	}
+}
+
+func TestProjectsUnknownMode(t *testing.T) {
+	r := prRepo(t, true)
+	prWrite(t, r.Env, `{"projects":[{"path":"/p","origin":null,"added":"2026-01-01T00:00:00Z","ignored":false,"mode":"always"}]}`)
+	code, m, raw, _ := prRun(t, r.Env, r.Dir, "ls")
+	if code != 3 || len(m.Unreadable) != 1 {
+		t.Fatalf("%d %s", code, raw)
+	}
+}

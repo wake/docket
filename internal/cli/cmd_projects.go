@@ -75,6 +75,31 @@ func absArg(c *Context, arg string) string {
 	return filepath.Clean(arg)
 }
 
+// locateDocket finds the Docket project holding dir. A directory that is not one gives the
+// finding to report as refused, and no error.
+func locateDocket(c *Context, dir string) (p projects.Project, refused *Finding, err error) {
+	p, err = projects.Locate(dir, c.Env)
+	switch {
+	case errors.Is(err, projects.ErrNotRepository):
+		return p, &Finding{Rule: "not-a-repository", Message: err.Error()}, nil
+	case errors.Is(err, gitx.ErrGitMissing):
+		return p, nil, EnvError{Rule: "git-missing", Msg: err.Error()}
+	case err != nil:
+		return p, nil, err
+	case !p.Docket:
+		return p, &Finding{Rule: "not-a-project", Message: p.Worktree + " has no docket/workflow.md"}, nil
+	}
+	return p, nil, nil
+}
+
+// refusal is the outcome that reports one finding, empty when there is none.
+func refusal(f *Finding) Outcome {
+	if f == nil {
+		return Outcome{}
+	}
+	return Outcome{Findings: []Finding{*f}}
+}
+
 func projectsAdd(c *Context, rest []string) (Outcome, error) {
 	index, err := projectsEnv(c)
 	if err != nil {
@@ -88,16 +113,9 @@ func projectsAdd(c *Context, rest []string) (Outcome, error) {
 	if err != nil {
 		return Outcome{Unreadable: []Unreadable{{Source: index, Reason: err.Error()}}}, nil
 	}
-	p, err := projects.Locate(dir, c.Env)
-	switch {
-	case errors.Is(err, projects.ErrNotRepository):
-		return Outcome{Findings: []Finding{{Rule: "not-a-repository", Message: err.Error()}}}, nil
-	case errors.Is(err, gitx.ErrGitMissing):
-		return Outcome{}, EnvError{Rule: "git-missing", Msg: err.Error()}
-	case err != nil:
-		return Outcome{}, err
-	case !p.Docket:
-		return Outcome{Findings: []Finding{{Rule: "not-a-project", Message: p.Worktree + " has no docket/workflow.md"}}}, nil
+	p, refused, err := locateDocket(c, dir)
+	if err != nil || refused != nil {
+		return refusal(refused), err
 	}
 	state := "exists"
 	if i := x.Find(p.Path); i < 0 {

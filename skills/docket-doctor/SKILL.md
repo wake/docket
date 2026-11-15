@@ -33,12 +33,18 @@ Its `findings` and `unreadable` are the problems found mechanically, among
 them `install-ignored` (a path `dkt init` writes is ignored by git),
 `title-missing` (a main spec's first line is still the generated id),
 `trailer-missing` (no commit carries the trailer of a change on the default
-branch), the four starting with `workflow-` (`docket/workflow.md` is
-missing, follows an older template, has an unknown version, or lacks a
-section), and the three starting with `user-workflow-` (the user template
-on this computer is older than Docket's template, newer than this dkt's,
-or has no version); the user template's path is
-`result.user_workflow.path`. When it exits with 2 or 4, it did not check
+branch), the four about `docket/workflow.md` itself (`workflow-missing`,
+`workflow-outdated`, `workflow-template-unknown`,
+`workflow-section-missing`: the file is missing, follows an older template,
+has an unknown version, or lacks a section), and the three starting with
+`user-workflow-` (the user template on this computer is older than
+Docket's template, newer than this dkt's, or has no version); the user
+template's path is `result.user_workflow.path`. When the project is in
+`sync` mode (`result.user_workflow.mode`), there are also the three
+starting with `workflow-sync-`, each naming a section and its state
+against the user template (`result.user_workflow.sections` lists every
+section), and `workflow-project-owned-invalid` (`project-owned` is not
+written as it should be). When it exits with 2 or 4, it did not check
 properly and has no result: say what else it reported and stop.
 
 Then run `dkt lint --json` and look only at `result.changes`: those whose
@@ -144,6 +150,30 @@ it and go on to the next.
   version that can be read. Say how `template` is written (a positive
   integer in the front matter) and let the user decide which version it
   is; do not guess.
+- `workflow-sync-template-changed`: the user template changed this section
+  and the project did not. Show the user how the two differ and propose
+  taking the user template's text; write it into the project's
+  `docket/workflow.md` only after the user agrees.
+- `workflow-sync-project-changed`: the project changed this section and the
+  user template did not; the project's edit is kept. Propose one of two:
+  add the section's heading to `project-owned` in the front matter, so it
+  is no longer compared, or copy the project's text into the user template,
+  so the other projects in `sync` mode get it too. When the user wants
+  neither, leave it. Write only after the user agrees.
+- `workflow-sync-conflict`: both changed this section, or the two were
+  never recorded as the same. Put the two texts side by side and let the
+  user choose: the user template's text, the project's text copied into the
+  user template, or the heading added to `project-owned`. Write only after
+  the user agrees.
+- `workflow-project-owned-invalid`: say how the field is written,
+  `project-owned: [<heading>, <heading>]`, and propose the fix; write it
+  only after the user agrees.
+- After each write the user agreed to for these four, run
+  `dkt workflow mode sync`, which records the sections the two files now
+  share. The user template is the user's own: do not commit it; commit the
+  project's `docket/workflow.md` as usual. When the user no longer wants the
+  project to follow the user template, run `dkt workflow mode independent`
+  once they agree.
 - Conflicts with the docket skill's steps: propose wording for the user's
   instructions; never edit their files.
 - `trailer-missing`: say that this change's commits on the default branch

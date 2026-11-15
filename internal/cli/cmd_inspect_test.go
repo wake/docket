@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/wake/docket/internal/projects"
 	"github.com/wake/docket/internal/setup"
 	"github.com/wake/docket/internal/testutil"
 )
@@ -30,9 +32,12 @@ type inspectOut struct {
 		}
 		Files        []struct{ Path, Kind, Status string }
 		UserWorkflow *struct {
-			Path    string
-			Exists  bool
-			Version int
+			Path     string
+			Exists   bool
+			Version  int
+			Default  *string
+			Mode     string
+			Sections []struct{ Heading, State string }
 		} `json:"user_workflow"`
 	}
 }
@@ -901,5 +906,293 @@ func TestInspectUserWorkflowSymlink(t *testing.T) {
 	code, m, _ := inspect(t, r, "1.14.0", false)
 	if u := m.Result.UserWorkflow; code != 0 || u == nil || !u.Exists || u.Version != shippedVersion(t) {
 		t.Errorf("code=%d %+v", code, u)
+	}
+}
+
+// editSection adds a line under the heading of the shipped-style workflow text.
+func editSection(text, heading, line string) string {
+	return strings.Replace(text, "### "+heading+"\n", "### "+heading+"\n\n"+line+"\n", 1)
+}
+
+func hashHex(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+// sectionText is the text of a section as setup.Sections gives it.
+func sectionText(t *testing.T, doc, heading string) string {
+	t.Helper()
+	for _, s := range setup.Sections([]byte(doc)) {
+		if s.Heading == heading {
+			return s.Text
+		}
+	}
+	t.Fatalf("no section %q", heading)
+	return ""
+}
+
+// syncFixture is a Docket project whose workflow file is project, beside a user template user,
+// with the project's index entry holding mode and synced (mode "" gives no entry).
+func syncFixture(t *testing.T, user, project, mode string, synced map[string]string) (*testutil.Repo, string) {
+	t.Helper()
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	userEnv(t, r, user)
+	r.Write("docket/workflow.md", project)
+	idx := prIndexPath(r.Env)
+	if mode != "" {
+		x := &projects.Index{Projects: []projects.Entry{{Path: prReal(t, r.Dir), Added: "2026-01-01T00:00:00Z", Mode: mode, Synced: synced}}}
+		if err := x.Save(idx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return r, idx
+}
+
+func headings(t *testing.T) []string {
+	var hs []string
+	for _, s := range setup.Sections([]byte(shippedWorkflow(t))) {
+		hs = append(hs, s.Heading)
+	}
+	if len(hs) < 4 {
+		t.Fatal("the shipped template has too few sections")
+	}
+	return hs
+}
+
+func TestInspectModeIndependent(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	for _, mode := range []string{"", "independent"} {
+		r, _ := syncFixture(t, editSection(tpl, hs[0], "user line"), tpl, mode, nil)
+		code, m, out := inspect(t, r, "1.14.0", false)
+		u := m.Result.UserWorkflow
+		if code != 0 || u == nil || u.Mode != "independent" || u.Default != nil || u.Sections == nil || len(u.Sections) != 0 || !strings.Contains(out, `"default":null`) || !strings.Contains(out, `"sections":[]`) {
+			t.Errorf("%q: code=%d %+v %s", mode, code, u, out)
+		}
+		for rule := range rules(m) {
+			if strings.HasPrefix(rule, "workflow-sync") {
+				t.Errorf("%q: %s", mode, rule)
+			}
+		}
+	}
+}
+
+func TestInspectSyncInStep(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, _ := syncFixture(t, tpl, tpl, "sync", nil)
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	u := m.Result.UserWorkflow
+	if code != 0 || u.Mode != "sync" || len(u.Sections) != len(headings(t)) || len(m.Findings) != 0 {
+		t.Fatalf("code=%d %+v %v", code, u, m.Findings)
+	}
+	for _, s := range u.Sections {
+		if s.State != "in-step" {
+			t.Errorf("%+v", s)
+		}
+	}
+}
+
+func TestInspectSyncStates(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	user := editSection(editSection(tpl, hs[0], "user edit"), hs[2], "user two")
+	proj := editSection(editSection(editSection(tpl, hs[1], "project edit"), hs[2], "project two"), hs[3], "owned edit")
+	proj = strings.Replace(proj, "template:", "project-owned: ["+hs[3]+"]\ntemplate:", 1)
+	synced := map[string]string{
+		hs[0]: hashHex(sectionText(t, tpl, hs[0])),
+		hs[1]: hashHex(sectionText(t, tpl, hs[1])),
+		hs[2]: hashHex(sectionText(t, tpl, hs[2])),
+	}
+	r, idx := syncFixture(t, user, proj, "sync", synced)
+	before, _ := os.ReadFile(idx)
+	snap := snapshot(r.Dir)
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	got := map[string]string{}
+	for _, s := range m.Result.UserWorkflow.Sections {
+		got[s.Heading] = s.State
+	}
+	want := map[string]string{hs[0]: "template-changed", hs[1]: "project-changed", hs[2]: "conflict"}
+	for _, h := range hs[4:] {
+		want[h] = "in-step"
+	}
+	if code != 1 || !reflect.DeepEqual(got, want) {
+		t.Fatalf("code=%d got %v want %v", code, got, want)
+	}
+	for rule, h := range map[string]string{"workflow-sync-template-changed": hs[0], "workflow-sync-project-changed": hs[1], "workflow-sync-conflict": hs[2]} {
+		n := 0
+		for _, f := range m.Findings {
+			if f.Rule == rule && f.File == "docket/workflow.md" && strings.Contains(f.Message, strconv.Quote(h)) {
+				n++
+			}
+		}
+		if n != 1 {
+			t.Errorf("%s: %d findings, %v", rule, n, m.Findings)
+		}
+	}
+	for _, f := range m.Findings {
+		if strings.Contains(f.Message, strconv.Quote(hs[3])) {
+			t.Errorf("owned section reported: %+v", f)
+		}
+	}
+	after, _ := os.ReadFile(idx)
+	if !bytes.Equal(before, after) || snapshot(r.Dir) != snap {
+		t.Error("inspect wrote")
+	}
+}
+
+func TestInspectProjectOwnedInvalid(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	proj := strings.Replace(tpl, "template:", "project-owned: "+hs[0]+"\ntemplate:", 1)
+	r, _ := syncFixture(t, tpl, proj, "sync", nil)
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if code != 1 || one(m, "workflow-project-owned-invalid") != "docket/workflow.md" || len(m.Result.UserWorkflow.Sections) != 0 {
+		t.Errorf("code=%d %v %+v", code, rules(m), m.Result.UserWorkflow)
+	}
+}
+
+func TestInspectNoSectionsWithoutBoth(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	edited := editSection(tpl, hs[0], "x")
+	older := strings.Replace(edited, "template: "+strconv.Itoa(shippedVersion(t)), "template: 1", 1)
+	if older == edited {
+		t.Fatal("version line not replaced")
+	}
+	for name, c := range map[string]struct{ user, proj string }{
+		"no user template": {"", edited},
+		"version gap":      {older, edited},
+	} {
+		r, _ := syncFixture(t, c.user, c.proj, "sync", nil)
+		_, m, _ := inspect(t, r, "1.14.0", false)
+		if u := m.Result.UserWorkflow; u == nil || len(u.Sections) != 0 || u.Mode != "sync" {
+			t.Errorf("%s: %+v", name, u)
+		}
+	}
+	r, _ := syncFixture(t, tpl, tpl, "sync", nil)
+	if err := os.Remove(filepath.Join(r.Dir, "docket", "workflow.md")); err != nil {
+		t.Fatal(err)
+	}
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	if u := m.Result.UserWorkflow; u == nil || len(u.Sections) != 0 {
+		t.Errorf("no project file: %+v", u)
+	}
+}
+
+func TestInspectDefaultSetting(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	for body, want := range map[string]string{`{"workflow":{"default":"sync"}}`: "sync", `{"workflow":{"default":"always"}}`: "", `not json`: ""} {
+		r, _ := syncFixture(t, tpl, tpl, "", nil)
+		cfg := filepath.Join(filepath.Dir(userEnvPath(r)), "config.json")
+		if err := os.WriteFile(cfg, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		code, m, _ := inspect(t, r, "1.14.0", false)
+		u := m.Result.UserWorkflow
+		if want != "" {
+			if code != 0 || u.Default == nil || *u.Default != want {
+				t.Errorf("%s: code=%d %+v", body, code, u)
+			}
+			continue
+		}
+		if code != 3 || u == nil || u.Default != nil || len(m.Unreadable) != 1 || m.Unreadable[0].Source != cfg {
+			t.Errorf("%s: code=%d %+v %+v", body, code, u, m.Unreadable)
+		}
+	}
+}
+
+// userEnvPath is the user template's path in the environment userEnv set.
+func userEnvPath(r *testutil.Repo) string {
+	p, _ := projects.UserWorkflowPath(r.Env)
+	return p
+}
+
+func TestInspectUnreadableIndex(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, idx := syncFixture(t, tpl, tpl, "", nil)
+	if err := os.MkdirAll(filepath.Dir(idx), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(idx, []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if u := m.Result.UserWorkflow; code != 3 || u == nil || u.Mode != "independent" || !slices.ContainsFunc(m.Unreadable, func(x Unreadable) bool { return x.Source == idx }) {
+		t.Errorf("code=%d %+v %+v", code, u, m.Unreadable)
+	}
+}
+
+func TestInspectIndexWithoutLocation(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, _ := syncFixture(t, tpl, tpl, "", nil)
+	cfg := t.TempDir()
+	r.Env = append(slices.DeleteFunc(slices.Clone(r.Env), func(kv string) bool { return strings.HasPrefix(kv, "HOME=") }), "XDG_CONFIG_HOME="+cfg)
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	u := m.Result.UserWorkflow
+	if code != 0 || u == nil || u.Path != filepath.Join(cfg, "docket", "workflow.md") || u.Mode != "independent" || len(m.Findings) != 0 || len(m.Unreadable) != 0 {
+		t.Errorf("code=%d %+v %v %v", code, u, m.Findings, m.Unreadable)
+	}
+}
+
+func TestInspectSyncLinkedWorktree(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	r, _ := syncFixture(t, tpl, tpl, "sync", nil)
+	r.Commit("base", nil)
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "-b", "other", wt)
+	if err := os.WriteFile(filepath.Join(wt, "docket", "workflow.md"), []byte(editSection(tpl, hs[1], "worktree edit")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env := append(slices.Clone(r.Env), "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "none"))
+	code, out, _ := runIn(t, wt, env, "inspect", "--json")
+	var m inspectOut
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatalf("%d %q: %v", code, out, err)
+	}
+	u := m.Result.UserWorkflow
+	if u == nil || u.Mode != "sync" || len(u.Sections) != len(hs) {
+		t.Fatalf("code=%d %+v", code, u)
+	}
+	for _, s := range u.Sections {
+		if (s.Heading == hs[1]) == (s.State == "in-step") {
+			t.Errorf("worktree file not compared: %+v", s)
+		}
+	}
+}
+
+func TestInspectSyncProjectWorkflowUnreadable(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, _ := syncFixture(t, tpl, tpl, "sync", nil)
+	p := filepath.Join(r.Dir, "docket", "workflow.md")
+	if err := os.Chmod(p, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(p, 0o644) })
+	if f, err := os.Open(p); err == nil {
+		f.Close()
+		t.Skip("file readable despite mode 0")
+	}
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	u := m.Result.UserWorkflow
+	if code != 3 || !slices.ContainsFunc(m.Unreadable, func(x Unreadable) bool { return strings.HasPrefix(x.Reason, "openat docket/workflow.md") }) || u == nil || len(u.Sections) != 0 {
+		t.Errorf("code=%d %+v %+v", code, m.Unreadable, u)
+	}
+}
+
+func TestInspectSyncDocketIsAFile(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, _ := syncFixture(t, tpl, tpl, "sync", nil)
+	if err := os.RemoveAll(filepath.Join(r.Dir, "docket")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.Dir, "docket"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	u := m.Result.UserWorkflow
+	if u == nil || u.Mode != "sync" || len(u.Sections) != 0 {
+		t.Fatalf("%+v", u)
+	}
+	// other checks may report the file; this path must add nothing to what independent mode reports
+	r2, _ := syncFixture(t, tpl, tpl, "independent", nil)
+	os.RemoveAll(filepath.Join(r2.Dir, "docket"))
+	os.WriteFile(filepath.Join(r2.Dir, "docket"), []byte("x"), 0o644)
+	_, m2, _ := inspect(t, r2, "1.14.0", false)
+	if len(m.Unreadable) != len(m2.Unreadable) {
+		t.Errorf("sync %+v, independent %+v", m.Unreadable, m2.Unreadable)
 	}
 }

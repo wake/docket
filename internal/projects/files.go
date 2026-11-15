@@ -60,6 +60,10 @@ type Entry struct {
 	Origin  *string `json:"origin"`
 	Added   string  `json:"added"`
 	Ignored bool    `json:"ignored"`
+	// Mode is "sync" or "independent"; empty means independent. Synced maps a workflow
+	// section's heading to the hash of the text both files had when it was recorded.
+	Mode   string            `json:"mode,omitempty"`
+	Synced map[string]string `json:"synced,omitempty"`
 }
 
 // Index is the content of the index file.
@@ -109,6 +113,9 @@ func Load(path string) (*Index, error) {
 		if _, err := time.Parse(time.RFC3339, e.Added); err != nil || !strings.HasSuffix(e.Added, "Z") {
 			return nil, fmt.Errorf("read %s: added %q is not an RFC 3339 UTC time", path, e.Added)
 		}
+		if e.Mode != "" && e.Mode != "sync" && e.Mode != "independent" {
+			return nil, fmt.Errorf("read %s: mode %q is not sync or independent", path, e.Mode)
+		}
 		if e.Origin != nil {
 			o := withoutUserInfo(*e.Origin)
 			x.Projects[i].Origin = &o
@@ -138,6 +145,30 @@ func (x *Index) Save(path string) error {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return safefile.Install(path, append(data, '\n'), 0o600, false, path)
+}
+
+// DefaultMode reads workflow.default from the settings: sync, independent, or empty when
+// the file or the key is missing.
+func DefaultMode(settings string) (string, error) {
+	data, err := os.ReadFile(settings)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", settings, err)
+	}
+	var s struct {
+		Workflow struct {
+			Default string `json:"default"`
+		} `json:"workflow"`
+	}
+	if err := json.Unmarshal(data, &s); err != nil {
+		return "", fmt.Errorf("read %s: %w", settings, err)
+	}
+	if d := s.Workflow.Default; d != "" && d != "sync" && d != "independent" {
+		return "", fmt.Errorf("read %s: workflow.default %q is not sync or independent", settings, d)
+	}
+	return s.Workflow.Default, nil
 }
 
 // AutoRegister reads projects.autoRegister from the settings; true when missing.
