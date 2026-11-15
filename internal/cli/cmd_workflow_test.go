@@ -1,13 +1,16 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wake/docket/internal/projects"
 	"github.com/wake/docket/internal/setup"
@@ -295,5 +298,244 @@ func TestWorkflowRefsText(t *testing.T) {
 	code, out, _ := runIn(t, t.TempDir(), env, "workflow", "refs")
 	if code != 0 || !strings.Contains(out, "Plan review") || !strings.Contains(out, a) || !strings.Contains(out, b) {
 		t.Errorf("code=%d %q", code, out)
+	}
+}
+
+type modeOut struct {
+	Findings   []Finding
+	Unreadable []Unreadable
+	Result     struct {
+		Path   string
+		Mode   string
+		Synced []string
+	}
+}
+
+// modeRun runs `workflow mode <args> --json` with a fixed clock.
+func modeRun(t *testing.T, dir string, env []string, args ...string) (int, modeOut, string) {
+	t.Helper()
+	now := func() time.Time { return time.Date(2026, 11, 16, 1, 2, 3, 0, time.UTC) }
+	var out, errb bytes.Buffer
+	code := Run(Options{Args: append(append([]string{"workflow", "mode"}, args...), "--json"), Dir: dir, Env: env, Stdout: &out, Stderr: &errb, Now: now})
+	var m modeOut
+	if out.Len() > 0 {
+		if err := json.Unmarshal(out.Bytes(), &m); err != nil {
+			t.Fatalf("%q: %v", out.String(), err)
+		}
+	}
+	return code, m, out.String()
+}
+
+// entryOf is the index entry for path.
+func entryOf(t *testing.T, idx, path string) projects.Entry {
+	t.Helper()
+	x, err := projects.Load(idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := x.Find(path)
+	if i < 0 {
+		t.Fatalf("no entry for %s", path)
+	}
+	return x.Projects[i]
+}
+
+func fileBytes(idx string) []byte { b, _ := os.ReadFile(idx); return b }
+
+func TestWorkflowModeSyncRecorded(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	r, idx := syncFixture(t, tpl, tpl, "independent", nil)
+	code, m, out := modeRun(t, r.Dir, r.Env, "sync")
+	e := entryOf(t, idx, prReal(t, r.Dir))
+	if code != 0 || m.Result.Path != prReal(t, r.Dir) || m.Result.Mode != "sync" || e.Mode != "sync" || !reflect.DeepEqual(m.Result.Synced, hs) || len(e.Synced) != len(hs) {
+		t.Fatalf("code=%d %s %+v", code, out, e)
+	}
+	for _, h := range hs {
+		if e.Synced[h] != hashHex(sectionText(t, tpl, h)) {
+			t.Errorf("hash of %q: %q", h, e.Synced[h])
+		}
+	}
+}
+
+func TestWorkflowModeKeepsEarlierHashes(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	user := editSection(tpl, hs[0], "user edit")
+	proj := editSection(tpl, hs[3], "owned edit")
+	proj = strings.Replace(proj, "template:", "project-owned: ["+hs[3]+"]\ntemplate:", 1)
+	r, idx := syncFixture(t, user, proj, "sync", map[string]string{hs[0]: "old0", hs[3]: "old3", "Only in index": "old"})
+	code, m, out := modeRun(t, r.Dir, r.Env, "sync")
+	e := entryOf(t, idx, prReal(t, r.Dir))
+	want := hs[1:3]
+	want = append(slices.Clone(want), hs[4:]...)
+	if code != 0 || !reflect.DeepEqual(m.Result.Synced, want) || e.Synced[hs[0]] != "old0" || e.Synced[hs[3]] != "old3" || e.Synced["Only in index"] != "old" || len(e.Synced) != len(want)+3 {
+		t.Fatalf("code=%d %s %+v", code, out, e.Synced)
+	}
+}
+
+func TestWorkflowModeVersionGap(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	older := strings.Replace(tpl, "template: "+strconv.Itoa(shippedVersion(t)), "template: 1", 1)
+	r, idx := syncFixture(t, older, tpl, "sync", map[string]string{hs[0]: "old0"})
+	code, m, out := modeRun(t, r.Dir, r.Env, "sync")
+	e := entryOf(t, idx, prReal(t, r.Dir))
+	if code != 0 || m.Result.Synced == nil || len(m.Result.Synced) != 0 || !strings.Contains(out, `"synced":[]`) || !reflect.DeepEqual(e.Synced, map[string]string{hs[0]: "old0"}) {
+		t.Fatalf("code=%d %s %+v", code, out, e.Synced)
+	}
+}
+
+func TestWorkflowModeIndependent(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, idx := syncFixture(t, tpl, tpl, "sync", map[string]string{"A": "x"})
+	code, m, out := modeRun(t, r.Dir, r.Env, "independent")
+	e := entryOf(t, idx, prReal(t, r.Dir))
+	if code != 0 || m.Result.Mode != "independent" || e.Mode != "independent" || e.Synced != nil || m.Result.Synced == nil || !strings.Contains(out, `"synced":[]`) {
+		t.Fatalf("code=%d %s %+v", code, out, e)
+	}
+}
+
+func TestWorkflowModeAddsEntry(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, idx := syncFixture(t, tpl, tpl, "", nil)
+	if code, _, out := modeRun(t, r.Dir, r.Env, "independent"); code != 0 {
+		t.Fatalf("%d %s", code, out)
+	}
+	e := entryOf(t, idx, prReal(t, r.Dir))
+	if e.Mode != "independent" || e.Ignored || e.Added != "2026-11-16T01:02:03Z" || e.Origin != nil {
+		t.Errorf("%+v", e)
+	}
+	// an ignored entry stays ignored
+	x := &projects.Index{Projects: []projects.Entry{{Path: prReal(t, r.Dir), Added: "2026-01-01T00:00:00Z", Ignored: true}}}
+	if err := x.Save(idx); err != nil {
+		t.Fatal(err)
+	}
+	modeRun(t, r.Dir, r.Env, "independent")
+	if e := entryOf(t, idx, prReal(t, r.Dir)); !e.Ignored || e.Mode != "independent" || e.Added != "2026-01-01T00:00:00Z" {
+		t.Errorf("%+v", e)
+	}
+}
+
+func TestWorkflowModeLinkedWorktree(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	r, idx := syncFixture(t, tpl, tpl, "independent", nil)
+	r.Commit("base", nil)
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "-b", "other", wt)
+	r.Write("docket/workflow.md", editSection(tpl, hs[0], "main edit"))
+	code, m, out := modeRun(t, wt, r.Env, "sync")
+	e := entryOf(t, idx, prReal(t, r.Dir))
+	if code != 0 || m.Result.Path != prReal(t, r.Dir) || e.Mode != "sync" || e.Synced[hs[0]] == "" || len(m.Result.Synced) != len(hs) {
+		t.Fatalf("code=%d %s %+v", code, out, e)
+	}
+	if x, _ := projects.Load(idx); len(x.Projects) != 1 {
+		t.Errorf("entries: %+v", x.Projects)
+	}
+}
+
+func TestWorkflowModeRefusals(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	badOwned := strings.Replace(tpl, "template:", "project-owned: "+hs[0]+"\ntemplate:", 1)
+	cases := []struct {
+		name, user, proj, rule, file string
+	}{
+		{"no user template", "", tpl, "user-workflow-missing", "USER"},
+		{"owned invalid", tpl, badOwned, "workflow-project-owned-invalid", "docket/workflow.md"},
+	}
+	for _, c := range cases {
+		r, idx := syncFixture(t, c.user, c.proj, "independent", nil)
+		before := fileBytes(idx)
+		code, m, out := modeRun(t, r.Dir, r.Env, "sync")
+		file := c.file
+		if file == "USER" {
+			file = userEnvPath(r)
+		}
+		if code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != c.rule || m.Findings[0].File != file || !bytes.Equal(before, fileBytes(idx)) {
+			t.Errorf("%s: code=%d %s", c.name, code, out)
+		}
+	}
+	r, _ := syncFixture(t, tpl, tpl, "", nil)
+	if code, m, out := modeRun(t, t.TempDir(), r.Env, "independent"); code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "not-a-repository" {
+		t.Errorf("outside: code=%d %s", code, out)
+	}
+	if err := os.Remove(filepath.Join(r.Dir, "docket", "workflow.md")); err != nil {
+		t.Fatal(err)
+	}
+	if code, m, out := modeRun(t, r.Dir, r.Env, "independent"); code != 1 || len(m.Findings) != 1 || m.Findings[0].Rule != "not-a-project" {
+		t.Errorf("not a project: code=%d %s", code, out)
+	}
+}
+
+func TestWorkflowModeUsage(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, _ := syncFixture(t, tpl, tpl, "", nil)
+	for _, args := range [][]string{{"always"}, {}, {"sync", "extra"}} {
+		if code, m, out := modeRun(t, r.Dir, r.Env, args...); code != 2 || len(m.Findings) != 1 || m.Findings[0].Rule != "usage" {
+			t.Errorf("%v: code=%d %s", args, code, out)
+		}
+	}
+}
+
+func TestWorkflowModeUnreadable(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, idx := syncFixture(t, tpl, tpl, "independent", nil)
+	if err := os.WriteFile(idx, []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, m, out := modeRun(t, r.Dir, r.Env, "sync")
+	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != idx || string(fileBytes(idx)) != "not json" {
+		t.Errorf("index: code=%d %s", code, out)
+	}
+	for name, file := range map[string]func(*testutil.Repo) string{
+		"user template":    userEnvPath,
+		"project workflow": func(r *testutil.Repo) string { return filepath.Join(r.Dir, "docket", "workflow.md") },
+	} {
+		r, idx := syncFixture(t, tpl, tpl, "independent", nil)
+		before := fileBytes(idx)
+		p := file(r)
+		want := strings.Replace(p, r.Dir, prReal(t, r.Dir), 1) // dkt names the real path
+		if err := os.Chmod(p, 0); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.Chmod(p, 0o644) })
+		if f, err := os.Open(p); err == nil {
+			f.Close()
+			t.Skip("file readable despite mode 0")
+		}
+		code, m, out := modeRun(t, r.Dir, r.Env, "sync")
+		if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != want || !bytes.Equal(before, fileBytes(idx)) {
+			t.Errorf("%s: code=%d %s", name, code, out)
+		}
+	}
+}
+
+func TestWorkflowModeNoHome(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	without := func(env []string, keys ...string) []string {
+		return slices.DeleteFunc(slices.Clone(env), func(kv string) bool {
+			for _, k := range keys {
+				if strings.HasPrefix(kv, k+"=") {
+					return true
+				}
+			}
+			return false
+		})
+	}
+	r, _ := syncFixture(t, tpl, tpl, "", nil)
+	noState := without(r.Env, "HOME", "XDG_STATE_HOME")
+	for _, mode := range []string{"independent", "sync"} {
+		if code, m, out := modeRun(t, r.Dir, noState, mode); code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "no-home" {
+			t.Errorf("%s: code=%d %s", mode, code, out)
+		}
+	}
+	state := t.TempDir()
+	onlyState := append(without(r.Env, "HOME", "XDG_CONFIG_HOME"), "XDG_STATE_HOME="+state)
+	idx := filepath.Join(state, "docket", "projects.json")
+	if code, m, out := modeRun(t, r.Dir, onlyState, "sync"); code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "no-home" {
+		t.Errorf("sync: code=%d %s", code, out)
+	}
+	if _, err := os.Stat(idx); err == nil {
+		t.Error("index written")
+	}
+	if code, _, out := modeRun(t, r.Dir, onlyState, "independent"); code != 0 || entryOf(t, idx, prReal(t, r.Dir)).Mode != "independent" {
+		t.Errorf("independent: code=%d %s", code, out)
 	}
 }
