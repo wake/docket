@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -42,6 +43,34 @@ func (e *UnavailableError) Error() string {
 		why = "is not usable: " + e.Reason
 	}
 	return fmt.Sprintf("OpenSpec CLI %q %s; install OpenSpec %s or later or set DOCKET_OPENSPEC to a command that runs it", e.Program, why, Minimum)
+}
+
+// UnsafeArgError reports an argument dkt will not pass to OpenSpec when it is
+// a .bat or .cmd file on Windows: cmd.exe reads such a file's arguments itself,
+// so characters such as & or % in one could run another command.
+type UnsafeArgError struct{ Program, Arg string }
+
+func (e *UnsafeArgError) Error() string {
+	return fmt.Sprintf("will not pass %q to %s: cmd.exe reads the arguments of a .bat or .cmd file itself, so they may hold only letters, digits and %s", e.Arg, e.Program, plainPunct)
+}
+
+// plainPunct is the punctuation an argument to a batch file may hold.
+const plainPunct = "-_.,/@+=:"
+
+// unsafeBatchArg returns the first argument in cmd[1:] that is not plain, when
+// cmd[0] is a .bat or .cmd file on Windows.
+func unsafeBatchArg(windows bool, cmd []string) (string, bool) {
+	if ext := strings.ToLower(filepath.Ext(cmd[0])); !windows || ext != ".bat" && ext != ".cmd" {
+		return "", false
+	}
+	for _, a := range cmd[1:] {
+		for _, c := range a {
+			if !('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' || strings.ContainsRune(plainPunct, c)) {
+				return a, true
+			}
+		}
+	}
+	return "", false
 }
 
 // UnsupportedError reports an OpenSpec that gave no version of the form
@@ -134,6 +163,9 @@ func isExecutable(p string) bool {
 
 func (r *Runner) exec(args ...string) (string, error) {
 	full := append(append([]string{}, r.Cmd...), args...)
+	if a, ok := unsafeBatchArg(runtime.GOOS == "windows", full); ok {
+		return "", &UnsafeArgError{Program: full[0], Arg: a}
+	}
 	c := exec.Command(full[0], full[1:]...)
 	c.Dir = r.Dir
 	c.Env = append(append([]string{}, r.Env...), "OPENSPEC_TELEMETRY=0")

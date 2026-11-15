@@ -56,6 +56,30 @@ func TestOpenSpecPathSpellings(t *testing.T) {
 	}
 }
 
+func TestBatchFileGetsNoUnsafeArgument(t *testing.T) {
+	fake, log := testutil.FakeOpenSpec(t, "1.14.0")
+	b, err := os.ReadFile(fake)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := filepath.Join(t.TempDir(), "openspec.cmd") // never started: the check comes first
+	if err := os.WriteFile(cmd, b, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r, err := openspec.New(t.TempDir(), append(testutil.Env(t), "DOCKET_OPENSPEC="+cmd))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = r.Run("show", "add-x&calc", "--type", "change")
+	var ue *openspec.UnsafeArgError
+	if !errors.As(err, &ue) || ue.Arg != "add-x&calc" {
+		t.Errorf("err = %v, want UnsafeArgError for add-x&calc", err)
+	}
+	if calls, _ := os.ReadFile(log); len(calls) != 0 {
+		t.Errorf("started: %q", calls)
+	}
+}
+
 func TestOverrideWithExtensionAndWithout(t *testing.T) {
 	dir := twoOpenSpecs(t)
 	exe := filepath.Join(dir, "openspec.exe")
