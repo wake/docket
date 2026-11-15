@@ -52,12 +52,12 @@
 - `markdown.FenceInfoBackticks(lines []string) []int`: the 0-based index of each backtick-info line OpenSpec 1.16 reads outside fenced code, in file order.
 - Rule `fence-info-backtick`, message exactly: `backticks that open a line and hold another backtick: dkt and OpenSpec 1.14 read the line as fenced code, OpenSpec 1.16 and later as inline code; use single backticks or a tilde fence`
 
-- [ ] `FenceMask` returns the same masks as before, its existing tests passing unchanged
-- [ ] `FenceInfoBackticks` returns the line made of three backticks, `npm test` and three backticks; a four-backtick line whose info holds a backtick; and such a line indented with spaces; tested in `internal/markdown`
-- [ ] `FenceInfoBackticks` returns nothing for a backtick opener with a plain info string, a tilde opener whose info holds a backtick, a line of six backticks, such a line inside a block fenced by tildes, and a line whose only backtick after the marker follows a U+2028, and one where it follows a U+2029; tested in `internal/markdown`
-- [ ] For the lines of scenario Line both rules read inside fenced code it returns the first line only, and for those of Line after the two readings swap the first and the fourth; tested in `internal/markdown`
-- [ ] Every file in the tests above with no line returned gets the same mask from `FenceMask` and from the 1.16 reading; tested in `internal/markdown`
-- [ ] `dkt lint` reports the rule with the fixed message on the line, in plan.md, the design, the proposal and a nested `.md` file of a `docket` change, and reports none for the plain-info, tilde and inside-fence cases, and on the first line only for the lines of Line both rules read inside fenced code; tested in `internal/lint/document_test.go`
-- [ ] `dkt lint` reports the rule in a record and in an issue; tested in `internal/lint/record_test.go` and `internal/lint/issue_test.go`
-- [ ] `dkt lint` naming no change reports the rule on the line of `openspec/specs/orders/spec.md`, and `SpecTitles` does not; tested in `internal/lint/document_test.go`
-- [ ] A change of another schema is not checked; tested in `internal/lint/document_test.go`
+- [x] `FenceMask` returns the same masks as before, its existing tests passing unchanged
+- [x] `FenceInfoBackticks` returns the line made of three backticks, `npm test` and three backticks; a four-backtick line whose info holds a backtick; and such a line indented with spaces; tested in `internal/markdown`
+- [x] `FenceInfoBackticks` returns nothing for a backtick opener with a plain info string, a tilde opener whose info holds a backtick, a line of six backticks, such a line inside a block fenced by tildes, and a line whose only backtick after the marker follows a U+2028, and one where it follows a U+2029; tested in `internal/markdown`
+- [x] For the lines of scenario Line both rules read inside fenced code it returns the first line only, and for those of Line after the two readings swap the first and the fourth; tested in `internal/markdown`
+- [x] Every file in the tests above with no line returned gets the same mask from `FenceMask` and from the 1.16 reading; tested in `internal/markdown`
+- [x] `dkt lint` reports the rule with the fixed message on the line, in plan.md, the design, the proposal and a nested `.md` file of a `docket` change, and reports none for the plain-info, tilde and inside-fence cases, and on the first line only for the lines of Line both rules read inside fenced code; tested in `internal/lint/document_test.go`
+- [x] `dkt lint` reports the rule in a record and in an issue; tested in `internal/lint/record_test.go` and `internal/lint/issue_test.go`
+- [x] `dkt lint` naming no change reports the rule on the line of `openspec/specs/orders/spec.md`, and `SpecTitles` does not; tested in `internal/lint/document_test.go`
+- [x] A change of another schema is not checked; tested in `internal/lint/document_test.go`
