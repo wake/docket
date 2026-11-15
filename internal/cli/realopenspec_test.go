@@ -129,8 +129,8 @@ func TestRealOpenSpec(t *testing.T) {
 	delta := "## ADDED Requirements\n\n### Requirement: Room list\nThe system SHALL list rooms.\n\n"
 	write("specs/rooms/spec.md", delta+scenario)
 	plan := func(scenarios string) string {
-		return "# Implementation Plan\n\n## Reuse\n\n| Need | Existing (path:symbol) | Decision | Reason | Evidence |\n|---|---|---|---|---|\n" +
-			"| Config | openspec/config.yaml | reuse | Already there | read it |\n\n### Task 1: Room list\n\n**Scenarios:** " + scenarios + "\n\n- [ ] **Step 1: List rooms**\n"
+		return "# Implementation Plan\n\n## Reuse\n\n| Need | Existing (path:symbol) | Decision | Reason |\n|---|---|---|---|\n" +
+			"| Config | openspec/config.yaml | extend | Already there |\n\n### Task 1: Room list\n\n**Scenarios:** " + scenarios + "\n\n- [ ] **Step 1: List rooms**\n"
 	}
 	write("plan.md", plan("rooms#list"))
 

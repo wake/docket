@@ -10,13 +10,23 @@ import (
 
 const pl = "openspec/changes/add-x/plan.md"
 
-const reuseHead = "| Need | Existing (path:symbol) | Decision | Reason | Evidence |\n|---|---|---|---|---|\n"
+const (
+	reuseHead   = "| Need | Existing (path:symbol) | Decision | Reason |\n|---|---|---|---|\n"
+	earlierHead = "| Need | Existing (path:symbol) | Decision | Reason | Evidence |\n|---|---|---|---|---|\n"
+	planTail    = "\n### Task 1: One\n\n**Scenarios:** none\n"
+)
 
 func reusePlan(rows string) string {
-	return "# Plan\n\n## Reuse\n\n" + reuseHead + rows + "\n### Task 1: One\n\n**Scenarios:** none\n"
+	return "# Plan\n\n## Reuse\n\n" + reuseHead + rows + planTail
 }
 
-const goodRow = "| Walk | `internal/a.go:Walk` | reuse | | rg Walk |\n"
+// earlierPlan puts rows, written with four cells, in the earlier five-column
+// table, each with an empty Evidence cell.
+func earlierPlan(rows string) string {
+	return "# Plan\n\n## Reuse\n\n" + earlierHead + strings.ReplaceAll(rows, "|\n", "| |\n") + planTail
+}
+
+const goodRow = "| Walk | `internal/a.go:Walk` | extend | |\n"
 
 var goodPlan = reusePlan(goodRow)
 
@@ -75,23 +85,16 @@ func TestDuplicateTaskNumber(t *testing.T) {
 	}
 }
 
-func TestReuseTable(t *testing.T) {
+func TestReuseSection(t *testing.T) {
 	tests := []struct {
 		name string
 		doc  string
-		line int // -1: any
+		line int
 		msg  string
 	}{
-		{"missing path", reusePlan("| Run | `internal/gitx/run.go:Run` | reuse | | rg |\n"), 7, "does not exist"},
-		{"empty table", reusePlan(""), 5, "no rows"},
-		{"no section", "# Plan\n\n### Task 1: One\n\n**Scenarios:** none\n", 0, "no `## Reuse`"},
-		{"no table", "# Plan\n\n## Reuse\n\ntext\n\n### Task 1: One\n\n**Scenarios:** none\n", 3, "no table"},
-		{"wrong header", "# Plan\n\n## Reuse\n\n| A | B | C | D | E |\n|---|---|---|---|---|\n" + goodRow, 5, "header"},
-		{"bad decision", reusePlan("| Walk | `internal/a.go` | borrow | | rg |\n"), 7, "must be reuse, extend or new"},
-		{"new without reason", reusePlan("| Walk | | new | | rg |\n"), 7, "needs a Reason"},
-		{"no evidence", reusePlan("| Walk | `internal/a.go` | extend | | |\n"), 7, "Evidence is empty"},
-		{"no path", reusePlan("| Walk | `:Walk` | reuse | | rg |\n"), 7, "repository path"},
-		{"missing dir", reusePlan("| Walk | `no/such/` | reuse | | rg |\n"), 7, "does not exist"},
+		{"no section", "# Plan\n" + planTail, 0, "no `## Reuse`"},
+		{"no table", "# Plan\n\n## Reuse\n\ntext\n" + planTail, 3, "no table"},
+		{"wrong header", "# Plan\n\n## Reuse\n\n| A | B | C | D |\n|---|---|---|---|\n" + goodRow + planTail, 5, "header"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -103,13 +106,53 @@ func TestReuseTable(t *testing.T) {
 	}
 }
 
-func TestReuseRowsThatPass(t *testing.T) {
-	rows := "| A | external: git CLI | reuse | | rg |\n" +
-		"| B | `internal/` | extend | | rg |\n" +
-		"| C | | new | nothing fits | rg |\n" +
-		"| D | `internal/a.go:Walk` | `reuse` | | rg |\n"
-	if r := lintPlan(t, reusePlan(rows)); len(r.Findings) != 0 {
-		t.Fatalf("findings = %+v", r.Findings)
+// TestReuseRows runs each row in both tables: the earlier one, its Evidence
+// empty, gives the same result, except that it accepts `reuse` rows.
+func TestReuseRows(t *testing.T) {
+	tests := []struct {
+		name    string
+		row     string
+		msg     string // "": no finding
+		earlier string // the earlier table's result when it differs; "-": no finding
+	}{
+		{"extend", "| B | `internal/` | extend | |\n", "", ""},
+		{"extend in backticks", "| D | `internal/a.go:Walk` | `extend` | |\n", "", ""},
+		{"external", "| A | external: git CLI | extend | |\n", "", ""},
+		{"new with a reason", "| C | | new | nothing fits |\n", "", ""},
+		{"missing path", "| Run | `internal/gitx/run.go:Run` | extend | |\n", "does not exist", ""},
+		{"missing dir", "| Walk | `no/such/` | extend | |\n", "does not exist", ""},
+		{"no path", "| Walk | `:Walk` | extend | |\n", "repository path", ""},
+		{"bad decision", "| Walk | `internal/a.go` | borrow | |\n", "must be extend or new", ""},
+		{"new without reason", "| Walk | | new | |\n", "needs a Reason", ""},
+		{"reuse", "| Walk | `internal/a.go:Walk` | reuse | |\n", "must be extend or new", "-"},
+		{"reuse external", "| A | external: git CLI | reuse | |\n", "must be extend or new", "-"},
+		{"reuse missing path", "| Run | `internal/gitx/run.go:Run` | reuse | |\n", "must be extend or new", "does not exist"},
+	}
+	for _, tc := range tests {
+		for _, f := range []struct {
+			name string
+			plan func(string) string
+		}{{"four", reusePlan}, {"earlier", earlierPlan}} {
+			want := tc.msg
+			if f.name == "earlier" && tc.earlier != "" {
+				want = strings.TrimPrefix(tc.earlier, "-")
+			}
+			t.Run(tc.name+"/"+f.name, func(t *testing.T) {
+				r := lintPlan(t, f.plan(tc.row))
+				if want == "" && len(r.Findings) != 0 ||
+					want != "" && (!has(r, "reuse-table", pl, 7, want) || len(r.Findings) != 1) {
+					t.Fatalf("want %q, findings = %+v", want, r.Findings)
+				}
+			})
+		}
+	}
+}
+
+func TestEmptyReuseTable(t *testing.T) {
+	for _, doc := range []string{reusePlan(""), earlierPlan("")} {
+		if r := lintPlan(t, doc); len(r.Findings) != 0 {
+			t.Fatalf("%q: findings = %+v", doc, r.Findings)
+		}
 	}
 }
 
@@ -119,7 +162,7 @@ func TestReusePathThroughALinkOutIsMissing(t *testing.T) {
 	for p, c := range map[string]string{
 		"openspec/changes/add-x/.openspec.yaml": "schema: docket\n",
 		"openspec/changes/add-x/proposal.md":    goodProposal,
-		"openspec/changes/add-x/plan.md":        reusePlan("| Out | `leak/secret.go:X` | reuse | | rg |\n"),
+		"openspec/changes/add-x/plan.md":        reusePlan("| Out | `leak/secret.go:X` | extend | |\n"),
 	} {
 		full := filepath.Join(dir, filepath.FromSlash(p))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
@@ -151,19 +194,30 @@ func TestNonTaskCancelledBullets(t *testing.T) {
 }
 
 func TestReuseHeaderCaseAndWidth(t *testing.T) {
-	tail := "\n### Task 1: One\n\n**Scenarios:** none\n"
-	lower := "# Plan\n\n## Reuse\n\n| need | existing (path:symbol) | decision | reason | evidence |\n|---|---|---|---|---|\n" + goodRow + tail
-	if r := lintPlan(t, lower); len(r.Findings) != 0 {
-		t.Fatalf("lower case: %+v", r.Findings)
+	for _, h := range []string{
+		"| need | existing (path:symbol) | decision | reason |\n|---|---|---|---|\n",
+		"| need | existing (path:symbol) | decision | reason | evidence |\n|---|---|---|---|---|\n",
+	} {
+		if r := lintPlan(t, "# Plan\n\n## Reuse\n\n"+h+goodRow+planTail); len(r.Findings) != 0 {
+			t.Fatalf("lower case %q: %+v", h, r.Findings)
+		}
 	}
-	wide := "# Plan\n\n## Reuse\n\n| Need | Existing (path:symbol) | Decision | Reason | Evidence | Extra |\n|---|---|---|---|---|---|\n| Walk | `internal/a.go` | reuse | | rg | x |\n" + tail
-	if r := lintPlan(t, wide); !has(r, "reuse-table", pl, 5, "header") {
-		t.Fatalf("wide: %+v", r.Findings)
+	for _, h := range []string{
+		"| Need | Existing (path:symbol) | Decision | Reason | Notes |\n|---|---|---|---|---|\n",
+		"| Need | Evidence | Existing (path:symbol) | Decision | Reason |\n|---|---|---|---|---|\n",
+		"| Need | Existing (path:symbol) | Decision | Reason | Evidence | Extra |\n|---|---|---|---|---|---|\n",
+		"| Need | Existing (path:symbol) | Decision |\n|---|---|---|\n",
+	} {
+		r := lintPlan(t, "# Plan\n\n## Reuse\n\n"+h+planTail)
+		if !has(r, "reuse-table", pl, 5, "header must be: Need | Existing (path:symbol) | Decision | Reason") ||
+			len(r.Findings) != 1 || strings.Contains(r.Findings[0].Message, "Evidence") {
+			t.Fatalf("%q: %+v", h, r.Findings)
+		}
 	}
 }
 
 func TestReuseExistingOutsideTheRepository(t *testing.T) {
-	r := lintPlan(t, reusePlan("| Out | `../outside.go:X` | reuse | | rg |\n"))
+	r := lintPlan(t, reusePlan("| Out | `../outside.go:X` | extend | |\n"))
 	if !has(r, "reuse-table", pl, 7, "must start with a repository path or `external:`") || len(r.Findings) != 1 {
 		t.Fatalf("findings = %+v", r.Findings)
 	}
