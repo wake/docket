@@ -224,9 +224,9 @@ artifacts:
         fixed format or string, an edge case that must be covered.
       - Right after the header, a `## Reuse` table:
         `| Need | Existing (path:symbol) | Decision | Reason |`,
-        one row for every capability the change builds, each one a thing a
-        reviewer could ask about on its own, such as a function or a file
-        (parts of one function are one row): `extend` when it
+        one row for each named thing the change builds or changes (a
+        function, a type, a command, a file); what one of them does in
+        several parts is still one row. A row is `extend` when it
         builds on something that exists, named in Existing by its path in the
         repository, or as `external: <name>` for a dependency from outside it
         (a CLI, a library); `new` when nothing that exists fits, with Reason

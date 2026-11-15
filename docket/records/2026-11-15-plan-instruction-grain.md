@@ -6,7 +6,7 @@ source: "Second plan written by the new instruction (fence-rule-drift, #158): th
 
 ## What
 
-The plan instruction in `shipped/schema/schema.yaml` and its installed copy: a Reuse row is one thing a reviewer could ask about on its own, such as a function or a file; a Review Focus line saying that something must not happen or change becomes an acceptance item too; a plan with a single task writes `**Review:** checks`.
+The plan instruction in `shipped/schema/schema.yaml` and its installed copy: a Reuse row is one named thing the change builds or changes (a function, a type, a command, a file); a Review Focus line saying that something must not happen or change becomes an acceptance item too; a plan with a single task writes `**Review:** checks`.
 
 ## Why
 
@@ -18,3 +18,4 @@ Writing the plan of `fence-rule-drift`: nothing said whether two parts of one fu
 
 ## Review
 
+Codex (gpt-5.6-sol), a different model, reviewed the whole diff: one must-fix finding, a row "for every capability" and "parts of one function are one row" gave two units for a row. Fixed by naming one unit; a small fix, not reviewed again.
