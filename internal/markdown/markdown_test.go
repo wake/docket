@@ -179,3 +179,37 @@ func TestFencesInComments(t *testing.T) {
 		})
 	}
 }
+
+func TestFenceInfoBackticks(t *testing.T) {
+	b3, t3 := "```", "~~~"
+	tests := []struct {
+		name  string
+		lines []string
+		want  []int
+	}{
+		{"inline code at line start", []string{b3 + "npm test" + b3, "### Task 2: Real"}, []int{0}},
+		{"four backticks", []string{"````a`", "x"}, []int{0}},
+		{"indented", []string{"  " + b3 + "a`", "x"}, []int{0}},
+		{"plain info", []string{b3 + "go", "x", b3}, nil},
+		{"tilde info with backtick", []string{t3 + " a`b", "x", t3}, nil},
+		{"six backticks", []string{"``````", "x", "``````"}, nil},
+		{"inside a tilde fence", []string{t3, b3 + "x" + b3, t3}, nil},
+		{"backtick after U+2028", []string{b3 + "a\u2028`", "x", b3}, nil},
+		{"backtick after U+2029", []string{b3 + "a\u2029`", "x", b3}, nil},
+		{"both read inside code", []string{b3 + "a`", b3, b3 + "b`", b3}, []int{0}},
+		{"readings swap", []string{b3 + "a`", b3, b3, b3 + "b`", b3}, []int{0, 3}},
+		{"after a closed fence", []string{b3, "x", b3, b3 + "a`"}, []int{3}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FenceInfoBackticks(tt.lines)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("FenceInfoBackticks = %v, want %v", got, tt.want)
+			}
+			// With no line reported, both rules read the file alike.
+			if got == nil && !reflect.DeepEqual(FenceMask(tt.lines), fenceMask(tt.lines, openFence116)) {
+				t.Errorf("masks differ with no finding")
+			}
+		})
+	}
+}

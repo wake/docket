@@ -107,6 +107,8 @@ func checkSections(r *state, c *loaded) {
 	}
 }
 
+const fenceInfoBacktickMessage = "backticks that open a line and hold another backtick: dkt and OpenSpec 1.14 read the line as fenced code, OpenSpec 1.16 and later as inline code; use single backticks or a tilde fence"
+
 const fenceInCommentMessage = "fence marker inside an HTML comment: dkt and OpenSpec read the lines after the comment as code; close the code inside the comment or remove the marker"
 
 // specTitleFinding returns the title finding for the main spec at p, if any.
@@ -238,6 +240,9 @@ func fenceFindings(b []byte) []Finding {
 	var out []Finding
 	for _, i := range markdown.FencesInComments(markdown.Lines(b)) {
 		out = append(out, Finding{Rule: "fence-in-comment", Line: i + 1, Message: fenceInCommentMessage})
+	}
+	for _, i := range markdown.FenceInfoBackticks(markdown.Lines(b)) {
+		out = append(out, Finding{Rule: "fence-info-backtick", Line: i + 1, Message: fenceInfoBacktickMessage})
 	}
 	return out
 }

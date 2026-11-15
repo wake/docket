@@ -261,3 +261,10 @@ func TestLintIssueFenceInComment(t *testing.T) {
 		t.Errorf("%+v", rep.Findings)
 	}
 }
+
+func TestLintIssueFenceInfoBacktick(t *testing.T) {
+	rep := lintIss(t, issFront+"## Current\nc\n```make```\n\n## Expected\ne\n\n## Unchanged\nu\n\n## Evidence\nv\n")
+	if !has(rep, "fence-info-backtick", issPath, 7, wantFenceInfoBacktick) || count(rep, "fence-info-backtick") != 1 {
+		t.Errorf("%+v", rep.Findings)
+	}
+}

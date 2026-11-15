@@ -57,6 +57,46 @@ func openFence(line string) (fence, bool) {
 	return fence{m[1][0], len(m[1])}, true
 }
 
+// infoBacktick reports whether a line opening a backtick fence holds another
+// backtick after its marker, up to the first U+2028 or U+2029, where the
+// `(.*)` of OpenSpec's getFenceMarker stops.
+func infoBacktick(line string) bool {
+	f, ok := openFence(line)
+	if !ok || f.marker != '`' {
+		return false
+	}
+	rest := line[fenceOpen.FindStringIndex(line)[1]:]
+	if i := strings.IndexAny(rest, "\u2028\u2029"); i >= 0 {
+		rest = rest[:i]
+	}
+	return strings.Contains(rest, "`")
+}
+
+// openFence116 reports the fence a line opens under the fence rule of
+// OpenSpec 1.16 and later, where a backtick fence's info string cannot hold
+// a backtick.
+func openFence116(line string) (fence, bool) {
+	if infoBacktick(line) {
+		return fence{}, false
+	}
+	return openFence(line)
+}
+
+// FenceInfoBackticks returns the index of each line that opens with backticks
+// and holds another backtick after them, and that the fence rule of OpenSpec
+// 1.16 and later reads outside fenced code, in file order. FenceMask reads
+// every such line as fenced code; with none, both rules read the file alike.
+func FenceInfoBackticks(lines []string) []int {
+	mask := fenceMask(lines, openFence116)
+	var out []int
+	for i, l := range lines {
+		if !mask[i] && infoBacktick(l) {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 // closedBy reports whether line closes f: the same character, at least as long.
 func (f fence) closedBy(line string) bool {
 	m := fenceClose.FindStringSubmatch(line)
