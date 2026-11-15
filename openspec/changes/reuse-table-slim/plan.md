@@ -45,7 +45,7 @@
 
 - [ ] A four-column table with no rows, and an earlier five-column table with no rows, give no finding.
 - [ ] In the four-column table, a `reuse` row gives `reuse-table` on that row; an `extend` row with a missing path gives `reuse-table`; `external:` and a `new` row with a Reason give nothing; a `new` row without a Reason gives `reuse-table`.
-- [ ] In the earlier table, an empty Evidence gives nothing, a `reuse` row naming an existing path gives nothing, and one naming a missing path gives `reuse-table`.
+- [ ] In the earlier table, with every Evidence cell empty, each row case of the item above gives the same result as in the four-column table, except that a `reuse` row is accepted there: naming an existing path or `external:` it gives nothing, naming a missing path it gives `reuse-table`.
 - [ ] Any other header, including five columns that do not end with Evidence, gives one `reuse-table` finding on the header line whose message lists the four columns.
 - [ ] The tests in `internal/lint/plan_test.go` use the four-column table, with the earlier table kept only in tests about it; the sample plan in `internal/cli/realopenspec_test.go` uses the four-column table.
 
