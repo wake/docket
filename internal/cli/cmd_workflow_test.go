@@ -539,3 +539,23 @@ func TestWorkflowModeNoHome(t *testing.T) {
 		t.Errorf("independent: code=%d %s", code, out)
 	}
 }
+
+func TestWorkflowModeSyncNoHashWithoutAgreement(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	user := editSection(tpl, hs[0], "user edit") + "\n### Only in user\n\ntext\n"
+	proj := editSection(tpl, hs[1], "project edit")
+	r, idx := syncFixture(t, user, proj, "independent", nil)
+	code, m, out := modeRun(t, r.Dir, r.Env, "sync")
+	e := entryOf(t, idx, prReal(t, r.Dir))
+	if code != 0 {
+		t.Fatalf("code=%d %s", code, out)
+	}
+	for _, h := range []string{hs[0], hs[1], "Only in user"} {
+		if _, ok := e.Synced[h]; ok || slices.Contains(m.Result.Synced, h) {
+			t.Errorf("%q got a hash: %v %v", h, e.Synced, m.Result.Synced)
+		}
+	}
+	if len(m.Result.Synced) != len(hs)-2 {
+		t.Errorf("synced %v", m.Result.Synced)
+	}
+}
