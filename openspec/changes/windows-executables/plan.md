@@ -34,6 +34,10 @@
 | The Windows CI job | .github/workflows/ci.yml | extend | A new job beside `test` |
 | Unix-only test helpers | internal/setup/setup_test.go:umask, internal/setup/fix_test.go:TestDecideNonRegularIsUnreadable | extend | Move into files that build only where `Umask` and `Mkfifo` exist |
 
+## Revision 1 (2026-11-16): a new file at a junction's name, and the lock's scope
+
+The Windows CI job found that opening with `CreateFlags` at a junction's name fails with "is a directory", not with an error matching `fs.ErrExist`; the protection holds, so Task 1's acceptance item now asks only that it fails and leaves the folder unchanged. Found by the Windows job on the pull request. The pre-merge review on the other model found that the requirement Runs that write hold each other off on Windows said nothing of the temporary folder the lock lives in, so two runs with different temporary folders do not hold each other off against an unconditional requirement; the requirement now states that scope, which the design and the lead had accepted as a known limit. Not taken from that review: a machine-wide lock, such as a named mutex, which needs thread-bound ownership and a security descriptor for a case one user does not meet.
+
 ---
 
 ### Task 1: Links refused on Windows
@@ -61,7 +65,7 @@
 - [x] `GOOS=windows go vet ./internal/safefile/ ./internal/safepath/` passes on macOS; `syscall.O_NOFOLLOW` appears only in files that do not build on Windows. (The whole build for Windows needs Task 2 and is checked in Task 3.)
 - [x] On every system, opening with `CreateFlags` a name where a symbolic link to a file outside the folder stands fails with an error matching `fs.ErrExist`, and the file outside is unchanged; covered by a test in `safefile_test.go` that runs on macOS, Linux and Windows.
 - [x] On Windows, `ReadNoFollow` of a symbolic link to a regular file fails with `syscall.ELOOP` and returns no bytes, and of a regular file returns its bytes; the existing `TestReadNoFollow` covers both and passes in the Windows job.
-- [x] On Windows, `ReadNoFollow` of a junction to a folder fails with `syscall.ELOOP`, and opening with `CreateFlags` at a junction's name fails with an error matching `fs.ErrExist` and leaves the folder it points to unchanged; tests in `safefile_windows_test.go`, with the junction made by `mklink /J`.
+- [x] On Windows, `ReadNoFollow` of a junction to a folder fails with `syscall.ELOOP`, and opening with `CreateFlags` at a junction's name fails (Go reports "is a directory") and leaves the folder it points to unchanged; tests in `safefile_windows_test.go`, with the junction made by `mklink /J`.
 - [x] On macOS and Linux, a test in `internal/cli` plants a symbolic link at the new record's name after the checks (through the `openNewFile` seam, then calling the real one) and sees `dkt record` fail with the link's target unchanged; the same holds for a new proposal of `dkt new`. Making `CreateFlags` follow links (dropping both `os.O_EXCL` and `syscall.O_NOFOLLOW`, since either alone refuses a link on macOS and Linux) makes it fail. `InstallIn` and `openNewFile` take their flags only from `CreateFlags`.
 - [x] On Windows, `ReadNoFollow` of a missing file returns an error matching `fs.ErrNotExist`, as on macOS and Linux.
 - [x] On Windows, `safepath.Check` on a path through a junction (made with `mklink /J`) to a folder inside the root returns a `*safepath.SymlinkError` naming the junction, and `safepath.OpenDir` through it does too; tests in `safepath_windows_test.go`, passing in the Windows job.

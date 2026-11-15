@@ -29,14 +29,14 @@ Wherever a requirement says that dkt does not read or write through a symbolic l
 - **THEN** dkt treats it as a symbolic link at that folder
 
 ### Requirement: New files never through a link
-When dkt creates a file that must not exist yet, such as a new record, a new proposal, or the temporary file a write goes through, and a symbolic link or, on Windows, a junction is at that name, the creation SHALL fail and SHALL leave the link's target untouched, on every supported system and on Windows.
+When dkt creates a file that must not exist yet, such as a new record, a new proposal, or the temporary file a write goes through, and a symbolic link or, on Windows, a junction is at that name, the creation SHALL fail and SHALL leave the link's target untouched, on macOS, Linux and Windows.
 
 #### Scenario: Link at a new file's name
 - **WHEN** a symbolic link to a file outside the folder is at the name dkt is about to create
 - **THEN** the creation fails as if the file existed, and the file outside is unchanged
 
 ### Requirement: Runs that write hold each other off on Windows
-The runs that other specs require not to interleave, such as two runs of `dkt new` or of `dkt issue` with a card in one worktree, SHALL hold each other off on Windows as they do on macOS and Linux: a second run waits until the first is done with the folder it locked.
+The runs that other specs require not to interleave, such as two runs of `dkt new` or of `dkt issue` with a card in one worktree, SHALL hold each other off on Windows as they do on macOS and Linux, when they use the same temporary folder, as the runs of one user do: a second run waits until the first is done with the folder it locked. Runs with different temporary folders, such as those of two users, do not hold each other off on Windows.
 
 #### Scenario: Second run waits
 - **WHEN** on Windows, one run holds the lock on a folder and a second run asks for the lock on the same folder
