@@ -53,6 +53,8 @@ jobs:
           GOARCH: arm64
       - run: go vet ./...
       - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/ ./internal/testutil/
+      - run: go test -count=1 -v ./internal/execpath/ ./internal/openspec/ ./cmd/dkt/
+      - run: go test -count=1 -v -run PathEntry\|PathSpelled ./internal/gitx/
 
   openspec:
     runs-on: ubuntu-latest
