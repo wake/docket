@@ -13,6 +13,7 @@
 - docket/ideas/bookkeeping-commits.md
 - docket/ideas/domain-tree-upkeep.md
 - docket/ideas/init-reuse-workflow.md
+- docket/ideas/workflow-sync.md
 - docket/ideas/session-activity.md
 - docket/ideas/docket-server.md
 - docket/issues/2026-11-08-findwork-one-scan.md

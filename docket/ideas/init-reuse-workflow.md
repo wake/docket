@@ -10,6 +10,8 @@ The project index already knows those projects: `dkt projects ls --json` lists e
 
 These replace the 2026-11-11 decisions where they differ: there is now a user-level workflow file, and a project can follow it.
 
+On 2026-11-15 the part about following it moved to `docket/ideas/workflow-sync.md`: the parameters, the question about the mode in step 2, and the checking in `sync` mode. This idea covers the user template and setting a project up from it; the decisions stay here as settled.
+
 ### Three layers
 
 - Docket's template, then the user template on this computer, then the project's `docket/workflow.md`.
