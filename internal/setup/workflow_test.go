@@ -1,8 +1,10 @@
 package setup
 
 import (
+	"fmt"
 	"io/fs"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -17,6 +19,26 @@ func template(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// version is the shipped template's version.
+func version(t *testing.T) int {
+	t.Helper()
+	n := templateVersion([]byte(template(t)))
+	if n == 0 {
+		t.Fatal("the shipped template has no version")
+	}
+	return n
+}
+
+// withVersion returns s with the value of its first template line set to v.
+func withVersion(t *testing.T, s string, v any) string {
+	t.Helper()
+	loc := regexp.MustCompile(`(?m)^template: .*$`).FindStringIndex(s)
+	if loc == nil {
+		t.Fatal("no template line")
+	}
+	return s[:loc[0]] + fmt.Sprint("template: ", v) + s[loc[1]:]
 }
 
 // shippedWith returns a copy of the shipped tree whose workflow template is body.
@@ -66,7 +88,8 @@ func TestWorkflowCreatedWhenMissing(t *testing.T) {
 
 func TestWorkflowKeptWithForce(t *testing.T) {
 	root := t.TempDir()
-	body := "---\ntemplate: 1\n---\n"
+	v := version(t)
+	body := fmt.Sprintf("---\ntemplate: %d\n---\n", v)
 	for _, l := range strings.Split(template(t), "\n") {
 		if strings.HasPrefix(l, "### ") {
 			body += "\n" + l + "\n\nour own text\n"
@@ -75,7 +98,7 @@ func TestWorkflowKeptWithForce(t *testing.T) {
 	put(t, root, wfPath, body)
 	ds, _ := decideT(t, root, true)
 	d := find(ds, wfPath)
-	if d.Status != StatusSame || d.Action != ActionKeep || !reflect.DeepEqual(d.Workflow, &WorkflowState{1, 1, nil}) {
+	if d.Status != StatusSame || d.Action != ActionKeep || !reflect.DeepEqual(d.Workflow, &WorkflowState{v, v, nil}) {
 		t.Fatalf("%+v %+v", d, d.Workflow)
 	}
 	if err := Write(root, ds); err != nil {
@@ -88,11 +111,11 @@ func TestWorkflowKeptWithForce(t *testing.T) {
 
 func TestWorkflowVersionUnknown(t *testing.T) {
 	cases := map[string]string{
-		"not a number":    strings.Replace(template(t), "template: 1", "template: one", 1),
+		"not a number":    withVersion(t, template(t), "one"),
 		"no front matter": "# Mine\n",
 		"unclosed":        "---\ntemplate: 1\n",
-		"zero":            strings.Replace(template(t), "template: 1", "template: 0", 1),
-		"negative":        strings.Replace(template(t), "template: 1", "template: -1", 1),
+		"zero":            withVersion(t, template(t), 0),
+		"negative":        withVersion(t, template(t), -1),
 	}
 	for name, content := range cases {
 		d := decideWorkflowFile(t, content, shipped(t))
@@ -111,9 +134,9 @@ func TestWorkflowHeadingInComment(t *testing.T) {
 }
 
 func TestWorkflowSame(t *testing.T) {
-	tpl := template(t)
+	tpl, v := template(t), version(t)
 	cases := map[string]string{
-		"quoted version": strings.Replace(tpl, "template: 1", `template: "1"`, 1),
+		"quoted version": withVersion(t, tpl, fmt.Sprintf(`"%d"`, v)),
 		"crlf":           strings.ReplaceAll(tpl, "\n", "\r\n"),
 		"bom":            "\ufeff" + tpl,
 		"extra section":  tpl + "\n### Our own step\n",
@@ -121,7 +144,7 @@ func TestWorkflowSame(t *testing.T) {
 	}
 	for name, content := range cases {
 		d := decideWorkflowFile(t, content, shipped(t))
-		if d.Status != StatusSame || d.Action != ActionKeep || d.Workflow.Version != 1 || d.Workflow.Missing != nil {
+		if d.Status != StatusSame || d.Action != ActionKeep || d.Workflow.Version != v || d.Workflow.Missing != nil {
 			t.Errorf("%s: %+v %+v", name, d, d.Workflow)
 		}
 	}
@@ -143,16 +166,18 @@ func TestWorkflowSectionMissing(t *testing.T) {
 
 // The two version tests drop a section: at another version the sections are not checked.
 func TestWorkflowHigherVersion(t *testing.T) {
-	d := decideWorkflowFile(t, withoutPlanReview(t, strings.Replace(template(t), "template: 1", "template: 2", 1)), shipped(t))
-	if d.Status != StatusDiffers || d.Workflow.Version != 2 || d.Workflow.Missing != nil {
+	v := version(t)
+	d := decideWorkflowFile(t, withoutPlanReview(t, withVersion(t, template(t), v+1)), shipped(t))
+	if d.Status != StatusDiffers || d.Workflow.Version != v+1 || d.Workflow.Missing != nil {
 		t.Errorf("%+v %+v", d, d.Workflow)
 	}
 }
 
 func TestWorkflowLowerVersion(t *testing.T) {
-	sh := shippedWith(t, strings.Replace(template(t), "template: 1", "template: 2", 1))
+	v := version(t)
+	sh := shippedWith(t, withVersion(t, template(t), v+1))
 	d := decideWorkflowFile(t, withoutPlanReview(t, template(t)), sh)
-	if d.Status != StatusOutdated || d.Action != ActionKeep || d.Workflow.Version != 1 || d.Workflow.Shipped != 2 || d.Workflow.Missing != nil {
+	if d.Status != StatusOutdated || d.Action != ActionKeep || d.Workflow.Version != v || d.Workflow.Shipped != v+1 || d.Workflow.Missing != nil {
 		t.Errorf("%+v %+v", d, d.Workflow)
 	}
 }
