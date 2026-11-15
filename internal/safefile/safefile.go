@@ -6,11 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"syscall"
 )
 
 // Rename is root.Rename; tests replace it to make the last step fail.
@@ -42,7 +40,7 @@ func InstallIn(root *os.Root, name string, data []byte, perm os.FileMode, keepMo
 		}
 		tmp = filepath.Join(filepath.Dir(name), "."+filepath.Base(name)+".docket-tmp-"+hex.EncodeToString(rnd[:]))
 		// a new file gets perm as is, so the kernel applies the umask
-		f, err = root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, perm)
+		f, err = root.OpenFile(tmp, CreateFlags, perm)
 		if !errors.Is(err, fs.ErrExist) {
 			break
 		}
@@ -71,14 +69,4 @@ func InstallIn(root *os.Root, name string, data []byte, perm os.FileMode, keepMo
 		return fmt.Errorf("write %s: %w", rel, err)
 	}
 	return nil
-}
-
-// ReadNoFollow reads the file at p without following a link there.
-func ReadNoFollow(p string) ([]byte, error) {
-	f, err := os.OpenFile(p, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return io.ReadAll(f)
 }

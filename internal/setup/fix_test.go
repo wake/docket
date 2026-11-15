@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -49,14 +48,14 @@ func TestWriteKeepsModeTheUmaskWouldStrip(t *testing.T) {
 }
 
 func TestDecideNonRegularIsUnreadable(t *testing.T) {
-	for _, kind := range []string{"fifo", "dir"} {
+	for _, kind := range nonRegularKinds {
 		root := t.TempDir()
 		p := filepath.Join(root, ".claude/skills/docket/SKILL.md")
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if kind == "fifo" {
-			if err := syscall.Mkfifo(p, 0o644); err != nil {
+			if err := mkfifo(p); err != nil {
 				t.Fatal(err)
 			}
 		} else if err := os.Mkdir(p, 0o755); err != nil {

@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/wake/docket/internal/change"
+	"github.com/wake/docket/internal/lock"
 	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/safepath"
 	"github.com/wake/docket/internal/scan"
@@ -47,23 +48,8 @@ func refuse(err error) (Outcome, error) {
 	return Outcome{}, err
 }
 
-// lockDir takes an exclusive lock on <root>/<rel>, blocking until it is free,
-// so two runs that write under it cannot interleave. The returned function
-// releases it.
-func lockDir(root, rel string) (func(), error) {
-	f, err := os.Open(filepath.Join(root, rel))
-	if err != nil {
-		return nil, err
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
-		f.Close()
-		return nil, err
-	}
-	return func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		f.Close()
-	}, nil
-}
+// lockDir is lock.Dir; tests replace it to make the lock fail.
+var lockDir = lock.Dir
 
 // runNew is the body of dkt new.
 func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {

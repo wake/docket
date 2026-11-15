@@ -36,6 +36,23 @@ jobs:
       - run: go vet ./...
       - run: go test ./...
 
+  windows:
+    # Only the build and the protections are verified on Windows; the rest of
+    # the suite needs the work in docket/ideas/windows-*.md.
+    name: 'windows: build and protections only (dkt is not supported on Windows yet)'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - run: go build ./...
+      - run: go build ./...
+        env:
+          GOARCH: arm64
+      - run: go vet ./...
+      - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/
+
   openspec:
     runs-on: ubuntu-latest
     strategy:

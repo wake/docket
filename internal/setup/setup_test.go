@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"syscall"
 	"testing"
 	"testing/fstest"
 
@@ -78,12 +77,6 @@ func decideT(t *testing.T, root string, force bool) ([]Decision, []Problem) {
 		t.Fatal(err)
 	}
 	return ds, ps
-}
-
-func umask() os.FileMode {
-	m := syscall.Umask(0)
-	syscall.Umask(m)
-	return os.FileMode(m)
 }
 
 func TestDecideEmptyRootIsAllMissingInOrder(t *testing.T) {
