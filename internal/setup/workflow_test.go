@@ -24,7 +24,7 @@ func template(t *testing.T) string {
 // version is the shipped template's version.
 func version(t *testing.T) int {
 	t.Helper()
-	n := templateVersion([]byte(template(t)))
+	n := TemplateVersion([]byte(template(t)))
 	if n == 0 {
 		t.Fatal("the shipped template has no version")
 	}
@@ -197,6 +197,21 @@ func TestWorkflowDocketIsAFile(t *testing.T) {
 	ds, ps := decideT(t, root, false)
 	if find(ds, wfPath) != nil || len(ps) != 1 || ps[0].Path != wfPath {
 		t.Errorf("%+v %+v", ds, ps)
+	}
+}
+
+func TestSections(t *testing.T) {
+	doc := "---\r\ntemplate: 3\r\n---\r\n\r\n## Part\r\n### One\r\n\r\nfirst  \r\nsecond\t\r\n\r\n\r\n### Two\r\ntwo\r\n```\r\n### Not a heading\r\n```\r\n<!--\r\n### Hidden\r\n-->\r\n#### Deeper\r\nstill two\r\n## Next part\r\nnot in two\r\n### One\r\nrepeated\r\n"
+	got := Sections([]byte(doc))
+	want := []Section{
+		{"One", "first\nsecond"},
+		{"Two", "two\n```\n### Not a heading\n```\n\n\n\n#### Deeper\nstill two"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+	if got := Sections([]byte("no headings\n")); got == nil || len(got) != 0 {
+		t.Errorf("want an empty, non-nil list, got %#v", got)
 	}
 }
 

@@ -3,6 +3,8 @@ package setup
 import (
 	"slices"
 	"strconv"
+	"strings"
+	"unicode"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/markdown"
@@ -19,8 +21,8 @@ type WorkflowState struct {
 	Missing []string
 }
 
-// templateVersion reads the positive integer in the front matter's template field, 0 when there is none.
-func templateVersion(b []byte) int {
+// TemplateVersion reads the positive integer in the front matter's template field, 0 when there is none.
+func TemplateVersion(b []byte) int {
 	fm, ok, err := change.ReadFrontMatter(b)
 	if !ok || err != nil {
 		return 0
@@ -44,6 +46,43 @@ func headingTexts(b []byte, level int) []string {
 	return out
 }
 
+// Section is one level-three section of a workflow file; Text is normalized so that
+// only edits a reader can see make texts differ.
+type Section struct {
+	Heading, Text string
+}
+
+// Sections returns the level-three sections in file order, the first of a repeated
+// heading only. A section runs to the next heading of level three or above; its text
+// has no fenced-code-masked heading, no HTML comment, no trailing whitespace on a line
+// and no blank line at either end, and its lines are joined with LF.
+func Sections(b []byte) []Section {
+	lines := markdown.Lines(b)
+	mask := markdown.FenceMask(lines)
+	blanked := markdown.BlankComments(lines, mask)
+	out := []Section{}
+	seen := map[string]bool{}
+	for _, h := range markdown.Headings(blanked, mask) {
+		if h.Level != 3 || seen[h.Text] {
+			continue
+		}
+		seen[h.Text] = true
+		from, to := markdown.Body(blanked, mask, h)
+		body := make([]string, 0, to-from)
+		for _, l := range blanked[from:to] {
+			body = append(body, strings.TrimRightFunc(l, unicode.IsSpace))
+		}
+		for len(body) > 0 && body[0] == "" {
+			body = body[1:]
+		}
+		for len(body) > 0 && body[len(body)-1] == "" {
+			body = body[:len(body)-1]
+		}
+		out = append(out, Section{h.Text, strings.Join(body, "\n")})
+	}
+	return out
+}
+
 // decideWorkflow settles the docket/workflow.md target: written when missing,
 // never replaced, so force makes no difference.
 func decideWorkflow(d Decision, got, want []byte, shipped int) Decision {
@@ -51,7 +90,7 @@ func decideWorkflow(d Decision, got, want []byte, shipped int) Decision {
 		d.Status, d.Action = StatusMissing, ActionCreate
 		return d
 	}
-	st := WorkflowState{Version: templateVersion(got), Shipped: shipped}
+	st := WorkflowState{Version: TemplateVersion(got), Shipped: shipped}
 	if st.Version == shipped {
 		have := headingTexts(got, 0)
 		for _, h := range headingTexts(want, 3) {

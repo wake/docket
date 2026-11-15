@@ -49,6 +49,11 @@ func SettingsPath(env []string) (string, error) {
 	return xdgFile(env, "XDG_CONFIG_HOME", ".config", "config.json")
 }
 
+// UserWorkflowPath is the user's workflow template, beside the settings file.
+func UserWorkflowPath(env []string) (string, error) {
+	return xdgFile(env, "XDG_CONFIG_HOME", ".config", "workflow.md")
+}
+
 // Entry is one project in the index.
 type Entry struct {
 	Path    string  `json:"path"`

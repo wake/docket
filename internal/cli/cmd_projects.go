@@ -171,6 +171,15 @@ func projectsEdit(c *Context, verb, arg string) (Outcome, error) {
 	return Outcome{Result: projectState{State: state, Project: e}, Human: []string{state + " " + e.Path}}, nil
 }
 
+// missingProject reports whether a registered path is gone; any other failure to look is err.
+func missingProject(path string) (bool, error) {
+	_, err := os.Lstat(path)
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return true, nil
+	}
+	return false, err
+}
+
 func projectsLs(c *Context) (Outcome, error) {
 	index, err := projectsEnv(c)
 	if err != nil {
@@ -185,7 +194,7 @@ func projectsLs(c *Context) (Outcome, error) {
 	list := projectList{Projects: []listedProject{}}
 	for _, e := range x.Projects {
 		lp := listedProject{Entry: e}
-		if _, err := os.Lstat(e.Path); errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		if missing, err := missingProject(e.Path); missing {
 			lp.Missing = true
 		} else if err != nil {
 			out.Unreadable = append(out.Unreadable, Unreadable{Source: e.Path, Reason: err.Error()})

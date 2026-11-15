@@ -7,7 +7,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -26,7 +28,12 @@ type inspectOut struct {
 			Minimum   string
 			Supported bool
 		}
-		Files []struct{ Path, Kind, Status string }
+		Files        []struct{ Path, Kind, Status string }
+		UserWorkflow *struct {
+			Path    string
+			Exists  bool
+			Version int
+		} `json:"user_workflow"`
 	}
 }
 
@@ -779,5 +786,120 @@ func TestWorkflowFindings(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// userEnv puts the user template (when body is not empty) under a temporary config home.
+func userEnv(t *testing.T, r *testutil.Repo, body string) string {
+	t.Helper()
+	cfg := t.TempDir()
+	r.Env = append(r.Env, "XDG_CONFIG_HOME="+cfg)
+	p := filepath.Join(cfg, "docket", "workflow.md")
+	if body != "" {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return p
+}
+
+func userTemplate(v string) string { return "---\ntemplate: " + v + "\n---\n\n# x\n" }
+
+func TestInspectUserWorkflow(t *testing.T) {
+	ship := shippedVersion(t)
+	cases := []struct {
+		name, body, rule string
+		version          int
+		code             int
+	}{
+		{"same", userTemplate(strconv.Itoa(ship)), "", ship, 0},
+		{"older", userTemplate(strconv.Itoa(ship - 1)), "user-workflow-outdated", ship - 1, 1},
+		{"newer", userTemplate(strconv.Itoa(ship + 1)), "user-workflow-newer", ship + 1, 1},
+		{"no front matter", "# x\n", "user-workflow-template-unknown", 0, 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := testutil.NewRepo(t)
+			installed(t, r)
+			p := userEnv(t, r, c.body)
+			code, m, _ := inspect(t, r, "1.14.0", false)
+			u := m.Result.UserWorkflow
+			if code != c.code || u == nil || u.Path != p || !u.Exists || u.Version != c.version {
+				t.Fatalf("code=%d %+v %v", code, u, rules(m))
+			}
+			got := map[string][]string{}
+			for k, v := range rules(m) {
+				if strings.HasPrefix(k, "user-workflow") {
+					got[k] = v
+				}
+			}
+			want := map[string][]string{}
+			if c.rule != "" {
+				want[c.rule] = []string{p}
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func TestInspectNoUserWorkflow(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	p := userEnv(t, r, "")
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	u := m.Result.UserWorkflow
+	if code != 0 || u == nil || u.Path != p || u.Exists || u.Version != 0 || len(m.Findings) != 0 {
+		t.Errorf("code=%d %+v %v", code, u, m.Findings)
+	}
+}
+
+func TestInspectUserWorkflowNoHome(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	r.Env = slices.DeleteFunc(slices.Clone(r.Env), func(kv string) bool { return strings.HasPrefix(kv, "HOME=") })
+	code, m, out := inspect(t, r, "1.14.0", false)
+	if code != 0 || m.Result.UserWorkflow != nil || len(m.Findings) != 0 || !strings.Contains(out, `"user_workflow": null`) && !strings.Contains(out, `"user_workflow":null`) {
+		t.Errorf("code=%d %+v %s", code, m, out)
+	}
+}
+
+func TestInspectUserWorkflowUnreadable(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	p := userEnv(t, r, userTemplate("1"))
+	if err := os.Chmod(p, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(p, 0o644) })
+	if f, err := os.Open(p); err == nil {
+		f.Close()
+		t.Skip("file readable despite mode 0")
+	}
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if code != 3 || len(m.Unreadable) != 1 || m.Unreadable[0].Source != p || m.Result.UserWorkflow == nil || m.Result.UserWorkflow.Path != p {
+		t.Errorf("code=%d %+v %+v", code, m.Unreadable, m.Result.UserWorkflow)
+	}
+}
+
+func TestInspectUserWorkflowSymlink(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	p := userEnv(t, r, "")
+	target := filepath.Join(t.TempDir(), "mine.md")
+	if err := os.WriteFile(target, []byte(userTemplate(strconv.Itoa(shippedVersion(t)))), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(filepath.Dir(p), 0o755)
+	if err := os.Symlink(target, p); err != nil {
+		t.Fatal(err)
+	}
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if u := m.Result.UserWorkflow; code != 0 || u == nil || !u.Exists || u.Version != shippedVersion(t) {
+		t.Errorf("code=%d %+v", code, u)
 	}
 }

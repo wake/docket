@@ -157,7 +157,7 @@ func targetsOf(shipped fs.FS) ([]target, error) {
 	if err != nil {
 		return nil, err
 	}
-	v := templateVersion(tpl)
+	v := TemplateVersion(tpl)
 	if v == 0 {
 		return nil, errors.New("the shipped workflow template has no template version")
 	}

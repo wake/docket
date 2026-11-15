@@ -33,10 +33,13 @@ Its `findings` and `unreadable` are the problems found mechanically, among
 them `install-ignored` (a path `dkt init` writes is ignored by git),
 `title-missing` (a main spec's first line is still the generated id),
 `trailer-missing` (no commit carries the trailer of a change on the default
-branch), and the four starting with `workflow-` (`docket/workflow.md` is
+branch), the four starting with `workflow-` (`docket/workflow.md` is
 missing, follows an older template, has an unknown version, or lacks a
-section). When it exits with 2 or 4, it did not check properly and has no
-result: say what else it reported and stop.
+section), and the three starting with `user-workflow-` (the user template
+on this computer is older than Docket's template, newer than this dkt's,
+or has no version); the user template's path is
+`result.user_workflow.path`. When it exits with 2 or 4, it did not check
+properly and has no result: say what else it reported and stop.
 
 Then run `dkt lint --json` and look only at `result.changes`: those whose
 `schema` is not `docket` are active changes made with another schema. Its
@@ -130,6 +133,17 @@ it and go on to the next.
   that section back from the current template, with its heading exactly as
   it is there; when the user wants it done their own way, rewrite its text
   by the rules of step 6. Write it only after the user agrees.
+- `user-workflow-outdated`: the user template on this computer follows an
+  older template. Upgrade it as for `workflow-outdated`, on the user
+  template; it is the user's own, not any project's: write it only after
+  the user agrees, and do not commit it.
+- `user-workflow-newer`: the user template's version is higher than the
+  template this dkt ships, which usually means the dkt on this machine is
+  older: propose upgrading dkt first; never downgrade the template.
+- `user-workflow-template-unknown`: the user template has no `template`
+  version that can be read. Say how `template` is written (a positive
+  integer in the front matter) and let the user decide which version it
+  is; do not guess.
 - Conflicts with the docket skill's steps: propose wording for the user's
   instructions; never edit their files.
 - `trailer-missing`: say that this change's commits on the default branch

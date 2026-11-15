@@ -40,6 +40,10 @@ func TestSettingsPath(t *testing.T) {
 	pathCases(t, SettingsPath, "XDG_CONFIG_HOME", ".config", "config.json")
 }
 
+func TestUserWorkflowPath(t *testing.T) {
+	pathCases(t, UserWorkflowPath, "XDG_CONFIG_HOME", ".config", "workflow.md")
+}
+
 func TestLoadMissing(t *testing.T) {
 	x, err := Load(filepath.Join(t.TempDir(), "none.json"))
 	if err != nil || x.Projects == nil || len(x.Projects) != 0 {
