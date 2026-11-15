@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wake/docket/internal/testutil"
 )
@@ -30,6 +31,30 @@ func actState(t *testing.T) ([]string, string) {
 func count(dir string) int {
 	es, _ := os.ReadDir(dir)
 	return len(es)
+}
+
+func TestActivityInputNeverClosed(t *testing.T) {
+	env, dir := actState(t)
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	defer w.Close()
+	w.WriteString("{")
+	done := make(chan int, 1)
+	go func() {
+		var out, errb bytes.Buffer
+		done <- Run(Options{Args: []string{"activity", "working"}, Dir: t.TempDir(), Env: env, Stdin: r, Stdout: &out, Stderr: &errb})
+	}()
+	select {
+	case code := <-done:
+		if code != 0 || count(dir) != 1 {
+			t.Fatalf("%d %d", code, count(dir))
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("dkt activity waited for its input")
+	}
 }
 
 func TestActivityWrites(t *testing.T) {

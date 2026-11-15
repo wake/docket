@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -28,7 +30,18 @@ func runActivity(o Options, args []string) int {
 	if o.Now != nil {
 		now = o.Now()
 	}
-	_ = activity.Write(o.Env, now, args[0], o.Stdin, o.Dir)
+	// The hook input may never be closed: wait one second, then go on without it.
+	var in io.Reader
+	if o.Stdin != nil {
+		ch := make(chan []byte, 1)
+		go func() { b, _ := io.ReadAll(o.Stdin); ch <- b }()
+		select {
+		case b := <-ch:
+			in = bytes.NewReader(b)
+		case <-time.After(time.Second):
+		}
+	}
+	_ = activity.Write(o.Env, now, args[0], in, o.Dir)
 	return 0
 }
 
