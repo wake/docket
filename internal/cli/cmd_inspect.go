@@ -7,6 +7,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
@@ -27,6 +28,13 @@ type userWorkflow struct {
 	Path    string `json:"path"`
 	Exists  bool   `json:"exists"`
 	Version int    `json:"version"`
+	// Default is the settings' workflow.default, null when unset; Mode is the project's
+	// mode; Sections is never null.
+	Default  *string              `json:"default"`
+	Mode     string               `json:"mode"`
+	Sections []setup.SectionState `json:"sections"`
+
+	synced map[string]string // the entry's hashes, for the comparison
 }
 
 type inspectOpenSpec struct {
@@ -82,7 +90,8 @@ func inspectUserWorkflow(c *Context, out *Outcome) (*userWorkflow, error) {
 	} else if err != nil {
 		return nil, err
 	}
-	u := &userWorkflow{Path: p}
+	u := &userWorkflow{Path: p, Mode: "independent", Sections: []setup.SectionState{}}
+	inspectMode(c, out, u)
 	b, err := os.ReadFile(p) // follows a link: the file is the user's own
 	if errors.Is(err, fs.ErrNotExist) {
 		return u, nil
@@ -92,6 +101,9 @@ func inspectUserWorkflow(c *Context, out *Outcome) (*userWorkflow, error) {
 		return u, nil
 	}
 	u.Exists, u.Version = true, setup.TemplateVersion(b)
+	if u.Mode == "sync" {
+		inspectSections(c, out, u, b)
+	}
 	tpl, err := fs.ReadFile(shippedFS(), "workflow/workflow.md")
 	if err != nil {
 		return nil, err
@@ -108,6 +120,61 @@ func inspectUserWorkflow(c *Context, out *Outcome) (*userWorkflow, error) {
 		out.Findings = append(out.Findings, Finding{Rule: "user-workflow-outdated", File: p, Message: fmt.Sprintf("%s follows template %d; this release ships template %d: run docket-doctor to bring in the changes", p, u.Version, shipped)})
 	}
 	return u, nil
+}
+
+// inspectMode reads the settings' default and the project's mode; the mode stays
+// independent when the index has no location, no entry or cannot be read.
+func inspectMode(c *Context, out *Outcome, u *userWorkflow) {
+	if s, err := projects.SettingsPath(c.Env); err == nil {
+		d, err := projects.DefaultMode(s)
+		if err != nil {
+			out.Unreadable = append(out.Unreadable, Unreadable{Source: s, Reason: err.Error()})
+		} else if d != "" {
+			u.Default = &d
+		}
+	}
+	idx, err := projects.IndexPath(c.Env)
+	if err != nil {
+		return
+	}
+	x, err := projects.Load(idx)
+	if err != nil {
+		out.Unreadable = append(out.Unreadable, Unreadable{Source: idx, Reason: err.Error()})
+		return
+	}
+	self, err := projects.ProjectPath(c.Git, c.Repo.Root)
+	if err != nil {
+		return
+	}
+	if i := x.Find(self); i >= 0 && x.Projects[i].Mode == "sync" {
+		u.Mode = "sync"
+		u.synced = x.Projects[i].Synced
+	}
+}
+
+// inspectSections compares the project's sections with the user template b, in sync mode.
+func inspectSections(c *Context, out *Outcome, u *userWorkflow, b []byte) {
+	pb, err := readProjectWorkflow(c.Repo.Root)
+	if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) {
+		return
+	}
+	if err != nil {
+		out.Unreadable = append(out.Unreadable, Unreadable{Source: workflowFile, Reason: err.Error()})
+		return
+	}
+	owned, err := setup.ProjectOwned(pb)
+	if err != nil {
+		out.Findings = append(out.Findings, Finding{Rule: "workflow-project-owned-invalid", File: workflowFile, Message: workflowFile + ": " + err.Error()})
+		return
+	}
+	u.Sections = setup.CompareSections(b, pb, owned, u.synced)
+	for _, s := range u.Sections {
+		if s.State == "in-step" {
+			continue
+		}
+		out.Findings = append(out.Findings, Finding{Rule: "workflow-sync-" + s.State, File: workflowFile,
+			Message: fmt.Sprintf("%q is %s between %s and the user template; docket-doctor can resolve it", s.Heading, s.State, workflowFile)})
+	}
 }
 
 // decisionFindings reports what dkt init would do with one decided file.
