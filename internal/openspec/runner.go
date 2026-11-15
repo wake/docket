@@ -45,32 +45,45 @@ func (e *UnavailableError) Error() string {
 	return fmt.Sprintf("OpenSpec CLI %q %s; install OpenSpec %s or later or set DOCKET_OPENSPEC to a command that runs it", e.Program, why, Minimum)
 }
 
-// UnsafeArgError reports an argument dkt will not pass to OpenSpec when it is
-// a .bat or .cmd file on Windows: cmd.exe reads such a file's arguments itself,
-// so characters such as & or % in one could run another command.
+// UnsafeArgError reports a word dkt will not hand to OpenSpec when it is a
+// .bat or .cmd file on Windows: cmd.exe reads the command line of such a file
+// itself, so characters such as & or % could run another command. Arg is the
+// argument, or the program's own path.
 type UnsafeArgError struct{ Program, Arg string }
 
 func (e *UnsafeArgError) Error() string {
-	return fmt.Sprintf("will not pass %q to %s: cmd.exe reads the arguments of a .bat or .cmd file itself, so they may hold only letters, digits and %s", e.Arg, e.Program, plainPunct)
+	return fmt.Sprintf("will not run %s with %q: cmd.exe reads the command line of a .bat or .cmd file itself, so its arguments may hold only letters, digits and %s, and its path those, \\, spaces, ( ) and ~",
+		e.Program, e.Arg, plainPunct)
 }
 
 // plainPunct is the punctuation an argument to a batch file may hold.
 const plainPunct = "-_.,/@+=:"
 
-// unsafeBatchArg returns the first argument in cmd[1:] that is not plain, when
-// cmd[0] is a .bat or .cmd file on Windows.
+// unsafeBatchArg returns the program path or the first argument that is not
+// plain, when cmd[0] is a .bat or .cmd file on Windows.
 func unsafeBatchArg(windows bool, cmd []string) (string, bool) {
 	if ext := strings.ToLower(filepath.Ext(cmd[0])); !windows || ext != ".bat" && ext != ".cmd" {
 		return "", false
 	}
+	if !plain(cmd[0], `\ ()~`) {
+		return cmd[0], true
+	}
 	for _, a := range cmd[1:] {
-		for _, c := range a {
-			if !('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' || strings.ContainsRune(plainPunct, c)) {
-				return a, true
-			}
+		if !plain(a, "") {
+			return a, true
 		}
 	}
 	return "", false
+}
+
+// plain reports whether s holds only ASCII letters, digits, plainPunct and extra.
+func plain(s, extra string) bool {
+	for _, c := range s {
+		if !('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' || strings.ContainsRune(plainPunct+extra, c)) {
+			return false
+		}
+	}
+	return true
 }
 
 // UnsupportedError reports an OpenSpec that gave no version of the form

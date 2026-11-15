@@ -19,6 +19,14 @@ func openSpecRunner(c *Context) (*openspec.Runner, error) {
 	return r, nil
 }
 
+// openSpecFailed reports whether err is an OpenSpec call that failed, or that
+// dkt refused to make, which a command reports as openspec-failed.
+func openSpecFailed(err error) bool {
+	var failed *openspec.FailedError
+	var unsafe *openspec.UnsafeArgError
+	return errors.As(err, &failed) || errors.As(err, &unsafe)
+}
+
 // openSpecEnvError turns a missing or too old OpenSpec into an EnvError and returns any other err as is.
 func openSpecEnvError(err error) error {
 	var unavail *openspec.UnavailableError

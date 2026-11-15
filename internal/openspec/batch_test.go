@@ -16,6 +16,16 @@ func TestUnsafeBatchArg(t *testing.T) {
 			t.Errorf("refused %q outside Windows", bad)
 		}
 	}
+	for _, prog := range []string{`C:\safe&whoami\openspec.cmd`, `C:\a%b%\openspec.cmd`, `C:\a|b\openspec.CMD`, `C:\a^b\openspec.bat`} {
+		if a, ok := unsafeBatchArg(true, []string{prog, "show"}); !ok || a != prog {
+			t.Errorf("program %s: %q %v, want refused", prog, a, ok)
+		}
+	}
+	for _, prog := range []string{`C:\Program Files\nodejs\npx.cmd`, `C:\Program Files (x86)\npm\openspec.cmd`, `C:\Users\RUNNER~1\AppData\openspec.cmd`} {
+		if a, ok := unsafeBatchArg(true, []string{prog, "show"}); ok {
+			t.Errorf("program %s refused: %q", prog, a)
+		}
+	}
 	plain := []string{`C:\npm\npx.cmd`, "-y", "@fission-ai/openspec@1.14.0", "show", "add-x", "identity/user-auth",
 		"--type", "change", "--deltas-only", "claude,codex", "a_b+c=d:e", ""}
 	if a, ok := unsafeBatchArg(true, plain); ok {

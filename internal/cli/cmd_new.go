@@ -13,7 +13,6 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/lock"
-	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/safepath"
 	"github.com/wake/docket/internal/scan"
 )
@@ -159,8 +158,7 @@ func runNew(c *Context, slug, kind, source, title string) (Outcome, error) {
 	}
 	if _, err := r.Run("new", "change", chosen, "--schema", "docket"); err != nil {
 		err = cleanup(err, false)
-		var fe *openspec.FailedError
-		if errors.As(err, &fe) {
+		if openSpecFailed(err) {
 			return finding("openspec-failed", err.Error())
 		}
 		return Outcome{}, err
