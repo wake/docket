@@ -17,3 +17,5 @@ The third and fourth plans written to the instruction met these cases and had to
 `dkt init --force` from this branch reinstalled the copy, which matches `shipped/`; `openspec schema validate docket` passes; `go test ./internal/setup/` passes with the new hash.
 
 ## Review
+
+codex (gpt-5.6-sol) reviewed the whole diff and marked two findings must-fix. Taken up: the Interfaces rule now names a dependency used as it is, which the Reuse rule sends there (ed9a3a1). Turned down: that `dkt sync` would tick an acceptance item added to a completed task from its old commits; plan-sync's "Ticks from trailers" ticks a task's steps as a whole by design, and the fix's commit and the Revision record it. A second codex reviewer (high effort) decided it: not valid.
