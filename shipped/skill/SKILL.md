@@ -115,7 +115,8 @@ off (such as `//nolint`) is a check setting.
 
 While working on a change or a record, do not touch `docket/order.md` or
 `docket/ideas/`. A new idea found during the work, and any edit to the
-order, is a direct merge of its own. When part of the work cannot be done
+order, goes in a direct merge apart from the work's pull request; a new idea
+and its place in the order may share one. When part of the work cannot be done
 with the rest and has to wait, write that part as a new idea and list the
 original idea in its `needs`.
 
@@ -253,7 +254,10 @@ No change is opened; a record in `docket/records/` says what the work did.
      and a suffix when the name is taken), not the name you passed.
 2. While doing the work, follow "Verification" in `docket/workflow.md`.
 3. Fill the record's sections as the work goes, keeping them short,
-   replacing the template's guidance comments. Every commit carries a
+   replacing the template's guidance comments; write `## Review` after the
+   review, in the commit that answers it, or in a commit of its own when
+   nothing needs fixing, then run `dkt lint` again (until then it reports
+   that section as empty). Every commit carries a
    trailer (see "Commit trailers"). Larger work may list tasks under the
    record's `## Tasks` in the plan's format.
 4. When the record lists tasks, run `dkt sync <slug>` and commit the record.
