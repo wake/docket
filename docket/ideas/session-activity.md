@@ -10,10 +10,13 @@ title: Show whether a piece of work is being worked on
 - A session writes its state to a file, with the time it last wrote it. Readers (dkt, and viewers through `dkt snapshot`) only read it.
 - A state counts only while its write time keeps being refreshed within some window; past the window without a write, it is treated as absent.
 
+## Settled (maintainer, 2026-11-16)
+
+- Consent: the user agrees once, when setting up the hook. A setup step the user runs on purpose installs it, saying that the hook writes the state file on every turn; nothing asks again after that. The state file is never committed.
+- Where the file goes: under `$XDG_STATE_HOME/docket/`, at a fixed place on the machine next to the projects index, mapped to the work by its working directory. Nothing is written in the repository.
+
 ## Open
 
-- Where the file goes: in the work's worktree (ignored by git), or at a fixed place on the machine, such as under `$XDG_STATE_HOME/docket/` next to the projects index, mapped to the work by its working directory.
 - Who writes it: the coding agent's hooks (a prompt sent, a tool used, a turn ended, the session ended) call a small command; whether dkt provides that command, and how it works with both Claude Code and Codex.
 - Which states (working, waiting for the user, ended), and how long the window is.
 - How `dkt snapshot` carries it.
-- Consent: a hook that writes on every turn is a write the user does not ask for each time, so setting up the hook, with the user's agreement, has to be what allows it; the file never lands in what is committed.
