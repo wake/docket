@@ -66,10 +66,10 @@ func TestDefaultFromPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(bin, "openspec"), b, 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, "openspec"+testutil.Exe), b, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	env := append(testutil.Env(t), "DOCKET_OPENSPEC=", "PATH="+bin+":/usr/bin:/bin")
+	env := append(testutil.Env(t), "DOCKET_OPENSPEC=", "PATH="+bin+string(os.PathListSeparator)+"/usr/bin"+string(os.PathListSeparator)+"/bin")
 	r, err := openspec.New(t.TempDir(), env)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestMissingProgram(t *testing.T) {
 
 func TestUnstartableProgramIsUnavailable(t *testing.T) {
 	dir := t.TempDir()
-	prog := filepath.Join(dir, "openspec")
+	prog := filepath.Join(dir, "openspec"+testutil.Exe)
 	if err := os.WriteFile(prog, []byte("#!/nonexistent/interpreter\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -234,9 +234,9 @@ func TestRepoOpenspecNotFoundThroughPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{":" + t.TempDir(), ".", "bin"} {
+	for _, path := range []string{string(os.PathListSeparator) + t.TempDir(), ".", "bin"} {
 		repo := t.TempDir()
-		for _, p := range []string{"openspec", "bin/openspec"} {
+		for _, p := range []string{"openspec" + testutil.Exe, "bin/openspec" + testutil.Exe} {
 			if err := os.MkdirAll(filepath.Dir(filepath.Join(repo, p)), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -259,7 +259,7 @@ func TestRelativeOverrideResolvesAgainstDir(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "bin/openspec"), b, 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "bin/openspec"+testutil.Exe), b, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	r, err := openspec.New(dir, append(testutil.Env(t), "DOCKET_OPENSPEC=./bin/openspec"))
