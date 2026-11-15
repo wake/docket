@@ -40,4 +40,5 @@ specs:
 - New package for the state records; `internal/projects` gives their folder beside the index.
 - `internal/cli`: the `activity` command, run before the repository is identified; `cmd/dkt` passes standard input.
 - `internal/snapshot`: `activity` on each work.
+- `cli-output`'s JSON output, exit code and outside-the-repository rules name `dkt activity` as their exception.
 - Prompt: `skills/docket-init/SKILL.md`.

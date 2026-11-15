@@ -30,7 +30,7 @@ When standard input holds a JSON object, its string `session_id` SHALL name the 
 - **THEN** one file holds a record with the directory `/w/app`
 
 ### Requirement: Activity never stops the agent
-`dkt activity` SHALL print nothing to standard output or standard error and SHALL exit with 0 in every case, including a missing or unknown state, extra arguments, standard input that is not JSON, no location for the state home, and a folder it cannot write. It SHALL start no process.
+`dkt activity` SHALL print nothing to standard output or standard error and SHALL exit with 0 in every case, including a missing or unknown state, extra arguments, standard input that is not JSON, no location for the state home, and a folder it cannot write; only `dkt activity --help` prints its help. It SHALL start no process, and SHALL wait at most one second for its standard input, going on as if there were none.
 
 #### Scenario: Unknown state
 - **WHEN** a session runs `dkt activity busy`
@@ -44,11 +44,19 @@ When standard input holds a JSON object, its string `session_id` SHALL name the 
 - **WHEN** neither `HOME` nor `XDG_STATE_HOME` is set and a session runs `dkt activity working`
 - **THEN** nothing is printed and dkt exits with 0
 
+#### Scenario: Input never closed
+- **WHEN** a session runs `dkt activity working` in `/w/app` with standard input a pipe that holds `{` and is never closed
+- **THEN** dkt exits with 0 within about a second, and a record holds the directory `/w/app`
+
 ### Requirement: Activity window
-A record SHALL count for 15 minutes after the time it was written; after that, it SHALL be treated as absent.
+A record SHALL count for 15 minutes after the time it was written; after that, it SHALL be treated as absent. A record whose time is more than 15 minutes ahead of the reader's clock SHALL be treated as absent too.
 
 #### Scenario: Record past the window
 - **WHEN** the only record for a worktree was written 16 minutes ago
+- **THEN** readers treat that worktree as having no session
+
+#### Scenario: Record from the future
+- **WHEN** the only record for a worktree has a time a day ahead of the reader's clock
 - **THEN** readers treat that worktree as having no session
 
 ### Requirement: Old records removed

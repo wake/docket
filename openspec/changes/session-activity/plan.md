@@ -35,11 +35,15 @@
 | Reading the records in `dkt snapshot` | `internal/snapshot/snapshot.go:Collect` | extend | Uses the worktrees it already lists, after the works are built |
 | docket-init's hook step | `skills/docket-init/SKILL.md` | extend | A new last step |
 
+## Revision 1 (2026-11-16): input time limit, future records, partly installed hooks
+
+Found by the pre-merge review's attacking reviewer (codex): standard input that is never closed could hold a hook call forever; a record with a time far in the future counted forever; and docket-init skipped its step when any one hook called `dkt activity`, so a partial set was never completed. Tasks 1, 2 and 4 gain an acceptance item or change one for these; the specs gain the scenarios "Input never closed" and "Record from the future".
+
 ---
 
 ### Task 1: Per-session state records
 
-**Scenarios:** session-activity#working-recorded, session-activity#later-state-replaces-the-earlier, session-activity#ended-removes-the-record, session-activity#two-sessions-in-one-directory, session-activity#no-hook-input, session-activity#record-past-the-window, session-activity#old-record-removed
+**Scenarios:** session-activity#working-recorded, session-activity#later-state-replaces-the-earlier, session-activity#ended-removes-the-record, session-activity#two-sessions-in-one-directory, session-activity#no-hook-input, session-activity#record-past-the-window, session-activity#old-record-removed, session-activity#record-from-the-future
 
 **Review:** checks
 
@@ -61,10 +65,11 @@
 - [x] Each `Write` removes the files in the folder modified more than 15 minutes before `now`, and keeps one modified 5 minutes before.
 - [x] An unknown state, no location for the state home, and a folder that cannot be written return an error and write no record.
 - [x] `Read` returns the records written 14 minutes before `now`, not one written 16 minutes before; it skips, while still returning the other records, a file that is not a record, a file it cannot read, and a symbolic link; it returns nothing when the folder is missing, and an error when the folder cannot be listed; it writes and removes nothing.
+- [ ] `Read` treats a record whose time is more than 15 minutes ahead of `now` as absent, and returns one a minute ahead.
 
 ### Task 2: The dkt activity command
 
-**Scenarios:** session-activity#unknown-state, session-activity#folder-that-cannot-be-written, session-activity#no-home, cli-output#activity-with-json, cli-output#activity-usage-error, cli-output#json-on-success, cli-output#json-on-failure, cli-output#unknown-command, cli-output#no-command, cli-output#help
+**Scenarios:** session-activity#unknown-state, session-activity#folder-that-cannot-be-written, session-activity#no-home, session-activity#input-never-closed, cli-output#activity-with-json, cli-output#activity-usage-error, cli-output#json-on-success, cli-output#json-on-failure, cli-output#unknown-command, cli-output#no-command, cli-output#help
 
 **Review:** judgment
 
@@ -85,6 +90,7 @@
 - [x] Standard input that is a terminal is not read: `cmd/dkt` passes it only when it is not a character device; and when the working directory cannot be read, `cmd/dkt` still exits with 0 for `activity`.
 - [x] `dkt --help` lists `activity`, and `dkt activity --help` prints its help and exits with 0; `dkt --json activity working` prints nothing and exits with 0.
 - [x] The existing tests of JSON output and exit codes for the other commands pass unchanged (`cli-output`'s MODIFIED requirements change only what `dkt activity` does).
+- [ ] With `Stdin` a pipe that holds `{` and is never closed, `activity working` returns 0 within about a second and records the working directory.
 
 ### Task 3: dkt snapshot reports each work's activity
 
@@ -121,7 +127,7 @@
 **Files:**
 - Modify: `skills/docket-init/SKILL.md`
 
-- [x] A new last step, for Claude Code only: when no hook in the user's `~/.claude/settings.json` already calls `dkt activity`, it offers the hooks, saying that they write a small state file under the state home on every prompt, tool call and turn end of every Claude Code session on the computer, never in a repository, so that `dkt snapshot` can show which works a session is on; it writes the settings only once the user agrees.
+- [ ] A new last step, for Claude Code only: it is skipped when all five hooks in the user's `~/.claude/settings.json` already call `dkt activity`, and offers only the missing ones when some do; it offers the hooks, saying that they write a small state file under the state home on every prompt, tool call and turn end of every Claude Code session on the computer, never in a repository, so that `dkt snapshot` can show which works a session is on; it writes the settings only once the user agrees.
 - [x] The step names the events and states (`UserPromptSubmit` and `PreToolUse` with `working`, `Notification` and `Stop` with `waiting`, `SessionEnd` with `ended`), the command as the absolute path `command -v dkt` gives followed by `2>/dev/null || true`, keeps the settings and hooks already in the file, and says how to remove the hooks.
 - [x] The step covers its other branches: the user declines (nothing is written); the settings file does not exist (it is created with the hooks alone); it is not valid JSON, or its `hooks` is not an object (nothing is written, and the user is told why); `command -v dkt` finds nothing (the step stops).
 - [x] The hooks object the step describes, written into a scratch settings file, parses as JSON and has the five events with those commands; the check is done by hand and noted in the pull request.
