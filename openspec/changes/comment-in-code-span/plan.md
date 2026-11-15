@@ -38,7 +38,7 @@ While implementing Task 1, the implementer checked the markdown cases against co
 
 ## Revision 2 (2026-11-15): HTML blocks
 
-The pre-merge review on the other model found that an opener in backticks inside an HTML block such as a div is reported, though Markdown reads no code span there and a browser reads the opener as a comment, as dkt does; the proposal had left HTML blocks other than a comment out of scope. The span-first reading now follows all seven kinds of CommonMark 0.31.2's HTML blocks, each case checked against commonmark.js; the delta adds the scenario Opener in an HTML block, and Task 1's acceptance items name the cases. No completed task changes; Task 1's code takes the fix. Requested by the reviewer, in the pre-merge review.
+The pre-merge review on the other model found that an opener in backticks inside an HTML block such as a div is reported, though Markdown reads no code span there and a browser reads the opener as a comment, as dkt does; the proposal had left HTML blocks other than a comment out of scope. The span-first reading now follows all seven kinds of CommonMark 0.31.2's HTML blocks, each case checked against commonmark.js; the delta adds the scenario Opener in an HTML block, and Task 1's acceptance items name the cases. No completed task changes; Task 1's code takes the fix. Requested by the reviewer, in the pre-merge review. Its re-review of the fix found that a thematic break or a setext underline also ends a paragraph, so a tag alone on the next line starts a block; that is followed too, with cases after each and one for an equals line with no paragraph before it.
 
 ---
 

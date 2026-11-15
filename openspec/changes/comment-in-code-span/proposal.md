@@ -21,7 +21,7 @@ dkt starts an HTML comment at every comment opener outside fenced code, code spa
 - No change to how dkt reads files: `markdown.BlankComments` keeps finding comments as OpenSpec does, so a file with no finding reads the same as today.
 - No report of an opener outside a code span that is never closed and does not start a line. Markdown reads it as text, but that follows from Markdown's rules for where a comment may start and end, not from code spans; it is a separate idea if wanted.
 - No code span that runs across lines: spans are found within a line, as `markdown.CodeSpans` and the placeholder rule find them. An opener in such a span is not reported, though Markdown reads it as code and dkt hides what follows.
-- No full Markdown parser: to know where code spans are found, the rule follows CommonMark's HTML blocks, whose lines hold none, but tells a paragraph, which some of them cannot interrupt, only by blank lines, headings and fenced code.
+- No full Markdown parser: to know where code spans are found, the rule follows CommonMark's HTML blocks, whose lines hold none, but tells a paragraph, which some of them cannot interrupt, only by blank lines, headings, thematic breaks, setext underlines and fenced code.
 - No other difference between dkt's comments and Markdown's, such as an empty comment written as an opener directly followed by the closing angle bracket, a closer written with an exclamation mark, or a backslash before the opener.
 - No check of `docket/workflow.md`, and no new check in `dkt inspect`, as for `fence-in-comment`.
 
