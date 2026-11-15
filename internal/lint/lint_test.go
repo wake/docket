@@ -556,7 +556,12 @@ func TestDomainUnlisted(t *testing.T) {
 		{"capability outside the named change", files(tree, []string{"invoice", "legacy"}, change("add-x", "invoice", delta)), []string{"add-x"}, nil},
 		{"two named changes", files(tree, []string{"invoice"}, merge(change("add-a", "refund", delta), change("add-b", "refund", delta))), []string{"add-a", "add-b"}, []string{"refund@add-a", "refund@add-b"}},
 		{"change of another schema", files(tree, []string{"invoice"}, other), []string{"legacy-schema"}, []string{"refund@legacy-schema"}},
-		{"removal only", files(tree, []string{"invoice", "refund"}, change("remove-refund", "refund", removal)), []string{"remove-refund"}, []string{"refund@remove-refund"}},
+		// The change retires refund and drops its line from the tree, as the skill says.
+		{"removal only", files(tree, []string{"invoice", "refund"}, change("remove-refund", "refund", removal)), []string{"remove-refund"}, nil},
+		{"removal only, no change named", files(tree, []string{"invoice", "refund"}, change("remove-refund", "refund", removal)), nil, nil},
+		{"removal with an addition", files(tree, []string{"invoice", "refund"}, change("rework-refund", "refund", delta+"\n"+removal)), []string{"rework-refund"}, []string{"refund@rework-refund"}},
+		{"empty delta", files(tree, []string{"invoice"}, change("add-refund", "refund", "# nothing yet\n")), []string{"add-refund"}, []string{"refund@add-refund"}},
+		{"removal and modification in two changes", files(tree, []string{"invoice", "refund"}, merge(change("remove-refund", "refund", removal), change("edit-refund", "refund", delta))), []string{"remove-refund", "edit-refund"}, []string{"refund@edit-refund"}},
 		{"missing change", files(tree, []string{"invoice", "refund"}, nil), []string{"missing"}, nil},
 		{"tree with no items", files("# This project keeps no domain tree.\n", []string{"refund"}, change("add-refund", "refund", delta)), nil, nil},
 		{"tree with no items, named", files("# This project keeps no domain tree.\n", []string{"refund"}, change("add-refund", "refund", delta)), []string{"add-refund"}, nil},

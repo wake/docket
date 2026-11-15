@@ -14,6 +14,7 @@ import (
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/domain"
 	"github.com/wake/docket/internal/openspec"
+	"github.com/wake/docket/internal/specdoc"
 )
 
 // OpenSpec is what lint asks of the OpenSpec CLI; *openspec.Runner satisfies it.
@@ -121,21 +122,38 @@ type listing struct {
 // tree leaves out: every one when named is empty, otherwise one for each named
 // change holding a delta for it. No tree, a tree with no items, and one that
 // stopped on a problem all have no nodes and give none; neither does an
-// unreadable source, which leaves the list incomplete.
-func domainUnlisted(d domain.Loaded, named []string) []Finding {
+// unreadable source, which leaves the list incomplete. A capability that a
+// linted change retires, its delta only removing requirements, gives none for
+// that change, or none at all when named is empty: the change drops its line
+// from the tree.
+func domainUnlisted(d domain.Loaded, named []string, changes []*loaded) []Finding {
 	if len(d.Nodes) == 0 || len(d.Unreadable) > 0 {
 		return nil
+	}
+	retiring := map[string][]string{} // capability -> slugs
+	for _, c := range changes {
+		for name, b := range c.Files {
+			cp, ok := strings.CutPrefix(name, "specs/")
+			if cp, ok = strings.CutSuffix(cp, "/spec.md"); !ok {
+				continue
+			}
+			if dl := specdoc.ParseDelta(b); len(dl.Removed) > 0 && len(dl.Added)+len(dl.Modified)+len(dl.Renamed) == 0 {
+				retiring[cp] = append(retiring[cp], c.Slug)
+			}
+		}
 	}
 	var out []Finding
 	for _, cp := range d.Unlisted() {
 		f := Finding{Rule: "domain-unlisted", File: domain.File,
 			Message: cp + " is not listed in " + domain.File + "; list it under a node there, then run dkt domains to check the tree"}
 		if len(named) == 0 {
-			out = append(out, f)
+			if len(retiring[cp]) == 0 {
+				out = append(out, f)
+			}
 			continue
 		}
 		for _, slug := range d.Capabilities[cp].Changes {
-			if slices.Contains(named, slug) {
+			if slices.Contains(named, slug) && !slices.Contains(retiring[cp], slug) {
 				f.Change = slug
 				out = append(out, f)
 			}
@@ -231,9 +249,9 @@ func Run(in Input) (Report, error) {
 				r.unreadable(u.Source, errors.New(u.Reason))
 			}
 		}
-		rep.Findings = append(rep.Findings, domainUnlisted(d, nil)...)
+		rep.Findings = append(rep.Findings, domainUnlisted(d, nil, changes)...)
 	} else if len(changeNames) > 0 {
-		rep.Findings = append(rep.Findings, domainUnlisted(domain.Load(in.Root), changeNames)...)
+		rep.Findings = append(rep.Findings, domainUnlisted(domain.Load(in.Root), changeNames, changes)...)
 	}
 	for _, p := range in.Added {
 		// Added only holds paths under docs/superpowers/plans or docs/superpowers/specs.
