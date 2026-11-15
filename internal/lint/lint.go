@@ -12,7 +12,6 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/domain"
-	"github.com/wake/docket/internal/markdown"
 	"github.com/wake/docket/internal/openspec"
 )
 
@@ -185,8 +184,9 @@ func Run(in Input) (Report, error) {
 	if len(in.Slugs) == 0 {
 		us, n := walkSpecs(in.Root, func(p string, b []byte) {
 			rep.Findings = append(rep.Findings, specTitleFinding(p, b)...)
-			for _, i := range markdown.FencesInComments(markdown.Lines(b)) {
-				rep.Findings = append(rep.Findings, Finding{Rule: "fence-in-comment", File: p, Line: i + 1, Message: fenceInCommentMessage})
+			for _, f := range fenceFindings(b) {
+				f.File = p
+				rep.Findings = append(rep.Findings, f)
 			}
 		})
 		for _, u := range us {
@@ -325,7 +325,7 @@ func lintChange(r *state, c *loaded) {
 	checkPlaceholders(r, c)
 	for n := range c.Files { // Run sorts the findings
 		if strings.HasSuffix(n, ".md") {
-			checkFenceInComments(r, c, n)
+			checkFences(r, c, n)
 		}
 	}
 	if c.Has(planFile) {

@@ -233,10 +233,19 @@ func checkPlaceholders(r *state, c *loaded) {
 	}
 }
 
-// checkFenceInComments reports each fence marker inside an HTML comment whose code runs past it.
-func checkFenceInComments(r *state, c *loaded, name string) {
-	for _, i := range markdown.FencesInComments(markdown.Lines(c.Files[name])) {
-		r.add(c, "fence-in-comment", name, i+1, fenceInCommentMessage)
+// fenceFindings returns, with no file set, the findings of the fence rules in a Markdown file.
+func fenceFindings(b []byte) []Finding {
+	var out []Finding
+	for _, i := range markdown.FencesInComments(markdown.Lines(b)) {
+		out = append(out, Finding{Rule: "fence-in-comment", Line: i + 1, Message: fenceInCommentMessage})
+	}
+	return out
+}
+
+// checkFences reports the findings of the fence rules in one file of c.
+func checkFences(r *state, c *loaded, name string) {
+	for _, f := range fenceFindings(c.Files[name]) {
+		r.add(c, f.Rule, name, f.Line, "%s", f.Message)
 	}
 }
 
