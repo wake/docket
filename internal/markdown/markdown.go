@@ -204,12 +204,8 @@ func BlankComments(lines []string, mask []bool) []string {
 				continue
 			}
 			end := len(b)
-			j, k := strings.Index(l[p:], "-->"), strings.Index(l[p:], "--!>")
-			switch {
-			case j >= 0 && (k < 0 || j < k):
-				end, open = p+j+3, false
-			case k >= 0:
-				end, open = p+k+4, false
+			if e := closerEnd(l[p:]); e >= 0 {
+				end, open = p+e, false
 			}
 			for q := p; q < end; q++ {
 				b[q] = ' '
@@ -231,28 +227,46 @@ func CodeSpans(line string) [][2]int {
 			i++
 			continue
 		}
-		n := backtickRun(line, i)
-		end := -1
-		for j := i + n; j < len(line); {
-			if line[j] != '`' {
-				j++
-				continue
-			}
-			m := backtickRun(line, j)
-			if m == n {
-				end = j + m
-				break
-			}
-			j += m
-		}
+		end := spanEnd(line, i)
 		if end < 0 {
-			i += n
+			i += backtickRun(line, i)
 			continue
 		}
 		spans = append(spans, [2]int{i, end})
 		i = end
 	}
 	return spans
+}
+
+// spanEnd returns the index just past the code span that the backtick run at
+// i opens, or -1 when no run of the same length follows on the line.
+func spanEnd(line string, i int) int {
+	n := backtickRun(line, i)
+	for j := i + n; j < len(line); {
+		if line[j] != '`' {
+			j++
+			continue
+		}
+		m := backtickRun(line, j)
+		if m == n {
+			return j + m
+		}
+		j += m
+	}
+	return -1
+}
+
+// closerEnd returns the index just past the first comment closer, "-->" or
+// "--!>", in s, or -1 when s holds none.
+func closerEnd(s string) int {
+	j, k := strings.Index(s, "-->"), strings.Index(s, "--!>")
+	switch {
+	case j >= 0 && (k < 0 || j < k):
+		return j + 3
+	case k >= 0:
+		return k + 4
+	}
+	return -1
 }
 
 func backtickRun(s string, i int) int {
@@ -295,16 +309,12 @@ func FencesInComments(lines []string) []int {
 				inComment = true
 				continue
 			}
-			j, k := strings.Index(l[p:], "-->"), strings.Index(l[p:], "--!>")
-			switch {
-			case j >= 0 && (k < 0 || j < k):
-				p += j + 3
-			case k >= 0:
-				p += k + 4
-			default:
+			e := closerEnd(l[p:])
+			if e < 0 {
 				p = len(l)
 				continue
 			}
+			p += e
 			inComment = false
 			if innerOpen {
 				out = append(out, at)
