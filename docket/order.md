@@ -21,5 +21,8 @@
 - docket/ideas/windows-executables.md
 - docket/ideas/windows-test-fakes.md
 - docket/ideas/windows-runtime.md
+- docket/ideas/windows-paths.md
+- docket/ideas/windows-user-folders.md
+- docket/ideas/windows-suite.md
 - docket/ideas/windows-release.md
 - docket/ideas/scenario-test-links.md

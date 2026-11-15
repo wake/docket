@@ -1,6 +1,6 @@
 ---
 title: Release dkt for Windows
-needs: [docket/ideas/windows-runtime.md]
+needs: [docket/ideas/windows-suite.md]
 ---
 
 The last part of shipping dkt for Windows, split off from `windows-executables` on 2026-11-16.
