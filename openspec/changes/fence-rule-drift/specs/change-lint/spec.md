@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Backtick in a backtick fence's info string
-In every Markdown file of a `docket` change, in each record and issue it lints and in each main spec whose title it checks, `dkt lint` SHALL report `fence-info-backtick`, naming the file and line, for each line that dkt reads as the start of fenced code when the line opens with backticks and the text after them holds a backtick. OpenSpec 1.16 and later read such a line as inline code, and OpenSpec 1.14 as the start of fenced code.
+In every Markdown file of a `docket` change, in each record and issue it lints and in each main spec whose title it checks, `dkt lint` SHALL report `fence-info-backtick`, naming the file and line, for each line that opens with three or more backticks, holds another backtick after them, and lies outside fenced code as OpenSpec 1.16 and later read the file. dkt and OpenSpec 1.14 read such a line as fenced code; OpenSpec 1.16 and later do not.
 
 #### Scenario: Inline code at the start of a line
 - **WHEN** plan.md holds a line made of three backticks, `npm test` and three backticks, followed by `### Task 2: Real`
@@ -18,6 +18,14 @@ In every Markdown file of a `docket` change, in each record and issue it lints a
 #### Scenario: Line inside fenced code
 - **WHEN** a code block fenced by lines of three tildes in the design holds a line made of three backticks, `x` and three backticks
 - **THEN** lint reports no `fence-info-backtick`
+
+#### Scenario: Line both rules read inside fenced code
+- **WHEN** the design holds, in order, a line made of three backticks, `a` and a backtick, a line of three backticks, a line made of three backticks, `b` and a backtick, and a line of three backticks
+- **THEN** lint reports `fence-info-backtick` on the first line only
+
+#### Scenario: Line after the two readings swap
+- **WHEN** the design holds, in order, a line made of three backticks, `a` and a backtick, two lines of three backticks, a line made of three backticks, `b` and a backtick, and a line of three backticks
+- **THEN** lint reports `fence-info-backtick` on the first and the fourth line
 
 #### Scenario: Line in a record
 - **WHEN** a record the branch adds holds a line made of three backticks, `make` and three backticks

@@ -12,7 +12,7 @@ Since OpenSpec 1.16.0, a line that starts with three or more backticks and holds
 
 ## What Changes
 
-- `dkt lint` reports `fence-info-backtick`, naming the file and line, for a line that dkt reads as the start of fenced code when the line is a backtick fence whose text after the backticks holds a backtick. It checks the files `fence-in-comment` checks: every Markdown file of a `docket` change, each record and issue it lints, and, when no change is named, each main spec whose title it checks.
+- `dkt lint` reports `fence-info-backtick`, naming the file and line, for a line that starts with three or more backticks, holds another backtick after them, and lies outside fenced code as OpenSpec 1.16 reads the file: dkt and OpenSpec 1.14 read such a line as fenced code, OpenSpec 1.16 and later do not. A file with no such finding is read the same way under both rules. It checks the files `fence-in-comment` checks: every Markdown file of a `docket` change, each record and issue it lints, and, when no change is named, each main spec whose title it checks.
 - A tilde fence whose text holds a backtick is not reported: every version reads it as an opener.
 
 ## Non-Goals
@@ -35,6 +35,6 @@ None.
 
 ## Impact
 
-- `internal/markdown` gains a function that finds, in a file's lines, each line `FenceMask` reads as an opener that OpenSpec 1.16 and later do not.
+- `internal/markdown` gains a function that finds these lines, reading the file with the fence rule of OpenSpec 1.16 next to `FenceMask`.
 - `internal/lint` applies it where it applies `FencesInComments`: the Markdown files of a `docket` change, records, issues and the main specs.
 - Tests in `internal/markdown` and `internal/lint`.
