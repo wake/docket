@@ -4,31 +4,16 @@ kind: prompt
 source: "PR #163 (comment-in-code-span) and PR #165 (init-reuse-workflow)"
 ---
 
-<!-- Keep the title to one line and the rest short; `dkt lint` checks the
-length. The details belong in the code and the pull request. Replace every
-comment with your text. -->
-
 ## What
 
-<!-- What changed, in a few sentences: the files or the behavior touched.
-fix: the behavior restored. refactor: what moved or was restructured.
-test: which behavior the new tests cover. prompt: which text changed, and
-which copies. checks: which checks run differently. -->
+The plan instruction in `shipped/schema/schema.yaml` and its installed copy gain a sentence or two beside four existing rules: a wording-only MODIFIED requirement is still claimed, with an acceptance item that existing tests pass unchanged; a review's fix in a completed task's own code changes that task's acceptance items with a Revision, and Compensates stays for overturning requirements; a Revision says who found the change when a reviewer or the implementer did; a dependency used as it is goes in the task's Interfaces block. `internal/setup/history.go` gains the v0.29.0 hash.
 
 ## Why
 
-<!-- Why it was needed. fix: the symptom and its cause. refactor: what the
-old shape made hard. test: what was not covered. prompt: what agents did
-wrong or could not do. checks: what the old settings missed. -->
+The third and fourth plans written to the instruction met these cases and had to guess.
 
 ## Verification
 
-<!-- How it was checked and the result, by the light review in the docket
-skill's default steps, or the user's own way: the regression test seen failing, then passing; the
-mutation that made a test fail; the mechanical check of the prompt; the
-pull request's own check run. Say what was not verified, too. -->
+`dkt init --force` from this branch reinstalled the copy, which matches `shipped/`; `openspec schema validate docket` passes; `go test ./internal/setup/` passes with the new hash.
 
 ## Review
-
-<!-- Who reviewed the diff (a model, or a person), what the review found,
-and how each finding was handled. -->
