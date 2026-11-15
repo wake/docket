@@ -307,3 +307,59 @@ func TestMainSpecFenceInComment(t *testing.T) {
 		}
 	}
 }
+
+const wantFenceInfoBacktick = "backticks that open a line and hold another backtick: dkt and OpenSpec 1.14 read the line as fenced code, OpenSpec 1.16 and later as inline code; use single backticks or a tilde fence"
+
+func TestFenceInfoBacktick(t *testing.T) {
+	const pfx = "openspec/changes/add-x/"
+	tests := []struct {
+		name  string
+		files map[string]string
+		file  string
+		lines []int
+	}{
+		{"inline code in plan", map[string]string{"proposal.md": goodProposal, "plan.md": "```npm test```\n### Task 2: Real\n"}, "plan.md", []int{1}},
+		{"in proposal", map[string]string{"proposal.md": goodProposal + "\n```a`\n"}, "proposal.md", []int{len(strings.Split(goodProposal, "\n")) + 1}},
+		{"nested file", map[string]string{"proposal.md": goodProposal, "deep/more.md": "x\n```a`\n"}, "deep/more.md", []int{2}},
+		{"plain info in design", map[string]string{"proposal.md": goodProposal, "design.md": "```go\nx\n```\n"}, "", nil},
+		{"tilde info in design", map[string]string{"proposal.md": goodProposal, "design.md": "~~~ a`b\nx\n~~~\n"}, "", nil},
+		{"inside fenced code", map[string]string{"proposal.md": goodProposal, "design.md": "~~~\n```x```\n~~~\n"}, "", nil},
+		{"both read inside code", map[string]string{"proposal.md": goodProposal, "design.md": "```a`\n```\n```b`\n```\n"}, "design.md", []int{1}},
+		{"readings swap", map[string]string{"proposal.md": goodProposal, "design.md": "```a`\n```\n```\n```b`\n```\n"}, "design.md", []int{1, 4}},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rep := lintX(t, tc.files)
+			if got := count(rep, "fence-info-backtick"); got != len(tc.lines) {
+				t.Fatalf("count = %d: %+v", got, rep.Findings)
+			}
+			for _, l := range tc.lines {
+				if !has(rep, "fence-info-backtick", pfx+tc.file, l, wantFenceInfoBacktick) {
+					t.Errorf("no finding on line %d: %+v", l, rep.Findings)
+				}
+			}
+		})
+	}
+	t.Run("other schema", func(t *testing.T) {
+		rep := lintX(t, map[string]string{".openspec.yaml": "schema: spec-driven\n", "proposal.md": goodProposal, "design.md": "```a`\n"})
+		if count(rep, "fence-info-backtick") != 0 {
+			t.Errorf("%+v", rep.Findings)
+		}
+	})
+}
+
+func TestMainSpecFenceInfoBacktick(t *testing.T) {
+	in, _ := repo(t, map[string]string{
+		"openspec/specs/orders/spec.md": "# Orders Specification\n```npm test```\n### Requirement: Persist orders\n",
+	})
+	rep := run(t, in)
+	if !has(rep, "fence-info-backtick", "openspec/specs/orders/spec.md", 2, wantFenceInfoBacktick) || count(rep, "fence-info-backtick") != 1 {
+		t.Errorf("%v", rep.Findings)
+	}
+	fnd, _, _ := SpecTitles(in.Root)
+	for _, f := range fnd {
+		if f.Rule == "fence-info-backtick" {
+			t.Errorf("SpecTitles reported %v", f)
+		}
+	}
+}

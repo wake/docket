@@ -291,3 +291,10 @@ func TestLintRecordFenceInComment(t *testing.T) {
 		t.Errorf("%+v", rep.Findings)
 	}
 }
+
+func TestLintRecordFenceInfoBacktick(t *testing.T) {
+	rep := lintRec(t, recFront+"## What\nw\n\n## Why\ny\n```make```\n\n## Verification\nv\n\n## Review\nr\n")
+	if !has(rep, "fence-info-backtick", recPath, 11, wantFenceInfoBacktick) || count(rep, "fence-info-backtick") != 1 {
+		t.Errorf("%+v", rep.Findings)
+	}
+}

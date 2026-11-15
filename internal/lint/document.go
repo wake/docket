@@ -107,6 +107,8 @@ func checkSections(r *state, c *loaded) {
 	}
 }
 
+const fenceInfoBacktickMessage = "backticks that open a line and hold another backtick: dkt and OpenSpec 1.14 read the line as fenced code, OpenSpec 1.16 and later as inline code; use single backticks or a tilde fence"
+
 const fenceInCommentMessage = "fence marker inside an HTML comment: dkt and OpenSpec read the lines after the comment as code; close the code inside the comment or remove the marker"
 
 // specTitleFinding returns the title finding for the main spec at p, if any.
@@ -233,10 +235,22 @@ func checkPlaceholders(r *state, c *loaded) {
 	}
 }
 
-// checkFenceInComments reports each fence marker inside an HTML comment whose code runs past it.
-func checkFenceInComments(r *state, c *loaded, name string) {
-	for _, i := range markdown.FencesInComments(markdown.Lines(c.Files[name])) {
-		r.add(c, "fence-in-comment", name, i+1, fenceInCommentMessage)
+// fenceFindings returns, with no file set, the findings of the fence rules in a Markdown file.
+func fenceFindings(b []byte) []Finding {
+	var out []Finding
+	for _, i := range markdown.FencesInComments(markdown.Lines(b)) {
+		out = append(out, Finding{Rule: "fence-in-comment", Line: i + 1, Message: fenceInCommentMessage})
+	}
+	for _, i := range markdown.FenceInfoBackticks(markdown.Lines(b)) {
+		out = append(out, Finding{Rule: "fence-info-backtick", Line: i + 1, Message: fenceInfoBacktickMessage})
+	}
+	return out
+}
+
+// checkFences reports the findings of the fence rules in one file of c.
+func checkFences(r *state, c *loaded, name string) {
+	for _, f := range fenceFindings(c.Files[name]) {
+		r.add(c, f.Rule, name, f.Line, "%s", f.Message)
 	}
 }
 
