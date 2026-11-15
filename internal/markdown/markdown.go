@@ -67,12 +67,17 @@ func (f fence) closedBy(line string) bool {
 // block; the fence lines themselves are included. An unclosed fence runs to
 // the end. It follows the fence rule of OpenSpec 1.14.3.
 func FenceMask(lines []string) []bool {
+	return fenceMask(lines, openFence)
+}
+
+// fenceMask is FenceMask with the rule for an opening fence line as a parameter.
+func fenceMask(lines []string, opens func(string) (fence, bool)) []bool {
 	mask := make([]bool, len(lines))
 	var f fence
 	open := false
 	for i, line := range lines {
 		if !open {
-			if f, open = openFence(line); open {
+			if f, open = opens(line); open {
 				mask[i] = true
 			}
 			continue
