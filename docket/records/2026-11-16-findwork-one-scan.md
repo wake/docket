@@ -19,3 +19,5 @@ Each of the two scans was a whole `scan.Scan`, so `dkt status` listed the worktr
 - Mutation: reading records from the changes inventory fails `TestStatusRecordOnAnotherBranch` and four more. Not caught: emptying the refs map, which only the kept fallback reads; `scan.Scan` gives every ref use its commit, so no test reaches it through `FindWork`.
 
 ## Review
+
+The whole diff was reviewed by codex (gpt-5.6-sol, adversarial review): approved, no findings. It found the result, findings and unreadable entries unchanged, the three lists now taken from one snapshot, and no other caller scanning twice.
