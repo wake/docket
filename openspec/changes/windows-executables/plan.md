@@ -81,9 +81,8 @@
 - Create: `internal/lock/lock_test.go`
 - Create: `internal/lock/lock_windows_test.go`
 - Modify: `internal/cli/cmd_new.go`
-- Modify: `internal/cli/cmd_issue.go`
 - Modify: `internal/cli/cmd_new_test.go`
-- Modify: `internal/cli/cmd_issue_test.go`
+- Modify: `internal/cli/cmd_issue_card_fix_test.go`
 
 **Interfaces:**
 - `lock.Dir(root, rel string) (unlock func(), err error)`: blocks until the folder `<root>/<rel>` is free and returns the function that releases it, as `lockDir` does now. `dkt new` locks `openspec`, `dkt issue` with a card locks `.`, as now.
@@ -106,9 +105,9 @@
 
 **Files:**
 - Modify: `internal/setup/setup_test.go`
-- Create: `internal/setup/setup_unix_test.go`
 - Modify: `internal/setup/fix_test.go`
-- Create: `internal/setup/fix_unix_test.go`
+- Create: `internal/setup/sys_unix_test.go`
+- Create: `internal/setup/sys_windows_test.go`
 - Modify: `.github/workflows/ci.yml`
 
 - [ ] `GOOS=windows GOARCH=amd64 go build ./...`, the same with `GOARCH=arm64`, and `GOOS=windows go vet ./...` pass on macOS: the `Umask` helper and the FIFO case of `TestDecideNonRegularIsUnreadable` are in files that build only on systems that have them, and the tests that use them still run on macOS and Linux.
