@@ -254,3 +254,51 @@ func TestLoadLinkedProposal(t *testing.T) {
 		t.Errorf("%+v %+v", got.Unreadable, got.Capabilities["refund"])
 	}
 }
+
+func TestUnlisted(t *testing.T) {
+	specs := fstest.MapFS{
+		"openspec/specs/refund/spec.md":                  spec("Refund"),
+		"openspec/specs/invoice/spec.md":                 spec("Invoice"),
+		"openspec/changes/add-tax/specs/tax/spec.md":     {Data: []byte("x")},
+		"openspec/changes/add-tax/proposal.md":           proposal(""),
+		"openspec/changes/add-zone/specs/a/zone/spec.md": {Data: []byte("x")},
+	}
+	with := func(tree string) fstest.MapFS {
+		m := fstest.MapFS{"docket/domains.md": {Data: []byte(tree)}}
+		for k, v := range specs {
+			m[k] = v
+		}
+		return m
+	}
+	for _, c := range []struct {
+		name string
+		fsys fstest.MapFS
+		want []string
+	}{
+		{"tree with nodes", with("- Billing\n  - `invoice`\n  - Zones\n    - `a/zone`\n"), []string{"refund", "tax"}},
+		{"tree with no items", with("# This project keeps no domain tree.\n"), []string{"a/zone", "invoice", "refund", "tax"}},
+		{"no tree", specs, []string{"a/zone", "invoice", "refund", "tax"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := Load(c.fsys).Unlisted(); !reflect.DeepEqual(got, c.want) {
+				t.Errorf("Unlisted = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestUnlistedWithUnreadableSource(t *testing.T) {
+	got := Load(linkedRoot(t, map[string]string{
+		"docket/domains.md":                  "- Billing\n  - `invoice`\n",
+		"openspec/specs/invoice/spec.md":     "# Invoice Specification\n",
+		"openspec/specs/refund/spec.md":      "# Refund Specification\n",
+		"elsewhere/specs/tax/spec.md":        "x",
+		"openspec/changes/add-x/proposal.md": "---\ntitle: X\n---\n",
+	}, map[string]string{"openspec/changes/add-x/specs": "elsewhere/specs"}))
+	if len(got.Unreadable) == 0 {
+		t.Fatalf("want an unreadable source: %+v", got)
+	}
+	if u := got.Unlisted(); !reflect.DeepEqual(u, []string{"refund"}) {
+		t.Errorf("Unlisted = %v", u)
+	}
+}

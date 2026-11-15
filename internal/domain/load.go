@@ -148,6 +148,30 @@ func Load(root fs.FS) Loaded {
 	return l
 }
 
+// Unlisted returns the paths of the capabilities no node holds, sorted. It
+// holds what was read even when a source was unreadable.
+func (l Loaded) Unlisted() []string {
+	listed := map[string]bool{}
+	var visit func([]*Node)
+	visit = func(ns []*Node) {
+		for _, n := range ns {
+			for _, e := range n.Capabilities {
+				listed[e.Path] = true
+			}
+			visit(n.Children)
+		}
+	}
+	visit(l.Nodes)
+	var out []string
+	for p := range l.Capabilities {
+		if !listed[p] {
+			out = append(out, p)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
 // readTree finds docket/domains.md through the directory listing, so that a
 // link is never read through.
 func readTree(root fs.FS) ([]byte, bool, error) {

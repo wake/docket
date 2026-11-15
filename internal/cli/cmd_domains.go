@@ -2,7 +2,6 @@ package cli
 
 import (
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/wake/docket/internal/domain"
@@ -51,14 +50,12 @@ func runDomains(c *Context, _ []string) (Outcome, error) {
 		return out, nil
 	}
 
-	listed := map[string]bool{}
 	var conv func([]*domain.Node) []domainNode
 	conv = func(ns []*domain.Node) []domainNode {
 		res := []domainNode{}
 		for _, n := range ns {
 			dn := domainNode{Name: n.Name, Capabilities: []domainCapability{}, Children: conv(n.Children)}
 			for _, e := range n.Capabilities {
-				listed[e.Path] = true
 				dn.Capabilities = append(dn.Capabilities, capabilityOf(l.Capabilities[e.Path], e.Path))
 			}
 			res = append(res, dn)
@@ -66,14 +63,7 @@ func runDomains(c *Context, _ []string) (Outcome, error) {
 		return res
 	}
 	res := &domainsResult{Found: l.Found, Nodes: conv(l.Nodes), Unclassified: []domainCapability{}}
-	var paths []string
-	for p := range l.Capabilities {
-		if !listed[p] {
-			paths = append(paths, p)
-		}
-	}
-	sort.Strings(paths)
-	for _, p := range paths {
+	for _, p := range l.Unlisted() {
 		res.Unclassified = append(res.Unclassified, capabilityOf(l.Capabilities[p], p))
 	}
 	out.Result = res
