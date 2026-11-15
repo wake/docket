@@ -6,7 +6,7 @@ Defines what every `dkt` command prints and returns, so that scripts, CI and cod
 ## Requirements
 
 ### Requirement: JSON output
-Every command and `--version` SHALL accept `--json`. With `--json`, standard output SHALL hold exactly one JSON object, on success and on failure alike, and diagnostics SHALL go to standard error; `--help` is the exception, see Help. Without `--json`, output SHALL be human-readable text.
+Every command other than `dkt activity`, and `--version`, SHALL accept `--json`. With `--json`, standard output SHALL hold exactly one JSON object, on success and on failure alike, and diagnostics SHALL go to standard error; `--help` is the exception, see Help. Without `--json`, output SHALL be human-readable text. `dkt activity` prints nothing, with or without `--json`, as `session-activity` says.
 
 #### Scenario: JSON on success
 - **WHEN** a user runs `dkt --version --json`
@@ -15,6 +15,10 @@ Every command and `--version` SHALL accept `--json`. With `--json`, standard out
 #### Scenario: JSON on failure
 - **WHEN** a user runs `dkt nosuch --json`
 - **THEN** standard output parses as a single JSON object whose `ok` is false and whose `findings` hold one with the `rule` `usage`
+
+#### Scenario: Activity with --json
+- **WHEN** a session runs `dkt activity working --json`
+- **THEN** standard output is empty and dkt exits with 0
 
 ### Requirement: Result envelope
 Every JSON result SHALL contain the eight fields `tool` (always `dkt`), `version`, `command`, `repo`, `ok`, `findings`, `unreadable` and `result`, including the result of a usage error. `command` is the name of the command run: `version` for `--version`, and the empty string when no command is recognized. `findings` and `unreadable` are arrays, empty when there is nothing to report. Each finding SHALL carry `rule` and `message`, and `change`, `file` and `line` when they apply.
@@ -73,7 +77,7 @@ When the URL of the `origin` remote has the scheme `http` or `https`, `repo.orig
 - **THEN** both `result.version` and `version` are `dev`
 
 ### Requirement: Exit codes
-Every command SHALL exit with 0 when it succeeded and has nothing to report, 1 when it ran and found problems or refused the request, 2 on a usage error, 3 when it could not read a source it needed, and 4 when its environment is unusable, such as no git repository, `git` missing, or no usable OpenSpec CLI for a command that needs one.
+Every command other than `dkt activity` SHALL exit with 0 when it succeeded and has nothing to report, 1 when it ran and found problems or refused the request, 2 on a usage error, 3 when it could not read a source it needed, and 4 when its environment is unusable, such as no git repository, `git` missing, or no usable OpenSpec CLI for a command that needs one. `dkt activity` always exits with 0, as `session-activity` says.
 
 #### Scenario: Unknown command
 - **WHEN** a user runs `dkt nosuch`
@@ -86,6 +90,10 @@ Every command SHALL exit with 0 when it succeeded and has nothing to report, 1 w
 #### Scenario: Help
 - **WHEN** a user runs `dkt --help`
 - **THEN** the usage is printed to standard output and the command exits with 0
+
+#### Scenario: Activity usage error
+- **WHEN** a session runs `dkt activity`
+- **THEN** dkt exits with 0
 
 ### Requirement: Unreadable sources
 When a command cannot read a source it needs, it SHALL list that source with the reason in `unreadable`, SHALL NOT treat it as empty or missing, and SHALL exit with 3, even when it also has other findings.
@@ -149,8 +157,12 @@ A command that needs a git repository, `dkt init`, `dkt inspect`, `dkt new`, `dk
 - **THEN** standard output is the usage text, not JSON, and dkt exits with 0
 
 ### Requirement: Writes outside the repository
-No command SHALL write outside the repository it runs in, except the project index that `project-index` defines: `dkt projects` edits it, and any other command may add the project it ran in. Where a requirement says that a command writes nothing, it SHALL mean nothing in the repository or its worktrees.
+No command SHALL write outside the repository it runs in, except the project index that `project-index` defines, which `dkt projects` edits and any other command may add the project it ran in to, and the session records that `session-activity` defines, which only `dkt activity` writes. Where a requirement says that a command writes nothing, it SHALL mean nothing in the repository or its worktrees.
 
 #### Scenario: Inspect in a new project
 - **WHEN** a user runs `dkt inspect --json` in a Docket project not in the index
 - **THEN** no file in the repository is written, and the index holds the project
+
+#### Scenario: Snapshot leaves the session records
+- **WHEN** the sessions folder holds a record past the window and a user runs `dkt snapshot`
+- **THEN** every file in the sessions folder is unchanged
