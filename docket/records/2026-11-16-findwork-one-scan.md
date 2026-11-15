@@ -4,31 +4,18 @@ kind: refactor
 source: "docket/issues/2026-11-08-findwork-one-scan.md"
 ---
 
-<!-- Keep the title to one line and the rest short; `dkt lint` checks the
-length. The details belong in the code and the pull request. Replace every
-comment with your text. -->
-
 ## What
 
-<!-- What changed, in a few sentences: the files or the behavior touched.
-fix: the behavior restored. refactor: what moved or was restructured.
-test: which behavior the new tests cover. prompt: which text changed, and
-which copies. checks: which checks run differently. -->
+`idea.FindWork` takes the change and record inventories and the refs from one `scan.Scan(g)`, as `dkt snapshot` does, instead of `scan.Changes`, `scan.Records` and `Git.Refs`. The fallback for a ref use with no commit stays.
 
 ## Why
 
-<!-- Why it was needed. fix: the symptom and its cause. refactor: what the
-old shape made hard. test: what was not covered. prompt: what agents did
-wrong or could not do. checks: what the old settings missed. -->
+Each of the two scans was a whole `scan.Scan`, so `dkt status` listed the worktrees twice, the refs three times and every ref commit twice.
 
 ## Verification
 
-<!-- How it was checked and the result, by the light review in the docket
-skill's default steps, or the user's own way: the regression test seen failing, then passing; the
-mutation that made a test fail; the mechanical check of the prompt; the
-pull request's own check run. Say what was not verified, too. -->
+- Git runs of one `dkt status`, counted by a logging git wrapper first on PATH, in a repository with 4 worktrees and 7 refs (6 distinct commits): 31 before, 22 after (worktree list 2 to 1, ref list 4 to 2, `ls-tree` 12 to 6). Result, findings and unreadable entries the same.
+- The `TestStatus*` tests and `internal/idea` pass before and after.
+- Mutation: reading records from the changes inventory fails `TestStatusRecordOnAnotherBranch` and four more. Not caught: emptying the refs map, which only the kept fallback reads; `scan.Scan` gives every ref use its commit, so no test reaches it through `FindWork`.
 
 ## Review
-
-<!-- Who reviewed the diff (a model, or a person), what the review found,
-and how each finding was handled. -->
