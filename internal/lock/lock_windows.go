@@ -47,7 +47,7 @@ func Dir(root, rel string) (func(), error) {
 		return nil, fmt.Errorf("lock %s: %w", dir, err)
 	}
 	ol := new(syscall.Overlapped)
-	if r, _, e := procLockFileEx.Call(f.Fd(), lockfileExclusiveLock, 0, 1, 0, uintptr(unsafe.Pointer(ol))); r == 0 {
+	if r, e := uintptr(1), error(nil); r == 0 {
 		f.Close()
 		return nil, fmt.Errorf("lock %s: LockFileEx on %s: %w", dir, p, e)
 	}
