@@ -17,11 +17,19 @@ func main() {
 	cli.Version = cli.ResolveVersion(cli.Version, bi)
 	dir, err := os.Getwd()
 	if err != nil {
+		if cli.IsActivity(os.Args[1:]) {
+			os.Exit(0) // a hook call never fails
+		}
 		fmt.Fprintf(os.Stderr, "dkt: %v\n", err)
 		os.Exit(4)
 	}
-	os.Exit(cli.Run(cli.Options{
+	o := cli.Options{
 		Args: os.Args[1:], Dir: dir, Env: os.Environ(),
 		Stdout: os.Stdout, Stderr: os.Stderr,
-	}))
+	}
+	// A terminal is never read: a hook's input is a pipe or a file.
+	if fi, err := os.Stdin.Stat(); err == nil && fi.Mode()&os.ModeCharDevice == 0 {
+		o.Stdin = os.Stdin
+	}
+	os.Exit(cli.Run(o))
 }
