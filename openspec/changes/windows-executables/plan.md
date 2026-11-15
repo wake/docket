@@ -58,15 +58,15 @@
 - `safefile.CreateFlags`: `os.O_WRONLY|os.O_CREATE|os.O_EXCL`, plus `syscall.O_NOFOLLOW` on systems that have it. `InstallIn` and `openNewFile` open with it; Task 2 does not use it.
 - `safefile.ReadNoFollow(p string) ([]byte, error)`: unchanged signature; on Windows a link at `p` fails with a `*fs.PathError` wrapping `syscall.ELOOP`.
 
-- [ ] `GOOS=windows go vet ./internal/safefile/ ./internal/safepath/` passes on macOS; `syscall.O_NOFOLLOW` appears only in files that do not build on Windows. (The whole build for Windows needs Task 2 and is checked in Task 3.)
-- [ ] On every system, opening with `CreateFlags` a name where a symbolic link to a file outside the folder stands fails with an error matching `fs.ErrExist`, and the file outside is unchanged; covered by a test in `safefile_test.go` that runs on macOS, Linux and Windows.
-- [ ] On Windows, `ReadNoFollow` of a symbolic link to a regular file fails with `syscall.ELOOP` and returns no bytes, and of a regular file returns its bytes; the existing `TestReadNoFollow` covers both and passes in the Windows job.
-- [ ] On Windows, `ReadNoFollow` of a junction to a folder fails with `syscall.ELOOP`, and opening with `CreateFlags` at a junction's name fails with an error matching `fs.ErrExist` and leaves the folder it points to unchanged; tests in `safefile_windows_test.go`, with the junction made by `mklink /J`.
-- [ ] On macOS and Linux, a test in `internal/cli` plants a symbolic link at the new record's name after the checks (through the `openNewFile` seam, then calling the real one) and sees `dkt record` fail with the link's target unchanged; the same holds for a new proposal of `dkt new`. Making `CreateFlags` follow links (dropping both `os.O_EXCL` and `syscall.O_NOFOLLOW`, since either alone refuses a link on macOS and Linux) makes it fail. `InstallIn` and `openNewFile` take their flags only from `CreateFlags`.
-- [ ] On Windows, `ReadNoFollow` of a missing file returns an error matching `fs.ErrNotExist`, as on macOS and Linux.
-- [ ] On Windows, `safepath.Check` on a path through a junction (made with `mklink /J`) to a folder inside the root returns a `*safepath.SymlinkError` naming the junction, and `safepath.OpenDir` through it does too; tests in `safepath_windows_test.go`, passing in the Windows job.
-- [ ] Removing the `godebug` line makes the junction tests fail, and making `ReadNoFollow` on Windows skip its link check makes the link test fail, both seen in the throwaway mutation run of the Windows job.
-- [ ] On macOS and Linux, `go test ./...` passes with the existing tests unchanged.
+- [x] `GOOS=windows go vet ./internal/safefile/ ./internal/safepath/` passes on macOS; `syscall.O_NOFOLLOW` appears only in files that do not build on Windows. (The whole build for Windows needs Task 2 and is checked in Task 3.)
+- [x] On every system, opening with `CreateFlags` a name where a symbolic link to a file outside the folder stands fails with an error matching `fs.ErrExist`, and the file outside is unchanged; covered by a test in `safefile_test.go` that runs on macOS, Linux and Windows.
+- [x] On Windows, `ReadNoFollow` of a symbolic link to a regular file fails with `syscall.ELOOP` and returns no bytes, and of a regular file returns its bytes; the existing `TestReadNoFollow` covers both and passes in the Windows job.
+- [x] On Windows, `ReadNoFollow` of a junction to a folder fails with `syscall.ELOOP`, and opening with `CreateFlags` at a junction's name fails with an error matching `fs.ErrExist` and leaves the folder it points to unchanged; tests in `safefile_windows_test.go`, with the junction made by `mklink /J`.
+- [x] On macOS and Linux, a test in `internal/cli` plants a symbolic link at the new record's name after the checks (through the `openNewFile` seam, then calling the real one) and sees `dkt record` fail with the link's target unchanged; the same holds for a new proposal of `dkt new`. Making `CreateFlags` follow links (dropping both `os.O_EXCL` and `syscall.O_NOFOLLOW`, since either alone refuses a link on macOS and Linux) makes it fail. `InstallIn` and `openNewFile` take their flags only from `CreateFlags`.
+- [x] On Windows, `ReadNoFollow` of a missing file returns an error matching `fs.ErrNotExist`, as on macOS and Linux.
+- [x] On Windows, `safepath.Check` on a path through a junction (made with `mklink /J`) to a folder inside the root returns a `*safepath.SymlinkError` naming the junction, and `safepath.OpenDir` through it does too; tests in `safepath_windows_test.go`, passing in the Windows job.
+- [x] Removing the `godebug` line makes the junction tests fail, and making `ReadNoFollow` on Windows skip its link check makes the link test fail, both seen in the throwaway mutation run of the Windows job.
+- [x] On macOS and Linux, `go test ./...` passes with the existing tests unchanged.
 
 ### Task 2: The folder lock on Windows
 
@@ -88,14 +88,14 @@
 - `lock.Dir(root, rel string) (unlock func(), err error)`: blocks until the folder `<root>/<rel>` is free and returns the function that releases it, as `lockDir` does now. `dkt new` locks `openspec`, `dkt issue` with a card locks `.`, as now.
 - On Windows the lock file is `<os.TempDir()>\docket\<volume serial>-<file index>.lock`, the two numbers in lower-case hex, from `GetFileInformationByHandle` on the opened folder.
 
-- [ ] Moving `lockDir` into `internal/lock` is its own commit, with no change in behavior; `TestIssueConcurrent`, `TestIssueCardConcurrent` and `TestRecordConcurrent` and the rest of `go test ./internal/cli/` pass unchanged on macOS and Linux.
-- [ ] A test in `lock_test.go`, run on macOS, Linux and Windows: while one `Dir` on a folder is held, a second `Dir` on the same folder through a different spelling of its path (a trailing separator or a `..` step) does not return; once the first is released, it returns.
-- [ ] A test in `lock_test.go`: `Dir` on two different folders does not wait.
-- [ ] On macOS and Linux, tests in `internal/cli` make the lock fail (the lock function is a package variable tests replace): `dkt new` and `dkt issue` with a card exit with an error naming the failure, and the working tree has no new or changed file.
-- [ ] On Windows, when the temporary folder (through `TMP`) is a regular file, `Dir` returns an error whose message names the `docket` folder it tried to create and the reason, and returns no unlock function; test in `lock_windows_test.go`.
-- [ ] On Windows, a lock file is created empty and is still there after the release; test in `lock_windows_test.go`.
-- [ ] A comment in `lock_windows.go` says why `golang.org/x/sys` is not used, and that users with different temporary folders do not hold each other off.
-- [ ] Making the Windows `Dir` return without calling `LockFileEx` makes the waiting test fail, seen in the throwaway mutation run of the Windows job.
+- [x] Moving `lockDir` into `internal/lock` is its own commit, with no change in behavior; `TestIssueConcurrent`, `TestIssueCardConcurrent` and `TestRecordConcurrent` and the rest of `go test ./internal/cli/` pass unchanged on macOS and Linux.
+- [x] A test in `lock_test.go`, run on macOS, Linux and Windows: while one `Dir` on a folder is held, a second `Dir` on the same folder through a different spelling of its path (a trailing separator or a `..` step) does not return; once the first is released, it returns.
+- [x] A test in `lock_test.go`: `Dir` on two different folders does not wait.
+- [x] On macOS and Linux, tests in `internal/cli` make the lock fail (the lock function is a package variable tests replace): `dkt new` and `dkt issue` with a card exit with an error naming the failure, and the working tree has no new or changed file.
+- [x] On Windows, when the temporary folder (through `TMP`) is a regular file, `Dir` returns an error whose message names the `docket` folder it tried to create and the reason, and returns no unlock function; test in `lock_windows_test.go`.
+- [x] On Windows, a lock file is created empty and is still there after the release; test in `lock_windows_test.go`.
+- [x] A comment in `lock_windows.go` says why `golang.org/x/sys` is not used, and that users with different temporary folders do not hold each other off.
+- [x] Making the Windows `Dir` return without calling `LockFileEx` makes the waiting test fail, seen in the throwaway mutation run of the Windows job.
 
 ### Task 3: Windows CI job
 
@@ -110,7 +110,7 @@
 - Create: `internal/setup/sys_windows_test.go`
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] `GOOS=windows GOARCH=amd64 go build ./...`, the same with `GOARCH=arm64`, and `GOOS=windows go vet ./...` pass on macOS: the `Umask` helper and the FIFO case of `TestDecideNonRegularIsUnreadable` are in files that build only on systems that have them, and the tests that use them still run on macOS and Linux.
-- [ ] The directory case of `TestDecideNonRegularIsUnreadable` stays in `fix_test.go`, built on every system.
-- [ ] `.github/workflows/ci.yml` has a job on `windows-latest` named `windows: build and protections only (dkt is not supported on Windows yet)`, which runs `go build ./...`, `go build ./...` with `GOARCH=arm64`, `go vet ./...`, and `go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/`; it passes on the pull request.
-- [ ] The existing `test`, `openspec` and `release-snapshot` jobs are unchanged and pass.
+- [x] `GOOS=windows GOARCH=amd64 go build ./...`, the same with `GOARCH=arm64`, and `GOOS=windows go vet ./...` pass on macOS: the `Umask` helper and the FIFO case of `TestDecideNonRegularIsUnreadable` are in files that build only on systems that have them, and the tests that use them still run on macOS and Linux.
+- [x] The directory case of `TestDecideNonRegularIsUnreadable` stays in `fix_test.go`, built on every system.
+- [x] `.github/workflows/ci.yml` has a job on `windows-latest` named `windows: build and protections only (dkt is not supported on Windows yet)`, which runs `go build ./...`, `go build ./...` with `GOARCH=arm64`, `go vet ./...`, and `go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/`; it passes on the pull request.
+- [x] The existing `test`, `openspec` and `release-snapshot` jobs are unchanged and pass.
