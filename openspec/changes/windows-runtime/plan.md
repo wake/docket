@@ -32,6 +32,10 @@
 | LF checkouts | — | new | `.gitattributes`; the repository has none |
 | The Windows CI job, the OpenSpec job | .github/workflows/ci.yml | extend | Gain the tests above and a Windows entry |
 
+## Revision 1 (2026-11-16): the batch file's own path, and its callers
+
+The pre-merge review on the other model found that the guard checked only the arguments, while the program's path goes on the same command line, so an `&` in a folder holding `openspec.cmd` could still run a command; and that `dkt init` and `dkt new` reported only a `*FailedError` as `openspec-failed`, leaving an `*UnsafeArgError` a raw error. The reviewer in a fresh context found the second too. The requirement Batch files given only plain arguments now covers the path, with a scenario of its own, and Task 2 gains the acceptance items for both. `dkt conflicts` already records any failed call of one copy as unreadable, as it does a `*FailedError`.
+
 ---
 
 ### Task 1: Finding programs on Windows
@@ -66,7 +70,7 @@
 
 ### Task 2: Plain arguments to a batch file
 
-**Scenarios:** platform-support#change-name-with-a-command-separator, platform-support#plain-arguments-pass
+**Scenarios:** platform-support#change-name-with-a-command-separator, platform-support#program-path-with-a-command-separator, platform-support#plain-arguments-pass
 
 **Review:** judgment
 
@@ -74,12 +78,18 @@
 - Modify: `internal/openspec/runner.go`
 - Create: `internal/openspec/batch_test.go`
 - Modify: `internal/openspec/runner_windows_test.go`
+- Modify: `internal/cli/runner.go`
+- Modify: `internal/cli/runner_test.go`
+- Modify: `internal/cli/cmd_init.go`
+- Modify: `internal/cli/cmd_new.go`
 
 **Interfaces:**
 - `openspec.UnsafeArgError{Program, Arg string}`: its message names the argument, says that `cmd.exe` would read it, and says that a `.bat` or `.cmd` OpenSpec takes only letters, digits and `-_.,/@+=:`.
 
 - [x] `batch_test.go`, on every system, through the check taking whether the system is Windows: each of `& | < > ^ % ! ( ) " '`, a space and a non-ASCII letter in an argument is refused for a `.cmd` and a `.BAT` program on Windows; `add-x`, `identity/user-auth`, `claude,codex`, `@fission-ai/openspec@1.14.0`, `--deltas-only` pass; nothing is refused for an `.exe` program, nor on other systems.
 - [x] On Windows, a `Runner` whose program is a `.cmd` fake returns an `*UnsafeArgError` for `show add-x&calc`, and the fake's log shows it was not started (`runner_windows_test.go`).
+- [x] `batch_test.go`: a `.cmd` or `.bat` program whose path holds `&`, `%`, `|` or `^` is refused, naming the path; `C:\Program Files\nodejs\npx.cmd`, `C:\Program Files (x86)\npm\openspec.cmd` and a path with an 8.3 `~` pass.
+- [x] `dkt init` and `dkt new` report an `*UnsafeArgError` as `openspec-failed`, through `openSpecFailed`, which `runner_test.go` in `internal/cli` covers for a wrapped `*FailedError` and `*UnsafeArgError` against `*UnavailableError` and a plain error.
 - [x] Removing the check makes `batch_test.go` and the Windows test fail.
 - [x] `TestRealOpenSpec` and `TestRealOpenSpecConflicts` still pass on Windows through `npx.cmd` (Task 4's job).
 

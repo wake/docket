@@ -26,11 +26,15 @@ On Windows, wherever dkt looks for a program, git, OpenSpec or the program `DOCK
 - **THEN** dkt runs `openspec.cmd`
 
 ### Requirement: Batch files given only plain arguments
-On Windows, `cmd.exe` reads the arguments of a `.bat` or `.cmd` file itself, so characters such as `&`, `|` or `%` in them can run other commands. When the program dkt runs for OpenSpec is such a file, dkt SHALL NOT start it with an argument holding anything but ASCII letters, digits and `-_.,/@+=:`; the call SHALL fail with a message naming the argument and the reason, as a failed OpenSpec call.
+On Windows, `cmd.exe` reads the command line of a `.bat` or `.cmd` file itself, so `&`, `|`, `%` and the like in it can run other commands. When OpenSpec is such a file, dkt SHALL NOT start it with an argument holding anything but ASCII letters, digits and `-_.,/@+=:`, nor when its path holds anything else but `\`, spaces, `(`, `)` and `~`; the call SHALL fail with a message naming the word and the reason, and be reported as a failed OpenSpec call.
 
 #### Scenario: Change name with a command separator
 - **WHEN** on Windows, OpenSpec is `openspec.cmd`, a change folder is named `add-x&calc`, and a user runs `dkt lint`
 - **THEN** dkt does not start OpenSpec for that change, and reports `openspec-failed` naming `add-x&calc`
+
+#### Scenario: Program path with a command separator
+- **WHEN** on Windows, `DOCKET_OPENSPEC` names `C:\tools\a&b\openspec.cmd` and a user runs `dkt init`
+- **THEN** dkt does not start it, and reports `openspec-failed` naming that path
 
 #### Scenario: Plain arguments pass
 - **WHEN** on Windows, `DOCKET_OPENSPEC` is `npx -y @fission-ai/openspec@1.14.0`, found as `npx.cmd`, and a user runs `dkt new add-x --kind feature --source x --title X`
