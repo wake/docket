@@ -19,8 +19,8 @@ type WorkflowState struct {
 	Missing []string
 }
 
-// templateVersion reads the positive integer in the front matter's template field, 0 when there is none.
-func templateVersion(b []byte) int {
+// TemplateVersion reads the positive integer in the front matter's template field, 0 when there is none.
+func TemplateVersion(b []byte) int {
 	fm, ok, err := change.ReadFrontMatter(b)
 	if !ok || err != nil {
 		return 0
@@ -51,7 +51,7 @@ func decideWorkflow(d Decision, got, want []byte, shipped int) Decision {
 		d.Status, d.Action = StatusMissing, ActionCreate
 		return d
 	}
-	st := WorkflowState{Version: templateVersion(got), Shipped: shipped}
+	st := WorkflowState{Version: TemplateVersion(got), Shipped: shipped}
 	if st.Version == shipped {
 		have := headingTexts(got, 0)
 		for _, h := range headingTexts(want, 3) {

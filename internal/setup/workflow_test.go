@@ -24,7 +24,7 @@ func template(t *testing.T) string {
 // version is the shipped template's version.
 func version(t *testing.T) int {
 	t.Helper()
-	n := templateVersion([]byte(template(t)))
+	n := TemplateVersion([]byte(template(t)))
 	if n == 0 {
 		t.Fatal("the shipped template has no version")
 	}
