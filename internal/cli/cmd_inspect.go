@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/lint"
 	"github.com/wake/docket/internal/openspec"
+	"github.com/wake/docket/internal/projects"
 	"github.com/wake/docket/internal/setup"
 )
 
@@ -18,6 +20,13 @@ type inspectResult struct {
 	DefaultBranch *string         `json:"default_branch"`
 	OpenSpec      inspectOpenSpec `json:"openspec"`
 	Files         []inspectFile   `json:"files"`
+	UserWorkflow  *userWorkflow   `json:"user_workflow"` // null when no home is known
+}
+
+type userWorkflow struct {
+	Path    string `json:"path"`
+	Exists  bool   `json:"exists"`
+	Version int    `json:"version"`
 }
 
 type inspectOpenSpec struct {
@@ -63,6 +72,42 @@ func workflowFindings(d setup.Decision) []Finding {
 		fs = append(fs, Finding{Rule: "workflow-section-missing", File: workflowFile, Message: fmt.Sprintf("%s has no %q section; the template has it", workflowFile, h)})
 	}
 	return fs
+}
+
+// inspectUserWorkflow reads the user template; with no home there is none to report.
+func inspectUserWorkflow(c *Context, out *Outcome) (*userWorkflow, error) {
+	p, err := projects.UserWorkflowPath(c.Env)
+	if errors.Is(err, projects.ErrNoHome) {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	u := &userWorkflow{Path: p}
+	b, err := os.ReadFile(p) // follows a link: the file is the user's own
+	if errors.Is(err, fs.ErrNotExist) {
+		return u, nil
+	}
+	if err != nil {
+		out.Unreadable = append(out.Unreadable, Unreadable{Source: p, Reason: err.Error()})
+		return u, nil
+	}
+	u.Exists, u.Version = true, setup.TemplateVersion(b)
+	tpl, err := fs.ReadFile(shippedFS(), "workflow/workflow.md")
+	if err != nil {
+		return nil, err
+	}
+	shipped := setup.TemplateVersion(tpl)
+	switch {
+	case u.Version == 0 || u.Version > shipped:
+		rule := "user-workflow-template-unknown"
+		if u.Version > shipped {
+			rule = "user-workflow-newer"
+		}
+		out.Findings = append(out.Findings, Finding{Rule: rule, File: p, Message: fmt.Sprintf("%s has no template version this release knows; it ships template %d", p, shipped)})
+	case u.Version < shipped:
+		out.Findings = append(out.Findings, Finding{Rule: "user-workflow-outdated", File: p, Message: fmt.Sprintf("%s follows template %d; this release ships template %d: run docket-doctor to bring in the changes", p, u.Version, shipped)})
+	}
+	return u, nil
 }
 
 // decisionFindings reports what dkt init would do with one decided file.
@@ -214,6 +259,9 @@ func inspectCommand() Command {
 			out.Findings, out.Unreadable = append(out.Findings, f...), append(out.Unreadable, u...)
 			f, u = ignoredFindings(c, paths)
 			out.Findings, out.Unreadable = append(out.Findings, f...), append(out.Unreadable, u...)
+			if res.UserWorkflow, err = inspectUserWorkflow(c, &out); err != nil {
+				return Outcome{}, err
+			}
 			if err := c.inspectDefaultBranch(&res, &out); err != nil {
 				return Outcome{}, err
 			}
