@@ -108,6 +108,18 @@ func TestDomainsNoTree(t *testing.T) {
 	}
 }
 
+func TestDomainsDeclinedTree(t *testing.T) {
+	r := dmRepo(t, map[string]string{
+		"docket/domains.md":             "# This project keeps no domain tree.\n",
+		"openspec/specs/refund/spec.md": dmSpec("Refund"),
+	})
+	code, m, raw := dmRun(t, r, r.Dir, true)
+	if code != 0 || m.Result == nil || !m.Result.Found || len(m.Result.Nodes) != 0 || len(m.Findings) != 0 ||
+		!slices.Equal(capPaths(m.Result.Unclassified), []string{"refund"}) {
+		t.Errorf("%d %s", code, raw)
+	}
+}
+
 func TestDomainsFormat(t *testing.T) {
 	r := dmRepo(t, map[string]string{"docket/domains.md": "- A\nUsers\n"})
 	code, m, raw := dmRun(t, r, r.Dir, true)

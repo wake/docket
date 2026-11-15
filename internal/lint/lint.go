@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -116,6 +117,33 @@ type listing struct {
 	unreadable bool
 }
 
+// domainUnlisted returns a domain-unlisted finding for each capability the
+// tree leaves out: every one when named is empty, otherwise one for each named
+// change holding a delta for it. No tree, a tree with no items, and one that
+// stopped on a problem all have no nodes and give none; neither does an
+// unreadable source, which leaves the list incomplete.
+func domainUnlisted(d domain.Loaded, named []string) []Finding {
+	if len(d.Nodes) == 0 || len(d.Unreadable) > 0 {
+		return nil
+	}
+	var out []Finding
+	for _, cp := range d.Unlisted() {
+		f := Finding{Rule: "domain-unlisted", File: domain.File,
+			Message: cp + " is not listed in " + domain.File + "; list it under a node there, then run dkt domains to check the tree"}
+		if len(named) == 0 {
+			out = append(out, f)
+			continue
+		}
+		for _, slug := range d.Capabilities[cp].Changes {
+			if slices.Contains(named, slug) {
+				f.Change = slug
+				out = append(out, f)
+			}
+		}
+	}
+	return out
+}
+
 func (r *state) add(c *loaded, rule, file string, line int, format string, args ...any) {
 	f := Finding{Rule: rule, Change: c.Slug, Line: line, Message: fmt.Sprintf(format, args...)}
 	if file != "" {
@@ -203,6 +231,9 @@ func Run(in Input) (Report, error) {
 				r.unreadable(u.Source, errors.New(u.Reason))
 			}
 		}
+		rep.Findings = append(rep.Findings, domainUnlisted(d, nil)...)
+	} else if len(changeNames) > 0 {
+		rep.Findings = append(rep.Findings, domainUnlisted(domain.Load(in.Root), changeNames)...)
 	}
 	for _, p := range in.Added {
 		// Added only holds paths under docs/superpowers/plans or docs/superpowers/specs.

@@ -124,6 +124,18 @@ func TestSnapshotDomains(t *testing.T) {
 	}
 }
 
+func TestSnapshotDeclinedTree(t *testing.T) {
+	r := testutil.NewRepo(t)
+	r.Commit("init", map[string]string{
+		"docket/domains.md":              "# This project keeps no domain tree.\n",
+		"openspec/specs/booking/spec.md": "# booking Specification\n",
+	})
+	res, rules, _ := collect(t, r)
+	if !res.Domains.Found || len(res.Domains.Nodes) != 0 || strings.Join(res.Domains.Unclassified, ",") != "booking" || len(rules) != 0 {
+		t.Fatalf("%+v %v", res.Domains, rules)
+	}
+}
+
 func TestSnapshotDomainProblems(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("init", map[string]string{
