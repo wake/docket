@@ -510,10 +510,14 @@ func unlisted(t *testing.T, rep Report) []string {
 func TestDomainUnlisted(t *testing.T) {
 	const tree = "- Billing\n  - `invoice`\n"
 	mainSpec := func(cp string) (string, string) {
-		return "openspec/specs/" + cp + "/spec.md", "# " + cp + " Specification\n"
+		// The extra spaces in the name match the removal's "Old rule" as OpenSpec matches names.
+		return "openspec/specs/" + cp + "/spec.md", "# " + cp + " Specification\n\n## Requirements\n\n### Requirement: Old  rule\nThe system SHALL x.\n"
 	}
+	// refund keeps a second requirement, so removing Old rule alone does not retire it.
+	twoReqs := map[string]string{"openspec/specs/refund/spec.md": "# refund Specification\n\n## Requirements\n\n### Requirement: Old rule\nx\n\n### Requirement: Y\ny\n"}
+	noReqs := map[string]string{"openspec/specs/refund/spec.md": "# refund Specification\n"}
 	delta := "## ADDED Requirements\n\n### Requirement: X\nThe system SHALL x.\n\n#### Scenario: Y\n- **WHEN** a\n- **THEN** b\n"
-	removal := "## REMOVED Requirements\n\n### Requirement: X\n**Reason**: r\n**Migration**: m\n"
+	removal := "## REMOVED Requirements\n\n### Requirement: Old rule\n**Reason**: r\n**Migration**: m\n"
 	files := func(tr string, specs []string, changes map[string]string) map[string]string {
 		m := map[string]string{}
 		if tr != "" {
@@ -559,6 +563,11 @@ func TestDomainUnlisted(t *testing.T) {
 		// The change retires refund and drops its line from the tree, as the skill says.
 		{"removal only", files(tree, []string{"invoice", "refund"}, change("remove-refund", "refund", removal)), []string{"remove-refund"}, nil},
 		{"removal only, no change named", files(tree, []string{"invoice", "refund"}, change("remove-refund", "refund", removal)), nil, nil},
+		{"partial removal", files(tree, []string{"invoice"}, merge(twoReqs, change("remove-x", "refund", removal))), []string{"remove-x"}, []string{"refund@remove-x"}},
+		{"partial removal, no change named", files(tree, []string{"invoice"}, merge(twoReqs, change("remove-x", "refund", removal))), nil, []string{"refund@"}},
+		{"removal from a main spec with no requirements", files(tree, []string{"invoice"}, merge(noReqs, change("remove-refund", "refund", removal))), []string{"remove-refund"}, []string{"refund@remove-refund"}},
+		{"removal with no main spec", files(tree, []string{"invoice"}, change("remove-refund", "refund", removal)), []string{"remove-refund"}, []string{"refund@remove-refund"}},
+		{"removal in a change of another schema", files(tree, []string{"invoice", "refund"}, merge(change("drop-refund", "refund", removal), map[string]string{"openspec/changes/drop-refund/.openspec.yaml": "schema: spec-driven\n"})), []string{"drop-refund"}, nil},
 		{"removal with an addition", files(tree, []string{"invoice", "refund"}, change("rework-refund", "refund", delta+"\n"+removal)), []string{"rework-refund"}, []string{"refund@rework-refund"}},
 		{"empty delta", files(tree, []string{"invoice"}, change("add-refund", "refund", "# nothing yet\n")), []string{"add-refund"}, []string{"refund@add-refund"}},
 		{"removal and modification in two changes", files(tree, []string{"invoice", "refund"}, merge(change("remove-refund", "refund", removal), change("edit-refund", "refund", delta))), []string{"remove-refund", "edit-refund"}, []string{"refund@edit-refund"}},
