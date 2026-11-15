@@ -483,3 +483,177 @@ func TestDomainTreeSkippedForNamedChange(t *testing.T) {
 		}
 	}
 }
+
+func unlistedMessage(cp string) string {
+	return cp + " is not listed in docket/domains.md; list it under a node there, then run dkt domains to check the tree"
+}
+
+// unlisted returns the domain-unlisted findings as "capability@change", sorted,
+// checking each one's file, line and message.
+func unlisted(t *testing.T, rep Report) []string {
+	t.Helper()
+	var out []string
+	for _, f := range rep.Findings {
+		if f.Rule != "domain-unlisted" {
+			continue
+		}
+		cp := strings.SplitN(f.Message, " ", 2)[0]
+		if f.File != domainFile || f.Line != 0 || f.Message != unlistedMessage(cp) {
+			t.Errorf("finding %+v", f)
+		}
+		out = append(out, cp+"@"+f.Change)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func TestDomainUnlisted(t *testing.T) {
+	const tree = "- Billing\n  - `invoice`\n"
+	mainSpec := func(cp string) (string, string) {
+		// The extra spaces in the name match the removal's "Old rule" as OpenSpec matches names.
+		return "openspec/specs/" + cp + "/spec.md", "# " + cp + " Specification\n\n## Requirements\n\n### Requirement: Old  rule\nThe system SHALL x.\n"
+	}
+	// refund keeps a second requirement, so removing Old rule alone does not retire it.
+	twoReqs := map[string]string{"openspec/specs/refund/spec.md": "# refund Specification\n\n## Requirements\n\n### Requirement: Old rule\nx\n\n### Requirement: Y\ny\n"}
+	noReqs := map[string]string{"openspec/specs/refund/spec.md": "# refund Specification\n"}
+	delta := "## ADDED Requirements\n\n### Requirement: X\nThe system SHALL x.\n\n#### Scenario: Y\n- **WHEN** a\n- **THEN** b\n"
+	removal := "## REMOVED Requirements\n\n### Requirement: Old rule\n**Reason**: r\n**Migration**: m\n"
+	files := func(tr string, specs []string, changes map[string]string) map[string]string {
+		m := map[string]string{}
+		if tr != "" {
+			m[domainFile] = tr
+		}
+		for _, cp := range specs {
+			p, c := mainSpec(cp)
+			m[p] = c
+		}
+		for k, v := range changes {
+			m[k] = v
+		}
+		return m
+	}
+	change := func(slug, cp, body string) map[string]string {
+		return map[string]string{
+			"openspec/changes/" + slug + "/proposal.md":              goodProposal,
+			"openspec/changes/" + slug + "/specs/" + cp + "/spec.md": body,
+		}
+	}
+	merge := func(ms ...map[string]string) map[string]string {
+		out := map[string]string{}
+		for _, m := range ms {
+			for k, v := range m {
+				out[k] = v
+			}
+		}
+		return out
+	}
+	other := merge(change("legacy-schema", "refund", delta), map[string]string{"openspec/changes/legacy-schema/.openspec.yaml": "schema: spec-driven\n"})
+	for _, tc := range []struct {
+		name  string
+		files map[string]string
+		slugs []string
+		want  []string
+	}{
+		{"main spec and delta, no change named", files(tree, []string{"invoice", "refund"}, change("add-tax", "tax", delta)), nil, []string{"refund@", "tax@"}},
+		{"no changes folder", files(tree, []string{"invoice", "refund"}, nil), nil, []string{"refund@"}},
+		{"new capability in a named change", files(tree, []string{"invoice", "legacy"}, change("add-refund", "refund", delta)), []string{"add-refund"}, []string{"refund@add-refund"}},
+		{"capability outside the named change", files(tree, []string{"invoice", "legacy"}, change("add-x", "invoice", delta)), []string{"add-x"}, nil},
+		{"two named changes", files(tree, []string{"invoice"}, merge(change("add-a", "refund", delta), change("add-b", "refund", delta))), []string{"add-a", "add-b"}, []string{"refund@add-a", "refund@add-b"}},
+		{"change of another schema", files(tree, []string{"invoice"}, other), []string{"legacy-schema"}, []string{"refund@legacy-schema"}},
+		// The change retires refund and drops its line from the tree, as the skill says.
+		{"removal only", files(tree, []string{"invoice", "refund"}, change("remove-refund", "refund", removal)), []string{"remove-refund"}, nil},
+		{"removal only, no change named", files(tree, []string{"invoice", "refund"}, change("remove-refund", "refund", removal)), nil, nil},
+		{"partial removal", files(tree, []string{"invoice"}, merge(twoReqs, change("remove-x", "refund", removal))), []string{"remove-x"}, []string{"refund@remove-x"}},
+		{"partial removal, no change named", files(tree, []string{"invoice"}, merge(twoReqs, change("remove-x", "refund", removal))), nil, []string{"refund@"}},
+		{"removal from a main spec with no requirements", files(tree, []string{"invoice"}, merge(noReqs, change("remove-refund", "refund", removal))), []string{"remove-refund"}, []string{"refund@remove-refund"}},
+		{"removal with no main spec", files(tree, []string{"invoice"}, change("remove-refund", "refund", removal)), []string{"remove-refund"}, []string{"refund@remove-refund"}},
+		{"removal in a change of another schema", files(tree, []string{"invoice", "refund"}, merge(change("drop-refund", "refund", removal), map[string]string{"openspec/changes/drop-refund/.openspec.yaml": "schema: spec-driven\n"})), []string{"drop-refund"}, nil},
+		{"removal with an addition", files(tree, []string{"invoice", "refund"}, change("rework-refund", "refund", delta+"\n"+removal)), []string{"rework-refund"}, []string{"refund@rework-refund"}},
+		{"empty delta", files(tree, []string{"invoice"}, change("add-refund", "refund", "# nothing yet\n")), []string{"add-refund"}, []string{"refund@add-refund"}},
+		{"removal and modification in two changes", files(tree, []string{"invoice", "refund"}, merge(change("remove-refund", "refund", removal), change("edit-refund", "refund", delta))), []string{"remove-refund", "edit-refund"}, []string{"refund@edit-refund"}},
+		{"missing change", files(tree, []string{"invoice", "refund"}, nil), []string{"missing"}, nil},
+		{"tree with no items", files("# This project keeps no domain tree.\n", []string{"refund"}, change("add-refund", "refund", delta)), nil, nil},
+		{"tree with no items, named", files("# This project keeps no domain tree.\n", []string{"refund"}, change("add-refund", "refund", delta)), []string{"add-refund"}, nil},
+		{"format problem", files("Users\n", []string{"refund"}, change("add-refund", "refund", delta)), nil, nil},
+		{"format problem, named", files("Users\n", []string{"refund"}, change("add-refund", "refund", delta)), []string{"add-refund"}, nil},
+		{"duplicate", files("- A\n  - `invoice`\n- B\n  - `invoice`\n", []string{"invoice", "refund"}, nil), nil, nil},
+		{"no tree", files("", []string{"refund"}, nil), nil, nil},
+		{"record named only", files(tree, []string{"invoice", "refund"}, nil), []string{"2026-11-01-x"}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in, _ := repo(t, tc.files)
+			in.Slugs = tc.slugs
+			rep := run(t, in)
+			if got := unlisted(t, rep); !slices.Equal(got, tc.want) {
+				t.Errorf("domain-unlisted = %v, want %v: %+v", got, tc.want, rep.Findings)
+			}
+			if tc.name == "missing change" && count(rep, "change-missing") != 1 {
+				t.Errorf("%+v", rep.Findings)
+			}
+		})
+	}
+}
+
+func TestDomainUnlistedWithUnknown(t *testing.T) {
+	in, _ := repo(t, map[string]string{
+		domainFile:                                         "- A\n  - `gone`\n",
+		"openspec/specs/refund/spec.md":                    "# refund Specification\n",
+		"openspec/changes/add-refund/proposal.md":          goodProposal,
+		"openspec/changes/add-refund/specs/refund/spec.md": "## ADDED Requirements\n\n### Requirement: X\nThe system SHALL x.\n\n#### Scenario: Y\n- **WHEN** a\n- **THEN** b\n",
+	})
+	rep := run(t, in)
+	if got := unlisted(t, rep); !slices.Equal(got, []string{"refund@"}) || !has(rep, "domain-unknown", domainFile, 2, "") {
+		t.Errorf("%v %+v", got, rep.Findings)
+	}
+	in.Slugs = []string{"add-refund"}
+	rep = run(t, in)
+	if got := unlisted(t, rep); !slices.Equal(got, []string{"refund@add-refund"}) || count(rep, "domain-unknown") != 0 {
+		t.Errorf("%v %+v", got, rep.Findings)
+	}
+}
+
+func TestDomainUnlistedWithLinks(t *testing.T) {
+	for _, c := range []struct {
+		name, link, target string
+	}{
+		{"change specs folder", "openspec/changes/add-refund/specs", "elsewhere/specs"},
+		{"changes folder", "openspec/changes", "elsewhere/changes"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for p, body := range map[string]string{
+				domainFile:                                 "- Billing\n  - `invoice`\n",
+				"openspec/specs/invoice/spec.md":           "# invoice Specification\n",
+				"openspec/specs/legacy/spec.md":            "# legacy Specification\n",
+				"elsewhere/specs/refund/spec.md":           "x",
+				"elsewhere/changes/add-refund/proposal.md": goodProposal,
+				"openspec/changes/add-refund/proposal.md":  goodProposal,
+			} {
+				if strings.HasPrefix(p, "openspec/changes/") && c.link == "openspec/changes" {
+					continue
+				}
+				full := filepath.Join(dir, p)
+				mkdirs(t, dir, filepath.Dir(p))
+				if err := os.WriteFile(full, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			mkdirs(t, dir, filepath.Dir(c.link))
+			rel, err := filepath.Rel(filepath.Dir(c.link), c.target)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(rel, filepath.Join(dir, c.link)); err != nil {
+				t.Fatal(err)
+			}
+			for _, slugs := range [][]string{nil, {"add-refund"}} {
+				in, _ := open(t, dir)
+				in.Slugs = slugs
+				rep := run(t, in)
+				if got := unlisted(t, rep); len(got) != 0 {
+					t.Errorf("slugs %v: domain-unlisted = %v", slugs, got)
+				}
+			}
+		})
+	}
+}

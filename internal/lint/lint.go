@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/domain"
 	"github.com/wake/docket/internal/openspec"
+	"github.com/wake/docket/internal/specdoc"
 )
 
 // OpenSpec is what lint asks of the OpenSpec CLI; *openspec.Runner satisfies it.
@@ -116,6 +118,73 @@ type listing struct {
 	unreadable bool
 }
 
+// domainUnlisted returns a domain-unlisted finding for each capability the
+// tree leaves out: every one when named is empty, otherwise one for each named
+// change holding a delta for it. No tree, a tree with no items, and one that
+// stopped on a problem all have no nodes and give none; neither does an
+// unreadable source, which leaves the list incomplete. A capability that a
+// linted change retires gives none for that change, or none at all when named
+// is empty: the change drops its line from the tree.
+func domainUnlisted(root fs.FS, d domain.Loaded, named []string, changes []*loaded) []Finding {
+	if len(d.Nodes) == 0 || len(d.Unreadable) > 0 {
+		return nil
+	}
+	retiring := map[string][]string{} // capability -> slugs
+	for _, c := range changes {
+		for name, b := range c.Files {
+			cp, inSpecs := strings.CutPrefix(name, "specs/")
+			cp, isSpec := strings.CutSuffix(cp, "/spec.md")
+			if inSpecs && isSpec && retires(root, cp, b) {
+				retiring[cp] = append(retiring[cp], c.Slug)
+			}
+		}
+	}
+	var out []Finding
+	for _, cp := range d.Unlisted() {
+		f := Finding{Rule: "domain-unlisted", File: domain.File,
+			Message: cp + " is not listed in " + domain.File + "; list it under a node there, then run dkt domains to check the tree"}
+		if len(named) == 0 {
+			if len(retiring[cp]) == 0 {
+				out = append(out, f)
+			}
+			continue
+		}
+		for _, slug := range d.Capabilities[cp].Changes {
+			if slices.Contains(named, slug) && !slices.Contains(retiring[cp], slug) {
+				f.Change = slug
+				out = append(out, f)
+			}
+		}
+	}
+	return out
+}
+
+// retires reports whether delta removes the capability cp whole: it only
+// removes requirements, and among them every requirement of the main spec.
+// Names compare with runs of space folded, as OpenSpec matches them.
+func retires(root fs.FS, cp string, delta []byte) bool {
+	dl := specdoc.ParseDelta(delta)
+	if len(dl.Added)+len(dl.Modified)+len(dl.Renamed) > 0 {
+		return false
+	}
+	main, err := fs.ReadFile(root, specsDir+"/"+cp+"/spec.md")
+	if err != nil {
+		return false
+	}
+	fold := func(s string) string { return strings.Join(strings.Fields(s), " ") }
+	removed := map[string]bool{}
+	for _, r := range dl.Removed {
+		removed[fold(r.Name)] = true
+	}
+	reqs := specdoc.Requirements(main)
+	for _, n := range reqs {
+		if !removed[fold(n)] {
+			return false
+		}
+	}
+	return len(reqs) > 0
+}
+
 func (r *state) add(c *loaded, rule, file string, line int, format string, args ...any) {
 	f := Finding{Rule: rule, Change: c.Slug, Line: line, Message: fmt.Sprintf(format, args...)}
 	if file != "" {
@@ -203,6 +272,9 @@ func Run(in Input) (Report, error) {
 				r.unreadable(u.Source, errors.New(u.Reason))
 			}
 		}
+		rep.Findings = append(rep.Findings, domainUnlisted(in.Root, d, nil, changes)...)
+	} else if len(changeNames) > 0 {
+		rep.Findings = append(rep.Findings, domainUnlisted(in.Root, domain.Load(in.Root), changeNames, changes)...)
 	}
 	for _, p := range in.Added {
 		// Added only holds paths under docs/superpowers/plans or docs/superpowers/specs.

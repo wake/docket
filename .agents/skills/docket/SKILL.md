@@ -133,7 +133,8 @@ issue.
 ## Domain tree
 
 When the project has `docket/domains.md`, read `domain-tree.md` in this
-skill's folder before editing it.
+skill's folder before editing it. Step 2 of "Full review" says when to
+suggest starting one.
 
 ## Full review
 
@@ -159,10 +160,14 @@ skill's folder before editing it.
      template and rules.
    - Give each new capability a name under `specs:` in the front matter of
      `proposal.md`.
-   - When the project has `docket/domains.md`, run `dkt domains --json` to see
-     the tree, and in the same change list each new capability under a node
-     that fits; when a capability's path changes or it is removed, update or
-     delete its line.
+   - When the project's `docket/domains.md` lists any item, run
+     `dkt domains --json` to see the tree, and in the same change list each
+     new capability under a node that fits; when a capability's path changes
+     or it is removed, update or delete its line.
+   - When the project has no `docket/domains.md` and already had ten or more
+     main specs before this change, and this change adds a capability, read
+     `domain-tree.md` in this skill's folder and suggest starting the tree as
+     it says.
 3. superpowers:writing-plans writes the plan to
    `openspec/changes/<slug>/plan.md`, not `docs/superpowers/plans/`,
    following the template and rules from
