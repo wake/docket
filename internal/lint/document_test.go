@@ -386,6 +386,7 @@ func TestCommentInCodeSpan(t *testing.T) {
 		{"proposal, later line", map[string]string{"proposal.md": goodProposal + "\nA `" + op + "` b\nc\n-->\n"}, "proposal.md", nProp + 1, wantSpanCommentTo(nProp + 3)},
 		{"design, same line", map[string]string{"proposal.md": goodProposal, "design.md": "x\n`" + op + "` and `-->`\n"}, "design.md", 2, wantSpanCommentTo(2)},
 		{"comment holding a span", map[string]string{"proposal.md": goodProposal, "design.md": op + " `x` -->\n"}, "", 0, ""},
+		{"html block", map[string]string{"proposal.md": goodProposal, "design.md": "<div>\n`" + op + "` x -->\n</div>\n"}, "", 0, ""},
 		{"comment starting a line", map[string]string{"proposal.md": goodProposal, "design.md": op + " a --> `" + op + "` b -->\n"}, "", 0, ""},
 		{"backticks inside comments", map[string]string{"proposal.md": goodProposal, "design.md": op + " ` --> " + op + " ` -->\n"}, "", 0, ""},
 		{"escaped backtick", map[string]string{"proposal.md": goodProposal, "design.md": "\\`" + op + " a -->`\n"}, "", 0, ""},

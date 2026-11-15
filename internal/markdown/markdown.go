@@ -340,14 +340,15 @@ type SpanComment struct {
 func CommentsInCodeSpans(lines []string) []SpanComment {
 	mask := FenceMask(lines)
 	var out []SpanComment
-	dkt, ref, block := false, false, false // inside a comment, in dkt's reading and in the span-first one; ref's comment started a line
-	pending := -1                          // the finding whose comment dkt's reading has open
+	dkt := false // inside a comment, in dkt's reading
+	var ref spanFirst
+	pending := -1 // the finding whose comment dkt's reading has open
 	for i, l := range lines {
 		if mask[i] {
+			ref.para = false
 			continue
 		}
-		var spans [][2]int
-		spans, ref, block = spanFirst(l, ref, block)
+		spans := ref.read(l)
 		for p := 0; p < len(l); {
 			if !dkt {
 				k := strings.Index(l[p:], "<!--")
@@ -375,29 +376,46 @@ func CommentsInCodeSpans(lines []string) []SpanComment {
 	return out
 }
 
-// spanFirst reads one line finding code spans before comments, starting inside
-// a comment when open is set. A comment that starts a line, after at most
-// three spaces, is an HTML block in Markdown, and the line where it ends holds
-// no code span; block carries that across lines. It returns the line's spans
-// and the state at its end.
-func spanFirst(l string, open, block bool) ([][2]int, bool, bool) {
+// spanFirst is a reading that finds each line's code spans before its
+// comments, as Markdown does, carried from line to line. Outside a span, a
+// backslash before a backtick or a backslash escapes it. The lines of an HTML
+// block hold no code span; comments there open and close as in dkt's reading.
+type spanFirst struct {
+	open  bool // inside a comment
+	block bool // that comment started a line: an HTML block of CommonMark's type 2
+	html  int  // the type, 1 or 3 to 7, of the HTML block the reading is in, or 0
+	para  bool // the previous line continues a paragraph, which type 7 cannot interrupt
+}
+
+// read reads one line and returns its code spans.
+func (r *spanFirst) read(l string) [][2]int {
+	if r.html >= 6 && Trim(l) == "" {
+		r.html = 0
+	}
+	if r.html == 0 && !r.open {
+		r.html = htmlBlockStart(l, r.para)
+	}
+	raw := r.html != 0 // the rest of the line belongs to an HTML block
+	if r.html != 0 && r.html < 6 && htmlBlockEnd[r.html].MatchString(l) {
+		r.html = 0 // after this line
+	}
+	r.para = !raw && Trim(l) != "" && !atxHeading.MatchString(l)
 	var spans [][2]int
-	raw := false // the rest of the line belongs to an HTML block
 	for p := 0; p < len(l); {
 		switch {
-		case open:
+		case r.open:
 			e := closerEnd(l[p:])
 			if e < 0 {
-				return spans, true, block
+				return spans
 			}
-			open, p = false, p+e
-			raw, block = raw || block, false
+			r.open, p = false, p+e
+			raw, r.block = raw || r.block, false
 		case raw:
 			if !strings.HasPrefix(l[p:], "<!--") {
 				p++
 				continue
 			}
-			open, p = true, p+4
+			r.open, p = true, p+4
 		case l[p] == '\\' && p+1 < len(l) && (l[p+1] == '`' || l[p+1] == '\\'):
 			p += 2
 		case l[p] == '`':
@@ -408,13 +426,66 @@ func spanFirst(l string, open, block bool) ([][2]int, bool, bool) {
 				p += backtickRun(l, p)
 			}
 		case strings.HasPrefix(l[p:], "<!--"):
-			block = p <= 3 && strings.Trim(l[:p], " ") == ""
-			open, p = true, p+4
+			r.block = p <= 3 && strings.Trim(l[:p], " ") == ""
+			r.open, p = true, p+4
 		default:
 			p++
 		}
 	}
-	return spans, open, block
+	return spans
+}
+
+// The start and end conditions of CommonMark 0.31.2's HTML blocks, except
+// type 2, the comment, which spanFirst follows as it reads comments.
+var (
+	htmlStart1   = regexp.MustCompile(`(?i)^ {0,3}<(?:script|pre|style|textarea)(?:[ \t>]|$)`)
+	htmlStart3   = regexp.MustCompile(`^ {0,3}<\?`)
+	htmlStart4   = regexp.MustCompile(`^ {0,3}<![A-Za-z]`)
+	htmlStart5   = regexp.MustCompile(`^ {0,3}<!\[CDATA\[`)
+	htmlStart6   = regexp.MustCompile(`(?i)^ {0,3}</?([A-Za-z][A-Za-z0-9-]*)(?:[ \t>]|/>|$)`)
+	htmlStart7   = regexp.MustCompile(`^ {0,3}(?:<[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t]*=[ \t]*(?:[^ \t"'=<>` + "`" + `]+|'[^']*'|"[^"]*"))?)*[ \t]*/?>|</[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$`)
+	htmlBlockEnd = map[int]*regexp.Regexp{
+		1: regexp.MustCompile(`(?i)</(?:script|pre|style|textarea)>`),
+		3: regexp.MustCompile(`\?>`),
+		4: regexp.MustCompile(`>`),
+		5: regexp.MustCompile(`\]\]>`),
+	}
+	atxHeading = regexp.MustCompile(`^ {0,3}#{1,6}(?:[ \t]|$)`)
+)
+
+// htmlBlockTags are the tag names that start an HTML block of type 6.
+var htmlBlockTags = map[string]bool{}
+
+func init() {
+	for _, t := range strings.Fields(`address article aside base basefont blockquote body caption center
+		col colgroup dd details dialog dir div dl dt fieldset figcaption figure footer form frame
+		frameset h1 h2 h3 h4 h5 h6 head header hr html iframe legend li link main menu menuitem
+		nav noframes ol optgroup option p param search section summary table tbody td tfoot th
+		thead title tr track ul`) {
+		htmlBlockTags[t] = true
+	}
+}
+
+// htmlBlockStart returns the type of the HTML block a line starts, or 0. A
+// block of type 7 cannot interrupt a paragraph, so para rules it out.
+func htmlBlockStart(l string, para bool) int {
+	switch {
+	case htmlStart1.MatchString(l):
+		return 1
+	case htmlStart3.MatchString(l):
+		return 3
+	case htmlStart5.MatchString(l):
+		return 5
+	case htmlStart4.MatchString(l):
+		return 4
+	}
+	if m := htmlStart6.FindStringSubmatch(l); m != nil && htmlBlockTags[strings.ToLower(m[1])] {
+		return 6
+	}
+	if !para && htmlStart7.MatchString(l) {
+		return 7
+	}
+	return 0
 }
 
 // inSpan reports whether byte p lies inside one of spans.
