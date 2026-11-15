@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wake/docket/internal/activity"
+	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/testutil"
 )
 
@@ -119,6 +120,12 @@ func TestActivityLinkedWorktreeInsideMain(t *testing.T) {
 	if act(res, "inner-work") != "working" || act(res, "main-work") != "null" {
 		t.Fatalf("%s %s", act(res, "inner-work"), act(res, "main-work"))
 	}
+	// a record in the main checkout, outside .claude/worktrees, counts for the main worktree only
+	report(t, env, time.Minute, "b", "waiting", r.Dir)
+	res, _, _ = collect(t, r, env...)
+	if act(res, "inner-work") != "working" || act(res, "main-work") != "waiting" {
+		t.Fatalf("%s %s", act(res, "inner-work"), act(res, "main-work"))
+	}
 }
 
 func TestActivityThroughLinks(t *testing.T) {
@@ -140,14 +147,61 @@ func TestActivityThroughLinks(t *testing.T) {
 
 func TestActivityPrunableWorktree(t *testing.T) {
 	r, wt, env := actRepo(t)
-	if err := os.RemoveAll(wt); err != nil {
+	// the folder keeps its files, but its link to the repository is gone
+	if err := os.Remove(filepath.Join(wt, ".git")); err != nil {
 		t.Fatal(err)
 	}
-	os.MkdirAll(wt, 0o755)
+	wts, err := gitx.Git{Dir: r.Dir, Env: r.Env}.Worktrees()
+	if err != nil {
+		t.Fatal(err)
+	}
+	prunable := false
+	for _, w := range wts {
+		prunable = prunable || (w.Prunable && resolve(w.Path) == wt)
+	}
+	if !prunable {
+		t.Fatalf("git does not report the worktree as prunable: %+v", wts)
+	}
 	report(t, env, time.Minute, "a", "working", wt)
 	res, _, _ := collect(t, r, env...)
-	if a := act(res, "add-x"); a != "null" && a != "missing" {
+	if hasWork(res, "add-x") == nil {
+		t.Fatal("the work vanished from the snapshot")
+	}
+	if a := act(res, "add-x"); a != "null" {
 		t.Fatalf("%s", a)
+	}
+}
+
+func TestActivityBareRepository(t *testing.T) {
+	src := testutil.NewRepo(t)
+	src.Commit("base", map[string]string{"openspec/changes/merged-x/proposal.md": proposal})
+	bare := filepath.Join(t.TempDir(), "bare.git")
+	src.Git("clone", "-q", "--bare", src.Dir, bare)
+	r := &testutil.Repo{T: t, Dir: bare, Env: src.Env}
+	wt := resolve(t.TempDir()) + "/wt"
+	r.Git("worktree", "add", "-q", "--detach", wt)
+	writeIn(t, wt, "openspec/changes/add-x/proposal.md", proposal)
+	r.Git("-C", wt, "add", "-A")
+	r.Git("-C", wt, "commit", "-q", "-m", "add x")
+	env := []string{"XDG_STATE_HOME=" + t.TempDir()}
+	report(t, env, time.Minute, "a", "working", resolve(bare))
+	res, _, _ := collect(t, r, env...)
+	if act(res, "add-x") != "null" {
+		t.Fatalf("a record in the bare repository: %s", act(res, "add-x"))
+	}
+	report(t, env, time.Minute, "b", "waiting", wt)
+	res, _, _ = collect(t, r, env...)
+	if act(res, "add-x") != "waiting" {
+		t.Fatalf("a record in the linked worktree: %s", act(res, "add-x"))
+	}
+}
+
+func TestActivityPathBoundary(t *testing.T) {
+	r, wt, env := actRepo(t)
+	report(t, env, time.Minute, "a", "working", wt+"2")
+	res, _, _ := collect(t, r, env...)
+	if act(res, "add-x") != "null" {
+		t.Fatalf("a sibling sharing the prefix: %s", act(res, "add-x"))
 	}
 }
 
@@ -157,6 +211,9 @@ func TestActivityUnlistableFolder(t *testing.T) {
 	dir := filepath.Join(env[0][len("XDG_STATE_HOME="):], "docket", "sessions")
 	os.Chmod(dir, 0)
 	defer os.Chmod(dir, 0o700)
+	if _, err := os.ReadDir(dir); err == nil {
+		t.Skip("a mode-0 folder is still listable (running as root)")
+	}
 	res, _, un := collect(t, r, env...)
 	if act(res, "add-x") != "null" || !contains(un, dir) {
 		t.Fatalf("%s %v", act(res, "add-x"), un)
