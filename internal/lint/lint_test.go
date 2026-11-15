@@ -564,6 +564,7 @@ func TestDomainUnlisted(t *testing.T) {
 		{"format problem, named", files("Users\n", []string{"refund"}, change("add-refund", "refund", delta)), []string{"add-refund"}, nil},
 		{"duplicate", files("- A\n  - `invoice`\n- B\n  - `invoice`\n", []string{"invoice", "refund"}, nil), nil, nil},
 		{"no tree", files("", []string{"refund"}, nil), nil, nil},
+		{"record named only", files(tree, []string{"invoice", "refund"}, nil), []string{"2026-11-01-x"}, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			in, _ := repo(t, tc.files)
