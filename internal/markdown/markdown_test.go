@@ -238,6 +238,10 @@ func TestCommentsInCodeSpans(t *testing.T) {
 		{"declaration ends on its line", []string{"<!DOCTYPE html>", "`" + op + "`"}, []SpanComment{{1, -1}}},
 		{"declaration over two lines", []string{"<!DOCTYPE", "`" + op + "` --> >", "`" + op + "`"}, []SpanComment{{2, -1}}},
 		{"div inside a comment", []string{op, "<div>", "-->", "`" + op + "`"}, []SpanComment{{3, -1}}},
+		{"tag after a setext dash line", []string{"para", "---", "<span>", "`" + op + "` x"}, nil},
+		{"tag after a setext equals line", []string{"para", "===", "<span>", "`" + op + "` x"}, nil},
+		{"tag after a thematic break", []string{"para", "***", "<span>", "`" + op + "` x"}, nil},
+		{"equals line with no paragraph", []string{"===", "<span>", "`" + op + "` x"}, []SpanComment{{2, -1}}},
 		{"tag after a fence", []string{"para", b3, "x", b3, "<span>", "`" + op + "` x"}, nil},
 		{"four spaces do not start a block", []string{"para", "    " + op + " a --> `" + op + "` b"}, []SpanComment{{1, -1}}},
 		// The comment opened after the block's comment ends carries over, as in dkt's reading.

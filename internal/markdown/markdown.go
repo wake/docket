@@ -399,7 +399,9 @@ func (r *spanFirst) read(l string) [][2]int {
 	if r.html != 0 && r.html < 6 && htmlBlockEnd[r.html].MatchString(l) {
 		r.html = 0 // after this line
 	}
-	r.para = !raw && Trim(l) != "" && !atxHeading.MatchString(l)
+	// A heading, a thematic break or a setext underline ends a paragraph.
+	r.para = !raw && Trim(l) != "" && !atxHeading.MatchString(l) &&
+		!thematicBreak.MatchString(l) && !(r.para && setextLine.MatchString(l))
 	var spans [][2]int
 	for p := 0; p < len(l); {
 		switch {
@@ -450,7 +452,9 @@ var (
 		4: regexp.MustCompile(`>`),
 		5: regexp.MustCompile(`\]\]>`),
 	}
-	atxHeading = regexp.MustCompile(`^ {0,3}#{1,6}(?:[ \t]|$)`)
+	atxHeading    = regexp.MustCompile(`^ {0,3}#{1,6}(?:[ \t]|$)`)
+	thematicBreak = regexp.MustCompile(`^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$`)
+	setextLine    = regexp.MustCompile(`^ {0,3}(?:=+|-+)[ \t]*$`)
 )
 
 // htmlBlockTags are the tag names that start an HTML block of type 6.
