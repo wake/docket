@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/wake/docket/internal/execpath"
 )
 
 var (
@@ -43,22 +45,19 @@ type Git struct {
 // entries are resolved against Dir, where git will run, and the result is
 // always absolute.
 func (g Git) lookPath() (string, error) {
-	var path string
-	for _, kv := range g.Env {
-		if v, ok := strings.CutPrefix(kv, "PATH="); ok {
-			path = v
-		}
-	}
+	path, _ := execpath.Getenv(g.Env, "PATH")
 	for _, d := range filepath.SplitList(path) {
 		if !filepath.IsAbs(d) {
 			d = filepath.Join(g.Dir, d)
 		}
-		p, err := filepath.Abs(filepath.Join(d, "git"))
-		if err != nil {
-			continue
-		}
-		if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o111 != 0 {
-			return p, nil
+		for _, name := range execpath.Names("git", g.Env) {
+			p, err := filepath.Abs(filepath.Join(d, name))
+			if err != nil {
+				continue
+			}
+			if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() && execpath.MayRun(fi) {
+				return p, nil
+			}
 		}
 	}
 	return "", ErrGitMissing

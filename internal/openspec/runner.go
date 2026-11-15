@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/wake/docket/internal/execpath"
 )
 
 // Minimum is the oldest OpenSpec version Docket works with; there is no upper bound.
@@ -72,13 +74,7 @@ func (e *FailedError) Error() string {
 
 // envValue returns the last value of key in env (the one a child would see).
 func envValue(env []string, key string) (string, bool) {
-	val, found := "", false
-	for _, kv := range env {
-		if k, v, ok := strings.Cut(kv, "="); ok && k == key {
-			val, found = v, true
-		}
-	}
-	return val, found
+	return execpath.Getenv(env, key)
 }
 
 // New builds a Runner for dir. The command comes from DOCKET_OPENSPEC in env
@@ -109,17 +105,23 @@ func resolve(prog, dir string, env []string) (string, bool) {
 		}
 		return p
 	}
-	if strings.Contains(prog, "/") {
-		p := abs(prog)
-		return p, isExecutable(p)
+	if strings.ContainsRune(prog, '/') || strings.ContainsRune(prog, filepath.Separator) {
+		for _, name := range execpath.Names(prog, env) {
+			if p := abs(name); isExecutable(p) {
+				return p, true
+			}
+		}
+		return abs(prog), false
 	}
 	path, _ := envValue(env, "PATH")
 	for _, d := range filepath.SplitList(path) {
 		if !filepath.IsAbs(d) { // like exec.LookPath: never run a program found in the repository
 			continue
 		}
-		if p := abs(filepath.Join(d, prog)); isExecutable(p) {
-			return p, true
+		for _, name := range execpath.Names(prog, env) {
+			if p := abs(filepath.Join(d, name)); isExecutable(p) {
+				return p, true
+			}
 		}
 	}
 	return "", false
@@ -127,7 +129,7 @@ func resolve(prog, dir string, env []string) (string, bool) {
 
 func isExecutable(p string) bool {
 	st, err := os.Stat(p)
-	return err == nil && !st.IsDir() && st.Mode()&0o111 != 0
+	return err == nil && !st.IsDir() && execpath.MayRun(st)
 }
 
 func (r *Runner) exec(args ...string) (string, error) {
