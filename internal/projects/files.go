@@ -44,6 +44,11 @@ func IndexPath(env []string) (string, error) {
 	return xdgFile(env, "XDG_STATE_HOME", ".local/state", "projects.json")
 }
 
+// SessionsDir is the folder of per-session activity records, beside the index.
+func SessionsDir(env []string) (string, error) {
+	return xdgFile(env, "XDG_STATE_HOME", ".local/state", "sessions")
+}
+
 // SettingsPath is the settings file under the config home.
 func SettingsPath(env []string) (string, error) {
 	return xdgFile(env, "XDG_CONFIG_HOME", ".config", "config.json")
