@@ -56,11 +56,11 @@
 **Interfaces:**
 - Produces: `projects.UserWorkflowPath(env []string) (string, error)`, returning `projects.ErrNoHome` as `SettingsPath` does; `setup.TemplateVersion(b []byte) int`, the former `templateVersion`.
 
-- [ ] `UserWorkflowPath` gives `/c/docket/workflow.md` for `XDG_CONFIG_HOME=/c`, and `$HOME/.config/docket/workflow.md` when that variable is unset or relative.
-- [ ] `dkt inspect --json` with `XDG_CONFIG_HOME=/c` reports `result.user_workflow.path` `/c/docket/workflow.md`; with a user template of template 3 it reports `exists` true and `version` 3 and no finding about it.
-- [ ] A user template of template 2 gives `user-workflow-outdated`, one of a version above the shipped one gives `user-workflow-newer`, one with no front matter gives `user-workflow-template-unknown`, each naming the path, and dkt exits with 1.
-- [ ] With no user template, `exists` is false, `version` is 0 and no finding is about it; with neither `XDG_CONFIG_HOME` nor `HOME`, `result.user_workflow` is null, there is no finding about it, and inspect still reports the rest.
-- [ ] A user template that cannot be read is listed in `unreadable`, `result.user_workflow` still holds its path, and dkt exits with 3; a symbolic link to a readable file is followed.
+- [x] `UserWorkflowPath` gives `/c/docket/workflow.md` for `XDG_CONFIG_HOME=/c`, and `$HOME/.config/docket/workflow.md` when that variable is unset or relative.
+- [x] `dkt inspect --json` with `XDG_CONFIG_HOME=/c` reports `result.user_workflow.path` `/c/docket/workflow.md`; with a user template of template 3 it reports `exists` true and `version` 3 and no finding about it.
+- [x] A user template of template 2 gives `user-workflow-outdated`, one of a version above the shipped one gives `user-workflow-newer`, one with no front matter gives `user-workflow-template-unknown`, each naming the path, and dkt exits with 1.
+- [x] With no user template, `exists` is false, `version` is 0 and no finding is about it; with neither `XDG_CONFIG_HOME` nor `HOME`, `result.user_workflow` is null, there is no finding about it, and inspect still reports the rest.
+- [x] A user template that cannot be read is listed in `unreadable`, `result.user_workflow` still holds its path, and dkt exits with 3; a symbolic link to a readable file is followed.
 
 ### Task 2: dkt workflow refs lists the references
 
@@ -80,14 +80,14 @@
 - Consumes: `projects.UserWorkflowPath`, `setup.TemplateVersion` (Task 1); `projects.Load` for the index; `projects.ProjectPath`, which maps a worktree to its project's main checkout, to leave out the repository the command runs in.
 - Produces: `setup.Section{Heading, Text string}` and `setup.Sections(b []byte) []setup.Section`, level-three sections in file order with their normalized text, the first of a repeated heading only.
 
-- [ ] `Sections` gives each level-three section's text normalized as Global Constraints say; a heading inside fenced code or an HTML comment is not a section; a repeated heading gives only its first section.
-- [ ] With two projects sharing a "Plan review" text and a third differing, "Plan review" has two variants with those project paths; texts differing only by CRLF, trailing whitespace or blank lines at the ends are one variant, and a variant equal to the template's text has `same_as_template` true.
-- [ ] An ignored project, a missing one, one without `docket/workflow.md`, and the repository the command runs in, reached from its main checkout or a worktree, are not sources; the user template is a source with kind `user` when it exists.
-- [ ] A source on template 2 with a section the shipped template lacks and without "Reviewers" has template 2, that heading in `left_out`, "Reviewers" in `missing`, and contributes no variant from the extra section; a source with no front matter has template 0 and is still compared.
-- [ ] An unreadable source is listed in `unreadable` while the other sources are listed, and dkt exits with 3; an index that cannot be read is listed in `unreadable` too; a project's `docket/workflow.md` that links out of the project is not read, is in no variant, and is listed in `unreadable`.
-- [ ] `dkt workflow refs --json` outside a repository gives one result envelope with `repo` null, empty arrays rather than null in `findings`, `unreadable`, `sources`, `sections` and each `variants`, and exits with 0; it writes nothing in any project.
-- [ ] `dkt workflow nosuch` and `dkt workflow` with no subcommand are usage errors with exit 2, and with `--json` give the `usage` finding; without `--json`, `dkt workflow refs` prints per section its heading and each variant's sources.
-- [ ] `dkt projects ls` reports missing projects exactly as before, through `missingProject`.
+- [x] `Sections` gives each level-three section's text normalized as Global Constraints say; a heading inside fenced code or an HTML comment is not a section; a repeated heading gives only its first section.
+- [x] With two projects sharing a "Plan review" text and a third differing, "Plan review" has two variants with those project paths; texts differing only by CRLF, trailing whitespace or blank lines at the ends are one variant, and a variant equal to the template's text has `same_as_template` true.
+- [x] An ignored project, a missing one, one without `docket/workflow.md`, and the repository the command runs in, reached from its main checkout or a worktree, are not sources; the user template is a source with kind `user` when it exists.
+- [x] A source on template 2 with a section the shipped template lacks and without "Reviewers" has template 2, that heading in `left_out`, "Reviewers" in `missing`, and contributes no variant from the extra section; a source with no front matter has template 0 and is still compared.
+- [x] An unreadable source is listed in `unreadable` while the other sources are listed, and dkt exits with 3; an index that cannot be read is listed in `unreadable` too; a project's `docket/workflow.md` that links out of the project is not read, is in no variant, and is listed in `unreadable`.
+- [x] `dkt workflow refs --json` outside a repository gives one result envelope with `repo` null, empty arrays rather than null in `findings`, `unreadable`, `sources`, `sections` and each `variants`, and exits with 0; it writes nothing in any project.
+- [x] `dkt workflow nosuch` and `dkt workflow` with no subcommand are usage errors with exit 2, and with `--json` give the `usage` finding; without `--json`, `dkt workflow refs` prints per section its heading and each variant's sources.
+- [x] `dkt projects ls` reports missing projects exactly as before, through `missingProject`.
 
 ### Task 3: docket-init and docket-doctor use the user template
 
@@ -99,8 +99,8 @@
 - Modify: `skills/docket-init/SKILL.md`
 - Modify: `skills/docket-doctor/SKILL.md`
 
-- [ ] docket-init's step for a created `docket/workflow.md` follows the idea's settled setup steps 1 to 5 without the mode question: same version, asks to use the user template and copies it; older, offers the upgrade first and otherwise uses it as one more reference; newer, asks for a newer dkt; none, reads the other projects' ways through `dkt workflow refs` only once the user agrees, offers them section by section with the projects that use each, then offers to save the result as the user template at the path `dkt inspect` reports, pointing out first what belongs only to this project.
-- [ ] In that step, Docket's template stays the starting point with every step and heading kept, the user's instructions and habits in context are still integrated as today, and the user template and the other projects are references beside them.
-- [ ] When `docket/workflow.md` existed before `dkt init`, the step still leaves it unchanged and points to docket-doctor for adjustments.
-- [ ] docket-doctor handles `user-workflow-outdated` as it handles `workflow-outdated`, on the user template and only once the user agrees, asks for a newer dkt on `user-workflow-newer`, and asks the user about `user-workflow-template-unknown`; the three go through its existing order: listed with the other problems, fixed one at a time with the user's agreement, then `dkt inspect` again.
-- [ ] Every rule and command the two skills name exists in `internal/cli` (`dkt workflow refs`, the three finding rules).
+- [x] docket-init's step for a created `docket/workflow.md` follows the idea's settled setup steps 1 to 5 without the mode question: same version, asks to use the user template and copies it; older, offers the upgrade first and otherwise uses it as one more reference; newer, asks for a newer dkt; none, reads the other projects' ways through `dkt workflow refs` only once the user agrees, offers them section by section with the projects that use each, then offers to save the result as the user template at the path `dkt inspect` reports, pointing out first what belongs only to this project.
+- [x] In that step, Docket's template stays the starting point with every step and heading kept, the user's instructions and habits in context are still integrated as today, and the user template and the other projects are references beside them.
+- [x] When `docket/workflow.md` existed before `dkt init`, the step still leaves it unchanged and points to docket-doctor for adjustments.
+- [x] docket-doctor handles `user-workflow-outdated` as it handles `workflow-outdated`, on the user template and only once the user agrees, asks for a newer dkt on `user-workflow-newer`, and asks the user about `user-workflow-template-unknown`; the three go through its existing order: listed with the other problems, fixed one at a time with the user's agreement, then `dkt inspect` again.
+- [x] Every rule and command the two skills name exists in `internal/cli` (`dkt workflow refs`, the three finding rules).
