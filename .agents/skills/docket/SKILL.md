@@ -164,9 +164,10 @@ suggest starting one.
      `dkt domains --json` to see the tree, and in the same change list each
      new capability under a node that fits; when a capability's path changes
      or it is removed, update or delete its line.
-   - When the project has no `docket/domains.md` and already has ten or more
-     main specs, and this change adds a capability, read `domain-tree.md` in
-     this skill's folder and suggest starting the tree as it says.
+   - When the project has no `docket/domains.md` and already had ten or more
+     main specs before this change, and this change adds a capability, read
+     `domain-tree.md` in this skill's folder and suggest starting the tree as
+     it says.
 3. superpowers:writing-plans writes the plan to
    `openspec/changes/<slug>/plan.md`, not `docs/superpowers/plans/`,
    following the template and rules from

@@ -17,8 +17,8 @@ their area themselves, so editing this file touches no spec.
 
 ## Starting the tree
 
-When the project has no `docket/domains.md` and ten or more main specs, and a
-change adds a capability:
+When the project has no `docket/domains.md` and had ten or more main specs
+before a change, and the change adds a capability:
 
 - Run `dkt domains --json` and draft a first tree from the capabilities it
   lists: nodes named for areas the user will recognize, each capability under
@@ -26,8 +26,10 @@ change adds a capability:
 - Only once the user agrees, write `docket/domains.md` in the same change, and
   run `dkt domains` and fix what it reports.
 - When the user does not want a tree, ask whether to record that. If they
-  agree, write a `docket/domains.md` with one comment line and no items, such
-  as `# This project keeps no domain tree.`. A file with no items records that
-  the project keeps no tree: the tree is not suggested again, and `dkt lint`
-  reports no capability as left out. If it is not recorded, the tree is
-  suggested again when a later change adds a capability.
+  agree, write, in the same change, a `docket/domains.md` with one comment
+  line and no items, such as `# This project keeps no domain tree.`. A file
+  with no items records that the project keeps no tree: the tree is not
+  suggested again, and `dkt lint` reports no capability as left out; deleting
+  the file, or adding a first node, brings the tree back. If it is not
+  recorded, the tree is suggested again when a later change adds a
+  capability.
