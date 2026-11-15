@@ -266,7 +266,7 @@ func TestDecideSymlinkOneProblemPerLink(t *testing.T) {
 	if len(ps) != 1 || ps[0].Kind != ProblemSymlink || ps[0].Path != "openspec/schemas/docket" {
 		t.Fatalf("%+v", ps)
 	}
-	if len(ds) != 4 {
+	if len(ds) != 2+2*len(skillFiles(t)) {
 		t.Errorf("config, skill and workflow targets should remain: %d", len(ds))
 	}
 	entries, _ := os.ReadDir(other)
