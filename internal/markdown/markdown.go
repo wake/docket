@@ -204,12 +204,8 @@ func BlankComments(lines []string, mask []bool) []string {
 				continue
 			}
 			end := len(b)
-			j, k := strings.Index(l[p:], "-->"), strings.Index(l[p:], "--!>")
-			switch {
-			case j >= 0 && (k < 0 || j < k):
-				end, open = p+j+3, false
-			case k >= 0:
-				end, open = p+k+4, false
+			if e := closerEnd(l[p:]); e >= 0 {
+				end, open = p+e, false
 			}
 			for q := p; q < end; q++ {
 				b[q] = ' '
@@ -231,28 +227,46 @@ func CodeSpans(line string) [][2]int {
 			i++
 			continue
 		}
-		n := backtickRun(line, i)
-		end := -1
-		for j := i + n; j < len(line); {
-			if line[j] != '`' {
-				j++
-				continue
-			}
-			m := backtickRun(line, j)
-			if m == n {
-				end = j + m
-				break
-			}
-			j += m
-		}
+		end := spanEnd(line, i)
 		if end < 0 {
-			i += n
+			i += backtickRun(line, i)
 			continue
 		}
 		spans = append(spans, [2]int{i, end})
 		i = end
 	}
 	return spans
+}
+
+// spanEnd returns the index just past the code span that the backtick run at
+// i opens, or -1 when no run of the same length follows on the line.
+func spanEnd(line string, i int) int {
+	n := backtickRun(line, i)
+	for j := i + n; j < len(line); {
+		if line[j] != '`' {
+			j++
+			continue
+		}
+		m := backtickRun(line, j)
+		if m == n {
+			return j + m
+		}
+		j += m
+	}
+	return -1
+}
+
+// closerEnd returns the index just past the first comment closer, "-->" or
+// "--!>", in s, or -1 when s holds none.
+func closerEnd(s string) int {
+	j, k := strings.Index(s, "-->"), strings.Index(s, "--!>")
+	switch {
+	case j >= 0 && (k < 0 || j < k):
+		return j + 3
+	case k >= 0:
+		return k + 4
+	}
+	return -1
 }
 
 func backtickRun(s string, i int) int {
@@ -295,16 +309,12 @@ func FencesInComments(lines []string) []int {
 				inComment = true
 				continue
 			}
-			j, k := strings.Index(l[p:], "-->"), strings.Index(l[p:], "--!>")
-			switch {
-			case j >= 0 && (k < 0 || j < k):
-				p += j + 3
-			case k >= 0:
-				p += k + 4
-			default:
+			e := closerEnd(l[p:])
+			if e < 0 {
 				p = len(l)
 				continue
 			}
+			p += e
 			inComment = false
 			if innerOpen {
 				out = append(out, at)
@@ -313,4 +323,181 @@ func FencesInComments(lines []string) []int {
 		}
 	}
 	return out
+}
+
+// SpanComment is a comment opener that BlankComments takes inside a code span:
+// the index of its line, and of the line where that comment ends, or -1 when
+// it runs to the end.
+type SpanComment struct {
+	Line, End int
+}
+
+// CommentsInCodeSpans returns, in file order, each comment opener that
+// BlankComments takes while a reading that finds each line's code spans before
+// its comments reads it inside a code span. Outside a span, that reading takes
+// a backslash before a backtick or a backslash as an escape, and nothing else
+// differs; with no opener returned, both readings hide the same text.
+func CommentsInCodeSpans(lines []string) []SpanComment {
+	mask := FenceMask(lines)
+	var out []SpanComment
+	dkt := false // inside a comment, in dkt's reading
+	var ref spanFirst
+	pending := -1 // the finding whose comment dkt's reading has open
+	for i, l := range lines {
+		if mask[i] {
+			ref.para = false
+			continue
+		}
+		spans := ref.read(l)
+		for p := 0; p < len(l); {
+			if !dkt {
+				k := strings.Index(l[p:], "<!--")
+				if k < 0 {
+					break
+				}
+				p += k
+				if inSpan(spans, p) {
+					out = append(out, SpanComment{i, -1})
+					pending = len(out) - 1
+				}
+				dkt, p = true, p+4
+				continue
+			}
+			e := closerEnd(l[p:])
+			if e < 0 {
+				break
+			}
+			dkt, p = false, p+e
+			if pending >= 0 {
+				out[pending].End, pending = i, -1
+			}
+		}
+	}
+	return out
+}
+
+// spanFirst is a reading that finds each line's code spans before its
+// comments, as Markdown does, carried from line to line. Outside a span, a
+// backslash before a backtick or a backslash escapes it. The lines of an HTML
+// block hold no code span; comments there open and close as in dkt's reading.
+type spanFirst struct {
+	open  bool // inside a comment
+	block bool // that comment started a line: an HTML block of CommonMark's type 2
+	html  int  // the type, 1 or 3 to 7, of the HTML block the reading is in, or 0
+	para  bool // the previous line continues a paragraph, which type 7 cannot interrupt
+}
+
+// read reads one line and returns its code spans.
+func (r *spanFirst) read(l string) [][2]int {
+	if r.html >= 6 && Trim(l) == "" {
+		r.html = 0
+	}
+	if r.html == 0 && !r.open {
+		r.html = htmlBlockStart(l, r.para)
+	}
+	raw := r.html != 0 // the rest of the line belongs to an HTML block
+	if r.html != 0 && r.html < 6 && htmlBlockEnd[r.html].MatchString(l) {
+		r.html = 0 // after this line
+	}
+	// A heading, a thematic break or a setext underline ends a paragraph.
+	r.para = !raw && Trim(l) != "" && !atxHeading.MatchString(l) &&
+		!thematicBreak.MatchString(l) && !(r.para && setextLine.MatchString(l))
+	var spans [][2]int
+	for p := 0; p < len(l); {
+		switch {
+		case r.open:
+			e := closerEnd(l[p:])
+			if e < 0 {
+				return spans
+			}
+			r.open, p = false, p+e
+			raw, r.block = raw || r.block, false
+		case raw:
+			if !strings.HasPrefix(l[p:], "<!--") {
+				p++
+				continue
+			}
+			r.open, p = true, p+4
+		case l[p] == '\\' && p+1 < len(l) && (l[p+1] == '`' || l[p+1] == '\\'):
+			p += 2
+		case l[p] == '`':
+			if e := spanEnd(l, p); e >= 0 {
+				spans = append(spans, [2]int{p, e})
+				p = e
+			} else {
+				p += backtickRun(l, p)
+			}
+		case strings.HasPrefix(l[p:], "<!--"):
+			r.block = p <= 3 && strings.Trim(l[:p], " ") == ""
+			r.open, p = true, p+4
+		default:
+			p++
+		}
+	}
+	return spans
+}
+
+// The start and end conditions of CommonMark 0.31.2's HTML blocks, except
+// type 2, the comment, which spanFirst follows as it reads comments.
+var (
+	htmlStart1   = regexp.MustCompile(`(?i)^ {0,3}<(?:script|pre|style|textarea)(?:[ \t>]|$)`)
+	htmlStart3   = regexp.MustCompile(`^ {0,3}<\?`)
+	htmlStart4   = regexp.MustCompile(`^ {0,3}<![A-Za-z]`)
+	htmlStart5   = regexp.MustCompile(`^ {0,3}<!\[CDATA\[`)
+	htmlStart6   = regexp.MustCompile(`(?i)^ {0,3}</?([A-Za-z][A-Za-z0-9-]*)(?:[ \t>]|/>|$)`)
+	htmlStart7   = regexp.MustCompile(`^ {0,3}(?:<[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t]*=[ \t]*(?:[^ \t"'=<>` + "`" + `]+|'[^']*'|"[^"]*"))?)*[ \t]*/?>|</[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$`)
+	htmlBlockEnd = map[int]*regexp.Regexp{
+		1: regexp.MustCompile(`(?i)</(?:script|pre|style|textarea)>`),
+		3: regexp.MustCompile(`\?>`),
+		4: regexp.MustCompile(`>`),
+		5: regexp.MustCompile(`\]\]>`),
+	}
+	atxHeading    = regexp.MustCompile(`^ {0,3}#{1,6}(?:[ \t]|$)`)
+	thematicBreak = regexp.MustCompile(`^ {0,3}(?:(?:\*[ \t]*){3,}|(?:-[ \t]*){3,}|(?:_[ \t]*){3,})$`)
+	setextLine    = regexp.MustCompile(`^ {0,3}(?:=+|-+)[ \t]*$`)
+)
+
+// htmlBlockTags are the tag names that start an HTML block of type 6.
+var htmlBlockTags = map[string]bool{}
+
+func init() {
+	for _, t := range strings.Fields(`address article aside base basefont blockquote body caption center
+		col colgroup dd details dialog dir div dl dt fieldset figcaption figure footer form frame
+		frameset h1 h2 h3 h4 h5 h6 head header hr html iframe legend li link main menu menuitem
+		nav noframes ol optgroup option p param search section summary table tbody td tfoot th
+		thead title tr track ul`) {
+		htmlBlockTags[t] = true
+	}
+}
+
+// htmlBlockStart returns the type of the HTML block a line starts, or 0. A
+// block of type 7 cannot interrupt a paragraph, so para rules it out.
+func htmlBlockStart(l string, para bool) int {
+	switch {
+	case htmlStart1.MatchString(l):
+		return 1
+	case htmlStart3.MatchString(l):
+		return 3
+	case htmlStart5.MatchString(l):
+		return 5
+	case htmlStart4.MatchString(l):
+		return 4
+	}
+	if m := htmlStart6.FindStringSubmatch(l); m != nil && htmlBlockTags[strings.ToLower(m[1])] {
+		return 6
+	}
+	if !para && htmlStart7.MatchString(l) {
+		return 7
+	}
+	return 0
+}
+
+// inSpan reports whether byte p lies inside one of spans.
+func inSpan(spans [][2]int, p int) bool {
+	for _, s := range spans {
+		if s[0] < p && p < s[1] {
+			return true
+		}
+	}
+	return false
 }

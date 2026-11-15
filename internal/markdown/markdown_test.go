@@ -213,3 +213,60 @@ func TestFenceInfoBackticks(t *testing.T) {
 		})
 	}
 }
+
+func TestCommentsInCodeSpans(t *testing.T) {
+	op, b3 := "<!--", "```"
+	tests := []struct {
+		name  string
+		lines []string
+		want  []SpanComment
+	}{
+		{"runs to the end", []string{"`" + op + "` x", "### T"}, []SpanComment{{0, -1}}},
+		{"closed on a later line", []string{"a `" + op + "` b", "c", "-->"}, []SpanComment{{0, 2}}},
+		{"closed in a later span", []string{"`" + op + "` and `-->`"}, []SpanComment{{0, 0}}},
+		{"span after a comment closes", []string{"x " + op + " a --> `" + op + "` b"}, []SpanComment{{0, -1}}},
+		{"comment starting a line", []string{"   " + op + " a --> `" + op + "` b -->"}, nil},
+		{"comment block over two lines", []string{op, "a --> `" + op + "` b -->"}, nil},
+		{"span on the line after a block", []string{op + " a -->", "`" + op + "`"}, []SpanComment{{1, -1}}},
+		{"div block", []string{"<div>", "`" + op + "` hidden -->", "</div>"}, nil},
+		{"after a div block's blank line", []string{"<div>", "", "`" + op + "`"}, []SpanComment{{2, -1}}},
+		{"details on one line", []string{"<details>`" + op + "` x -->"}, nil},
+		{"pre block", []string{"<pre>", "`" + op + "` x -->", "</pre>", "`" + op + "`"}, []SpanComment{{3, -1}}},
+		{"tag alone on a line", []string{"<span>", "`" + op + "` x -->"}, nil},
+		{"tag alone in a paragraph", []string{"para", "<span>", "`" + op + "` x"}, []SpanComment{{2, -1}}},
+		{"tag with text after it", []string{"<span> `" + op + "` x"}, []SpanComment{{0, -1}}},
+		{"declaration ends on its line", []string{"<!DOCTYPE html>", "`" + op + "`"}, []SpanComment{{1, -1}}},
+		{"declaration over two lines", []string{"<!DOCTYPE", "`" + op + "` --> >", "`" + op + "`"}, []SpanComment{{2, -1}}},
+		{"div inside a comment", []string{op, "<div>", "-->", "`" + op + "`"}, []SpanComment{{3, -1}}},
+		{"tag after a setext dash line", []string{"para", "---", "<span>", "`" + op + "` x"}, nil},
+		{"tag after a setext equals line", []string{"para", "===", "<span>", "`" + op + "` x"}, nil},
+		{"tag after a thematic break", []string{"para", "***", "<span>", "`" + op + "` x"}, nil},
+		{"equals line with no paragraph", []string{"===", "<span>", "`" + op + "` x"}, []SpanComment{{2, -1}}},
+		{"tag after a fence", []string{"para", b3, "x", b3, "<span>", "`" + op + "` x"}, nil},
+		{"four spaces do not start a block", []string{"para", "    " + op + " a --> `" + op + "` b"}, []SpanComment{{1, -1}}},
+		// The comment opened after the block's comment ends carries over, as in dkt's reading.
+		{"comment opened in a block line", []string{op + " a --> " + op + " b", "` --> `" + op + "`"}, []SpanComment{{1, -1}}},
+		{"after an escaped backslash", []string{`\\` + "`" + op + "`"}, []SpanComment{{0, -1}}},
+		{"two-backtick span", []string{"``a ` " + op + " b` c``"}, []SpanComment{{0, -1}}},
+		{"closer only on a fenced line", []string{"`" + op + "`", b3 + "text", "-->", b3, "### T"}, []SpanComment{{0, -1}}},
+		{"closed after a fence", []string{"`" + op + "`", b3, "-->", b3, "x", "-->"}, []SpanComment{{0, 5}}},
+		{"two openers in one span", []string{"`" + op + " --> " + op + " -->`"}, []SpanComment{{0, 0}, {0, 0}}},
+		{"second opener on a later line", []string{"`" + op + "` -->", "`" + op + "`"}, []SpanComment{{0, 0}, {1, -1}}},
+		{"comment holding a span", []string{op + " `x` -->", "### T"}, nil},
+		{"backticks inside comments", []string{op + " ` --> " + op + " ` -->"}, nil},
+		{"escaped backtick", []string{"\\`" + op + " a -->`"}, nil},
+		{"opener in fenced code", []string{b3, "`" + op + "`", b3}, nil},
+		{"single unmatched backtick", []string{"` " + op + " x -->"}, nil},
+		{"unmatched run of two", []string{"`` " + op + " a ` -->"}, nil},
+		{"unmatched run inside a closed span", []string{"`a `` b` " + op + " c -->"}, nil},
+		{"opener before a span", []string{op + " x -->`y`"}, nil},
+		{"span does not cross lines", []string{"`a", op + " b`", "-->"}, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CommentsInCodeSpans(tt.lines); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CommentsInCodeSpans = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

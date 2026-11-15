@@ -268,3 +268,10 @@ func TestLintIssueFenceInfoBacktick(t *testing.T) {
 		t.Errorf("%+v", rep.Findings)
 	}
 }
+
+func TestLintIssueCommentInCodeSpan(t *testing.T) {
+	rep := lintIss(t, issFront+"## Current\nc `<!--` and `-->`\n\n## Expected\ne\n\n## Unchanged\nu\n\n## Evidence\nv\n")
+	if !has(rep, "comment-in-code-span", issPath, 6, wantSpanCommentTo(6)) || count(rep, "comment-in-code-span") != 1 {
+		t.Errorf("%+v", rep.Findings)
+	}
+}
