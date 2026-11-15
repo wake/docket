@@ -29,6 +29,7 @@
 |---|---|---|---|
 | Skill targets for every file of the shipped skill folder | `internal/setup/setup.go:targetsOf` | extend | It already walks `shipped/schema/` the same way |
 | A test shipped tree with one file replaced or added | `internal/cli/cmd_inspect_test.go:withShippedWorkflow` | extend | It copies the shipped tree and replaces the workflow; any path is the same work |
+| Hashes of the new skill files and the new `SKILL.md` | `internal/setup/history.go:Earlier` | extend | Every shipped target's hashes are kept there |
 
 ---
 
@@ -48,6 +49,7 @@
 - [ ] Fresh `dkt init` with that shipped tree writes both files to both folders, each byte-for-byte the same in both.
 - [ ] Both folders holding only an earlier release's `SKILL.md`: `dkt init` lists each `SKILL.md` as `updated` and the other file as `created` in both folders and exits with 0; `dkt inspect` reports `skill-outdated` for each `SKILL.md` and `skill-missing` for the other file in both folders and exits with 1.
 - [ ] An edited `SKILL.md` is listed as `kept` with `skill-differs`, and the other file is still `created`.
+- [ ] The other file gets each rule `SKILL.md` gets, tested on it: edited, it is `kept` with `skill-differs`, and `--force` makes it `overwritten`; equal to an earlier release's hash, it is `updated` by `dkt init` and `outdated` with `skill-outdated` in `dkt inspect`; a symbolic link in its place makes `dkt init` write nothing and report `symlink-refused` naming it, and `dkt inspect` report `symlink-refused` without reading through it.
 - [ ] A file of the user's own in a skill folder is not listed and stays unchanged.
 - [ ] The reload step is printed when a `SKILL.md` is created, and not when only the other file is created.
 
