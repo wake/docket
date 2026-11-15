@@ -183,6 +183,20 @@ func TestReadWindowAndSkips(t *testing.T) {
 	}
 }
 
+func TestReadFutureRecord(t *testing.T) {
+	env, dir := newEnv(t)
+	rec := func(name string, at time.Time) {
+		os.MkdirAll(dir, 0o700)
+		os.WriteFile(filepath.Join(dir, name+".json"), []byte(`{"session":"`+name+`","dir":"/w","state":"working","time":"`+at.Format(time.RFC3339)+`"}`), 0o600)
+	}
+	rec("day", t0.Add(24*time.Hour))
+	rec("minute", t0.Add(time.Minute))
+	recs, err := Read(env, t0)
+	if err != nil || len(recs) != 1 || recs[0].Session != "minute" {
+		t.Fatalf("%+v %v", recs, err)
+	}
+}
+
 func TestReadSkipsLinkToRecord(t *testing.T) {
 	env, dir := newEnv(t)
 	Write(env, t0, "working", in("a", "/w"), "/x")

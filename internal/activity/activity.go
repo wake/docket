@@ -120,7 +120,7 @@ func Read(env []string, now time.Time) ([]Record, error) {
 		if json.Unmarshal(data, &r) != nil || (r.State != "working" && r.State != "waiting") || r.Time.IsZero() {
 			continue
 		}
-		if now.Sub(r.Time) <= Window {
+		if d := now.Sub(r.Time); d <= Window && d >= -Window {
 			recs = append(recs, r)
 		}
 	}
