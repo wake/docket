@@ -1127,3 +1127,72 @@ func TestInspectIndexWithoutLocation(t *testing.T) {
 		t.Errorf("code=%d %+v %v %v", code, u, m.Findings, m.Unreadable)
 	}
 }
+
+func TestInspectSyncLinkedWorktree(t *testing.T) {
+	tpl, hs := shippedWorkflow(t), headings(t)
+	r, _ := syncFixture(t, tpl, tpl, "sync", nil)
+	r.Commit("base", nil)
+	wt := filepath.Join(t.TempDir(), "wt")
+	r.Git("worktree", "add", "-b", "other", wt)
+	if err := os.WriteFile(filepath.Join(wt, "docket", "workflow.md"), []byte(editSection(tpl, hs[1], "worktree edit")), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	env := append(slices.Clone(r.Env), "DOCKET_OPENSPEC="+filepath.Join(t.TempDir(), "none"))
+	code, out, _ := runIn(t, wt, env, "inspect", "--json")
+	var m inspectOut
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatalf("%d %q: %v", code, out, err)
+	}
+	u := m.Result.UserWorkflow
+	if u == nil || u.Mode != "sync" || len(u.Sections) != len(hs) {
+		t.Fatalf("code=%d %+v", code, u)
+	}
+	for _, s := range u.Sections {
+		if (s.Heading == hs[1]) == (s.State == "in-step") {
+			t.Errorf("worktree file not compared: %+v", s)
+		}
+	}
+}
+
+func TestInspectSyncProjectWorkflowUnreadable(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, _ := syncFixture(t, tpl, tpl, "sync", nil)
+	p := filepath.Join(r.Dir, "docket", "workflow.md")
+	if err := os.Chmod(p, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(p, 0o644) })
+	if f, err := os.Open(p); err == nil {
+		f.Close()
+		t.Skip("file readable despite mode 0")
+	}
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	u := m.Result.UserWorkflow
+	if code != 3 || !slices.ContainsFunc(m.Unreadable, func(x Unreadable) bool { return strings.HasPrefix(x.Reason, "openat docket/workflow.md") }) || u == nil || len(u.Sections) != 0 {
+		t.Errorf("code=%d %+v %+v", code, m.Unreadable, u)
+	}
+}
+
+func TestInspectSyncDocketIsAFile(t *testing.T) {
+	tpl := shippedWorkflow(t)
+	r, _ := syncFixture(t, tpl, tpl, "sync", nil)
+	if err := os.RemoveAll(filepath.Join(r.Dir, "docket")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(r.Dir, "docket"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, m, _ := inspect(t, r, "1.14.0", false)
+	u := m.Result.UserWorkflow
+	if u == nil || u.Mode != "sync" || len(u.Sections) != 0 {
+		t.Fatalf("%+v", u)
+	}
+	// other checks may report the file; this path must add nothing to what independent mode reports
+	r2, _ := syncFixture(t, tpl, tpl, "independent", nil)
+	os.RemoveAll(filepath.Join(r2.Dir, "docket"))
+	os.WriteFile(filepath.Join(r2.Dir, "docket"), []byte("x"), 0o644)
+	_, m2, _ := inspect(t, r2, "1.14.0", false)
+	if len(m.Unreadable) != len(m2.Unreadable) {
+		t.Errorf("sync %+v, independent %+v", m.Unreadable, m2.Unreadable)
+	}
+}

@@ -144,6 +144,7 @@ func inspectMode(c *Context, out *Outcome, u *userWorkflow) {
 	}
 	self, err := projects.ProjectPath(c.Git, c.Repo.Root)
 	if err != nil {
+		out.Unreadable = append(out.Unreadable, Unreadable{Source: c.Repo.Root, Reason: err.Error()})
 		return
 	}
 	if i := x.Find(self); i >= 0 && x.Projects[i].Mode == "sync" {
