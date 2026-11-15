@@ -20,11 +20,13 @@ dkt finds HTML comments with `markdown.BlankComments`, after `FenceMask`: outsid
 The check walks the lines once, keeping two readings side by side, both skipping the lines `FenceMask` marks:
 
 - **dkt's reading**, as `BlankComments` reads: outside a comment, an opener starts one; inside, the first closer ends it.
-- **The span-first reading**: the same, except that outside a comment it also finds code spans, left to right. A run of backticks that a run of the same length closes later on the line opens a code span, which ends after that run; nothing inside it starts a comment. A run with no such match is text. Outside a span, a backslash followed by a backtick or a backslash makes that character text. Inside a comment, backticks are text.
+- **The span-first reading**: the same, except that outside a comment it also finds code spans, left to right. A run of backticks that a run of the same length closes later on the line opens a code span, which ends after that run; nothing inside it starts a comment. A run with no such match is text. Outside a span, a backslash followed by a backtick or a backslash makes that character text. Inside a comment, backticks are text. A comment that starts a line, after at most three spaces, is an HTML block in Markdown, whose lines hold no code span: on the line where such a comment ends, the rest of the line is read for comments only.
 
 The check reports each opener where dkt's reading starts a comment while the span-first reading is inside a code span.
 
 Each finding is a place the two readings differ: dkt hides the text after the opener, the span-first reading shows it as code. And a file with no finding is read the same way by both: while both are inside a comment they close on the same closer; while both are outside a comment and the span-first reading is outside a span, both start a comment on the same opener; so they first differ where the span-first reading is inside a span and dkt starts a comment, which is a finding. After a finding the readings stay out of step until dkt's comment ends, and an opener inside that comment is not seen; fixing the finding brings it out on the next run.
+
+The HTML block rule came from checking the cases against commonmark.js 0.31.2, the CommonMark reference implementation: on a line that starts with a comment, an opener in backticks after the comment's end is raw HTML, which a browser also reads as a comment, so reporting it would be wrong. Other HTML blocks, indented code and container blocks such as lists and quotes are not followed.
 
 The escapes are limited to backticks and backslashes because they decide where a span starts. A backslash before the opener also makes it text in Markdown, but following that would make the span-first reading differ from dkt's for a reason other than code spans, which the check would then not report.
 

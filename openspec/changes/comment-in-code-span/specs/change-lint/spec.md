@@ -19,6 +19,10 @@ In every Markdown file of a `docket` change, in each record and issue it lints a
 - **WHEN** the design holds a line made of a comment opener, a code span and a comment closer
 - **THEN** lint reports no `comment-in-code-span`
 
+#### Scenario: Comment starting a line
+- **WHEN** the design holds a line that starts with a comment, closes it, and then holds a comment opener in a code span
+- **THEN** lint reports no `comment-in-code-span`
+
 #### Scenario: Backticks inside comments
 - **WHEN** the design holds a line made of two comments, each holding one backtick
 - **THEN** lint reports no `comment-in-code-span`
