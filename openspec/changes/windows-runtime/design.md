@@ -20,7 +20,7 @@ Two packages look for programs, each with its own rules: `internal/gitx` (`lookP
 `internal/execpath` holds three functions both packages call:
 
 - `Getenv(env, key)`: the last value of `key` in `env`, comparing names without case on Windows, as Windows does.
-- `Names(name, env)`: the file names to try for a program, in order: on Windows the name with each `PATHEXT` extension, or the name alone when it already has one of them; elsewhere the name alone.
+- `Names(name, env)`: the file names to try for a program, in order: on Windows the name with each `PATHEXT` extension, a dot added where it is missing as `exec.LookPath` does, or the name alone when it already has one of them; elsewhere the name alone.
 - `MayRun(fi)`: whether a file's permissions let it run: an execute bit, or always on Windows. Each caller keeps its own check of the kind of file.
 
 Each function takes the system as an unexported parameter in an inner function, so its tests cover the Windows and the other rules on every system; the exported functions pass `runtime.GOOS`.
@@ -35,7 +35,13 @@ Alternative: `exec.LookPath`. It reads the process's own `PATH` and `PATHEXT`, n
 
 The Windows CI job also runs `internal/execpath`, `internal/openspec`, `cmd/dkt`, the root package, the path tests of `internal/gitx` and the history tests of `internal/setup` (which compare the embedded files with the recorded hashes); the whole of `internal/gitx` and `internal/setup` still fails there for reasons `windows-suite` covers. The real OpenSpec test runs on Windows too, through `npx`, which npm installs as `npx.cmd`.
 
+### Arguments to a batch file
+
+Go hands a `.bat` or `.cmd` file to `CreateProcess`, which runs it through `cmd.exe`; `os/exec` quotes the arguments for `CommandLineToArgvW`, which `cmd.exe` does not follow, so `&`, `|`, `%` and others in an argument can run other commands. dkt passes OpenSpec names read from the repository (change folders, capability folders) and the user's `--tools`, so a cloned repository could hold a folder named to run a command. `Runner.exec` therefore checks, on Windows, when the program's extension is `.bat` or `.cmd` (compared without case), that every argument holds only ASCII letters, digits and `-_.,/@+=:`, and otherwise returns an `*UnsafeArgError` naming the argument without starting anything. Callers report it as they report any failed OpenSpec call (`dkt lint` as `openspec-failed`). The check is a function taking whether the system is Windows, so its tests run on every system.
+
+Alternatives: quoting for `cmd.exe` with `SysProcAttr.CmdLine`, whose rules differ between `cmd.exe` and the batch file's own parsing and are easy to get wrong; running `node` with OpenSpec's script directly, which depends on how npm installed it. Not chosen; names with other characters are not change or capability names Docket makes.
+
 ## Risks / Trade-offs
 
-- [Go runs a `.cmd` file through `cmd.exe`, which reads some characters in arguments itself] → The arguments dkt passes to OpenSpec are fixed words, change names and paths, which hold none of those characters; the real OpenSpec test on Windows covers the commands dkt runs.
+- [A user's OpenSpec is a `.cmd` file and a name holds a character outside the set] → The call fails with a message naming the argument; the user can set `DOCKET_OPENSPEC` to run OpenSpec through `node` instead.
 - [A folder on `PATH` holding both `git` and `git.exe` on Windows] → Windows itself would run `git.exe`; dkt does too, since it tries only names with an extension from `PATHEXT`.

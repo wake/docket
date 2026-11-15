@@ -13,6 +13,7 @@ On Windows dkt finds neither git nor OpenSpec, so nearly every command reports `
 ## What Changes
 
 - On Windows, dkt looks for git, OpenSpec and a program named in `DOCKET_OPENSPEC` under each extension in `PATHEXT` (`.com`, `.exe`, `.bat` and `.cmd` when it is unset), unless the name already has one of them; any file found counts as runnable, and the environment variables `PATH` and `PATHEXT` are read whatever their case.
+- On Windows, when OpenSpec is a `.bat` or `.cmd` file, which `cmd.exe` runs and whose arguments it reads itself, dkt refuses to pass an argument holding anything but letters, digits and `-_.,/@+=:`: change and capability names come from the repository's folders, and `&` or `%` in one could run another command.
 - The other rules for finding them stay as they are on every system: the last `PATH` wins; git resolves a relative `PATH` entry against the folder it runs in; OpenSpec skips a relative entry, and resolves a relative `DOCKET_OPENSPEC` program against the folder it runs in.
 - `.gitattributes` asks for LF line endings in every checkout.
 - The `windows-latest` CI job also runs the tests of finding programs (`internal/execpath`, `internal/openspec`, `cmd/dkt`), and the real OpenSpec test runs on Windows too.
@@ -32,7 +33,7 @@ None.
 
 ### Modified Capabilities
 
-- `platform-support`: adds Programs found on Windows, Variable names without case on Windows, and Same shipped files from any checkout.
+- `platform-support`: adds Programs found on Windows, Batch files given only plain arguments, Variable names without case on Windows, and Same shipped files from any checkout.
 
 ## Impact
 
