@@ -18,3 +18,4 @@ The shipped skill and its two installed copies are identical; `dkt inspect` of t
 
 ## Review
 
+Codex (gpt-5.6-sol), a different model, reviewed the whole diff: one must-fix finding, step 4 still said to fix everything `dkt lint` reports before the review, which an empty `## Review` makes impossible. Fixed by excepting that section in step 4 and writing it in step 5; a small fix, not reviewed again.

@@ -254,15 +254,15 @@ No change is opened; a record in `docket/records/` says what the work did.
      and a suffix when the name is taken), not the name you passed.
 2. While doing the work, follow "Verification" in `docket/workflow.md`.
 3. Fill the record's sections as the work goes, keeping them short,
-   replacing the template's guidance comments; write `## Review` after the
-   review, in the commit that answers it, or in a commit of its own when
-   nothing needs fixing, then run `dkt lint` again (until then it reports
-   that section as empty). Every commit carries a
-   trailer (see "Commit trailers"). Larger work may list tasks under the
-   record's `## Tasks` in the plan's format.
+   replacing the template's guidance comments; `## Review` is written in
+   step 5. Every commit carries a trailer (see "Commit trailers"). Larger
+   work may list tasks under the record's `## Tasks` in the plan's format.
 4. When the record lists tasks, run `dkt sync <slug>` and commit the record.
-   Run `dkt lint` and fix what it reports.
-5. Follow "Review" in `docket/workflow.md`.
+   Run `dkt lint` and fix what it reports, except the empty `## Review`
+   section.
+5. Follow "Review" in `docket/workflow.md`. Then write the record's
+   `## Review`, in the commit that answers the review or, when nothing needs
+   fixing, in a commit of its own, and run `dkt lint` again.
 6. Follow "How to merge" in `docket/workflow.md`; never squash.
 
 ## Checked merge
