@@ -176,6 +176,49 @@ func TestAutoRegister(t *testing.T) {
 	}
 }
 
+func TestEntryModeSynced(t *testing.T) {
+	p := write(t, `{"projects":[
+{"path":"/w/a","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false,"mode":"sync","synced":{"Plan review":"ab"}},
+{"path":"/w/b","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`)
+	x, err := Load(p)
+	if err != nil || x.Projects[0].Mode != "sync" || x.Projects[0].Synced["Plan review"] != "ab" || x.Projects[1].Mode != "" {
+		t.Fatalf("%+v %v", x, err)
+	}
+	out := filepath.Join(t.TempDir(), "o.json")
+	if err := x.Save(out); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(out)
+	if strings.Count(string(b), `"mode"`) != 1 || strings.Count(string(b), `"synced"`) != 1 {
+		t.Errorf("keys: %s", b)
+	}
+	y, err := Load(out)
+	if err != nil || y.Projects[0].Mode != "sync" || y.Projects[0].Synced["Plan review"] != "ab" {
+		t.Errorf("%+v %v", y, err)
+	}
+	bad := write(t, `{"projects":[{"path":"/w/a","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false,"mode":"always"}]}`)
+	if _, err := Load(bad); err == nil || !strings.Contains(err.Error(), bad) {
+		t.Errorf("unknown mode: %v", err)
+	}
+}
+
+func TestDefaultMode(t *testing.T) {
+	if v, err := DefaultMode(filepath.Join(t.TempDir(), "none")); v != "" || err != nil {
+		t.Error(v, err)
+	}
+	for s, want := range map[string]string{`{"workflow":{"default":"sync"}}`: "sync", `{"workflow":{"default":"independent"}}`: "independent", `{}`: "", `{"workflow":{}}`: ""} {
+		if v, err := DefaultMode(write(t, s)); v != want || err != nil {
+			t.Errorf("%s: %q %v", s, v, err)
+		}
+	}
+	for _, s := range []string{`{"workflow":{"default":"always"}}`, `not json`} {
+		p := write(t, s)
+		if _, err := DefaultMode(p); err == nil || !strings.Contains(err.Error(), p) {
+			t.Errorf("%s: %v", s, err)
+		}
+	}
+}
+
 func TestAutoRegisterLink(t *testing.T) {
 	d := t.TempDir()
 	target := filepath.Join(d, "real.json")
