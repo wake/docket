@@ -21,7 +21,8 @@ and habits.
 ### Plan review
 
 Before any code, review the plan once, together with the proposal, the delta
-specs and design.md (see "Reviewers"), and fix what the review finds.
+specs and design.md (see "Reviewers"), and fix what the review finds; a
+finding not taken up is handled as "Reviewers" says.
 
 ### Task execution
 
