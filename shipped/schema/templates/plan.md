@@ -11,8 +11,8 @@
 
 ## Reuse
 
-| Need | Existing (path:symbol) | Decision | Reason | Evidence |
-|---|---|---|---|---|
+| Need | Existing (path:symbol) | Decision | Reason |
+|---|---|---|---|
 
 ---
 

@@ -221,13 +221,13 @@ artifacts:
         implementer could not work out: an interface other tasks depend on, a
         fixed format or string, an edge case that must be covered.
       - Right after the header, a `## Reuse` table:
-        `| Need | Existing (path:symbol) | Decision | Reason | Evidence |`,
-        one row for every capability the plan needs. Decision is `reuse`,
-        `extend` or `new`. A `reuse` or `extend` row names a path that exists
-        in the repository, or a dependency from outside it written as
-        `external: <name>` (a CLI, a library). A `new` row says in Reason why
-        nothing that exists fits. Evidence is the search behind the decision,
-        for example `rg -n "func Run" internal/`. When the project's
+        `| Need | Existing (path:symbol) | Decision | Reason |`,
+        one row for every capability the change builds: `extend` when it
+        builds on something that exists, named in Existing by its path in the
+        repository, or as `external: <name>` for a dependency from outside it
+        (a CLI, a library); `new` when nothing that exists fits, with Reason
+        saying why. What the change only uses as it is gets no row, and a plan
+        that builds nothing keeps the table with no rows. When the project's
         instructions name architecture notes, read them before filling it in.
         This is the main reuse decision of the change: make it here, not during
         implementation.
