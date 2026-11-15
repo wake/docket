@@ -1,6 +1,9 @@
 package setup
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -79,6 +82,74 @@ func Sections(b []byte) []Section {
 			body = body[:len(body)-1]
 		}
 		out = append(out, Section{h.Text, strings.Join(body, "\n")})
+	}
+	return out
+}
+
+// ProjectOwned reads the front matter's project-owned list, nil when there is none.
+func ProjectOwned(b []byte) ([]string, error) {
+	fm, ok, err := change.ReadFrontMatter(b)
+	if !ok || err != nil {
+		return nil, nil
+	}
+	f, found := fm.Fields["project-owned"]
+	if !found {
+		return nil, nil
+	}
+	v := f.Value
+	if !strings.HasPrefix(v, "[") || !strings.HasSuffix(v, "]") {
+		return nil, fmt.Errorf("line %d: project-owned must be written as project-owned: [<heading>, <heading>]", f.Line)
+	}
+	out := []string{}
+	if inner := strings.TrimSpace(v[1 : len(v)-1]); inner != "" {
+		for _, p := range strings.Split(inner, ",") {
+			if p = strings.TrimSpace(p); p == "" {
+				return nil, fmt.Errorf("line %d: project-owned has an empty heading", f.Line)
+			}
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+// SectionState is how one section of a project compares with the user template.
+// Hash is the SHA-256 of the shared text for in-step, empty otherwise.
+type SectionState struct {
+	Heading string `json:"heading"`
+	State   string `json:"state"`
+	Hash    string `json:"-"`
+}
+
+func hashText(s string) string { h := sha256.Sum256([]byte(s)); return hex.EncodeToString(h[:]) }
+
+// CompareSections compares the level-three sections both files have and the project does not own,
+// in the user template's order; empty unless both have the same template version.
+func CompareSections(user, project []byte, owned []string, synced map[string]string) []SectionState {
+	out := []SectionState{}
+	if v := TemplateVersion(user); v == 0 || v != TemplateVersion(project) {
+		return out
+	}
+	have := map[string]string{}
+	for _, s := range Sections(project) {
+		have[s.Heading] = s.Text
+	}
+	for _, s := range Sections(user) {
+		pt, ok := have[s.Heading]
+		if !ok || slices.Contains(owned, s.Heading) {
+			continue
+		}
+		st := SectionState{Heading: s.Heading}
+		switch h := synced[s.Heading]; {
+		case pt == s.Text:
+			st.State, st.Hash = "in-step", hashText(s.Text)
+		case h == hashText(pt):
+			st.State = "template-changed"
+		case h == hashText(s.Text):
+			st.State = "project-changed"
+		default:
+			st.State = "conflict"
+		}
+		out = append(out, st)
 	}
 	return out
 }
