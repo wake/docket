@@ -19,9 +19,9 @@
 
 `domain.Loaded` gains the sorted paths of the capabilities no node holds. `dkt domains` builds `result.unclassified` from it, in a structural commit before the rule, and `dkt lint` reports `domain-unlisted` for the same paths, so the two cannot disagree.
 
-Lint reports them only when the tree lists at least one item, `Load` did not stop on a format problem or duplicate, and nothing it reads was unreadable: in those cases what is unlisted is not known, and the other findings already say why. A `domain-unknown` finding does not hold it back, as it concerns a line of the tree, not a capability.
+Lint reports them only when the tree lists at least one item, `Load` did not stop on a format problem or duplicate, and nothing it reads was unreadable: in those cases what is unlisted is not known, and the other findings already say why. `Unlisted` itself still returns what was read, so `dkt domains` keeps listing it as today; lint applies the condition. A `domain-unknown` finding does not hold it back, as it concerns a line of the tree, not a capability.
 
-With no change named, lint already loads the tree and reports every unlisted capability. With changes named, which is how archiving runs lint, it loads the tree too and reports the unlisted capabilities with a delta in a named change, with the finding's change set to that change; a capability outside the named changes is left to the lint that names none, so a change is not stopped by an older omission it does not touch. Every capability with a delta in a named change is checked, including one the change modifies but did not add: with the tree in place it should be listed either way.
+With no change named, lint already loads the tree and reports every unlisted capability. With changes named, which is how archiving runs lint, it loads the tree too and reports the unlisted capabilities with a delta in a named change, with the finding's change set to that change; a capability outside the named changes is left to the lint that names none, so a change is not stopped by an older omission it does not touch. Every capability with a delta in a named change is checked, including one the change modifies or removes and one in a change of another schema: with the tree in place it should be listed either way, and `dkt domains` counts it the same way. A capability with deltas in two named changes is reported once for each, so each change's finding stands on its own.
 
 The finding names `docket/domains.md`, with no line, and its message is fixed: `<capability> is not listed in docket/domains.md; list it under a node there, then run dkt domains to check the tree`.
 
@@ -45,7 +45,7 @@ The step 2 bullet that lists a new capability in the tree now applies when the f
 
 ### Ten main specs
 
-The skill suggests a tree once the project has ten or more main specs. Below that, the specs fit in one short listing and areas have rarely formed; the project that built its tree by hand at 27 found it late, as by then each capability had to be placed at once. Ten keeps the first tree small, about one line per capability, and is a number the agent can check with `ls openspec/specs` or `dkt domains --json`. It counts main specs, not changes in flight, since those are what pile up.
+The skill suggests a tree once the project already has ten or more main specs, counted before the change, when the change adds a capability; a project with nine that adds its tenth is not asked until the next one. The number is a judgment, not a measurement: the one data point is a project that asked for its tree by hand at 27 capabilities and found it late, as every capability then had to be placed at once. Ten is well before that, keeps the first tree to about ten lines to agree on, and is a number the agent can check with `ls openspec/specs` or `dkt domains --json`. It counts main specs, not changes in flight, since main specs are what pile up.
 
 ## Risks / Trade-offs
 
