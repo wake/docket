@@ -53,6 +53,7 @@ jobs:
           GOARCH: arm64
       - run: go vet ./...
       - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/ ./internal/testutil/
+      - run: go test -count=5 -v -run TestSnapshotWritesNothing ./internal/snapshot/
 
   openspec:
     runs-on: ubuntu-latest

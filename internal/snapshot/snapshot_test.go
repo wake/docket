@@ -280,7 +280,7 @@ func TestSnapshotWritesNothing(t *testing.T) {
 	times := func() map[string]string {
 		m := map[string]string{}
 		filepath.WalkDir(r.Dir, func(p string, d fs.DirEntry, err error) error {
-			if fi, e := d.Info(); err == nil && e == nil {
+			if fi, e := os.Lstat(p); err == nil && e == nil { // probe: the file's own times, not the parent's listing
 				m[p] = fi.ModTime().String()
 			}
 			return nil
