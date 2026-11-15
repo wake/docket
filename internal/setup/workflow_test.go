@@ -200,6 +200,21 @@ func TestWorkflowDocketIsAFile(t *testing.T) {
 	}
 }
 
+func TestSections(t *testing.T) {
+	doc := "---\r\ntemplate: 3\r\n---\r\n\r\n## Part\r\n### One\r\n\r\nfirst  \r\nsecond\t\r\n\r\n\r\n### Two\r\ntwo\r\n```\r\n### Not a heading\r\n```\r\n<!--\r\n### Hidden\r\n-->\r\n#### Deeper\r\nstill two\r\n## Next part\r\nnot in two\r\n### One\r\nrepeated\r\n"
+	got := Sections([]byte(doc))
+	want := []Section{
+		{"One", "first\nsecond"},
+		{"Two", "two\n```\n### Not a heading\n```\n\n\n\n#### Deeper\nstill two"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+	if got := Sections([]byte("no headings\n")); got == nil || len(got) != 0 {
+		t.Errorf("want an empty, non-nil list, got %#v", got)
+	}
+}
+
 func TestWorkflowShippedWithoutVersion(t *testing.T) {
 	_, _, err := Decide(t.TempDir(), shippedWith(t, "# No front matter\n"), false)
 	if err == nil {
