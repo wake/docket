@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/openspec"
@@ -62,7 +63,7 @@ func TestBatchFileGetsNoUnsafeArgument(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := filepath.Join(t.TempDir(), "openspec.cmd") // never started: the check comes first
+	cmd := filepath.Join(t.TempDir(), "openspec.cmd") // started only for the version check
 	if err := os.WriteFile(cmd, b, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -75,8 +76,8 @@ func TestBatchFileGetsNoUnsafeArgument(t *testing.T) {
 	if !errors.As(err, &ue) || ue.Arg != "add-x&calc" {
 		t.Errorf("err = %v, want UnsafeArgError for add-x&calc", err)
 	}
-	if calls, _ := os.ReadFile(log); len(calls) != 0 {
-		t.Errorf("started: %q", calls)
+	if calls, _ := os.ReadFile(log); strings.Contains(string(calls), "calc") {
+		t.Errorf("started with the unsafe argument: %q", calls)
 	}
 }
 
