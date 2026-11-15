@@ -230,8 +230,10 @@ artifacts:
         builds on something that exists, named in Existing by its path in the
         repository, or as `external: <name>` for a dependency from outside it
         (a CLI, a library); `new` when nothing that exists fits, with Reason
-        saying why. What the change only uses as it is gets no row, and a plan
-        that builds nothing keeps the table with no rows. When the project's
+        saying why. What the change only uses as it is gets no row; when other
+        tasks or the reviewers need to know about such a dependency, name it
+        in that task's `**Interfaces:**` block. A plan that builds nothing
+        keeps the table with no rows. When the project's
         instructions name architecture notes, read them before filling it in.
         This is the main reuse decision of the change: make it here, not during
         implementation.
@@ -244,7 +246,10 @@ artifacts:
         lower case, with every run of characters that are not letters or
         digits replaced by a single `-`, and no leading or trailing `-`.
         Every scenario under this change's ADDED and MODIFIED requirements is
-        claimed by at least one task. A task that implements no scenario,
+        claimed by at least one task. A MODIFIED requirement that changes
+        only its wording, not its behavior, is claimed all the same, by a task
+        whose acceptance item says the existing tests still pass unchanged.
+        A task that implements no scenario,
         such as scaffolding, writes `**Scenarios:** none`.
       - A task is a slice that can be verified on its own. Tasks that are
         tightly coupled are one task; split a task only where a reviewer
@@ -278,15 +283,20 @@ artifacts:
       `docket/workflow.md` says.
 
       When requirements change after the plan is approved:
-      - Leave completed tasks as written and ticked.
+      - Leave completed tasks as written and ticked, except when a review asks
+        for a fix in a completed task's own code: then change that task's
+        acceptance items and add a Revision section.
       - Move a task that is cancelled before it is done out of the task list
         into a `## Cancelled Tasks` section, as a bullet
         `- Task N: <name> - <reason>`. It is no longer a `### Task` heading,
         and its number is not reused.
       - When a new requirement overturns a completed task, add a new task with
         a `**Compensates:** Task N` line; it changes or removes what Task N built.
+        Use Compensates only for this, not for a fix a review asks for.
       - Add a `## Revision N (YYYY-MM-DD): <what changed>` section above the
-        task list; in it, say who asked for the change and through which channel.
+        task list; in it, say who asked for the change and through which channel,
+        or, when a reviewer or the implementer found it, who found it and in
+        which review or task.
     requires:
       - specs
 
