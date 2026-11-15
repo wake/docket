@@ -26,7 +26,11 @@ Two texts SHALL be the same variant, and a text SHALL equal the template's, when
 - **THEN** they are one variant
 
 ### Requirement: Reference sources
-The sources SHALL be the user template when it exists, and each registered project that is not ignored, exists, holds `docket/workflow.md`, and is not the repository the command runs in.
+The sources SHALL be the user template when it exists, and each registered project that is not ignored, exists, holds `docket/workflow.md`, and is not the repository the command runs in. A project's `docket/workflow.md` reached through a symbolic link that leads out of the project SHALL NOT be read, and SHALL be listed in `unreadable`.
+
+#### Scenario: Link out of a project
+- **WHEN** a registered project's `docket/workflow.md` is a symbolic link to a file outside that project
+- **THEN** the file is not read, its text is in no variant, and `unreadable` names it
 
 #### Scenario: Projects that are not references
 - **WHEN** one registered project is ignored, one no longer exists, one has no `docket/workflow.md`, and the command runs in a fourth
