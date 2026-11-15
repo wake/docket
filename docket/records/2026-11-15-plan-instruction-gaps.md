@@ -1,5 +1,5 @@
 ---
-title: "Close four gaps the plan instruction left in the first plan written by it"
+title: "Close three gaps the plan instruction left in the first plan written by it"
 kind: prompt
 source: "First plan written by the v0.26.0 instruction (reuse-table-slim, #154): four places it left unclear"
 ---
@@ -17,3 +17,5 @@ Writing the plan of `reuse-table-slim` by the v0.26.0 instruction: the copied he
 `openspec schema validate docket` passes; the installed copy, written by this branch's `init --force`, equals `shipped/`; `TestEarlierHoldsShippedFiles` and `TestEarlierHoldsReleases` pass with the replaced hash.
 
 ## Review
+
+Codex (gpt-5.6-sol), a different model, reviewed the whole diff: no finding that must be fixed; one minor, the title said four gaps where three are closed, fixed in the title.
