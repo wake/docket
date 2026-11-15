@@ -100,6 +100,7 @@ func TestShippedNextStepsAreOneLine(t *testing.T) {
 // workflowTemplates maps each template version to the SHA-256 of the template as shipped at that version.
 var workflowTemplates = map[int]string{
 	1: "6642708242c599fe3930bce7873c8feca7234f3ea84e3c5a48f3870fa2453be6",
+	2: "dac53d1c9eadcf3a02d73b4e884787cc0e68251fb56290171e0472828e77da5c",
 }
 
 func TestWorkflowTemplatePinned(t *testing.T) {
