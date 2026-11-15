@@ -4,11 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	docket "github.com/wake/docket"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -235,6 +238,32 @@ func shippedWorkflow(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+var templateLine = regexp.MustCompile(`(?m)^template: (.*)$`)
+
+// shippedVersion is the shipped workflow template's version.
+func shippedVersion(t *testing.T) int {
+	t.Helper()
+	m := templateLine.FindStringSubmatch(shippedWorkflow(t))
+	if m == nil {
+		t.Fatal("no template line")
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+// withVersion returns s with the value of its first template line set to v.
+func withVersion(t *testing.T, s string, v any) string {
+	t.Helper()
+	loc := templateLine.FindStringIndex(s)
+	if loc == nil {
+		t.Fatal("no template line")
+	}
+	return s[:loc[0]] + fmt.Sprint("template: ", v) + s[loc[1]:]
 }
 
 func TestInitWorkflowKeptWithForce(t *testing.T) {
@@ -531,7 +560,7 @@ func TestInitWorkflowSectionMissing(t *testing.T) {
 func TestInitWorkflowTemplateUnknown(t *testing.T) {
 	r := testutil.NewRepo(t)
 	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
-	mine := strings.Replace(shippedWorkflow(t), "template: 1", "template: 99", 1)
+	mine := withVersion(t, shippedWorkflow(t), 99)
 	r.Write("docket/workflow.md", mine)
 	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
 	var n int
@@ -549,7 +578,8 @@ func TestInitWorkflowOutdated(t *testing.T) {
 	r := testutil.NewRepo(t)
 	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
 	before := readFile(t, r, "docket/workflow.md")
-	withShippedWorkflow(t, strings.Replace(shippedWorkflow(t), "template: 1", "template: 2", 1))
+	v := shippedVersion(t)
+	withShippedWorkflow(t, withVersion(t, shippedWorkflow(t), v+1))
 	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
 	var msg string
 	for _, f := range m.Findings {
@@ -558,7 +588,7 @@ func TestInitWorkflowOutdated(t *testing.T) {
 		}
 	}
 	if code != 1 || status(m, "docket/workflow.md") != "kept" || readFile(t, r, "docket/workflow.md") != before ||
-		!strings.Contains(msg, "template 1") || !strings.Contains(msg, "template 2") {
+		!strings.Contains(msg, fmt.Sprint("template ", v)) || !strings.Contains(msg, fmt.Sprint("template ", v+1)) {
 		t.Errorf("code=%d %+v", code, m.Findings)
 	}
 	lastStep(t, m)

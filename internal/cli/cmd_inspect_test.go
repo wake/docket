@@ -652,7 +652,7 @@ func TestInspectWorkflowCustomized(t *testing.T) {
 func TestInspectWorkflowHigherVersion(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
-	r.Write(wfPath, strings.Replace(shippedWorkflow(t), "template: 1", "template: 99", 1))
+	r.Write(wfPath, withVersion(t, shippedWorkflow(t), 99))
 	_, m, _ := inspect(t, r, "1.14.0", false)
 	if wfStatus(m) != "differs" || one(m, "workflow-template-unknown") != wfPath {
 		t.Errorf("%v %q", rules(m), wfStatus(m))
@@ -662,7 +662,7 @@ func TestInspectWorkflowHigherVersion(t *testing.T) {
 func TestInspectWorkflowNotANumber(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
-	r.Write(wfPath, strings.Replace(shippedWorkflow(t), "template: 1", "template: one", 1))
+	r.Write(wfPath, withVersion(t, shippedWorkflow(t), "one"))
 	_, m, _ := inspect(t, r, "1.14.0", false)
 	if wfStatus(m) != "differs" || one(m, "workflow-template-unknown") != wfPath {
 		t.Errorf("%v %q", rules(m), wfStatus(m))
@@ -682,7 +682,7 @@ func TestInspectWorkflowNoFrontMatter(t *testing.T) {
 func TestInspectWorkflowOutdated(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
-	withShippedWorkflow(t, strings.Replace(shippedWorkflow(t), "template: 1", "template: 2", 1))
+	withShippedWorkflow(t, withVersion(t, shippedWorkflow(t), shippedVersion(t)+1))
 	code, m, _ := inspect(t, r, "1.14.0", false)
 	if code != 1 || wfStatus(m) != "outdated" || one(m, "workflow-outdated") != wfPath {
 		t.Errorf("code=%d %v %q", code, rules(m), wfStatus(m))

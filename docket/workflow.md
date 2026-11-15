@@ -1,5 +1,5 @@
 ---
-template: 1
+template: 2
 ---
 
 The `template` value in the front matter is the template's version. Do not
@@ -113,6 +113,14 @@ A required review is done by a reviewer on a different model. If there is
 none, by the same model in a fresh context. If that is not possible either,
 the pull request says it had no independent review and asks a person to
 review it. The author's own reading is not a review.
+
+When the author does not take up a finding, they write down why. When
+the finding turned down is one the reviewer said must be fixed before
+merging, or when two reviewers reach opposite conclusions on the same
+point, another reviewer, found in the order of the paragraph above,
+decides it once; where its reasoning effort can be set, pass high as a
+parameter when calling it. The reasons and the decision go in the work's
+plan, record or pull request.
 
 ### Parallel work
 
