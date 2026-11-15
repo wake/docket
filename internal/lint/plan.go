@@ -11,7 +11,13 @@ import (
 
 const planFile = "plan.md"
 
-var reuseHeader = []string{"Need", "Existing (path:symbol)", "Decision", "Reason", "Evidence"}
+var (
+	reuseHeader = []string{"Need", "Existing (path:symbol)", "Decision", "Reason"}
+	// earlierHeader is the format before reuseHeader, still accepted so that
+	// changes opened before an upgrade pass: Evidence is not checked, and
+	// `reuse` rows are checked as `extend` rows are.
+	earlierHeader = []string{"Need", "Existing (path:symbol)", "Decision", "Reason", "Evidence"}
+)
 
 // checkPlan applies the plan rules to a change that has a readable plan.md.
 func checkPlan(r *state, c *loaded) {
@@ -99,13 +105,10 @@ func checkReuse(r *state, c *loaded, p change.Plan) {
 		return
 	}
 	t := p.Reuse
-	if !sameHeader(t.Header) {
+	earlier := sameHeader(t.Header, earlierHeader)
+	if !earlier && !sameHeader(t.Header, reuseHeader) {
 		r.add(c, "reuse-table", planFile, t.Index+1,
 			"the Reuse table header must be: %s", strings.Join(reuseHeader, " | "))
-		return
-	}
-	if len(t.Rows) == 0 {
-		r.add(c, "reuse-table", planFile, t.Index+1, "the Reuse table has no rows")
 		return
 	}
 	for _, row := range t.Rows {
@@ -113,21 +116,18 @@ func checkReuse(r *state, c *loaded, p change.Plan) {
 		need := strings.TrimSpace(row.Cells[0])
 		existing := strings.TrimSpace(strings.ReplaceAll(row.Cells[1], "`", ""))
 		decision := strings.TrimSpace(strings.ReplaceAll(row.Cells[2], "`", ""))
-		switch decision {
-		case "reuse", "extend":
+		switch {
+		case decision == "extend" || earlier && decision == "reuse":
 			if !strings.HasPrefix(existing, "external:") {
 				checkExistingPath(r, c, rl, need, existing)
 			}
-		case "new":
+		case decision == "new":
 			if strings.TrimSpace(row.Cells[3]) == "" {
 				r.add(c, "reuse-table", planFile, rl, "%q: a `new` row needs a Reason", need)
 			}
 		default:
 			r.add(c, "reuse-table", planFile, rl,
-				"%q: Decision %q must be reuse, extend or new", need, decision)
-		}
-		if strings.TrimSpace(row.Cells[4]) == "" {
-			r.add(c, "reuse-table", planFile, rl, "%q: Evidence is empty", need)
+				"%q: Decision %q must be extend or new; the table lists only what the change builds", need, decision)
 		}
 	}
 }
@@ -145,12 +145,12 @@ func checkExistingPath(r *state, c *loaded, line int, need, existing string) {
 	}
 }
 
-func sameHeader(h []string) bool {
-	if len(h) != len(reuseHeader) {
+func sameHeader(h, want []string) bool {
+	if len(h) != len(want) {
 		return false
 	}
 	for i := range h {
-		if !strings.EqualFold(strings.TrimSpace(h[i]), reuseHeader[i]) {
+		if !strings.EqualFold(strings.TrimSpace(h[i]), want[i]) {
 			return false
 		}
 	}

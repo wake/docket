@@ -27,6 +27,7 @@ var Earlier = map[string][]string{
 	"openspec/schemas/docket/schema.yaml": {
 		"5aeaf2bbbbf4ee8f2231f2f7d16d0de079ebe7f1257a3d5381d77467171e4550", // v0.16.0, v0.17.0, v0.18.0
 		"b7126bff76ee3b91994dca48cc0a28f4b7fc38393776b5ea5498e73b2e530589", // v0.26.0
+		"5fbc2aaef7f42f715647ee475dd1d80d266209d3f8fba5bfe65f9c93d8b4703a", // v0.27.0
 	},
 	"openspec/schemas/docket/templates/design.md": {
 		"6ccc87f5017fb190e69e8759dd4e20d5ac3320cc4dabf152708bf8f2aa5205f8", // v0.16.0, v0.17.0, v0.18.0
@@ -34,6 +35,7 @@ var Earlier = map[string][]string{
 	"openspec/schemas/docket/templates/plan.md": {
 		"9f58b30fa65f74b3893423d73b94f64d04f37cb18db575ab43e0df4d1ea545a4", // v0.16.0, v0.17.0, v0.18.0
 		"65d6b1cd124cad1888a8b6be96e6542aabc75d40ed072c1c3edf91978e58fb1d", // v0.26.0
+		"cde45107190618d0a13258c5698c4af728961cee197eca112f549383bba0ebd9", // v0.27.0
 	},
 	"openspec/schemas/docket/templates/proposal.md": {
 		"baa96c14f1c7540b6ea644628ec88e192832e92a7290c6b40bc40dffb8344d31", // v0.16.0, v0.17.0, v0.18.0
