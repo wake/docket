@@ -2,7 +2,7 @@
 
 **Goal:** `dkt lint` reports `domain-unlisted` for each capability the domain tree leaves out, and the docket skill tells the agent when to suggest starting a tree and how to record that the user declined one.
 
-**Architecture:** `domain.Loaded` gains the sorted list of capabilities no node holds; `dkt domains` builds `result.unclassified` from it, and `dkt lint` reports the same list, all of it with no change named and the part with a delta in a named change otherwise. The skill's Full review step 2 says when to suggest a tree and sends the agent to `domain-tree.md`, whose new section says how.
+**Architecture:** `domain.Loaded` gains the sorted list of capabilities no node holds; `dkt domains` builds `result.unclassified` from it, and `dkt lint` reports the same list, all of it with no change named and the part with a delta in a named change otherwise, leaving out a capability a linted change retires. The skill's Full review step 2 says when to suggest a tree and sends the agent to `domain-tree.md`, whose new section says how.
 
 **Tech Stack:** Go, standard library only; Markdown prompt text.
 
@@ -31,11 +31,15 @@
 | The docket skill | shipped/skill/SKILL.md | extend | Step 2 and the Domain tree section point to it |
 | Hashes of earlier shipped files | internal/setup/history.go:Earlier | extend | `dkt init` must recognize the two files as shipped before this change |
 
+## Revision 1 (2026-11-16): a capability a change retires
+
+The pre-merge review on the other model found that a change removing a capability was stopped: the skill has it delete the capability's line from the tree, but until archiving the main spec and the removing delta remain, so `domain-unlisted` reported it, and keeping the line instead leaves `domain-unknown` after archiving. Lint now leaves out a capability whose delta in a linted change only removes requirements; the delta adds the requirement Capability retired by a change, and Task 1 gains the acceptance item for it, replacing the case that expected the removing change to be reported. Requested by the reviewer, in the pre-merge review.
+
 ---
 
 ### Task 1: The domain-unlisted rule
 
-**Scenarios:** change-lint#main-spec-left-out-of-the-tree, change-lint#new-capability-in-a-named-change, change-lint#capability-outside-the-named-change, change-lint#tree-with-no-items, change-lint#tree-with-a-format-problem, domain-tree#declined-tree, domain-tree#spec-outside-the-tree
+**Scenarios:** change-lint#main-spec-left-out-of-the-tree, change-lint#new-capability-in-a-named-change, change-lint#capability-outside-the-named-change, change-lint#tree-with-no-items, change-lint#tree-with-a-format-problem, change-lint#capability-being-removed, change-lint#removal-with-an-addition, domain-tree#declined-tree, domain-tree#spec-outside-the-tree
 
 **Review:** judgment
 
@@ -56,8 +60,9 @@
 - [x] `dkt domains` gives the same `result.unclassified` as before, its existing tests passing unchanged, and the declined-tree case reports found, no nodes and the capability unclassified, with no finding; tested in `internal/cli/cmd_domains_test.go`
 - [x] `dkt snapshot` reads a tree holding only a comment line as found, with no nodes and every capability unclassified, as before; tested in `internal/snapshot/snapshot_test.go`
 - [x] `dkt lint` naming no change reports `domain-unlisted` with the fixed message for an unlisted main spec and for an unlisted capability with only a delta in an active change, and none for a listed one; with no `openspec/changes` folder it still reports the unlisted main specs; tested in `internal/lint/lint_test.go`
-- [x] `dkt lint add-refund` reports it for `refund`, with the change set to `add-refund`; `dkt lint add-x` reports none for an unlisted main spec outside `add-x`; naming two changes that both hold a delta for an unlisted capability reports it once for each, with each change set; a change of another schema and a change whose only delta removes the capability are reported too; `dkt lint missing` reports `change-missing` and no `domain-unlisted`; tested in `internal/lint/lint_test.go`
+- [x] `dkt lint add-refund` reports it for `refund`, with the change set to `add-refund`; `dkt lint add-x` reports none for an unlisted main spec outside `add-x`; naming two changes that both hold a delta for an unlisted capability reports it once for each, with each change set; a change of another schema is reported too; `dkt lint missing` reports `change-missing` and no `domain-unlisted`; tested in `internal/lint/lint_test.go`
 - [x] No `domain-unlisted` for a tree with no items, a tree with a format problem, a tree with a duplicate, an active change's `specs` folder that is a symbolic link, or an `openspec/changes` folder that is a symbolic link, with and without a change named; no tree gives no domain finding; tested in `internal/lint/lint_test.go`
+- [ ] A change whose delta for `refund` only removes requirements gives no `domain-unlisted`, named or not; a delta that also adds a requirement, or holds none, is reported; with a removing change and a modifying change both named, only the modifying one is; tested in `internal/lint/lint_test.go`
 - [x] With a tree that lists `gone`, which does not exist, and leaves out `refund`, which has a main spec and a delta in `add-refund`: `dkt lint` reports `domain-unknown` for `gone` and `domain-unlisted` for `refund`, and `dkt lint add-refund` reports only `domain-unlisted` for `refund`; tested in `internal/lint/lint_test.go`
 
 ### Task 2: The skill suggests starting a tree

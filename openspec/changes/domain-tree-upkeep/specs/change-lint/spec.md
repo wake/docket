@@ -22,3 +22,14 @@ When `docket/domains.md` lists at least one item, has no format problem or dupli
 #### Scenario: Tree with a format problem
 - **WHEN** `docket/domains.md` holds a line that is not an item, `openspec/specs/refund/spec.md` exists, no node lists it, and a user runs `dkt lint`
 - **THEN** the finding `domain-format` is reported and there is no `domain-unlisted` finding
+
+### Requirement: Capability retired by a change
+`dkt lint` SHALL NOT report `domain-unlisted` for a capability whose delta in a linted change only removes requirements, as the change retires it and drops its line from the tree: with changes named, not for that change; with none named, not at all. A delta that also adds, modifies or renames a requirement SHALL NOT count as one that only removes.
+
+#### Scenario: Capability being removed
+- **WHEN** the tree lists `invoice` only, `openspec/specs/refund/spec.md` exists, the change `remove-refund` holds a delta for `refund` with only REMOVED requirements, and a user runs `dkt lint remove-refund` or `dkt lint`
+- **THEN** there is no `domain-unlisted` finding
+
+#### Scenario: Removal with an addition
+- **WHEN** the tree lists `invoice` only and the change `rework-refund` holds a delta for `refund` with an ADDED and a REMOVED requirement, and a user runs `dkt lint rework-refund`
+- **THEN** the finding `domain-unlisted` names `refund` and the change `rework-refund`
