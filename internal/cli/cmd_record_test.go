@@ -403,6 +403,47 @@ func TestRecordFolderSwappedAfterTheChecks(t *testing.T) {
 	}
 }
 
+// plantLinkAtName makes the first openNewFile find, at the name it creates, a
+// link to a file beside it, as another process could after the checks; the
+// link stays inside the folder, so only the open's own flags stop it. The
+// creation must take it as a taken name, never write through it. The
+// returned function reads the link's target.
+func plantLinkAtName(t *testing.T, repo string) (target func() string) {
+	t.Helper()
+	real := openNewFile
+	t.Cleanup(func() { openNewFile = real })
+	var p string
+	openNewFile = func(root *os.Root, rel string) (*os.File, error) {
+		if p == "" {
+			name := filepath.Join(repo, filepath.FromSlash(rel))
+			p = filepath.Join(filepath.Dir(name), "target")
+			if err := os.WriteFile(p, []byte("kept"), 0o644); err != nil {
+				t.Error(err)
+			}
+			if err := os.Symlink("target", name); err != nil {
+				t.Error(err)
+			}
+		}
+		return real(root, rel)
+	}
+	return func() string {
+		b, _ := os.ReadFile(p)
+		return string(b)
+	}
+}
+
+func TestRecordLinkAtNameAfterTheChecks(t *testing.T) {
+	r := recordRepo(t)
+	if err := os.MkdirAll(filepath.Join(r.Dir, "docket/records"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	target := plantLinkAtName(t, r.Dir)
+	doRecord(t, r, r.Dir, recArgs...)
+	if got := target(); got != "kept" {
+		t.Errorf("wrote through the link: target now %q", got)
+	}
+}
+
 func TestRecordFolderSwappedForLinkInside(t *testing.T) {
 	r := recordRepo(t)
 	folder := filepath.Join(r.Dir, "docket/records")

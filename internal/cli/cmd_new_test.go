@@ -469,6 +469,15 @@ func TestNewFolderSwappedAfterTheChecks(t *testing.T) {
 	}
 }
 
+func TestNewLinkAtNameAfterTheChecks(t *testing.T) {
+	e := newProject(t)
+	target := plantLinkAtName(t, e.r.Dir)
+	e.doNew(t, e.r.Dir, nil, okArgs...)
+	if got := target(); got != "kept" {
+		t.Errorf("wrote through the link: target now %q", got)
+	}
+}
+
 func TestNewFolderSwappedForLinkInside(t *testing.T) {
 	e := newProject(t)
 	dir := filepath.Join(e.r.Dir, "openspec/changes/add-x")

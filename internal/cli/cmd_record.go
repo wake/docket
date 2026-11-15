@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"syscall"
 
 	docket "github.com/wake/docket"
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/record"
+	"github.com/wake/docket/internal/safefile"
 	"github.com/wake/docket/internal/safepath"
 	"github.com/wake/docket/internal/scan"
 )
@@ -34,7 +34,7 @@ var openNewFile = func(root *os.Root, rel string) (*os.File, error) {
 		return nil, err
 	}
 	defer dir.Close()
-	return dir.OpenFile(path.Base(rel), os.O_WRONLY|os.O_CREATE|os.O_EXCL|syscall.O_NOFOLLOW, 0o644)
+	return dir.OpenFile(path.Base(rel), safefile.CreateFlags, 0o644)
 }
 
 // runRecord is the body of dkt record.
