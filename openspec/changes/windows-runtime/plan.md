@@ -34,7 +34,7 @@
 
 ## Revision 1 (2026-11-16): the batch file's own path, and its callers
 
-The pre-merge review on the other model found that the guard checked only the arguments, while the program's path goes on the same command line, so an `&` in a folder holding `openspec.cmd` could still run a command; and that `dkt init` and `dkt new` reported only a `*FailedError` as `openspec-failed`, leaving an `*UnsafeArgError` a raw error. The reviewer in a fresh context found the second too. The requirement Batch files given only plain arguments now covers the path, with a scenario of its own, and Task 2 gains the acceptance items for both. `dkt conflicts` already records any failed call of one copy as unreadable, as it does a `*FailedError`.
+The pre-merge review on the other model found that the guard checked only the arguments, while the program's path goes on the same command line, so an `&` in a folder holding `openspec.cmd` could still run a command; and that `dkt init` and `dkt new` reported only a `*FailedError` as `openspec-failed`, leaving an `*UnsafeArgError` a raw error. The reviewer in a fresh context found the second too. The requirement Batch files given only plain arguments now covers the path, with a scenario of its own, and Task 2 gains the acceptance items for both. `dkt conflicts` already records any failed call of one copy as unreadable, as it does a `*FailedError`. The re-review of that fix found that parentheses in a path with no space are not quoted, so `cmd.exe` reads them as syntax; they are now allowed only in a path that also holds a space.
 
 ---
 
@@ -88,7 +88,7 @@ The pre-merge review on the other model found that the guard checked only the ar
 
 - [x] `batch_test.go`, on every system, through the check taking whether the system is Windows: each of `& | < > ^ % ! ( ) " '`, a space and a non-ASCII letter in an argument is refused for a `.cmd` and a `.BAT` program on Windows; `add-x`, `identity/user-auth`, `claude,codex`, `@fission-ai/openspec@1.14.0`, `--deltas-only` pass; nothing is refused for an `.exe` program, nor on other systems.
 - [x] On Windows, a `Runner` whose program is a `.cmd` fake returns an `*UnsafeArgError` for `show add-x&calc`, and the fake's log shows it was not started (`runner_windows_test.go`).
-- [x] `batch_test.go`: a `.cmd` or `.bat` program whose path holds `&`, `%`, `|` or `^` is refused, naming the path; `C:\Program Files\nodejs\npx.cmd`, `C:\Program Files (x86)\npm\openspec.cmd` and a path with an 8.3 `~` pass.
+- [x] `batch_test.go`: a `.cmd` or `.bat` program whose path holds `&`, `%`, `|` or `^` is refused, naming the path; `C:\Program Files\nodejs\npx.cmd`, `C:\Program Files (x86)\npm\openspec.cmd` and a path with an 8.3 `~` pass; `C:\tools\a(b)\openspec.cmd`, with parentheses but no space and so unquoted, is refused.
 - [x] `dkt init` and `dkt new` report an `*UnsafeArgError` as `openspec-failed`, through `openSpecFailed`, which `runner_test.go` in `internal/cli` covers for a wrapped `*FailedError` and `*UnsafeArgError` against `*UnavailableError` and a plain error.
 - [x] Removing the check makes `batch_test.go` and the Windows test fail.
 - [x] `TestRealOpenSpec` and `TestRealOpenSpecConflicts` still pass on Windows through `npx.cmd` (Task 4's job).
