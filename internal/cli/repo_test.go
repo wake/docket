@@ -150,7 +150,7 @@ func TestRepoOriginReadFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	bin := t.TempDir()
-	testutil.FakeProgram(t, filepath.Join(bin, "git"), testutil.Program{ExitIfArg: "remote.origin.url", Code: 3, Real: real})
+	testutil.FakeProgram(t, filepath.Join(bin, "git"+testutil.Exe), testutil.Program{ExitIfArg: "remote.origin.url", Code: 3, Real: real})
 	env := append(append([]string{}, r.Env...), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var out bytes.Buffer
 	code := Run(Options{Args: []string{"domains", "--json"}, Dir: r.Dir, Env: env, Stdout: &out, Stderr: &bytes.Buffer{}})

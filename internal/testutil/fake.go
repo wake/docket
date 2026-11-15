@@ -13,8 +13,9 @@ import (
 	"testing"
 )
 
-// exe is the suffix of an executable's name on this system.
-var exe = func() string {
+// Exe is the suffix of an executable's name on this system: a fake that is
+// found through PATH must carry it.
+var Exe = func() string {
 	if runtime.GOOS == "windows" {
 		return ".exe"
 	}
@@ -76,9 +77,8 @@ func writeFake(t testing.TB, path string, payload map[string]any) {
 	}
 }
 
-// buildFakebin builds fakebin once per test process into the temporary
-// folder, named for its source, its system and the Go version, so later
-// processes reuse it.
+// buildFakebin builds fakebin once per test process, named for its source,
+// its system and the Go version, so later processes reuse it.
 func buildFakebin() {
 	_, here, _, _ := runtime.Caller(0)
 	src := filepath.Join(filepath.Dir(here), "fakebin")
@@ -88,18 +88,29 @@ func buildFakebin() {
 		return
 	}
 	sum := sha256.Sum256(fmt.Appendf(code, "\n%s/%s/%s", runtime.GOOS, runtime.GOARCH, runtime.Version()))
-	fakebin.path = filepath.Join(os.TempDir(), "docket-fakebin-"+hex.EncodeToString(sum[:8])+exe)
+	// the user's own cache, which other users cannot write to; the build is renamed into place whole
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		fakebin.err = err
+		return
+	}
+	dir := filepath.Join(cache, "docket-test")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		fakebin.err = err
+		return
+	}
+	fakebin.path = filepath.Join(dir, "fakebin-"+hex.EncodeToString(sum[:8])+Exe)
 	if _, err := os.Stat(fakebin.path); err == nil {
 		return
 	}
-	tmp, err := os.CreateTemp(os.TempDir(), "docket-fakebin-*"+exe)
+	tmp, err := os.CreateTemp(dir, "fakebin-*"+Exe)
 	if err != nil {
 		fakebin.err = err
 		return
 	}
 	tmp.Close()
 	defer os.Remove(tmp.Name())
-	goTool := filepath.Join(runtime.GOROOT(), "bin", "go"+exe)
+	goTool := filepath.Join(runtime.GOROOT(), "bin", "go"+Exe)
 	if _, err := os.Stat(goTool); err != nil {
 		goTool = "go"
 	}

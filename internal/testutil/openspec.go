@@ -64,7 +64,7 @@ const OpenSpecConfig = `schema: spec-driven
 func FakeOpenSpec(t testing.TB, version string) (cmd, log string) {
 	t.Helper()
 	dir := t.TempDir()
-	cmd = filepath.Join(dir, "openspec"+exe)
+	cmd = filepath.Join(dir, "openspec"+Exe)
 	log = filepath.Join(dir, "calls.log")
 	writeFake(t, cmd, map[string]any{"Kind": "openspec", "Log": log, "Version": version, "Config": OpenSpecConfig})
 	if err := os.WriteFile(log, nil, 0o644); err != nil {

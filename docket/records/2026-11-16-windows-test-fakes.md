@@ -18,5 +18,4 @@ The fakes could not run on Windows; `windows-runtime` needs them there.
 
 ## Review
 
-<!-- Who reviewed the diff (a model, or a person), what the review found,
-and how each finding was handled. -->
+codex (gpt-5.6-sol) found two: the built fake was cached in the shared temporary folder, where another user could plant one, now in the user's cache folder; fakes found through PATH lacked `.exe` on Windows, now named with `testutil.Exe`.

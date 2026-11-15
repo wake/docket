@@ -26,12 +26,12 @@ func run(t *testing.T, prog string, args ...string) (string, int) {
 func TestFakeProgram(t *testing.T) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "log")
-	printer := filepath.Join(dir, "printer"+exe)
+	printer := filepath.Join(dir, "printer"+Exe)
 	FakeProgram(t, printer, Program{Print: "hi\n", Code: 4})
 	if out, code := run(t, printer); out != "hi\n" || code != 4 {
 		t.Errorf("print: %q %d", out, code)
 	}
-	wrapper := filepath.Join(dir, "wrapper"+exe)
+	wrapper := filepath.Join(dir, "wrapper"+Exe)
 	FakeProgram(t, wrapper, Program{Log: log, ExitIfArg: "stop", Code: 3, Real: printer})
 	if out, code := run(t, wrapper, "a", "b"); out != "hi\n" || code != 4 {
 		t.Errorf("real: %q %d", out, code)
@@ -47,9 +47,9 @@ func TestFakeProgram(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gone := filepath.Join(dir, "gone"+exe)
+	gone := filepath.Join(dir, "gone"+Exe)
 	FakeProgram(t, gone, Program{Print: "bye\n", RemoveSelf: true})
-	copied := filepath.Join(t.TempDir(), "copied"+exe)
+	copied := filepath.Join(t.TempDir(), "copied"+Exe)
 	if err := os.WriteFile(copied, b, 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -9,7 +9,7 @@ import (
 
 func writeStub(t *testing.T, path string) {
 	t.Helper()
-	testutil.FakeProgram(t, path, testutil.Program{Print: "stub-marker\n"})
+	testutil.FakeProgram(t, path+testutil.Exe, testutil.Program{Print: "stub-marker\n"})
 }
 
 func TestRelativePathEntryResolvesAgainstDir(t *testing.T) {
