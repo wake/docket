@@ -263,8 +263,9 @@ artifacts:
       - Every task's `**Files:**` block lists every file the task creates or
         modifies, so parallel changes can be compared before they start.
       - What a task gives other tasks or takes from them (exported symbols
-        with their signatures, formats) goes in an `**Interfaces:**` block;
-        leave it out when there is none.
+        with their signatures, formats), and what it uses as it is that other
+        tasks or the reviewers need to know about, goes in an
+        `**Interfaces:**` block; leave it out when there is none.
       - Under each task, `- [ ]` checkboxes list its acceptance items: what
         must hold when the task is done, each one a result that can be
         checked, not a step to perform (a behavior and the test that covers

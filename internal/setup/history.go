@@ -45,7 +45,7 @@ var Earlier = map[string][]string{
 		"b7126bff76ee3b91994dca48cc0a28f4b7fc38393776b5ea5498e73b2e530589", // v0.26.0
 		"93357a05020f74fd4e847d038831513ea0a18b9687c39c5648ac5a6c2c2f617e", // v0.27.0
 		"b97feb0a9a40cac937b55eb03daaca66ea9fb283c362f68db99dcadd46c0cb0a", // v0.28.0
-		"a3f985fef0634dc718349f2b6799d61e81af0acd1784ffc90a7ad72827434b81", // v0.29.0
+		"508dd52f2098cca3d175f4a79cdd4193b6411d20562bfb2d364518411d0b2923", // v0.29.0
 	},
 	"openspec/schemas/docket/templates/design.md": {
 		"6ccc87f5017fb190e69e8759dd4e20d5ac3320cc4dabf152708bf8f2aa5205f8", // v0.16.0, v0.17.0, v0.18.0
