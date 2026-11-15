@@ -57,12 +57,12 @@
 - `execpath.MayRun(fi fs.FileInfo) bool`: true on Windows; elsewhere whether any execute bit is set.
 - Each has an unexported form taking whether the system is Windows, so the tests cover both rules on every system.
 
-- [ ] `execpath_test.go`, on every system, covers both rules: `Names` with `PATHEXT` unset, empty, set in mixed case, with an entry written without its dot, and with the name already carrying an extension in another case; `Getenv` with `Path` against `PATH`, and with two entries (the last wins); `MayRun` with and without execute bits.
-- [ ] On macOS and Linux, the existing tests of `internal/gitx` and `internal/openspec` pass unchanged apart from the `testutil.Exe` and `os.PathListSeparator` edits, including those of a relative `PATH` entry: `TestRelativePathEntryResolvesAgainstDir` and `TestEmptyPathEntryResolvesAgainstDir` (git resolves it against its folder), and the OpenSpec tests that a relative entry is skipped and a relative `DOCKET_OPENSPEC` program resolves against its folder.
-- [ ] `internal/openspec` and `internal/gitx`'s path tests pass on Windows, with the programs they make named with `testutil.Exe`: `TestDefaultFromPath`, `TestRelativeOverrideResolvesAgainstDir`, `TestUnstartableProgramIsUnavailable`, `TestRelativePathEntryResolvesAgainstDir`, `TestEmptyPathEntryResolvesAgainstDir`.
-- [ ] On Windows, through the real lookups: git is found from an environment spelling `Path` (`path_windows_test.go`); with two spellings of `Path`, the last one decides, for git and for OpenSpec; with `PATHEXT=.CMD;.EXE` and both `openspec.exe` and `openspec.cmd` in one folder, OpenSpec resolves to `openspec.cmd`, and to `openspec.exe` once the order is reversed; `DOCKET_OPENSPEC` naming an absolute `openspec.exe` resolves to that file, and naming `./bin/openspec` (no extension) resolves to `bin\openspec.exe` beside it (`runner_windows_test.go`).
-- [ ] `cmd/dkt`'s tests pass on Windows, running the `dkt` they build as `dkt` plus `testutil.Exe`.
-- [ ] Making `Names` return the name alone on Windows makes `execpath_test.go` and `TestDefaultFromPath` on Windows fail; making `Getenv` compare names exactly does the same for its test.
+- [x] `execpath_test.go`, on every system, covers both rules: `Names` with `PATHEXT` unset, empty, set in mixed case, with an entry written without its dot, and with the name already carrying an extension in another case; `Getenv` with `Path` against `PATH`, and with two entries (the last wins); `MayRun` with and without execute bits.
+- [x] On macOS and Linux, the existing tests of `internal/gitx` and `internal/openspec` pass unchanged apart from the `testutil.Exe` and `os.PathListSeparator` edits, including those of a relative `PATH` entry: `TestRelativePathEntryResolvesAgainstDir` and `TestEmptyPathEntryResolvesAgainstDir` (git resolves it against its folder), and the OpenSpec tests that a relative entry is skipped and a relative `DOCKET_OPENSPEC` program resolves against its folder.
+- [x] `internal/openspec` and `internal/gitx`'s path tests pass on Windows, with the programs they make named with `testutil.Exe`: `TestDefaultFromPath`, `TestRelativeOverrideResolvesAgainstDir`, `TestUnstartableProgramIsUnavailable`, `TestRelativePathEntryResolvesAgainstDir`, `TestEmptyPathEntryResolvesAgainstDir`.
+- [x] On Windows, through the real lookups: git is found from an environment spelling `Path` (`path_windows_test.go`); with two spellings of `Path`, the last one decides, for git and for OpenSpec; with `PATHEXT=.CMD;.EXE` and both `openspec.exe` and `openspec.cmd` in one folder, OpenSpec resolves to `openspec.cmd`, and to `openspec.exe` once the order is reversed; `DOCKET_OPENSPEC` naming an absolute `openspec.exe` resolves to that file, and naming `./bin/openspec` (no extension) resolves to `bin\openspec.exe` beside it (`runner_windows_test.go`).
+- [x] `cmd/dkt`'s tests pass on Windows, running the `dkt` they build as `dkt` plus `testutil.Exe`.
+- [x] Making `Names` return the name alone on Windows makes `execpath_test.go` and `TestDefaultFromPath` on Windows fail; making `Getenv` compare names exactly does the same for its test.
 
 ### Task 2: Plain arguments to a batch file
 
@@ -78,10 +78,10 @@
 **Interfaces:**
 - `openspec.UnsafeArgError{Program, Arg string}`: its message names the argument, says that `cmd.exe` would read it, and says that a `.bat` or `.cmd` OpenSpec takes only letters, digits and `-_.,/@+=:`.
 
-- [ ] `batch_test.go`, on every system, through the check taking whether the system is Windows: each of `& | < > ^ % ! ( ) " '`, a space and a non-ASCII letter in an argument is refused for a `.cmd` and a `.BAT` program on Windows; `add-x`, `identity/user-auth`, `claude,codex`, `@fission-ai/openspec@1.14.0`, `--deltas-only` pass; nothing is refused for an `.exe` program, nor on other systems.
-- [ ] On Windows, a `Runner` whose program is a `.cmd` fake returns an `*UnsafeArgError` for `show add-x&calc`, and the fake's log shows it was not started (`runner_windows_test.go`).
-- [ ] Removing the check makes `batch_test.go` and the Windows test fail.
-- [ ] `TestRealOpenSpec` and `TestRealOpenSpecConflicts` still pass on Windows through `npx.cmd` (Task 4's job).
+- [x] `batch_test.go`, on every system, through the check taking whether the system is Windows: each of `& | < > ^ % ! ( ) " '`, a space and a non-ASCII letter in an argument is refused for a `.cmd` and a `.BAT` program on Windows; `add-x`, `identity/user-auth`, `claude,codex`, `@fission-ai/openspec@1.14.0`, `--deltas-only` pass; nothing is refused for an `.exe` program, nor on other systems.
+- [x] On Windows, a `Runner` whose program is a `.cmd` fake returns an `*UnsafeArgError` for `show add-x&calc`, and the fake's log shows it was not started (`runner_windows_test.go`).
+- [x] Removing the check makes `batch_test.go` and the Windows test fail.
+- [x] `TestRealOpenSpec` and `TestRealOpenSpecConflicts` still pass on Windows through `npx.cmd` (Task 4's job).
 
 ### Task 3: LF checkouts
 
@@ -92,8 +92,8 @@
 **Files:**
 - Create: `.gitattributes`
 
-- [ ] `.gitattributes` holds `* text=auto eol=lf`, with a comment saying why; `git ls-files --eol` shows no file whose index copy has CRLF, so no file changes on renormalizing.
-- [ ] On Windows, `TestShippedStarts` (root package) and `TestEarlierHoldsShippedFiles` (`internal/setup`) pass, which failed there with CRLF checkouts.
+- [x] `.gitattributes` holds `* text=auto eol=lf`, with a comment saying why; `git ls-files --eol` shows no file whose index copy has CRLF, so no file changes on renormalizing.
+- [x] On Windows, `TestShippedStarts` (root package) and `TestEarlierHoldsShippedFiles` (`internal/setup`) pass, which failed there with CRLF checkouts.
 
 ### Task 4: Windows CI
 
@@ -104,6 +104,6 @@
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] The Windows job fetches the whole history (as the `test` job does, for the release tags) and also runs `go test` of `internal/execpath`, `internal/openspec`, `cmd/dkt` and the root package, `-run 'PathEntry'` of `internal/gitx`, and `-run 'TestEarlierHolds'` of `internal/setup`; its name is unchanged.
-- [ ] The `openspec` job runs on `ubuntu-latest` and `windows-latest` for each OpenSpec version, and `TestRealOpenSpec` and `TestRealOpenSpecConflicts` pass on both.
-- [ ] Every other job is unchanged and passes.
+- [x] The Windows job fetches the whole history (as the `test` job does, for the release tags) and also runs `go test` of `internal/execpath`, `internal/openspec`, `cmd/dkt` and the root package, `-run 'PathEntry'` of `internal/gitx`, and `-run 'TestEarlierHolds'` of `internal/setup`; its name is unchanged.
+- [x] The `openspec` job runs on `ubuntu-latest` and `windows-latest` for each OpenSpec version, and `TestRealOpenSpec` and `TestRealOpenSpecConflicts` pass on both.
+- [x] Every other job is unchanged and passes.
