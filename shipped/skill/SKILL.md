@@ -195,8 +195,9 @@ their area themselves, so editing this file touches no spec.
      source into the front matter of `proposal.md`.
    - When the slug is taken, it uses the first free suffix (`-2`, `-3`, ...)
      and reports it; use the slug it reports from then on.
-   - Always open a change with `dkt new`, never with `/opsx:propose` or
-     `/opsx:new`.
+   - Always open a change with `dkt new`, never with OpenSpec's
+     `openspec-propose` or `openspec-new-change` skill (`/opsx:propose` or
+     `/opsx:new` before OpenSpec 2.0).
 2. superpowers:brainstorming writes its design documents into the change
    folder, not `docs/superpowers/specs/`.
    - The design documents are `proposal.md`, the delta specs under `specs/`,
@@ -218,17 +219,18 @@ their area themselves, so editing this file touches no spec.
 5. Execute the plan task by task: for each task, follow "Task execution"
    in `docket/workflow.md`, then "Task review" in `docket/workflow.md`.
    Every commit carries a trailer (see "Commit trailers"). Work started
-   from `/opsx:apply` follows the same steps.
+   from OpenSpec's `openspec-apply-change` skill (`/opsx:apply` before
+   OpenSpec 2.0) follows the same steps.
 6. Before opening the pull request, run `dkt sync <slug>` (which ticks the
    plan from the trailers) and `dkt lint <slug>`, and commit plan.md.
 7. Follow "Pre-merge review" in `docket/workflow.md`.
 8. Merge: follow "Splitting pull requests" and "How to merge" in
    `docket/workflow.md`. Whatever the method, never squash.
 9. Archive: when to archive follows "When to archive" in
-   `docket/workflow.md`. Always archive with OpenSpec's archive
-   (`/opsx:archive`). Following the instructions in `openspec/config.yaml`,
-   it runs Docket's checks first and, after archiving, replaces each new
-   spec's title with the name given in step 2.
+   `docket/workflow.md`. Always archive with OpenSpec's
+   `openspec-archive-change` skill. Following the instructions in
+   `openspec/config.yaml`, it runs Docket's checks first and, after
+   archiving, replaces each new spec's title with the name given in step 2.
 
 When requirements change mid-way, follow the plan rules: cancelled tasks,
 compensating tasks, a Revision section.
