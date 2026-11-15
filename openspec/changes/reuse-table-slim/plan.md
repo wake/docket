@@ -43,11 +43,11 @@
 - Modify: `internal/lint/plan_test.go`
 - Modify: `internal/cli/realopenspec_test.go`
 
-- [ ] A four-column table with no rows, and an earlier five-column table with no rows, give no finding.
-- [ ] In the four-column table, a `reuse` row gives `reuse-table` on that row; an `extend` row with a missing path gives `reuse-table`; `external:` and a `new` row with a Reason give nothing; a `new` row without a Reason gives `reuse-table`.
-- [ ] In the earlier table, with every Evidence cell empty, each row case of the item above gives the same result as in the four-column table, except that a `reuse` row is accepted there: naming an existing path or `external:` it gives nothing, naming a missing path it gives `reuse-table`.
-- [ ] Any other header, including five columns that do not end with Evidence, gives one `reuse-table` finding on the header line whose message lists the four columns.
-- [ ] The tests in `internal/lint/plan_test.go` use the four-column table, with the earlier table kept only in tests about it; the sample plan in `internal/cli/realopenspec_test.go` uses the four-column table.
+- [x] A four-column table with no rows, and an earlier five-column table with no rows, give no finding.
+- [x] In the four-column table, a `reuse` row gives `reuse-table` on that row; an `extend` row with a missing path gives `reuse-table`; `external:` and a `new` row with a Reason give nothing; a `new` row without a Reason gives `reuse-table`.
+- [x] In the earlier table, with every Evidence cell empty, each row case of the item above gives the same result as in the four-column table, except that a `reuse` row is accepted there: naming an existing path or `external:` it gives nothing, naming a missing path it gives `reuse-table`.
+- [x] Any other header, including five columns that do not end with Evidence, gives one `reuse-table` finding on the header line whose message lists the four columns.
+- [x] The tests in `internal/lint/plan_test.go` use the four-column table, with the earlier table kept only in tests about it; the sample plan in `internal/cli/realopenspec_test.go` uses the four-column table.
 
 ### Task 2: The plan instruction and the template describe the four-column table
 
@@ -62,8 +62,8 @@
 - Modify: `openspec/schemas/docket/templates/plan.md`
 - Modify: `internal/setup/history.go`
 
-- [ ] The plan instruction's Reuse paragraph says the table lists what the change builds, gives the four-column header, says when a row is `extend` or `new` and that the table may be empty, and no longer mentions Evidence or `reuse` rows.
-- [ ] The template's table header is the four columns.
-- [ ] The copies under `openspec/schemas/docket/` match `shipped/`, installed by this worktree's own build with `init --force`.
-- [ ] `internal/setup/history.go` holds the new hashes under v0.27.0, and `go test ./...` passes, `TestEarlierHoldsShippedFiles` included.
-- [ ] `openspec instructions plan --change reuse-table-slim` prints the four-column template, and `dkt lint reuse-table-slim` from this worktree's build reports nothing.
+- [x] The plan instruction's Reuse paragraph says the table lists what the change builds, gives the four-column header, says when a row is `extend` or `new` and that the table may be empty, and no longer mentions Evidence or `reuse` rows.
+- [x] The template's table header is the four columns.
+- [x] The copies under `openspec/schemas/docket/` match `shipped/`, installed by this worktree's own build with `init --force`.
+- [x] `internal/setup/history.go` holds the new hashes under v0.27.0, and `go test ./...` passes, `TestEarlierHoldsShippedFiles` included.
+- [x] `openspec instructions plan --change reuse-table-slim` prints the four-column template, and `dkt lint reuse-table-slim` from this worktree's build reports nothing.
