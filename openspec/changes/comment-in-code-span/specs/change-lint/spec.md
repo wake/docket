@@ -35,6 +35,10 @@ In every Markdown file of a `docket` change, in each record and issue it lints a
 - **WHEN** a record the branch adds holds a line with a comment opener in a code span
 - **THEN** lint reports `comment-in-code-span` on that line of the record
 
+#### Scenario: Opener in an issue
+- **WHEN** an issue the branch adds holds a line with a comment opener in a code span
+- **THEN** lint reports `comment-in-code-span` on that line of the issue
+
 #### Scenario: Opener in a main spec
 - **WHEN** `openspec/specs/orders/spec.md` holds a line with a comment opener in a code span, followed by `### Requirement: Persist orders`, and a user runs `dkt lint` naming no change
 - **THEN** lint reports `comment-in-code-span` on that line of that spec

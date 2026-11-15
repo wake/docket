@@ -2,12 +2,12 @@
 
 ## Context
 
-dkt finds HTML comments with `markdown.BlankComments`, after `FenceMask`: outside fenced lines, a comment opener starts a comment wherever it stands, and the first comment closer (the two dashes and angle bracket, or the form with an exclamation mark) ends it; the state carries across lines and over fenced lines. `change.ParsePlan`, `record.Parse`, `specdoc`, `setup` and the lint rules read through it. OpenSpec 2.0.0, the version checked here, finds comments the same way where it looks at them (`maskHtmlComments` in `core/parsers/requirement-blocks.js` and in `core/specs-apply.js`); its requirement parser does not look at comments. Neither knows code spans. `markdown.CodeSpans` finds the code spans of one line for the placeholder rule: a run of backticks opens a span that the next run of the same length on the line closes. See proposal.md - Why for the effect.
+dkt finds HTML comments with `markdown.BlankComments`, after `FenceMask`: outside fenced lines, a comment opener starts a comment wherever it stands, and the first comment closer (the two dashes and angle bracket, or the form with an exclamation mark) ends it; the state carries across lines and over fenced lines. `change.ParsePlan`, `record.Parse`, `specdoc`, `setup` and the lint rules read through it. OpenSpec 2.0.0, the version checked here, finds comments the same way after fences in `maskHtmlComments` of `core/parsers/requirement-blocks.js`, which only decides whether delta text was left unapplied; `maskHtmlComments` of `core/specs-apply.js` blanks comments before fences, for the Purpose of a new main spec, the order `fence-in-comment` covers; its requirement parser does not look at comments. None of them knows code spans. `markdown.CodeSpans` finds the code spans of one line for the placeholder rule: a run of backticks opens a span that the next run of the same length on the line closes. See proposal.md - Why for the effect.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Name the comment openers where dkt's reading and a reading that finds code spans first differ, so that a file with no finding is read the same by both.
+- Name the comment openers where dkt's reading and a reading that finds each line's code spans first differ, so that a file with no finding is read the same by both. That reading is not Markdown's in full: a span across lines is not part of it (see Risks).
 
 **Non-Goals:**
 - Changing `BlankComments`, `CodeSpans` or any reader built on them.
@@ -38,11 +38,11 @@ When dkt's reading closes the comment a reported opener started, the finding tak
 
 ### Shared pieces
 
-The closer search and the span search already exist inline in `BlankComments`, `FencesInComments` and `CodeSpans`. They move into two small helpers, one finding the end of a comment closer in a string and one finding the end of the span a backtick run opens, in a structural commit before the rule, so the readers and the check find closers and spans the same way.
+The closer search and the span search already exist inline in `BlankComments`, `FencesInComments` and `CodeSpans`. They move into two small helpers, one finding the end of a comment closer in a string and one finding the end of the span a backtick run opens, in a structural commit before the rule, so the readers and the check find closers and spans the same way. A closer on a fenced line does not end a comment, as in `BlankComments`.
 
 ### Checked where the fence rules are checked
 
-The rule runs wherever the fence rules run, through the helper that gathers a file's findings for every lint caller: each `.md` file of a `docket` change, each record and issue lint reads, and, when no change is named, each main spec in the walk that checks titles.
+The rule runs wherever the fence rules run, through `fenceFindings`, the helper that gathers a file's findings for every lint caller, so no caller changes: each `.md` file of a `docket` change, each record and issue lint reads, and, when no change is named, each main spec in the walk that checks titles.
 
 ### Main spec text
 
