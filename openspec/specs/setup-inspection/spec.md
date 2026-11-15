@@ -38,6 +38,10 @@ For each file that is not `same`, `dkt inspect` SHALL report a finding named aft
 - **WHEN** `openspec/schemas/docket/templates/plan.md` equals the file an earlier release shipped
 - **THEN** `result.files` lists it as `outdated` and the finding `schema-outdated` names it
 
+#### Scenario: Skill folder from an earlier release inspected
+- **WHEN** both skill folders hold only an earlier release's `SKILL.md`
+- **THEN** `skill-outdated` names each `SKILL.md`, `skill-missing` names each other skill file in both folders, and dkt exits with 1
+
 ### Requirement: config.yaml inspected
 `dkt inspect` SHALL check `openspec/config.yaml` by the rules `dkt init` uses and report `config-schema-default` when the file is missing, has no top-level `schema` or has `schema: spec-driven`; `config-schema-other` when it names another schema; and `guidance-missing`, `guidance-outdated` or `guidance-differs` when its `operations` section is missing, equals an earlier release's, or holds anything else.
 

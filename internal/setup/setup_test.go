@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"syscall"
 	"testing"
 	"testing/fstest"
@@ -23,6 +24,22 @@ func shipped(t *testing.T) fs.FS {
 		t.Fatal(err)
 	}
 	return sub
+}
+
+// skillFiles lists the shipped skill folder's files, relative to it.
+func skillFiles(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	err := fs.WalkDir(shipped(t), "skill", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			out = append(out, p[len("skill/"):])
+		}
+		return err
+	})
+	if err != nil || len(out) == 0 {
+		t.Fatal("no skill files", err)
+	}
+	return out
 }
 
 func put(t *testing.T, root, rel, content string) {
@@ -88,10 +105,13 @@ func TestDecideEmptyRootIsAllMissingInOrder(t *testing.T) {
 		"openspec/schemas/docket/templates/proposal.md",
 		"openspec/schemas/docket/templates/spec.md",
 		"openspec/config.yaml",
-		".claude/skills/docket/SKILL.md",
-		".agents/skills/docket/SKILL.md",
-		"docket/workflow.md",
 	}
+	for _, r := range []string{".claude/skills/docket/", ".agents/skills/docket/"} {
+		for _, f := range skillFiles(t) {
+			want = append(want, r+f)
+		}
+	}
+	want = append(want, "docket/workflow.md")
 	if len(paths) != len(want) {
 		t.Fatalf("got %v", paths)
 	}
@@ -188,6 +208,41 @@ func TestDecideOutdated(t *testing.T) {
 	}
 }
 
+func TestDecideEverySkillFileInEachFolder(t *testing.T) {
+	m := fstest.MapFS{}
+	fs.WalkDir(shipped(t), ".", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			b, _ := fs.ReadFile(shipped(t), p)
+			m[p] = &fstest.MapFile{Data: b}
+		}
+		return err
+	})
+	m["skill/side.md"] = &fstest.MapFile{Data: []byte("side\n")}
+	ds, _, err := Decide(t.TempDir(), m, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, d := range ds {
+		if d.Kind == KindSkill {
+			got = append(got, d.Path)
+		}
+	}
+	var want []string
+	for _, r := range []string{".claude/skills/docket/", ".agents/skills/docket/"} {
+		want = append(want, r+"SKILL.md")
+		for _, f := range skillFiles(t) {
+			if f != "SKILL.md" {
+				want = append(want, r+f)
+			}
+		}
+		want = append(want, r+"side.md")
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestDecideUserFilesAreNotTargets(t *testing.T) {
 	root := t.TempDir()
 	put(t, root, ".claude/skills/docket/extra.md", "x")
@@ -211,7 +266,7 @@ func TestDecideSymlinkOneProblemPerLink(t *testing.T) {
 	if len(ps) != 1 || ps[0].Kind != ProblemSymlink || ps[0].Path != "openspec/schemas/docket" {
 		t.Fatalf("%+v", ps)
 	}
-	if len(ds) != 4 {
+	if len(ds) != 2+2*len(skillFiles(t)) {
 		t.Errorf("config, skill and workflow targets should remain: %d", len(ds))
 	}
 	entries, _ := os.ReadDir(other)
@@ -280,7 +335,7 @@ func TestWriteModes(t *testing.T) {
 		t.Errorf("dir mode %v", di.Mode().Perm())
 	}
 	entries, _ := os.ReadDir(filepath.Join(root, ".claude/skills/docket"))
-	if len(entries) != 1 {
+	if len(entries) != len(skillFiles(t)) {
 		t.Error("temporary file left behind")
 	}
 }

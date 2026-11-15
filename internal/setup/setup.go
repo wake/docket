@@ -110,7 +110,7 @@ func Decide(root string, shipped fs.FS, force bool) ([]Decision, []Problem, erro
 	return ds, problems, nil
 }
 
-// targetsOf lists the schema files sorted by path, then openspec/config.yaml, then the skill in each skill root, then the workflow file.
+// targetsOf lists the schema files sorted by path, then openspec/config.yaml, then the skill folder's files sorted by path in each skill root, then the workflow file.
 func targetsOf(shipped fs.FS) ([]target, error) {
 	var out []target
 	err := fs.WalkDir(shipped, "schema", func(p string, d fs.DirEntry, err error) error {
@@ -132,12 +132,26 @@ func targetsOf(shipped fs.FS) ([]target, error) {
 		return nil, err
 	}
 	out = append(out, target{rel: configPath, want: ops, kind: KindConfig})
-	skill, err := fs.ReadFile(shipped, "skill/SKILL.md")
+	var skill []target
+	err = fs.WalkDir(shipped, "skill", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		want, err := fs.ReadFile(shipped, p)
+		if err != nil {
+			return err
+		}
+		skill = append(skill, target{rel: p[len("skill/"):], want: want, kind: KindSkill})
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range []string{".claude/skills/docket/SKILL.md", ".agents/skills/docket/SKILL.md"} {
-		out = append(out, target{rel: r, want: skill, kind: KindSkill})
+	for _, r := range []string{".claude/skills/docket", ".agents/skills/docket"} {
+		for _, t := range skill {
+			t.rel = path.Join(r, t.rel)
+			out = append(out, t)
+		}
 	}
 	tpl, err := fs.ReadFile(shipped, "workflow/workflow.md")
 	if err != nil {

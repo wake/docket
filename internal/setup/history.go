@@ -14,6 +14,13 @@ var Earlier = map[string][]string{
 		"74b12750a28b2af14d7f2717ce35f2e237a30ca135c57bb86880562fbe605f7a", // v0.22.0
 		"40503ca11812dae05ff3e2e2c4fdc5e7f13661bb0b8f0b1dc7dbd8e32eb614a8", // v0.24.2
 		"ca265ef4ab31fcc0a8c96324bd30ab6091512431337c530f52e8fe1d04085e09", // v0.27.0
+		"891c3b3f3ef767bc03158be092829d18922747506b1599563f1fea9dc1998027", // v0.28.0
+	},
+	".agents/skills/docket/domain-tree.md": {
+		"13e8d75866c692b0bf5936b7a877a74d3026b3a4613018284fd14c368eec3d70", // v0.28.0
+	},
+	".agents/skills/docket/issues-in-another-tool.md": {
+		"cf438e83ed3e6f7f0db63c31c82e28a695d6fe4f37197773c1f8e8147d66da7d", // v0.28.0
 	},
 	".claude/skills/docket/SKILL.md": {
 		"0930d8fc316c0c7a152cbf3535de013bbc5e5ac9918f97444099f27e051b5a18", // v0.16.0
@@ -22,6 +29,13 @@ var Earlier = map[string][]string{
 		"74b12750a28b2af14d7f2717ce35f2e237a30ca135c57bb86880562fbe605f7a", // v0.22.0
 		"40503ca11812dae05ff3e2e2c4fdc5e7f13661bb0b8f0b1dc7dbd8e32eb614a8", // v0.24.2
 		"ca265ef4ab31fcc0a8c96324bd30ab6091512431337c530f52e8fe1d04085e09", // v0.27.0
+		"891c3b3f3ef767bc03158be092829d18922747506b1599563f1fea9dc1998027", // v0.28.0
+	},
+	".claude/skills/docket/domain-tree.md": {
+		"13e8d75866c692b0bf5936b7a877a74d3026b3a4613018284fd14c368eec3d70", // v0.28.0
+	},
+	".claude/skills/docket/issues-in-another-tool.md": {
+		"cf438e83ed3e6f7f0db63c31c82e28a695d6fe4f37197773c1f8e8147d66da7d", // v0.28.0
 	},
 	"openspec/config.yaml#operations": {
 		"e3f455c4cdf31ed8f6b754df7e912832d60e3583d5376cfb0afd1ad7b22c5753", // v0.16.0, v0.17.0, v0.18.0

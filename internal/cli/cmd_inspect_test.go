@@ -171,6 +171,61 @@ func TestInspectEditedSkill(t *testing.T) {
 	}
 }
 
+func TestInspectSkillFolderFromEarlierRelease(t *testing.T) {
+	withSideFile(t)
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	earlier(t, "old skill", skillDirs[0]+"SKILL.md", skillDirs[1]+"SKILL.md")
+	for _, d := range skillDirs {
+		r.Write(d+"SKILL.md", "old skill")
+		if err := os.Remove(filepath.Join(r.Dir, d+sideFile)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	got := rules(m)
+	slices.Sort(got["skill-outdated"])
+	slices.Sort(got["skill-missing"])
+	if code != 1 ||
+		!slices.Equal(got["skill-outdated"], []string{skillDirs[1] + "SKILL.md", skillDirs[0] + "SKILL.md"}) ||
+		!slices.Equal(got["skill-missing"], []string{skillDirs[1] + sideFile, skillDirs[0] + sideFile}) {
+		t.Errorf("code=%d %v", code, got)
+	}
+}
+
+func TestInspectSideFileRules(t *testing.T) {
+	withSideFile(t)
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	side := skillDirs[0] + sideFile
+
+	r.Write(side, "mine")
+	if code, m, _ := inspect(t, r, "1.14.0", false); code != 1 || one(m, "skill-differs") != side {
+		t.Errorf("edited: code=%d %+v", code, m.Findings)
+	}
+
+	earlier(t, "old side", side)
+	r.Write(side, "old side")
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	listed := false
+	for _, f := range m.Result.Files {
+		listed = listed || f.Path == side && f.Status == "outdated"
+	}
+	if code != 1 || one(m, "skill-outdated") != side || !listed {
+		t.Errorf("earlier: code=%d %+v", code, m)
+	}
+
+	if err := os.Remove(filepath.Join(r.Dir, side)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(t.TempDir(), "nowhere"), filepath.Join(r.Dir, side)); err != nil {
+		t.Fatal(err)
+	}
+	if code, m, _ := inspect(t, r, "1.14.0", false); code != 1 || one(m, "symlink-refused") != side {
+		t.Errorf("link: code=%d %+v", code, m.Findings)
+	}
+}
+
 func TestInspectConfigOutdatedAndOther(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
@@ -608,6 +663,13 @@ const wfPath = "docket/workflow.md"
 // withShippedWorkflow makes dkt see a shipped workflow template with the given text.
 func withShippedWorkflow(t *testing.T, text string) {
 	t.Helper()
+	withShipped(t, "workflow/workflow.md", text)
+}
+
+// withShipped makes the shipped tree, for the rest of the test, the real one
+// with the file at p, relative to shipped/, set to text.
+func withShipped(t *testing.T, p, text string) {
+	t.Helper()
 	saved := shippedFS
 	t.Cleanup(func() { shippedFS = saved })
 	m := fstest.MapFS{}
@@ -618,7 +680,7 @@ func withShippedWorkflow(t *testing.T, text string) {
 		}
 		return nil
 	})
-	m["workflow/workflow.md"] = &fstest.MapFile{Data: []byte(text)}
+	m[p] = &fstest.MapFile{Data: []byte(text)}
 	shippedFS = func() fs.FS { return m }
 }
 

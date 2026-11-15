@@ -293,6 +293,123 @@ func TestInitEarlierRelease(t *testing.T) {
 	}
 }
 
+const sideFile = "side.md"
+
+var skillDirs = []string{".claude/skills/docket/", ".agents/skills/docket/"}
+
+// withSideFile adds a second file, side.md, to the shipped skill folder.
+func withSideFile(t *testing.T) {
+	t.Helper()
+	withShipped(t, "skill/"+sideFile, "side\n")
+}
+
+// earlier makes text, for the rest of the test, the only earlier release's
+// file at each of paths.
+func earlier(t *testing.T, text string, paths ...string) {
+	t.Helper()
+	saved := setup.Earlier
+	t.Cleanup(func() { setup.Earlier = saved })
+	sum := sha256.Sum256([]byte(text))
+	setup.Earlier = map[string][]string{}
+	for _, p := range paths {
+		setup.Earlier[p] = []string{hex.EncodeToString(sum[:])}
+	}
+}
+
+func reloads(m initOut) bool {
+	return strings.Contains(strings.Join(m.Result.NextSteps, "\n"), "reload")
+}
+
+func TestInitSkillFolder(t *testing.T) {
+	withSideFile(t)
+	r := testutil.NewRepo(t)
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	if code != 0 || !reloads(m) {
+		t.Fatalf("code=%d %+v", code, m.Result)
+	}
+	for _, d := range skillDirs {
+		if status(m, d+sideFile) != "created" || readFile(t, r, d+sideFile) != "side\n" {
+			t.Errorf("%s: %q", d, status(m, d+sideFile))
+		}
+	}
+}
+
+func TestInitSkillFolderFromEarlierRelease(t *testing.T) {
+	withSideFile(t)
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	earlier(t, "old skill", skillDirs[0]+"SKILL.md", skillDirs[1]+"SKILL.md")
+	for _, d := range skillDirs {
+		r.Write(d+"SKILL.md", "old skill")
+		if err := os.Remove(filepath.Join(r.Dir, d+sideFile)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	if code != 0 || reloads(m) {
+		t.Fatalf("code=%d %+v", code, m.Result)
+	}
+	for _, d := range skillDirs {
+		if status(m, d+"SKILL.md") != "updated" || readFile(t, r, d+"SKILL.md") == "old skill" ||
+			status(m, d+sideFile) != "created" || readFile(t, r, d+sideFile) != "side\n" {
+			t.Errorf("%s: %q %q", d, status(m, d+"SKILL.md"), status(m, d+sideFile))
+		}
+	}
+}
+
+func TestInitEditedSkillStillGetsSideFile(t *testing.T) {
+	withSideFile(t)
+	r := testutil.NewRepo(t)
+	r.Write("openspec/specs/.keep", "")
+	r.Write(skillPath, "mine")
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	if code != 1 || status(m, skillPath) != "kept" || status(m, skillDirs[0]+sideFile) != "created" {
+		t.Errorf("code=%d %+v", code, m.Result.Files)
+	}
+}
+
+func TestInitSideFileRules(t *testing.T) {
+	withSideFile(t)
+	r := testutil.NewRepo(t)
+	doInit(t, r, r.Dir, "1.14.0", nil, "--tools", "claude")
+	side := skillDirs[0] + sideFile
+
+	r.Write(side, "mine")
+	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", nil)
+	if code != 1 || status(m, side) != "kept" || !hasFinding(m, "skill-differs", side) {
+		t.Errorf("edited: code=%d %+v", code, m)
+	}
+	code, m, _, _ = doInit(t, r, r.Dir, "1.14.0", nil, "--force")
+	if code != 0 || status(m, side) != "overwritten" || readFile(t, r, side) != "side\n" {
+		t.Errorf("forced: code=%d %+v", code, m.Result.Files)
+	}
+
+	earlier(t, "old side", side)
+	r.Write(side, "old side")
+	code, m, _, _ = doInit(t, r, r.Dir, "1.14.0", nil)
+	if code != 0 || status(m, side) != "updated" || readFile(t, r, side) != "side\n" {
+		t.Errorf("earlier: code=%d %+v", code, m.Result.Files)
+	}
+
+	target := filepath.Join(t.TempDir(), "elsewhere.md")
+	if err := os.WriteFile(target, []byte("elsewhere"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(r.Dir, side)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, filepath.Join(r.Dir, side)); err != nil {
+		t.Fatal(err)
+	}
+	other := skillDirs[1] + sideFile
+	r.Write(other, "mine")
+	code, m, _, _ = doInit(t, r, r.Dir, "1.14.0", nil, "--force")
+	b, _ := os.ReadFile(target)
+	if code != 1 || !hasFinding(m, "symlink-refused", side) || string(b) != "elsewhere" || readFile(t, r, other) != "mine" {
+		t.Errorf("link: code=%d %+v", code, m)
+	}
+}
+
 func TestInitEditedSkill(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Write("openspec/specs/.keep", "")
