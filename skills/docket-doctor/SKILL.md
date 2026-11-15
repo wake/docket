@@ -38,8 +38,8 @@ missing, follows an older template, has an unknown version, or lacks a
 section), and the three starting with `user-workflow-` (the user template
 on this computer is older than Docket's template, newer than this dkt's,
 or has no version); the user template's path is
-`result.user_workflow.path`. When it exits with 2 or 4, it did not check properly and has no
-result: say what else it reported and stop.
+`result.user_workflow.path`. When it exits with 2 or 4, it did not check
+properly and has no result: say what else it reported and stop.
 
 Then run `dkt lint --json` and look only at `result.changes`: those whose
 `schema` is not `docket` are active changes made with another schema. Its
