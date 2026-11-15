@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/wake/docket/internal/projects"
 	"github.com/wake/docket/internal/setup"
@@ -144,7 +145,7 @@ func workflowRefs(c *Context) (Outcome, error) {
 			switch {
 			case err == nil:
 				add(e.Path, "project", b)
-			case !errors.Is(err, fs.ErrNotExist):
+			case !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR): // a file named docket holds no workflow
 				out.Unreadable = append(out.Unreadable, Unreadable{Source: file, Reason: err.Error()})
 			}
 		}

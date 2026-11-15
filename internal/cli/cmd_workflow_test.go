@@ -165,8 +165,12 @@ func TestWorkflowRefsNotReferences(t *testing.T) {
 	ignored := refsProject(t, wf("3", "Plan review", "ignored"))
 	gone := filepath.Join(t.TempDir(), "gone")
 	bare := refsProject(t, "")
+	fileDocket := t.TempDir() // docket is a file, so there is no docket/workflow.md
+	if err := os.WriteFile(filepath.Join(fileDocket, "docket"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	ok := refsProject(t, wf("3", "Plan review", "kept"))
-	refsIndex(t, state, refEntry{path: self}, refEntry{path: ignored, ignored: true}, refEntry{path: gone}, refEntry{path: bare}, refEntry{path: ok})
+	refsIndex(t, state, refEntry{path: self}, refEntry{path: ignored, ignored: true}, refEntry{path: gone}, refEntry{path: bare}, refEntry{path: fileDocket}, refEntry{path: ok})
 	for _, dir := range []string{r.Dir, wt} {
 		code, m, out := refsRun(t, dir, env, "refs")
 		if code != 0 || len(m.Result.Sources) != 1 || m.Result.Sources[0].Path != ok {
