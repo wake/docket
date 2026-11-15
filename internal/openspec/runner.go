@@ -52,7 +52,7 @@ func (e *UnavailableError) Error() string {
 type UnsafeArgError struct{ Program, Arg string }
 
 func (e *UnsafeArgError) Error() string {
-	return fmt.Sprintf("will not run %s with %q: cmd.exe reads the command line of a .bat or .cmd file itself, so its arguments may hold only letters, digits and %s, and its path those, \\, spaces, ( ) and ~",
+	return fmt.Sprintf("will not run %s with %q: cmd.exe reads the command line of a .bat or .cmd file itself, so its arguments may hold only letters, digits and %s, and its path those, \\, spaces and ~, and ( ) only with a space",
 		e.Program, e.Arg, plainPunct)
 }
 
@@ -65,7 +65,8 @@ func unsafeBatchArg(windows bool, cmd []string) (string, bool) {
 	if ext := strings.ToLower(filepath.Ext(cmd[0])); !windows || ext != ".bat" && ext != ".cmd" {
 		return "", false
 	}
-	if !plain(cmd[0], `\ ()~`) {
+	// Go quotes a path with a space, inside which cmd.exe reads ( and ) as text
+	if !plain(cmd[0], `\ ~`) && !(strings.ContainsRune(cmd[0], ' ') && plain(cmd[0], `\ ()~`)) {
 		return cmd[0], true
 	}
 	for _, a := range cmd[1:] {
