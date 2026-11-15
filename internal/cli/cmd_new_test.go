@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -466,6 +467,18 @@ func TestNewFolderSwappedAfterTheChecks(t *testing.T) {
 	}
 	if entries, err := os.ReadDir(outside); err != nil || len(entries) != 0 {
 		t.Errorf("outside the repository: %v %v", entries, err)
+	}
+}
+
+func TestNewLockFails(t *testing.T) {
+	e := newProject(t)
+	msg := failLock(t)
+	before := tree(t, e.r.Dir)
+	if code, _, raw, _ := e.doNew(t, e.r.Dir, nil, okArgs...); code == 0 || !strings.Contains(raw, msg) {
+		t.Errorf("code=%d %s", code, raw)
+	}
+	if after := tree(t, e.r.Dir); !maps.Equal(before, after) {
+		t.Errorf("files changed: %v -> %v", before, after)
 	}
 }
 
