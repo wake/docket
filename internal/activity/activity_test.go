@@ -147,6 +147,40 @@ func TestWritePrunes(t *testing.T) {
 	}
 }
 
+func TestRemoveIfOld(t *testing.T) {
+	dir := t.TempDir()
+	cutoff := t0.Add(-15 * time.Minute)
+	mk := func(name string, age time.Duration) string {
+		p := filepath.Join(dir, name)
+		os.WriteFile(p, []byte("data"), 0o600)
+		os.Chtimes(p, t0.Add(-age), t0.Add(-age))
+		return p
+	}
+	if err := removeIfOld(mk("old.json", 16*time.Minute), cutoff); err != nil {
+		t.Fatal(err)
+	}
+	if got := files(t, dir); len(got) != 0 {
+		t.Errorf("old: left %v", got)
+	}
+	fresh := mk("fresh.json", time.Minute)
+	if err := removeIfOld(fresh, cutoff); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := os.ReadFile(fresh); err != nil || string(b) != "data" {
+		t.Errorf("fresh not kept: %q %v", b, err)
+	}
+	if got := files(t, dir); len(got) != 1 {
+		t.Errorf("fresh: left %v", got)
+	}
+	os.Remove(fresh)
+	if err := removeIfOld(filepath.Join(dir, "gone.json"), cutoff); err != nil {
+		t.Fatal(err)
+	}
+	if got := files(t, dir); len(got) != 0 {
+		t.Errorf("missing: created %v", got)
+	}
+}
+
 func TestWriteErrors(t *testing.T) {
 	env, dir := newEnv(t)
 	if Write(env, t0, "busy", nil, "/x") == nil {

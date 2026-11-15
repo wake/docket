@@ -83,8 +83,9 @@ func Write(env []string, now time.Time, state string, in io.Reader, wd string) e
 	}
 	if es, err := os.ReadDir(dir); err == nil {
 		for _, e := range es {
-			if fi, err := e.Info(); err == nil && fi.Mode().IsRegular() && fi.ModTime().Before(now.Add(-Window)) {
-				if err := os.Remove(filepath.Join(dir, e.Name())); err != nil && first == nil {
+			cutoff := now.Add(-Window)
+			if fi, err := e.Info(); err == nil && fi.Mode().IsRegular() && fi.ModTime().Before(cutoff) {
+				if err := removeIfOld(filepath.Join(dir, e.Name()), cutoff); err != nil && first == nil {
 					first = err
 				}
 			}
@@ -125,4 +126,26 @@ func Read(env []string, now time.Time) ([]Record, error) {
 		}
 	}
 	return recs, nil
+}
+
+// removeIfOld removes path when it is older than cutoff, without the check-then-remove race: a
+// record renamed onto path after the caller's check is moved aside, found newer and linked back.
+func removeIfOld(path string, cutoff time.Time) error {
+	aside := fmt.Sprintf("%s.prune-%d-%d", path, os.Getpid(), time.Now().UnixNano())
+	if err := os.Rename(path, aside); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	defer os.Remove(aside)
+	fi, err := os.Lstat(aside)
+	if err != nil {
+		return err
+	}
+	if !fi.ModTime().Before(cutoff) {
+		// Fails when a newer record already took path, which is fine.
+		os.Link(aside, path)
+	}
+	return nil
 }
