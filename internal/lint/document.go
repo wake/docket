@@ -2,6 +2,7 @@ package lint
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"regexp"
 	"slices"
@@ -108,6 +109,11 @@ func checkSections(r *state, c *loaded) {
 }
 
 const fenceInfoBacktickMessage = "backticks that open a line and hold another backtick: dkt and OpenSpec 1.14 read the line as fenced code, OpenSpec 1.16 and later as inline code; use single backticks or a tilde fence"
+
+const (
+	spanCommentToMessage  = "comment opener inside a code span: dkt reads the text after it as an HTML comment up to line %d, Markdown as code; write the opener in fenced code or in words"
+	spanCommentEOFMessage = "comment opener inside a code span: dkt reads the rest of the file after it as an HTML comment, Markdown as code; write the opener in fenced code or in words"
+)
 
 const fenceInCommentMessage = "fence marker inside an HTML comment: dkt and OpenSpec read the lines after the comment as code; close the code inside the comment or remove the marker"
 
@@ -235,7 +241,8 @@ func checkPlaceholders(r *state, c *loaded) {
 	}
 }
 
-// fenceFindings returns, with no file set, the findings of the fence rules in a Markdown file.
+// fenceFindings returns, with no file set, the findings of the rules on how a
+// Markdown file's fences and comments are read.
 func fenceFindings(b []byte) []Finding {
 	var out []Finding
 	for _, i := range markdown.FencesInComments(markdown.Lines(b)) {
@@ -243,6 +250,13 @@ func fenceFindings(b []byte) []Finding {
 	}
 	for _, i := range markdown.FenceInfoBackticks(markdown.Lines(b)) {
 		out = append(out, Finding{Rule: "fence-info-backtick", Line: i + 1, Message: fenceInfoBacktickMessage})
+	}
+	for _, c := range markdown.CommentsInCodeSpans(markdown.Lines(b)) {
+		msg := spanCommentEOFMessage
+		if c.End >= 0 {
+			msg = fmt.Sprintf(spanCommentToMessage, c.End+1)
+		}
+		out = append(out, Finding{Rule: "comment-in-code-span", Line: c.Line + 1, Message: msg})
 	}
 	return out
 }

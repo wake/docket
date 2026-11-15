@@ -324,3 +324,105 @@ func FencesInComments(lines []string) []int {
 	}
 	return out
 }
+
+// SpanComment is a comment opener that BlankComments takes inside a code span:
+// the index of its line, and of the line where that comment ends, or -1 when
+// it runs to the end.
+type SpanComment struct {
+	Line, End int
+}
+
+// CommentsInCodeSpans returns, in file order, each comment opener that
+// BlankComments takes while a reading that finds each line's code spans before
+// its comments reads it inside a code span. Outside a span, that reading takes
+// a backslash before a backtick or a backslash as an escape, and nothing else
+// differs; with no opener returned, both readings hide the same text.
+func CommentsInCodeSpans(lines []string) []SpanComment {
+	mask := FenceMask(lines)
+	var out []SpanComment
+	dkt, ref, block := false, false, false // inside a comment, in dkt's reading and in the span-first one; ref's comment started a line
+	pending := -1                          // the finding whose comment dkt's reading has open
+	for i, l := range lines {
+		if mask[i] {
+			continue
+		}
+		var spans [][2]int
+		spans, ref, block = spanFirst(l, ref, block)
+		for p := 0; p < len(l); {
+			if !dkt {
+				k := strings.Index(l[p:], "<!--")
+				if k < 0 {
+					break
+				}
+				p += k
+				if inSpan(spans, p) {
+					out = append(out, SpanComment{i, -1})
+					pending = len(out) - 1
+				}
+				dkt, p = true, p+4
+				continue
+			}
+			e := closerEnd(l[p:])
+			if e < 0 {
+				break
+			}
+			dkt, p = false, p+e
+			if pending >= 0 {
+				out[pending].End, pending = i, -1
+			}
+		}
+	}
+	return out
+}
+
+// spanFirst reads one line finding code spans before comments, starting inside
+// a comment when open is set. A comment that starts a line, after at most
+// three spaces, is an HTML block in Markdown, and the line where it ends holds
+// no code span; block carries that across lines. It returns the line's spans
+// and the state at its end.
+func spanFirst(l string, open, block bool) ([][2]int, bool, bool) {
+	var spans [][2]int
+	raw := false // the rest of the line belongs to an HTML block
+	for p := 0; p < len(l); {
+		switch {
+		case open:
+			e := closerEnd(l[p:])
+			if e < 0 {
+				return spans, true, block
+			}
+			open, p = false, p+e
+			raw, block = raw || block, false
+		case raw:
+			if !strings.HasPrefix(l[p:], "<!--") {
+				p++
+				continue
+			}
+			open, p = true, p+4
+		case l[p] == '\\' && p+1 < len(l) && (l[p+1] == '`' || l[p+1] == '\\'):
+			p += 2
+		case l[p] == '`':
+			if e := spanEnd(l, p); e >= 0 {
+				spans = append(spans, [2]int{p, e})
+				p = e
+			} else {
+				p += backtickRun(l, p)
+			}
+		case strings.HasPrefix(l[p:], "<!--"):
+			block = p <= 3 && strings.Trim(l[:p], " ") == ""
+			open, p = true, p+4
+		default:
+			p++
+		}
+	}
+	return spans, open, block
+}
+
+// inSpan reports whether byte p lies inside one of spans.
+func inSpan(spans [][2]int, p int) bool {
+	for _, s := range spans {
+		if s[0] < p && p < s[1] {
+			return true
+		}
+	}
+	return false
+}

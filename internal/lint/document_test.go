@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -359,6 +360,71 @@ func TestMainSpecFenceInfoBacktick(t *testing.T) {
 	fnd, _, _ := SpecTitles(in.Root)
 	for _, f := range fnd {
 		if f.Rule == "fence-info-backtick" {
+			t.Errorf("SpecTitles reported %v", f)
+		}
+	}
+}
+
+const wantSpanCommentEOF = "comment opener inside a code span: dkt reads the rest of the file after it as an HTML comment, Markdown as code; write the opener in fenced code or in words"
+
+func wantSpanCommentTo(line int) string {
+	return fmt.Sprintf("comment opener inside a code span: dkt reads the text after it as an HTML comment up to line %d, Markdown as code; write the opener in fenced code or in words", line)
+}
+
+func TestCommentInCodeSpan(t *testing.T) {
+	const pfx = "openspec/changes/add-x/"
+	op := "<!--"
+	nProp := len(strings.Split(goodProposal, "\n"))
+	tests := []struct {
+		name  string
+		files map[string]string
+		file  string
+		line  int
+		msg   string
+	}{
+		{"plan, to the end", map[string]string{"proposal.md": goodProposal, "plan.md": "Blank `" + op + "` first.\n### Task 2: Report it\n"}, "plan.md", 1, wantSpanCommentEOF},
+		{"proposal, later line", map[string]string{"proposal.md": goodProposal + "\nA `" + op + "` b\nc\n-->\n"}, "proposal.md", nProp + 1, wantSpanCommentTo(nProp + 3)},
+		{"design, same line", map[string]string{"proposal.md": goodProposal, "design.md": "x\n`" + op + "` and `-->`\n"}, "design.md", 2, wantSpanCommentTo(2)},
+		{"comment holding a span", map[string]string{"proposal.md": goodProposal, "design.md": op + " `x` -->\n"}, "", 0, ""},
+		{"comment starting a line", map[string]string{"proposal.md": goodProposal, "design.md": op + " a --> `" + op + "` b -->\n"}, "", 0, ""},
+		{"backticks inside comments", map[string]string{"proposal.md": goodProposal, "design.md": op + " ` --> " + op + " ` -->\n"}, "", 0, ""},
+		{"escaped backtick", map[string]string{"proposal.md": goodProposal, "design.md": "\\`" + op + " a -->`\n"}, "", 0, ""},
+		{"fenced", map[string]string{"proposal.md": goodProposal, "design.md": "```\n`" + op + "`\n```\n"}, "", 0, ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rep := lintX(t, tc.files)
+			n := 0
+			if tc.file != "" {
+				n = 1
+			}
+			if got := count(rep, "comment-in-code-span"); got != n {
+				t.Fatalf("count = %d: %+v", got, rep.Findings)
+			}
+			if n > 0 && !has(rep, "comment-in-code-span", pfx+tc.file, tc.line, tc.msg) {
+				t.Errorf("%+v", rep.Findings)
+			}
+		})
+	}
+	t.Run("other schema", func(t *testing.T) {
+		rep := lintX(t, map[string]string{".openspec.yaml": "schema: spec-driven\n", "proposal.md": goodProposal, "design.md": "`" + op + "`\n"})
+		if count(rep, "comment-in-code-span") != 0 {
+			t.Errorf("%+v", rep.Findings)
+		}
+	})
+}
+
+func TestMainSpecCommentInCodeSpan(t *testing.T) {
+	in, _ := repo(t, map[string]string{
+		"openspec/specs/orders/spec.md": "# Orders Specification\nSee `<!--`.\n### Requirement: Persist orders\n",
+	})
+	rep := run(t, in)
+	if !has(rep, "comment-in-code-span", "openspec/specs/orders/spec.md", 2, wantSpanCommentEOF) || count(rep, "comment-in-code-span") != 1 {
+		t.Errorf("%v", rep.Findings)
+	}
+	fnd, _, _ := SpecTitles(in.Root)
+	for _, f := range fnd {
+		if f.Rule == "comment-in-code-span" {
 			t.Errorf("SpecTitles reported %v", f)
 		}
 	}
