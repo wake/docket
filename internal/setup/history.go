@@ -27,7 +27,7 @@ var Earlier = map[string][]string{
 	"openspec/schemas/docket/schema.yaml": {
 		"5aeaf2bbbbf4ee8f2231f2f7d16d0de079ebe7f1257a3d5381d77467171e4550", // v0.16.0, v0.17.0, v0.18.0
 		"b7126bff76ee3b91994dca48cc0a28f4b7fc38393776b5ea5498e73b2e530589", // v0.26.0
-		"5fbc2aaef7f42f715647ee475dd1d80d266209d3f8fba5bfe65f9c93d8b4703a", // v0.27.0
+		"93357a05020f74fd4e847d038831513ea0a18b9687c39c5648ac5a6c2c2f617e", // v0.27.0
 	},
 	"openspec/schemas/docket/templates/design.md": {
 		"6ccc87f5017fb190e69e8759dd4e20d5ac3320cc4dabf152708bf8f2aa5205f8", // v0.16.0, v0.17.0, v0.18.0

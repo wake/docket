@@ -213,7 +213,9 @@ artifacts:
       plan.md is the only task list, and OpenSpec tracks its checkboxes.
 
       Keep the writing-plans header, except that the heading is
-      `# Implementation Plan`, since the change's title names the work. Write
+      `# Implementation Plan`, since the change's title names the work, and
+      that the line naming a sub-skill to execute the plan is left out: who
+      implements it follows "Task execution" in `docket/workflow.md`. Write
       the tasks by the rules below, not in that skill's step-by-step format:
       - A task says what to build and how it is accepted, not how to do it:
         no code to copy, no sequence of commands to run, no commit messages; those are
@@ -257,7 +259,10 @@ artifacts:
       - Under each task, `- [ ]` checkboxes list its acceptance items: what
         must hold when the task is done, each one a result that can be
         checked, not a step to perform (a behavior and the test that covers
-        it, what a command prints).
+        it, what a command prints). Name every case an item covers, instead
+        of saying that a rule applies the same way elsewhere. Each line of
+        the header's Review Focus becomes an acceptance item of the task that
+        owns it.
         `dkt sync` ticks the checkboxes of Task N from the commit trailer
         `Change: <change-name>/<N>`; tick by hand only
         a task that was finished without any commit. OpenSpec counts every
