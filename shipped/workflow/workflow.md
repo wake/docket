@@ -1,5 +1,5 @@
 ---
-template: 2
+template: 3
 ---
 
 The `template` value in the front matter is the template's version. Do not
@@ -26,9 +26,13 @@ finding not taken up is handled as "Reviewers" says.
 
 ### Task execution
 
-Use superpowers:subagent-driven-development, with a fresh implementer agent
-for each task, test first. Each implementer gets the Reuse rows for its task
-and reports every exported symbol it added, with why no existing one fit.
+One implementer does the whole change in the plan's order, test first: the
+agent that wrote the plan, or one agent given the change folder. Only when
+tasks are independent and can run in parallel, or the change is too large
+for one context, use superpowers:subagent-driven-development with a fresh
+implementer agent for each task, given the Reuse rows for its task. What the
+plan does not say how to do is the implementer's to decide. The implementer
+reports every exported symbol it added, with why no existing one fit.
 Structural changes and behavior changes go in separate commits.
 
 ### Task review
@@ -113,7 +117,8 @@ Open a pull request and merge it with a merge commit or a rebase.
 A required review is done by a reviewer on a different model. If there is
 none, by the same model in a fresh context. If that is not possible either,
 the pull request says it had no independent review and asks a person to
-review it. The author's own reading is not a review.
+review it. The author's own reading is not a review. A reviewer marks which
+of its findings must be fixed before merging.
 
 When the author does not take up a finding, they write down why. When
 the finding turned down is one the reviewer said must be fixed before
