@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 
@@ -27,9 +28,15 @@ func main() {
 		Args: os.Args[1:], Dir: dir, Env: os.Environ(),
 		Stdout: os.Stdout, Stderr: os.Stderr,
 	}
-	// A terminal is never read: a hook's input is a pipe or a file.
-	if fi, err := os.Stdin.Stat(); err == nil && fi.Mode()&os.ModeCharDevice == 0 {
-		o.Stdin = os.Stdin
-	}
+	o.Stdin = hookInput(os.Stdin)
 	os.Exit(cli.Run(o))
+}
+
+// hookInput returns f unless it is a terminal or cannot be inspected: a hook's input is a pipe
+// or a file, and a terminal is never read.
+func hookInput(f *os.File) io.Reader {
+	if fi, err := f.Stat(); err != nil || fi.Mode()&os.ModeCharDevice != 0 {
+		return nil
+	}
+	return f
 }

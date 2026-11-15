@@ -104,6 +104,10 @@ func TestActivityHelpAndUsage(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "usage: dkt activity") {
 		t.Errorf("%d %q", code, out)
 	}
+	code, out = actRun(t, nil, t.TempDir(), "", "activity", "-h")
+	if code != 0 || !strings.Contains(out, "usage: dkt activity") {
+		t.Errorf("-h: %d %q", code, out)
+	}
 }
 
 func TestIsActivity(t *testing.T) {
