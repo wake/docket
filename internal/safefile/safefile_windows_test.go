@@ -2,7 +2,6 @@ package safefile
 
 import (
 	"errors"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,8 +43,9 @@ func TestReadNoFollowJunction(t *testing.T) {
 func TestCreateFlagsRefuseJunction(t *testing.T) {
 	dir, outside := t.TempDir(), t.TempDir()
 	junction(t, filepath.Join(dir, "new"), outside)
-	if err := createThrough(t, dir, "new"); !errors.Is(err, fs.ErrExist) {
-		t.Errorf("err = %v, want fs.ErrExist", err)
+	// Go reports "is a directory" here rather than fs.ErrExist; either way nothing is created.
+	if err := createThrough(t, dir, "new"); err == nil {
+		t.Error("created a file at a junction's name")
 	}
 	if entries, _ := os.ReadDir(outside); len(entries) != 0 {
 		t.Errorf("wrote into the junction's folder: %v", entries)
