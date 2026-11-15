@@ -20,11 +20,8 @@ func CountGit(t testing.TB, env []string) (withFake []string, runs func() []stri
 	}
 	bin, _ := filepath.EvalSymlinks(t.TempDir())
 	log := filepath.Join(bin, "log")
-	script := "#!/bin/sh\necho \"$@\" >> '" + log + "'\nexec '" + real + "' \"$@\"\n"
-	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	withFake = append(append([]string(nil), env...), "PATH="+bin+":"+os.Getenv("PATH")) // the last PATH wins
+	FakeProgram(t, filepath.Join(bin, "git"+Exe), Program{Log: log, Real: real})
+	withFake = append(append([]string(nil), env...), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH")) // the last PATH wins
 	return withFake, func() []string {
 		b, _ := os.ReadFile(log)
 		var lines []string

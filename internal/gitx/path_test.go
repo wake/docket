@@ -1,19 +1,15 @@
 package gitx
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/wake/docket/internal/testutil"
 )
 
 func writeStub(t *testing.T, path string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte("#!/bin/sh\necho stub-marker\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	testutil.FakeProgram(t, path+testutil.Exe, testutil.Program{Print: "stub-marker\n"})
 }
 
 func TestRelativePathEntryResolvesAgainstDir(t *testing.T) {
