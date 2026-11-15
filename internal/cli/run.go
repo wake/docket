@@ -24,6 +24,7 @@ type Options struct {
 	Env            []string
 	Stdout, Stderr io.Writer
 	Now            func() time.Time // nil means time.Now
+	Stdin          io.Reader        // the hook input of dkt activity; nil means none
 }
 
 // Run executes dkt with the real command set and returns the process exit code.
@@ -52,6 +53,9 @@ func RunWith(o Options, cmds []func() Command) int {
 	}
 	if len(rest) == 0 {
 		return usageFailure(o, cmds, asJSON, "no command given")
+	}
+	if rest[0] == "activity" { // a hook call: no repository, no index, no output
+		return runActivity(o, rest[1:])
 	}
 	for _, f := range cmds {
 		if c := f(); c.Name == rest[0] {

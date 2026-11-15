@@ -36,6 +36,10 @@ func TestIndexPath(t *testing.T) {
 	pathCases(t, IndexPath, "XDG_STATE_HOME", ".local/state", "projects.json")
 }
 
+func TestSessionsDir(t *testing.T) {
+	pathCases(t, SessionsDir, "XDG_STATE_HOME", ".local/state", "sessions")
+}
+
 func TestSettingsPath(t *testing.T) {
 	pathCases(t, SettingsPath, "XDG_CONFIG_HOME", ".config", "config.json")
 }

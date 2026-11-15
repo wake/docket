@@ -82,6 +82,7 @@ type WorkEntry struct {
 	Release    *Release     `json:"release"`
 	LastCommit *LastCommit  `json:"last_commit"`
 	Locations  []Location   `json:"locations"`
+	Activity   *string      `json:"activity"` // "working", "waiting" or nil
 	Tasks      []Task       `json:"tasks" null:"ok"`
 	Documents  []Document   `json:"documents"`
 	Deltas     []DeltaEntry `json:"deltas"`

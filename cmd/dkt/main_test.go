@@ -113,3 +113,28 @@ func TestBuildInfoVersion(t *testing.T) {
 		t.Errorf("--version = %q, want %q", got, "dkt v1.2.3\n")
 	}
 }
+
+func TestHookInput(t *testing.T) {
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer null.Close()
+	if got := hookInput(null); got != nil {
+		t.Errorf("character device: %v", got)
+	}
+	rd, wr, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rd.Close()
+	defer wr.Close()
+	if got := hookInput(rd); got == nil {
+		t.Error("pipe: nil")
+	}
+	closed, _ := os.Open(os.DevNull)
+	closed.Close()
+	if got := hookInput(closed); got != nil {
+		t.Errorf("failed Stat: %v", got)
+	}
+}
