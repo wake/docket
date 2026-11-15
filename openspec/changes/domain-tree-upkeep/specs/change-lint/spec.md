@@ -24,11 +24,15 @@ When `docket/domains.md` lists at least one item, has no format problem or dupli
 - **THEN** the finding `domain-format` is reported and there is no `domain-unlisted` finding
 
 ### Requirement: Capability retired by a change
-`dkt lint` SHALL NOT report `domain-unlisted` for a capability whose delta in a linted change only removes requirements, as the change retires it and drops its line from the tree: with changes named, not for that change; with none named, not at all. A delta that also adds, modifies or renames a requirement SHALL NOT count as one that only removes.
+`dkt lint` SHALL NOT report `domain-unlisted` for a capability that a linted change retires, as the change drops its line from the tree: with changes named, not for that change; with none named, not at all. A change retires a capability when its delta for it removes every requirement of the main spec, names compared with runs of space folded, and adds, modifies and renames none.
 
 #### Scenario: Capability being removed
-- **WHEN** the tree lists `invoice` only, `openspec/specs/refund/spec.md` exists, the change `remove-refund` holds a delta for `refund` with only REMOVED requirements, and a user runs `dkt lint remove-refund` or `dkt lint`
+- **WHEN** the tree lists `invoice` only, `openspec/specs/refund/spec.md` holds the one requirement `Old rule`, the change `remove-refund` holds a delta for `refund` that only removes `Old rule`, and a user runs `dkt lint remove-refund` or `dkt lint`
 - **THEN** there is no `domain-unlisted` finding
+
+#### Scenario: Partial removal
+- **WHEN** the tree lists `invoice` only, `openspec/specs/refund/spec.md` holds the requirements `Old rule` and `Y`, the change `remove-x` holds a delta for `refund` that only removes `Old rule`, and a user runs `dkt lint remove-x`
+- **THEN** the finding `domain-unlisted` names `refund` and the change `remove-x`
 
 #### Scenario: Removal with an addition
 - **WHEN** the tree lists `invoice` only and the change `rework-refund` holds a delta for `refund` with an ADDED and a REMOVED requirement, and a user runs `dkt lint rework-refund`
