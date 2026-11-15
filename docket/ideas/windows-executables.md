@@ -4,6 +4,8 @@ title: Ship dkt for Windows
 
 The first releases ship macOS and Linux only. The maintainer chose that on 2026-11-06, when a GoReleaser snapshot showed that dkt does not build for Windows. This is what adding Windows takes, as found at `c83d025`; nothing has been run on Windows.
 
+Split on 2026-11-16 into four parts, done in order: this idea is the first, which makes dkt build for Windows without dropping its protections, and tests those protections in a `windows-latest` CI job; `windows-test-fakes`, `windows-runtime` and `windows-release` are the rest. Until `windows-release`, dkt is not meant to work on Windows.
+
 ## What does not build
 
 - `syscall.O_NOFOLLOW`: `Install` and `ReadNoFollow` in `internal/safefile/safefile.go`, `internal/cli/cmd_new.go`, `internal/cli/cmd_record.go`.
