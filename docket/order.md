@@ -6,8 +6,11 @@
 - docket/ideas/origin-without-token.md
 - docket/ideas/fence-inside-comment.md
 - docket/issues/2026-11-07-title-missing-wrong-path.md
+- docket/ideas/reuse-table-slim.md
 - docket/ideas/fence-rule-drift.md
 - docket/ideas/comment-in-code-span.md
+- docket/ideas/skill-optional-sections.md
+- docket/ideas/bookkeeping-commits.md
 - docket/ideas/domain-tree-upkeep.md
 - docket/ideas/init-reuse-workflow.md
 - docket/ideas/session-activity.md
