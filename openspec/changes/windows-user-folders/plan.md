@@ -71,10 +71,10 @@
 **Interfaces:** `testutil.WithoutHome(env []string) []string`: a copy of env without its `HOME` and `USERPROFILE` entries.
 
 - [ ] `testutil.Env` sets `USERPROFILE` to the same temporary folder as `HOME`, on every system.
-- [ ] `TestInspectUserWorkflowNoHome`, `TestInspectIndexWithoutLocation`, `TestRegisterNoHome`, `TestRegisterNoStateHome` and the no-home cases of the `dkt workflow mode` test remove the home folder with `testutil.WithoutHome`, and still pass on macOS and Linux.
+- [ ] `TestInspectUserWorkflowNoHome`, `TestInspectIndexWithoutLocation`, `TestRegisterNoHome`, `TestRegisterNoStateHome` and the no-home cases of `TestWorkflowModeNoHome` remove the home folder with `testutil.WithoutHome`, and still pass on macOS and Linux; the first four still pass on Windows.
 - [ ] A `dkt projects ls --json` test whose environment holds only the other system's variable (`USERPROFILE` on macOS and Linux, `HOME` on Windows) reports `no-home` with a message naming the system's variable, and exits with 4.
-- [ ] A `dkt inspect --json` test with no `XDG_CONFIG_HOME` reports `result.user_workflow.path` under the system's variable's folder at `.config/docket/workflow.md`.
-- [ ] The `dkt activity` tests with an absolute `XDG_STATE_HOME` (temporary folders) pass on Windows unchanged.
+- [ ] A `dkt inspect --json` test with no `XDG_CONFIG_HOME`, and `HOME` and `USERPROFILE` set to two different folders, reports `result.user_workflow.path` as `.config/docket/workflow.md` under the system's variable's folder, with `exists` true for a template written there.
+- [ ] The `internal/cli` tests of `dkt activity`, which use a temporary `XDG_STATE_HOME`, pass on Windows (scenario "State home kept on Windows").
 
 ### Task 3: The Windows CI job runs these tests
 
@@ -85,5 +85,6 @@
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] The Windows job runs `internal/projects`'s path tests, the `internal/cli` tests of Task 2 and of `dkt inspect`'s workflow sync, and the activity tests of `internal/snapshot`, `internal/activity` and `internal/cli`, each selected with `-run` where the rest of the package still fails on Windows, and its name is unchanged.
+- [ ] The Windows job runs, with an anchored `-run` pattern since the rest of each package still fails there: in `internal/projects`, the path tests and the home-variable tests of Task 1; in `internal/cli`, `TestInspectUserWorkflow`, `TestInspectNoUserWorkflow`, `TestInspectUserWorkflowNoHome`, `TestInspectIndexWithoutLocation`, `TestProjectsAddUnderStateHome`, `TestProjectsNoHome`, `TestRegisterNoHome`, `TestRegisterNoStateHome`, the `TestActivity` tests and the new tests of Task 2. Its name is unchanged.
+- [ ] The inspect workflow sync tests and the activity tests of `internal/snapshot` and `internal/activity` are not added: they fail on Windows for path forms and Unix test paths (see design.md, Context), which `windows-paths` and `windows-suite` handle.
 - [ ] The pull request's Windows job passes.

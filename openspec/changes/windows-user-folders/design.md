@@ -2,7 +2,14 @@
 
 ## Context
 
-All four user files are found by one function, `xdgFile` in `internal/projects/files.go`: an absolute `XDG_*` variable, else `HOME`, else `ErrNoHome`. It reads the environment it is given (`Options.Env`, which `cmd/dkt` fills from `os.Environ()` and tests build themselves), not the process's own, as the rest of dkt does. `testutil.Env` gives every test a temporary `HOME`; on Windows nothing sets `USERPROFILE` in it, so a test there would see none, and once dkt reads `USERPROFILE` it would see the runner's own if the test environment kept it.
+All four user files are found by one function, `xdgFile` in `internal/projects/files.go`: an absolute `XDG_*` variable, else `HOME`, else `ErrNoHome`. It reads the environment it is given (`Options.Env`, which `cmd/dkt` fills from `os.Environ()` and tests build themselves), not the process's own, as the rest of dkt does. `testutil.Env` gives every test a temporary `HOME` and keeps nothing else of the user's from the process, so on Windows it holds no `USERPROFILE`.
+
+A probe of `internal/projects`, `internal/snapshot`, `internal/activity` and `internal/cli` on `windows-latest` (2026-11-16, before this change) shows which failures are this change's:
+
+- Only `TestIndexPath`, `TestSessionsDir`, `TestSettingsPath` and `TestUserWorkflowPath` fail for the user folders, because they give `/s` as an absolute `XDG_*` and expect `/` separators.
+- The tests that remove the home folder (`TestInspectUserWorkflowNoHome`, `TestProjectsNoHome`, `TestRegisterNoHome`, `TestRegisterNoStateHome`) and the `dkt activity` tests of `internal/cli` pass there today.
+- The idea also counted `internal/cli`'s workflow sync tests and `internal/snapshot`'s activity tests as user-folder failures. They fail because the index or a record holds a path with backslashes while git gives the repository's root as `C:/...`, so the entry or the worktree is not matched. Their user folders are temporary `XDG_*` folders, found correctly; they belong to `windows-paths`. ("no user template" in the probe is the name of a subtest.)
+- The rest are Unix paths in test data, file modes and unreadable files (`windows-suite`), or paths git prints (`windows-paths`).
 
 ## Goals / Non-Goals
 

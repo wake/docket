@@ -37,5 +37,5 @@ dkt keeps the project index, the settings, the user's workflow template and the 
 
 - `internal/projects/files.go` and `register.go`: the home folder's variable and the no-home messages.
 - `internal/testutil/repo.go`: the test environment sets the home folder on every system.
-- Tests in `internal/projects`, `internal/cli`, `internal/snapshot` and `internal/activity` that remove the home folder or give Unix paths.
+- Tests in `internal/projects` and `internal/cli` that find or remove the home folder.
 - `.github/workflows/ci.yml`: the Windows job runs those tests.
