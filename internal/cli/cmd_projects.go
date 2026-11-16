@@ -58,7 +58,7 @@ func runProjects(c *Context, args []string) (Outcome, error) {
 	return projectsEdit(c, args[0], rest[0])
 }
 
-// projectsEnv is the index path; a machine without HOME is an environment error.
+// projectsEnv is the index path; a machine without a home folder is an environment error.
 func projectsEnv(c *Context) (string, error) {
 	p, err := projects.IndexPath(c.Env)
 	if errors.Is(err, projects.ErrNoHome) {

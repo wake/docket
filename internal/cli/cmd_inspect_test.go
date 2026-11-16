@@ -866,10 +866,29 @@ func TestInspectNoUserWorkflow(t *testing.T) {
 func TestInspectUserWorkflowNoHome(t *testing.T) {
 	r := testutil.NewRepo(t)
 	installed(t, r)
-	r.Env = slices.DeleteFunc(slices.Clone(r.Env), func(kv string) bool { return strings.HasPrefix(kv, "HOME=") })
+	r.Env = testutil.WithoutHome(r.Env)
 	code, m, out := inspect(t, r, "1.14.0", false)
 	if code != 0 || m.Result.UserWorkflow != nil || len(m.Findings) != 0 || !strings.Contains(out, `"user_workflow": null`) && !strings.Contains(out, `"user_workflow":null`) {
 		t.Errorf("code=%d %+v %s", code, m, out)
+	}
+}
+
+func TestInspectUserWorkflowUnderHomeFolder(t *testing.T) {
+	r := testutil.NewRepo(t)
+	installed(t, r)
+	home, other := homeVars()
+	h := t.TempDir()
+	r.Env = append(testutil.WithoutHome(r.Env), home+"="+h, other+"="+t.TempDir())
+	p := filepath.Join(h, ".config", "docket", "workflow.md")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(userTemplate(strconv.Itoa(shippedVersion(t)))), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, m, _ := inspect(t, r, "1.14.0", false)
+	if u := m.Result.UserWorkflow; code != 0 || u == nil || u.Path != p || !u.Exists {
+		t.Errorf("code=%d %+v %v", code, u, rules(m))
 	}
 }
 
@@ -1120,7 +1139,7 @@ func TestInspectIndexWithoutLocation(t *testing.T) {
 	tpl := shippedWorkflow(t)
 	r, _ := syncFixture(t, tpl, tpl, "", nil)
 	cfg := t.TempDir()
-	r.Env = append(slices.DeleteFunc(slices.Clone(r.Env), func(kv string) bool { return strings.HasPrefix(kv, "HOME=") }), "XDG_CONFIG_HOME="+cfg)
+	r.Env = append(testutil.WithoutHome(r.Env), "XDG_CONFIG_HOME="+cfg)
 	code, m, _ := inspect(t, r, "1.14.0", false)
 	u := m.Result.UserWorkflow
 	if code != 0 || u == nil || u.Path != filepath.Join(cfg, "docket", "workflow.md") || u.Mode != "independent" || len(m.Findings) != 0 || len(m.Unreadable) != 0 {

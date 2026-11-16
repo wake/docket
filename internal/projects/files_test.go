@@ -7,19 +7,24 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/wake/docket/internal/execpath"
+	"github.com/wake/docket/internal/gitx"
 )
 
 func pathCases(t *testing.T, fn func([]string) (string, error), xdg, fallback, name string) {
 	t.Helper()
-	home := "/h/" + fallback + "/docket/" + name
+	s, h, x := t.TempDir(), t.TempDir(), t.TempDir()
+	hv := homeVar(isWindows)
+	home := filepath.Join(h, filepath.FromSlash(fallback), "docket", name)
 	cases := []struct {
 		env  []string
 		want string
 	}{
-		{[]string{xdg + "=/s"}, "/s/docket/" + name},
-		{[]string{"HOME=/h"}, home},
-		{[]string{xdg + "=rel", "HOME=/h"}, home},
-		{[]string{"HOME=/x", "HOME=/h"}, home},
+		{[]string{xdg + "=" + s}, filepath.Join(s, "docket", name)},
+		{[]string{hv + "=" + h}, home},
+		{[]string{xdg + "=rel", hv + "=" + h}, home},
+		{[]string{hv + "=" + x, hv + "=" + h}, home},
 	}
 	for _, c := range cases {
 		got, err := fn(c.env)
@@ -29,6 +34,76 @@ func pathCases(t *testing.T, fn func([]string) (string, error), xdg, fallback, n
 	}
 	if _, err := fn(nil); !errors.Is(err, ErrNoHome) {
 		t.Errorf("empty env: %v", err)
+	}
+}
+
+func TestHomeVar(t *testing.T) {
+	if homeVar(true) != "USERPROFILE" || homeVar(false) != "HOME" {
+		t.Errorf("windows %q, elsewhere %q", homeVar(true), homeVar(false))
+	}
+}
+
+// The rule is os.UserHomeDir's, read from the given environment instead of the process's.
+func TestHomeVarMatchesUserHomeDir(t *testing.T) {
+	want, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("this process has no home folder:", err)
+	}
+	if got, _ := execpath.Getenv(os.Environ(), homeVar(isWindows)); got != want {
+		t.Errorf("%s gives %q, os.UserHomeDir %q", homeVar(isWindows), got, want)
+	}
+}
+
+func TestUserFoldersElsewhere(t *testing.T) {
+	if isWindows {
+		t.Skip("the rule for macOS and Linux")
+	}
+	h, u := t.TempDir(), t.TempDir()
+	if got, err := IndexPath([]string{"HOME=" + h, "USERPROFILE=" + u}); err != nil || got != filepath.Join(h, ".local", "state", "docket", "projects.json") {
+		t.Errorf("HOME and USERPROFILE: %q, %v", got, err)
+	}
+	if _, err := IndexPath([]string{"USERPROFILE=" + u}); !errors.Is(err, ErrNoHome) {
+		t.Errorf("USERPROFILE only: %v", err)
+	}
+	if !strings.HasSuffix(ErrNoHome.Error(), "set HOME") {
+		t.Errorf("message %q", ErrNoHome)
+	}
+}
+
+func TestUserFoldersOnWindows(t *testing.T) {
+	if !isWindows {
+		t.Skip("the rule for Windows")
+	}
+	h, u, s, c := t.TempDir(), t.TempDir(), t.TempDir(), t.TempDir()
+	if _, err := IndexPath([]string{"HOME=" + h}); !errors.Is(err, ErrNoHome) {
+		t.Errorf("HOME only: %v", err)
+	}
+	if got, err := IndexPath([]string{"HOME=" + h, "UserProfile=" + u}); err != nil || got != filepath.Join(u, ".local", "state", "docket", "projects.json") {
+		t.Errorf("UserProfile: %q, %v", got, err)
+	}
+	if got, err := SessionsDir([]string{"xdg_state_home=" + s}); err != nil || got != filepath.Join(s, "docket", "sessions") {
+		t.Errorf("xdg_state_home: %q, %v", got, err)
+	}
+	if got, err := UserWorkflowPath([]string{"Xdg_Config_Home=" + c}); err != nil || got != filepath.Join(c, "docket", "workflow.md") {
+		t.Errorf("Xdg_Config_Home: %q, %v", got, err)
+	}
+	if !strings.HasSuffix(ErrNoHome.Error(), "set USERPROFILE") {
+		t.Errorf("message %q", ErrNoHome)
+	}
+}
+
+// Register names the system's home variable when it finds no folder.
+func TestRegisterNoHomeNamesVariable(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "docket"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "docket", "workflow.md"), []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err := Register(root, gitx.Git{Dir: root}, nil, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "set "+homeVar(isWindows)+", XDG_CONFIG_HOME") {
+		t.Errorf("%v", err)
 	}
 }
 

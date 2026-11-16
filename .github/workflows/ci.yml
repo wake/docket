@@ -37,8 +37,8 @@ jobs:
       - run: go test ./...
 
   windows:
-    # Only the build, the protections, finding programs and the test fakes are
-    # verified on Windows; the rest of the suite needs the work in
+    # Only the build, the protections, finding programs, the test fakes and the
+    # user folders are verified on Windows; the rest of the suite needs the work in
     # docket/ideas/windows-*.md.
     name: 'windows: build and protections only (dkt is not supported on Windows yet)'
     runs-on: windows-latest
@@ -59,6 +59,8 @@ jobs:
       - run: go test . ./cmd/dkt/ ./internal/execpath/ ./internal/openspec/
       - run: go test -run 'PathEntry|PathSpelled' ./internal/gitx/
       - run: go test -run 'TestEarlierHolds' ./internal/setup/
+      - run: go test -run '^(TestHomeVar|TestHomeVarMatchesUserHomeDir|TestUserFoldersElsewhere|TestUserFoldersOnWindows|TestRegisterNoHomeNamesVariable|TestIndexPath|TestSessionsDir|TestSettingsPath|TestUserWorkflowPath)$' ./internal/projects/
+      - run: go test -run '^(TestInspectUserWorkflow|TestInspectNoUserWorkflow|TestInspectUserWorkflowNoHome|TestInspectUserWorkflowUnderHomeFolder|TestInspectIndexWithoutLocation|TestProjectsAddUnderStateHome|TestProjectsAddUnderHomeFolder|TestProjectsNoHome|TestProjectsNoHomeOtherVariable|TestRegisterNoHome|TestRegisterNoStateHome|TestActivity.*)$' ./internal/cli/
 
   openspec:
     runs-on: ${{ matrix.os }}
