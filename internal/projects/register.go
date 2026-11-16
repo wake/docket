@@ -14,7 +14,7 @@ func Register(root string, g gitx.Git, env []string, now time.Time) error {
 	if !IsDocket(root) {
 		return nil
 	}
-	noHome := fmt.Errorf("cannot locate the user folders: set HOME, XDG_CONFIG_HOME and XDG_STATE_HOME")
+	noHome := fmt.Errorf("cannot locate the user folders: set %s, XDG_CONFIG_HOME and XDG_STATE_HOME", homeVar(isWindows))
 	settings, err := SettingsPath(env)
 	if errors.Is(err, ErrNoHome) {
 		return noHome

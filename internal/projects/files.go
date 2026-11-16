@@ -8,32 +8,34 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/wake/docket/internal/execpath"
 	"github.com/wake/docket/internal/safefile"
 )
 
-// ErrNoHome means neither the XDG variable nor HOME gives a usable folder.
-var ErrNoHome = errors.New("cannot locate the user folders: set HOME")
+const isWindows = runtime.GOOS == "windows"
 
-// envValue returns the last value of key in env (the one a child would see).
-func envValue(env []string, key string) string {
-	val := ""
-	for _, kv := range env {
-		if k, v, ok := strings.Cut(kv, "="); ok && k == key {
-			val = v
-		}
+// homeVar names the variable holding the home folder, by os.UserHomeDir's rule; dkt reads
+// it from the environment it is given rather than the process's own.
+func homeVar(windows bool) string {
+	if windows {
+		return "USERPROFILE"
 	}
-	return val
+	return "HOME"
 }
 
+// ErrNoHome means neither the XDG variable nor the home folder's variable gives a usable folder.
+var ErrNoHome = errors.New("cannot locate the user folders: set " + homeVar(isWindows))
+
 func xdgFile(env []string, xdg, fallback, name string) (string, error) {
-	if v := envValue(env, xdg); filepath.IsAbs(v) {
+	if v, _ := execpath.Getenv(env, xdg); filepath.IsAbs(v) {
 		return filepath.Join(v, "docket", name), nil
 	}
-	if h := envValue(env, "HOME"); h != "" {
+	if h, _ := execpath.Getenv(env, homeVar(isWindows)); h != "" {
 		return filepath.Join(h, fallback, "docket", name), nil
 	}
 	return "", ErrNoHome
