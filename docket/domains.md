@@ -1,0 +1,28 @@
+- Changes and records
+  - `change-creation`
+  - `change-metadata`
+  - `change-lint`
+  - `plan-sync`
+  - `conflict-detection`
+  - `records`
+- Backlog
+  - `ideas`
+  - `issues`
+- Project setup
+  - `project-setup`
+  - `workflow-file`
+  - `user-workflow`
+  - `setup-inspection`
+- Project view
+  - `workspace-scan`
+  - `default-branch`
+  - `project-snapshot`
+  - `domain-tree`
+- Machine-wide
+  - `project-index`
+  - `session-activity`
+- CLI and releases
+  - `cli-output`
+  - `openspec-runtime`
+  - `platform-support`
+  - `release`
