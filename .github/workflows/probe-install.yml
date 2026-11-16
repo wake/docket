@@ -1,0 +1,94 @@
+name: probe-install
+
+on:
+  pull_request:
+
+jobs:
+  install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Build a release-like folder and the script variants
+        shell: bash
+        run: |
+          set -eux
+          mkdir -p site site-bad
+          GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/wake/docket/internal/cli.Version=v9.9.9-probe" -o site/dkt-windows-amd64.exe ./cmd/dkt
+          GOOS=windows GOARCH=arm64 go build -ldflags "-X github.com/wake/docket/internal/cli.Version=v9.9.9-probe" -o site/dkt-windows-arm64.exe ./cmd/dkt
+          (cd site && sha256sum dkt-windows-amd64.exe dkt-windows-arm64.exe | sed "s/ \*/  /" > checksums.txt && cat checksums.txt)
+          cp site/dkt-windows-*.exe site-bad/
+          sed 's/^[0-9a-f]\{8\}/00000000/' site/checksums.txt > site-bad/checksums.txt
+          cat site-bad/checksums.txt
+          gh=https://github.com/wake/docket/releases/latest/download
+          sed "s#$gh#http://127.0.0.1:8765#" probe/install.ps1 > local.ps1
+          sed "s#$gh#http://127.0.0.1:8766#" probe/install.ps1 > bad.ps1
+          grep -n '127.0.0.1' local.ps1 bad.ps1
+          # what an agent in Git Bash runs: the script inside single quotes
+          { printf "powershell -NoProfile -Command '"; cat local.ps1; printf "'\n"; } > gitbash-local.sh
+          { printf "powershell -NoProfile -Command '"; cat bad.ps1; printf "'\n"; } > gitbash-bad.sh
+          uname -s; echo "PROCESSOR_ARCHITECTURE=$PROCESSOR_ARCHITECTURE LOCALAPPDATA=$LOCALAPPDATA"
+      - name: Serve the two folders
+        shell: pwsh
+        run: |
+          Start-Process python -ArgumentList "-m","http.server","8765","--directory","site" -WindowStyle Hidden
+          Start-Process python -ArgumentList "-m","http.server","8766","--directory","site-bad" -WindowStyle Hidden
+          Start-Sleep 3
+          (Invoke-WebRequest http://127.0.0.1:8765/checksums.txt -UseBasicParsing).StatusCode
+          (Invoke-WebRequest http://127.0.0.1:8766/checksums.txt -UseBasicParsing).StatusCode
+      - name: Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $PSVersionTable.PSVersion.ToString()
+          $dir = Join-Path $env:LOCALAPPDATA "Programs\dkt"
+          "== fresh install"
+          Invoke-Expression (Get-Content -Raw local.ps1)
+          & "$dir\dkt.exe" --version
+          $before = (Get-FileHash "$dir\dkt.exe").Hash
+          "== mismatch"
+          try { Invoke-Expression (Get-Content -Raw bad.ps1); "NO ERROR" } catch { "stopped: $_" }
+          "unchanged: " + ((Get-FileHash "$dir\dkt.exe").Hash -eq $before)
+          "left over: " + ((Get-ChildItem -Force $dir | ForEach-Object Name) -join ", ")
+          "== Get-Command"
+          $env:Path = "$dir;$env:Path"
+          (Get-Command dkt).Source
+          "== replace while running"
+          Copy-Item -Force "$env:SystemRoot\System32\PING.EXE" "$dir\dkt.exe"
+          $p = Start-Process "$dir\dkt.exe" -ArgumentList "-n","30","127.0.0.1" -PassThru -WindowStyle Hidden
+          Start-Sleep 1
+          try { Invoke-Expression (Get-Content -Raw local.ps1); "NO ERROR" } catch { "stopped: $_" }
+          "left over: " + ((Get-ChildItem -Force $dir | ForEach-Object Name) -join ", ")
+          Stop-Process $p
+          Start-Sleep 1
+          Invoke-Expression (Get-Content -Raw local.ps1)
+          "== update over an older dkt.exe"
+          Invoke-Expression (Get-Content -Raw local.ps1)
+          "== curl.exe and the real release"
+          (curl.exe -fsSL https://api.github.com/repos/wake/docket/releases/latest | ConvertFrom-Json).tag_name
+          Invoke-WebRequest https://github.com/wake/docket/releases/latest/download/checksums.txt -OutFile gh-checksums.txt -UseBasicParsing
+          Get-Content gh-checksums.txt
+          "== curl alias in 5.1"
+          try { curl -fsSL https://api.github.com/repos/wake/docket/releases/latest | Out-Null; "curl worked" } catch { "curl failed: $_" }
+      - name: PowerShell 7
+        shell: pwsh
+        run: |
+          $PSVersionTable.PSVersion.ToString()
+          $dir = Join-Path $env:LOCALAPPDATA "Programs\dkt"
+          Remove-Item -Recurse -Force $dir
+          Invoke-Expression (Get-Content -Raw local.ps1)
+          try { Invoke-Expression (Get-Content -Raw bad.ps1); "NO ERROR" } catch { "stopped: $_" }
+          (Get-ChildItem -Force $dir | ForEach-Object Name) -join ", "
+      - name: Git Bash
+        shell: bash
+        run: |
+          set -u
+          rm -rf "$LOCALAPPDATA/Programs/dkt"
+          bash gitbash-local.sh; echo "exit=$?"
+          "$LOCALAPPDATA/Programs/dkt/dkt.exe" --version
+          bash gitbash-bad.sh && echo "bad: NO ERROR" || echo "bad exit=$?"
+          ls -a "$LOCALAPPDATA/Programs/dkt"
+          export PATH="$(cygpath -u "$LOCALAPPDATA")/Programs/dkt:$PATH"
+          command -v dkt; dkt --version
+          powershell -NoProfile -Command '(Get-Command dkt).Source'
