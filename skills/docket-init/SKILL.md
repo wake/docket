@@ -18,7 +18,36 @@ Docket is a development workflow management framework built on superpowers and O
 
 2. Fill in what is missing:
    - not a git directory: find the folder where `git init` should run, have the user confirm it, run it there, and do the remaining steps in that folder. If it is a home directory, a temporary directory, or does not look like a project, first ask for the project's folder.
-   - dkt: `curl -fsSL https://raw.githubusercontent.com/wake/docket/main/install.sh | sh` (installs `~/.local/bin/dkt`)
+   - dkt:
+     - macOS and Linux: `curl -fsSL https://raw.githubusercontent.com/wake/docket/main/install.sh | sh` (installs `~/.local/bin/dkt`)
+     - Windows (the coding agent says the environment is Windows, or `uname -s` starts with `MINGW`, `MSYS` or `CYGWIN`): run the script below in PowerShell; in a POSIX shell such as Git Bash, run it inside the single quotes of `powershell -NoProfile -Command '...'`. It downloads the latest `dkt-windows-amd64.exe` or `dkt-windows-arm64.exe`, by `PROCESSOR_ARCHITECTURE`, and `checksums.txt`; when the SHA-256 does not match, it deletes the download and stops; only once the file runs does it put it at `%LOCALAPPDATA%\Programs\dkt\dkt.exe` (no administrator rights needed). When it fails, tell the user the error; `dkt.exe` cannot be replaced while a dkt runs, so end that dkt and run the script again.
+
+       ```powershell
+       $ErrorActionPreference = "Stop"; $ProgressPreference = "SilentlyContinue"
+       $base = "https://github.com/wake/docket/releases/latest/download"
+       $arch = @{ AMD64 = "amd64"; ARM64 = "arm64" }[$env:PROCESSOR_ARCHITECTURE]
+       if (-not $arch) { throw "no dkt for $env:PROCESSOR_ARCHITECTURE" }
+       $name = "dkt-windows-$arch.exe"
+       $dir = Join-Path $env:LOCALAPPDATA "Programs\dkt"
+       $tmp = Join-Path $dir ".install-$PID"
+       New-Item -ItemType Directory -Force $tmp | Out-Null
+       try {
+         Invoke-WebRequest "$base/$name" -OutFile "$tmp\$name" -UseBasicParsing
+         Invoke-WebRequest "$base/checksums.txt" -OutFile "$tmp\checksums.txt" -UseBasicParsing
+         $want = foreach ($l in Get-Content "$tmp\checksums.txt") { $f = -split $l; if ($f[1] -eq $name) { $f[0] } }
+         $got = (Get-FileHash "$tmp\$name" -Algorithm SHA256).Hash
+         if (-not $want -or $got -ne $want) { throw "SHA-256 of $name does not match checksums.txt" }
+         & "$tmp\$name" --version
+         if ($LASTEXITCODE -ne 0) { throw "$name does not run on this machine" }
+         try { Move-Item -Force "$tmp\$name" "$dir\dkt.exe" }
+         catch { throw "could not replace $dir\dkt.exe; Windows keeps it while a dkt runs: $_" }
+         & "$dir\dkt.exe" --version
+       } finally {
+         Remove-Item -Recurse -Force $tmp
+       }
+       ```
+
+       When that folder is not on `PATH`, do not change `PATH` for the user (all their programs share it); ask them to add it: search the Start menu for "Edit environment variables for your account" and add `%LOCALAPPDATA%\Programs\dkt` to `Path`; to undo, remove that entry there. Only a new terminal, or the coding agent restarted, sees it; until then, run dkt by its full path: `& "$env:LOCALAPPDATA\Programs\dkt\dkt.exe"` in PowerShell, `"$LOCALAPPDATA/Programs/dkt/dkt.exe"` in Git Bash.
    - OpenSpec: follow https://github.com/Fission-AI/OpenSpec/blob/main/install.md
    - superpowers: in Claude Code, `claude plugin install superpowers@claude-plugins-official`; in Codex, `codex plugin add superpowers@openai-curated-remote`
 

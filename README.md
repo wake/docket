@@ -37,14 +37,34 @@ This puts the latest release at `~/.local/bin/dkt`, after verifying its SHA-256.
 curl -fsSL https://raw.githubusercontent.com/wake/docket/main/install.sh | DKT_VERSION=v0.16.0 sh
 ```
 
-`install.sh` is for macOS and Linux. On Windows, download `dkt-windows-amd64.exe` (or `dkt-windows-arm64.exe` on ARM) and `checksums.txt` from the [latest release](https://github.com/wake/docket/releases/latest), and check the file in PowerShell:
+`install.sh` is for macOS and Linux. On Windows, run this in PowerShell. It downloads the latest `dkt-windows-amd64.exe` or `dkt-windows-arm64.exe` and `checksums.txt`, stops when the SHA-256 does not match, and puts the file at `%LOCALAPPDATA%\Programs\dkt\dkt.exe`:
 
 ```powershell
-(Get-FileHash .\dkt-windows-amd64.exe -Algorithm SHA256).Hash.ToLower()
-Select-String dkt-windows-amd64.exe .\checksums.txt
+$ErrorActionPreference = "Stop"; $ProgressPreference = "SilentlyContinue"
+$base = "https://github.com/wake/docket/releases/latest/download"
+$arch = @{ AMD64 = "amd64"; ARM64 = "arm64" }[$env:PROCESSOR_ARCHITECTURE]
+if (-not $arch) { throw "no dkt for $env:PROCESSOR_ARCHITECTURE" }
+$name = "dkt-windows-$arch.exe"
+$dir = Join-Path $env:LOCALAPPDATA "Programs\dkt"
+$tmp = Join-Path $dir ".install-$PID"
+New-Item -ItemType Directory -Force $tmp | Out-Null
+try {
+  Invoke-WebRequest "$base/$name" -OutFile "$tmp\$name" -UseBasicParsing
+  Invoke-WebRequest "$base/checksums.txt" -OutFile "$tmp\checksums.txt" -UseBasicParsing
+  $want = foreach ($l in Get-Content "$tmp\checksums.txt") { $f = -split $l; if ($f[1] -eq $name) { $f[0] } }
+  $got = (Get-FileHash "$tmp\$name" -Algorithm SHA256).Hash
+  if (-not $want -or $got -ne $want) { throw "SHA-256 of $name does not match checksums.txt" }
+  & "$tmp\$name" --version
+  if ($LASTEXITCODE -ne 0) { throw "$name does not run on this machine" }
+  try { Move-Item -Force "$tmp\$name" "$dir\dkt.exe" }
+  catch { throw "could not replace $dir\dkt.exe; Windows keeps it while a dkt runs: $_" }
+  & "$dir\dkt.exe" --version
+} finally {
+  Remove-Item -Recurse -Force $tmp
+}
 ```
 
-The two digests must match. Then rename the file to `dkt.exe` and put it in a folder on your `PATH`.
+Then add `%LOCALAPPDATA%\Programs\dkt` to your `Path` (search the Start menu for "Edit environment variables for your account") and open a new terminal. Run the script again to update; it cannot replace `dkt.exe` while a dkt runs. To choose a version, set `$base` to `https://github.com/wake/docket/releases/download/<tag>`, for a release that holds the Windows executables.
 
 ## Upgrade
 
