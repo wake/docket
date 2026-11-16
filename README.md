@@ -12,7 +12,7 @@ The fixed workflow is in the [docket skill](shipped/skill/SKILL.md). The steps a
 - [OpenSpec](https://github.com/Fission-AI/OpenSpec/blob/main/install.md) 1.14.0 or later
 - [superpowers](https://github.com/obra/superpowers)
 - Claude Code. Codex has not been verified yet.
-- macOS or Linux, on Intel or ARM. There is no Windows executable yet.
+- macOS, Linux or Windows, on Intel or ARM.
 
 ## Install
 
@@ -36,6 +36,15 @@ This puts the latest release at `~/.local/bin/dkt`, after verifying its SHA-256.
 ```sh
 curl -fsSL https://raw.githubusercontent.com/wake/docket/main/install.sh | DKT_VERSION=v0.16.0 sh
 ```
+
+`install.sh` is for macOS and Linux. On Windows, download `dkt-windows-amd64.exe` (or `dkt-windows-arm64.exe` on ARM) and `checksums.txt` from the [latest release](https://github.com/wake/docket/releases/latest), and check the file in PowerShell:
+
+```powershell
+(Get-FileHash .\dkt-windows-amd64.exe -Algorithm SHA256).Hash.ToLower()
+Select-String dkt-windows-amd64.exe .\checksums.txt
+```
+
+The two digests must match. Then rename the file to `dkt.exe` and put it in a folder on your `PATH`.
 
 ## Upgrade
 

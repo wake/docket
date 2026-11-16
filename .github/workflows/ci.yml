@@ -37,11 +37,8 @@ jobs:
       - run: go test ./...
 
   windows:
-    # The name understates this job: it runs the whole test suite, with the
-    # tests that need Unix skipped and their reasons in the skip messages. The
-    # name is fixed by the platform-support spec and changes with it in
-    # docket/ideas/windows-release.md.
-    name: 'windows: build and protections only (dkt is not supported on Windows yet)'
+    # The whole test suite; a test that needs Unix skips here and says why.
+    name: 'test (windows-latest, stable)'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
