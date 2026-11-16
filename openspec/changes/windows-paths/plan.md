@@ -16,7 +16,7 @@
 
 ## Review Focus
 
-- No absolute path dkt reads from git is left in git's spelling: the repository root and the worktree paths are the only ones.
+- No absolute path dkt reads from git for the repository's root or worktrees is left in git's spelling: `Toplevel` and `Worktrees` are the only places that read them. A remote's URL (`RemoteURL`, printed as `origin`) stays as configured.
 - Paths relative to the repository root keep forward slashes.
 - No test changes what it checks on macOS and Linux.
 
@@ -59,6 +59,6 @@
 - Modify: `internal/snapshot/activity_test.go`
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] Every test in `internal/cli/cmd_projects_test.go`, `internal/cli/register_test.go` and `internal/snapshot/activity_test.go` that writes a path into JSON, or looks for one in a JSON file's text, escapes it as JSON does (`prJSON` in `internal/cli`, `json.Marshal` in `internal/snapshot`).
+- [ ] Every test in `internal/cli/cmd_projects_test.go`, `internal/cli/register_test.go` and `internal/snapshot/activity_test.go` that writes a path into JSON, or looks for one in a JSON file's text, escapes it as JSON does (`prJSON` in `internal/cli`, `json.Marshal` in `internal/snapshot`), the checks that a path is absent included, such as `TestProjectsRm`'s, which would otherwise pass on Windows whatever the file holds.
 - [ ] The `windows-latest` CI job also runs, each reporting tests run and none skipped by name except as listed: `go test ./internal/scan/ ./internal/conflicts/`; `internal/gitx` with `PathsFromGit` added to the tests it runs; `internal/snapshot`'s `TestActivity` tests; and `internal/cli`'s `TestRepoRoot`, `TestRegister`, `TestInspectInNewProject`, `TestProjects` and `TestWorkflow` tests, skipping only `TestProjectsLsUncheckable`, which relies on `chmod`, with the reason in a comment. The job's comment names the paths read from git among what it verifies.
 - [ ] On macOS and Linux, `go test ./...` passes, and no test changed in this task checks anything different there.

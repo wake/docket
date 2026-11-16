@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Absolute paths as Windows writes them
-On Windows, every absolute path dkt prints or compares, including the repository root and the worktree paths it reads from git, SHALL be written with backslashes, as Windows writes it, with the drive letter as git gives it; paths relative to the repository root SHALL keep forward slashes on every system. On macOS and Linux paths SHALL stay as they are.
+On Windows, the absolute paths dkt builds, and those it reads from git for the repository's root and worktrees, SHALL be written with backslashes, as Windows writes them, with the drive letter as git gives it, wherever dkt prints or compares them; paths relative to the repository root SHALL keep forward slashes on every system. A remote's URL SHALL be printed as configured, even when it names a local folder. On macOS and Linux paths SHALL stay as they are.
 
 #### Scenario: Repository root on Windows
 - **WHEN** on Windows, a command runs in a repository whose root git prints as `C:/work/repo`
