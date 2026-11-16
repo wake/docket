@@ -2,6 +2,7 @@ package gitx
 
 import (
 	"reflect"
+	"runtime"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
@@ -32,7 +33,9 @@ func TestUncommittedUnder(t *testing.T) {
 	}
 }
 
-const oddName = "a b\"c\nd.md"
+// oddName is a name git quotes outside -z; Windows forbids " and control
+// characters in names, so there it is a space and a letter outside ASCII.
+var oddName = map[bool]string{false: "a b\"c\nd.md", true: "a b é.md"}[runtime.GOOS == "windows"]
 
 func TestUncommittedUnderOddName(t *testing.T) {
 	r := testutil.NewRepo(t)

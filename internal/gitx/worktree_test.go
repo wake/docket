@@ -3,6 +3,8 @@ package gitx
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/wake/docket/internal/testutil"
@@ -15,6 +17,9 @@ func TestWorktreesUnusualPaths(t *testing.T) {
 	names := []string{"需求 草稿", "back\\slash", "tab\there", "new\nline", "quo\"te"}
 	want := map[string]bool{}
 	for i, n := range names {
+		if runtime.GOOS == "windows" && strings.ContainsAny(n, "\\\t\n\"") {
+			continue // Windows forbids these in names, and \ separates folders there
+		}
 		parent := filepath.Join(base, n)
 		if err := os.MkdirAll(parent, 0o755); err != nil {
 			if n == "new\nline" {

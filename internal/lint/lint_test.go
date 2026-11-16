@@ -2,6 +2,7 @@ package lint
 
 import (
 	"errors"
+	"github.com/wake/docket/internal/testutil"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -199,7 +200,7 @@ func TestOtherSchemaNeverNeedsOpenSpec(t *testing.T) {
 }
 
 func TestUnreadable(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	dir := t.TempDir()
 	write := func(p, c string, mode os.FileMode) {
 		full := filepath.Join(dir, p)
@@ -280,7 +281,7 @@ func TestFindingsSorted(t *testing.T) {
 }
 
 func TestNoOpenSpecForUnreadableFolder(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	dir := t.TempDir()
 	locked := filepath.Join(dir, "openspec/changes/a")
 	if err := os.MkdirAll(locked, 0o755); err != nil {
@@ -307,7 +308,7 @@ func TestNamedPlainFileIsMissing(t *testing.T) {
 }
 
 func TestUnreadableChangesDirectory(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	dir := t.TempDir()
 	d := filepath.Join(dir, "openspec/changes")
 	if err := os.MkdirAll(d, 0o755); err != nil {
@@ -443,7 +444,7 @@ func TestDomainTreeLinkedSpecsFolderNoTree(t *testing.T) {
 }
 
 func TestDomainTreeUnreadableSpec(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	dir := t.TempDir()
 	spec := filepath.Join(dir, "openspec/specs/booking/spec.md")
 	for p, c := range map[string]string{spec: "# Booking Specification\n", filepath.Join(dir, domainFile): "- A\n  - `gone`\n"} {

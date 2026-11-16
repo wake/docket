@@ -120,9 +120,7 @@ func TestLintMainSpecsNeedNoOpenSpec(t *testing.T) {
 }
 
 func TestLintUnreadable(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root reads everything")
-	}
+	testutil.SkipUnlessModesDeny(t)
 	r := lintRepo(t, "docket")
 	r.Write("openspec/changes/add-x/proposal.md", "x\n")
 	if err := os.Chmod(filepath.Join(r.Dir, "openspec/changes/add-x/proposal.md"), 0); err != nil {
@@ -421,6 +419,7 @@ func TestLintNamedChangeSkipsRecords(t *testing.T) {
 // lockRecordsFolder makes docket/records unreadable until the test ends.
 func lockRecordsFolder(t *testing.T, dir string) {
 	t.Helper()
+	testutil.SkipUnlessModesDeny(t)
 	folder := filepath.Join(dir, "docket/records")
 	if err := os.MkdirAll(folder, 0o755); err != nil {
 		t.Fatal(err)

@@ -1,6 +1,8 @@
 package activity
 
 import (
+	"encoding/json"
+	"github.com/wake/docket/internal/testutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,7 +32,8 @@ func files(t *testing.T, dir string) []string {
 }
 
 func in(id, cwd string) *strings.Reader {
-	return strings.NewReader(`{"session_id":"` + id + `","cwd":"` + cwd + `"}`)
+	b, _ := json.Marshal(map[string]string{"session_id": id, "cwd": cwd})
+	return strings.NewReader(string(b))
 }
 
 func TestWriteLifecycle(t *testing.T) {
@@ -245,6 +248,7 @@ func TestReadSkipsLinkToRecord(t *testing.T) {
 }
 
 func TestReadMissingAndUnlistable(t *testing.T) {
+	testutil.SkipUnlessModesDeny(t)
 	env, dir := newEnv(t)
 	if recs, err := Read(env, t0); err != nil || recs != nil {
 		t.Fatalf("%v %v", recs, err)

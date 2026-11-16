@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -377,6 +378,9 @@ func TestRecordFailedWriteKeepsAnothersFile(t *testing.T) {
 }
 
 func TestRecordCleanupDoesNotFollowALink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not let a folder be renamed while dkt holds it open, so it cannot be swapped for a link mid-run")
+	}
 	r := recordRepo(t)
 	outside := t.TempDir()
 	kept := filepath.Join(outside, "2026-10-30-fix-x.md")

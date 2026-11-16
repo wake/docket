@@ -102,6 +102,7 @@ func TestSnapshotText(t *testing.T) {
 }
 
 func TestSnapshotSessionsFolderUnlistable(t *testing.T) {
+	testutil.SkipUnlessModesDeny(t)
 	r := testutil.NewRepo(t)
 	r.Commit("base", snFiles())
 	state := t.TempDir()
