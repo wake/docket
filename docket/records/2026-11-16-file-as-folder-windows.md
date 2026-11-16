@@ -6,7 +6,7 @@ source: "docket/issues/2026-11-16-file-as-folder-windows.md"
 
 ## What
 
-`internal/missing` decides whether a failed read means "not there". On Windows it looks up the deepest existing part of the path: missing only when that is a folder above it. Fifteen checks use it: the index, settings, user template (×3), sessions folder, and the `domains`, `lint` and `conflicts` reads. The table of all 44 checks is in the pull request.
+`internal/missing` decides whether a failed read means "not there". On Windows it looks up the deepest existing part of the path: missing only when that is a folder above it. Fifteen checks use it: the index, settings, user template (×3), sessions folder, and the `domains`, `lint` and `conflicts` reads. The table of all 46 such checks is in the pull request.
 
 ## Why
 
