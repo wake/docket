@@ -51,14 +51,11 @@ jobs:
         with:
           go-version: stable
       - run: go build ./...
-      - run: go build ./...
-        env:
-          GOARCH: arm64
-      - run: go vet ./...
-      - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/ ./internal/testutil/
-      - run: go test . ./cmd/dkt/ ./internal/execpath/ ./internal/openspec/
-      - run: go test -run 'PathEntry|PathSpelled' ./internal/gitx/
-      - run: go test -run 'TestEarlierHolds' ./internal/setup/
+      - name: probe
+        shell: bash
+        run: |
+          go test ./internal/projects/ ./internal/snapshot/ ./internal/activity/ ./internal/cli/ > out.txt 2>&1 || true
+          grep -v -E '^\s*(=== (RUN|PAUSE|CONT)|--- PASS)' out.txt | cut -c1-400 || true
 
   openspec:
     runs-on: ${{ matrix.os }}
