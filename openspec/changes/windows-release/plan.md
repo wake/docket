@@ -44,11 +44,11 @@
 - Modify: `.goreleaser.yaml`
 - Modify: `release_test.go`
 
-- [ ] `TestInstallSnapshot` expects exactly `checksums.txt`, `dkt-darwin-amd64`, `dkt-darwin-arm64`, `dkt-linux-amd64`, `dkt-linux-arm64`, `dkt-windows-amd64.exe` and `dkt-windows-arm64.exe` among the snapshot's assets, and fails on any other set, a Windows name without `.exe` included.
-- [ ] `checkSums(sums []byte, files map[string][]byte) error` accepts `checksums.txt` text only when it has a line `<sha256>  <name>` for every file, with that file's digest; a test with fixed data covers a missing line, a wrong digest and a valid set, and `TestInstallSnapshot` calls it on the snapshot's executables.
-- [ ] With `windows` in `goos`, the `release-snapshot` CI job passes: `goreleaser check`, the snapshot build and `TestInstallSnapshot`, whose log lists the assets it found; the install from the snapshot still prints the stamped version.
-- [ ] Other tags, tags off `main`, two tags on one commit and the stamped version keep the checks they have, unchanged: `.github/workflows/release.yml` and `TestPluginVersion` are not modified, and the Windows executables get the same `-X ...cli.Version={{ .Tag }}` stamp from the one build entry.
-- [ ] Removing `windows` from `goos` makes `TestInstallSnapshot` fail in CI, seen on a throwaway branch.
+- [x] `TestInstallSnapshot` expects exactly `checksums.txt`, `dkt-darwin-amd64`, `dkt-darwin-arm64`, `dkt-linux-amd64`, `dkt-linux-arm64`, `dkt-windows-amd64.exe` and `dkt-windows-arm64.exe` among the snapshot's assets, and fails on any other set, a Windows name without `.exe` included.
+- [x] `checkSums(sums []byte, files map[string][]byte) error` accepts `checksums.txt` text only when it has a line `<sha256>  <name>` for every file, with that file's digest; a test with fixed data covers a missing line, a wrong digest and a valid set, and `TestInstallSnapshot` calls it on the snapshot's executables.
+- [x] With `windows` in `goos`, the `release-snapshot` CI job passes: `goreleaser check`, the snapshot build and `TestInstallSnapshot`, whose log lists the assets it found; the install from the snapshot still prints the stamped version.
+- [x] Other tags, tags off `main`, two tags on one commit and the stamped version keep the checks they have, unchanged: `.github/workflows/release.yml` and `TestPluginVersion` are not modified, and the Windows executables get the same `-X ...cli.Version={{ .Tag }}` stamp from the one build entry.
+- [x] Removing `windows` from `goos` makes `TestInstallSnapshot` fail in CI, seen on a throwaway branch.
 
 ### Task 2: Say dkt is supported on Windows
 
@@ -60,8 +60,8 @@
 - Modify: `.github/workflows/ci.yml`
 - Modify: `README.md`
 
-- [ ] The Windows CI job's name no longer says dkt is unsupported or that the job covers only the build and the protections, and the comment that said the name understated the job is gone; the job still runs `go test ./...`.
-- [ ] The README lists Windows on Intel and ARM among the supported systems, and its install section tells Windows users to download `dkt-windows-<arch>.exe` and `checksums.txt` from the releases page, compare the digest with PowerShell's `Get-FileHash`, and put the file on `PATH` as `dkt.exe`; it says `install.sh` is for macOS and Linux.
+- [x] The Windows CI job's name no longer says dkt is unsupported or that the job covers only the build and the protections, and the comment that said the name understated the job is gone; the job still runs `go test ./...`.
+- [x] The README lists Windows on Intel and ARM among the supported systems, and its install section tells Windows users to download `dkt-windows-<arch>.exe` and `checksums.txt` from the releases page, compare the digest with PowerShell's `Get-FileHash`, and put the file on `PATH` as `dkt.exe`; it says `install.sh` is for macOS and Linux.
 
 ### Task 3: Point a Windows shell to the Windows executables
 
@@ -73,5 +73,5 @@
 - Modify: `install.sh`
 - Modify: `release_test.go`
 
-- [ ] When `uname -s` reports `MINGW64_NT-10.0`, `MSYS_NT-10.0` or `CYGWIN_NT-10.0`, `install.sh` exits non-zero before downloading anything, and its message says it does not install on Windows and names the system, `dkt-windows-amd64.exe`, `dkt-windows-arm64.exe`, `checksums.txt` and the releases page; the install test's Windows shell case checks this for the three systems.
-- [ ] `FreeBSD` still gets the unsupported-system message, and the other failure cases of the install tests pass unchanged.
+- [x] When `uname -s` reports `MINGW64_NT-10.0`, `MSYS_NT-10.0` or `CYGWIN_NT-10.0`, `install.sh` exits non-zero before downloading anything, and its message says it does not install on Windows and names the system, `dkt-windows-amd64.exe`, `dkt-windows-arm64.exe`, `checksums.txt` and the releases page; the install test's Windows shell case checks this for the three systems.
+- [x] `FreeBSD` still gets the unsupported-system message, and the other failure cases of the install tests pass unchanged.
