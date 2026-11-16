@@ -5,16 +5,16 @@ Says which operating systems dkt supports, what is verified on a system before i
 
 ## Requirements
 
-### Requirement: Supported systems
-dkt SHALL be supported on macOS and Linux. It SHALL build for Windows, where only the protections this spec names are verified; running its commands on Windows SHALL NOT be described as supported, by the documentation or by the name of a check, until a spec says so.
+### Requirement: Supported on macOS, Linux and Windows
+dkt SHALL be supported on macOS, Linux and Windows, on Intel and ARM. CI SHALL run the whole test suite on each of the three systems; a test that cannot run on one of them SHALL skip there and say why in its skip message.
 
 #### Scenario: Build for Windows
 - **WHEN** dkt is built for Windows on amd64 or arm64
 - **THEN** the build succeeds
 
-#### Scenario: Windows check names its limit
+#### Scenario: Whole suite on Windows
 - **WHEN** the CI job that runs on Windows is listed among a pull request's checks
-- **THEN** its name says that it covers only the build and the protections, and that dkt is not yet supported on Windows
+- **THEN** it runs the whole test suite, and its name does not say that dkt is unsupported on Windows or that the job covers only part of it
 
 ### Requirement: Links refused on Windows
 Wherever a requirement says that dkt does not read or write through a symbolic link, on Windows a symbolic link and a junction SHALL both count as one, whether it is the file itself or a folder on the path to it.
