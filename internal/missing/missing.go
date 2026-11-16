@@ -22,7 +22,24 @@ func In(fsys fs.FS, err error, p string) bool {
 }
 
 // is reports whether err means that p is not there; stat looks a path up and dir gives the
-// folder holding one.
+// folder holding one. Windows reports a file standing where p needs a folder like a missing
+// path, where macOS and Linux report ENOTDIR, so there p is missing only when the deepest part
+// of it that exists is a folder above p.
 func is(windows bool, err error, p string, stat func(string) (fs.FileInfo, error), dir func(string) string) bool {
-	return errors.Is(err, fs.ErrNotExist)
+	if !errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	if !windows {
+		return true
+	}
+	for q := p; ; {
+		if fi, serr := stat(q); serr == nil {
+			return q != p && fi.IsDir()
+		}
+		up := dir(q)
+		if up == q {
+			return true
+		}
+		q = up
+	}
 }
