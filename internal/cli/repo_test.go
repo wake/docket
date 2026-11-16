@@ -106,7 +106,7 @@ func TestRepoOutsideRepository(t *testing.T) {
 func TestRepoRootFromSubdirectory(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("one", map[string]string{"a/b/f": "1"})
-	want := r.Git("rev-parse", "--show-toplevel")
+	want := filepath.FromSlash(r.Git("rev-parse", "--show-toplevel"))
 	code, raw := versionRepo(t, filepath.Join(r.Dir, "a", "b"), r.Env)
 	var got repoJSON
 	if err := json.Unmarshal(raw, &got); code != 0 || err != nil {

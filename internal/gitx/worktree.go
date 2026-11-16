@@ -3,6 +3,7 @@ package gitx
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -42,7 +43,7 @@ func (g Git) Worktrees() ([]Worktree, error) {
 					return nil, fmt.Errorf("git worktree list: %w", err)
 				}
 			}
-			wts = append(wts, Worktree{Path: val})
+			wts = append(wts, Worktree{Path: filepath.FromSlash(val)})
 			cur = &wts[len(wts)-1]
 			continue
 		}

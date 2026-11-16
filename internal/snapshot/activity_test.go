@@ -1,6 +1,7 @@
 package snapshot
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -41,7 +42,8 @@ func writeIn(t *testing.T, root, rel, content string) {
 
 func report(t *testing.T, env []string, ago time.Duration, session, state, dir string) {
 	t.Helper()
-	if err := activity.Write(env, time.Now().Add(-ago), state, strings.NewReader(`{"session_id":"`+session+`","cwd":"`+dir+`"}`), "/"); err != nil {
+	hook, _ := json.Marshal(map[string]string{"session_id": session, "cwd": dir})
+	if err := activity.Write(env, time.Now().Add(-ago), state, bytes.NewReader(hook), "/"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -137,8 +139,8 @@ func TestActivityThroughLinks(t *testing.T) {
 	// a record written by hand, so that its directory stays the link
 	dir := filepath.Join(env[0][len("XDG_STATE_HOME="):], "docket", "sessions")
 	os.MkdirAll(dir, 0o700)
-	rec := `{"session":"a","dir":"` + link + `","state":"working","time":"` + time.Now().UTC().Format(time.RFC3339) + `"}`
-	os.WriteFile(filepath.Join(dir, "a.json"), []byte(rec), 0o600)
+	rec, _ := json.Marshal(map[string]string{"session": "a", "dir": link, "state": "working", "time": time.Now().UTC().Format(time.RFC3339)})
+	os.WriteFile(filepath.Join(dir, "a.json"), rec, 0o600)
 	res, _, _ := collect(t, r, env...)
 	if act(res, "add-x") != "working" {
 		t.Fatal("record through a link")
