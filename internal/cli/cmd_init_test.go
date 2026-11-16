@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -558,7 +559,10 @@ func TestInitListsWhatOpenSpecChanged(t *testing.T) {
 	r := testutil.NewRepo(t)
 	r.Commit("base", map[string]string{"tracked.txt": "t\n"})
 	r.Write("before.txt", "untracked before")
-	const odd = `we "ird" name.txt`
+	odd := `we "ird" name.txt` // a name git quotes outside -z
+	if runtime.GOOS == "windows" {
+		odd = "we ïrd name.txt" // Windows forbids " in names
+	}
 	code, m, _, _ := doInit(t, r, r.Dir, "1.14.0", []string{"FAKE_OPENSPEC_TOUCH=tracked.txt", "FAKE_OPENSPEC_CREATE=" + odd}, "--tools", "claude")
 	if code != 0 {
 		t.Fatal(code)

@@ -2,6 +2,7 @@ package lint
 
 import (
 	"errors"
+	"github.com/wake/docket/internal/testutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -80,7 +81,7 @@ func TestUnsafeCapabilityNotAskedOfOpenSpec(t *testing.T) {
 }
 
 func TestUnreadableMainSpecIsSkipped(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	f := &fakeOS{deltas: []openspec.Delta{delta("ADDED", "booking", req("A", "Success"), req("B", "Success"))}}
 	dir := t.TempDir()
 	for p, c := range map[string]string{

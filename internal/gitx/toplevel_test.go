@@ -26,9 +26,7 @@ func TestToplevelCorruptRepo(t *testing.T) {
 }
 
 func TestToplevelUnreadableGitDir(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root ignores file modes")
-	}
+	testutil.SkipUnlessModesDeny(t)
 	r := testutil.NewRepo(t)
 	gitDir := filepath.Join(r.Dir, ".git")
 	if err := os.Chmod(gitDir, 0o000); err != nil {

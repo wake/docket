@@ -409,8 +409,8 @@ func TestInspectRelativeOpenSpecFromSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r.Write("tools/openspec", string(b))
-	if err := os.Chmod(filepath.Join(r.Dir, "tools/openspec"), 0o755); err != nil {
+	r.Write("tools/openspec"+testutil.Exe, string(b))
+	if err := os.Chmod(filepath.Join(r.Dir, "tools/openspec"+testutil.Exe), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	sub := filepath.Join(r.Dir, "sub/dir")

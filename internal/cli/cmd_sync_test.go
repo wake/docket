@@ -269,7 +269,7 @@ func TestSyncBOMAndMode(t *testing.T) { // BOM kept, mode 0600 kept
 	if got := readPlan(t, r); got != "\ufeff### Task 1: One\n\n- [x] a\n" {
 		t.Fatalf("%q", got)
 	}
-	if fi, _ := os.Stat(p); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(p); testutil.ModeBits && fi.Mode().Perm() != 0o600 {
 		t.Fatalf("mode %v", fi.Mode())
 	}
 }
@@ -468,9 +468,7 @@ func TestSyncOtherSchema(t *testing.T) { // Sync refused for another schema
 }
 
 func TestSyncUnreadable(t *testing.T) { // unreadable plan.md and .openspec.yaml
-	if os.Geteuid() == 0 {
-		t.Skip("root reads mode 000 files")
-	}
+	testutil.SkipUnlessModesDeny(t)
 	for _, name := range []string{"plan.md", ".openspec.yaml"} {
 		r := syncRepo(t, plan4)
 		trail(r, "add-x/1")
