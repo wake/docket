@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -190,9 +189,6 @@ func TestDomainsLinkedSpecsFolder(t *testing.T) {
 }
 
 func TestDomainsChangesIsAFile(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows reads a file as a missing folder: docket/issues/2026-11-16-file-as-folder-windows.md")
-	}
 	r := dmRepo(t, map[string]string{"docket/domains.md": "- A\n  - `gone`\n", "openspec/changes": "x"})
 	code, m, raw := dmRun(t, r, r.Dir, true)
 	if code != 3 || m.Result == nil || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/changes" {
