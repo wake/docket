@@ -4,31 +4,18 @@ kind: fix
 source: "docket/issues/2026-11-16-file-as-folder-windows.md"
 ---
 
-<!-- Keep the title to one line and the rest short; `dkt lint` checks the
-length. The details belong in the code and the pull request. Replace every
-comment with your text. -->
-
 ## What
 
-<!-- What changed, in a few sentences: the files or the behavior touched.
-fix: the behavior restored. refactor: what moved or was restructured.
-test: which behavior the new tests cover. prompt: which text changed, and
-which copies. checks: which checks run differently. -->
+`internal/missing` decides whether a failed read means "not there". On Windows it looks up the deepest existing part of the path: missing only when that is a folder above it. Fifteen checks use it: the index, settings, user template (×3), sessions folder, and the `domains`, `lint` and `conflicts` reads. The table of all 44 checks is in the pull request.
 
 ## Why
 
-<!-- Why it was needed. fix: the symptom and its cause. refactor: what the
-old shape made hard. test: what was not covered. prompt: what agents did
-wrong or could not do. checks: what the old settings missed. -->
+Windows gives a file in the way ERROR_PATH_NOT_FOUND, which matches `fs.ErrNotExist` (and is `syscall.ENOTDIR` there), so those reads took a file in a folder's place for a missing folder. macOS and Linux give ENOTDIR.
 
 ## Verification
 
-<!-- How it was checked and the result, by the light review in the docket
-skill's default steps, or the user's own way: the regression test seen failing, then passing; the
-mutation that made a test fail; the mechanical check of the prompt; the
-pull request's own check run. Say what was not verified, too. -->
+- `TestIsOnWindows` runs the Windows rule on any system; it failed before the fix.
+- Eleven new CLI tests and `TestDomainsChangesIsAFile` failed on `windows-latest` before the fix (#190) with the issue's symptom. Mutating `missing` makes each fail on macOS.
+- `go test ./...`, `go vet ./...`, `gofmt -l .` pass on macOS.
 
 ## Review
-
-<!-- Who reviewed the diff (a model, or a person), what the review found,
-and how each finding was handled. -->
