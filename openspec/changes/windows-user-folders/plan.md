@@ -83,8 +83,8 @@ Found in the pre-merge review. The attacking reviewer (codex) found that `testut
 - [x] A `dkt inspect --json` test with no `XDG_CONFIG_HOME`, and `HOME` and `USERPROFILE` set to two different folders, reports `result.user_workflow.path` as `.config/docket/workflow.md` under the system's variable's folder, with `exists` true for a template written there.
 - [x] The `internal/cli` tests of `dkt activity`, which use a temporary `XDG_STATE_HOME`, pass on Windows (scenario "State home kept on Windows").
 - [x] The helpers that work out an expected path from `HOME` (`prIndexPath` in `cmd_projects_test.go`, `regHome` in `register_test.go`) and `TestInspectNothingWritten`, which watches the `HOME` folder, stay as they are: `testutil.Env` gives `HOME` and `USERPROFILE` the same folder, so they point at the folder dkt uses on every system. Which variable dkt reads is told apart only by the tests above that give the two different folders.
-- [ ] `testutil.WithoutHome` removes `HOME` and `USERPROFILE` whatever the case of their names (`home`, `UserProfile`) and keeps every other entry, such as `HOMEDRIVE`; `TestWithoutHome` covers it.
-- [ ] `TestRegisterNoHome` checks that the warning names the system's variable (`set USERPROFILE, XDG_CONFIG_HOME` on Windows, `set HOME, XDG_CONFIG_HOME` elsewhere).
+- [x] `testutil.WithoutHome` removes `HOME` and `USERPROFILE` whatever the case of their names (`home`, `UserProfile`) and keeps every other entry, such as `HOMEDRIVE`; `TestWithoutHome` covers it.
+- [x] `TestRegisterNoHome` checks that the warning names the system's variable (`set USERPROFILE, XDG_CONFIG_HOME` on Windows, `set HOME, XDG_CONFIG_HOME` elsewhere).
 
 ### Task 3: The Windows CI job runs these tests
 
