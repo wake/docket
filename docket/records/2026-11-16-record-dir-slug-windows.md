@@ -22,3 +22,10 @@ On Windows, Go's exclusive create reports a folder at the name as `EISDIR`, not 
 - `go test ./...`, `go vet ./...`, `gofmt -l .` pass on macOS.
 
 ## Review
+
+Codex (gpt-5.6-sol, adversarial review) approved with no findings. It checked these points:
+
+- `EISDIR` counts as taken only on Windows, and only for the final name's exclusive create.
+- Failures at folders on the path, refused links and other open errors still stop the run and clean up.
+- `dkt new` does not use `taken`.
+- `safefile`'s temporary-file loop has the same shape, but it only matters if a random name collides with a folder, which is not a real risk.
