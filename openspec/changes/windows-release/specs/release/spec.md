@@ -37,3 +37,38 @@ CI SHALL build every target with the release configuration on each pull request 
 #### Scenario: Checksum missing
 - **WHEN** the snapshot's `checksums.txt` lacks an executable, or holds another digest for it than the file built
 - **THEN** the check of the snapshot fails and so does CI
+
+### Requirement: Failing without installing
+`install.sh` SHALL exit non-zero, say why on standard error, leave `~/.local/bin/dkt` as it was and leave no temporary file in `~/.local/bin` when it does not install on the machine, as on a system or architecture with no published executable or in a Windows shell, `HOME` is not an absolute path, a download fails, or the executable cannot be run. It SHALL run the executable before putting it in place.
+
+#### Scenario: Home is not an absolute path
+- **WHEN** `HOME` is empty or a relative path
+- **THEN** the script exits non-zero before downloading anything, its message names `HOME`, and it writes nothing
+
+#### Scenario: Unsupported system
+- **WHEN** `uname -s` reports `FreeBSD`
+- **THEN** the script exits non-zero before downloading anything, and its message names the system and the releases page
+
+#### Scenario: Windows shell
+- **WHEN** `uname -s` reports a Windows shell, such as `MINGW64_NT-10.0`, `MSYS_NT-10.0` or `CYGWIN_NT-10.0`
+- **THEN** the script exits non-zero before downloading anything, and its message says that it does not install on Windows and names the system, `dkt-windows-amd64.exe`, `dkt-windows-arm64.exe`, `checksums.txt` and the releases page
+
+#### Scenario: Unsupported architecture
+- **WHEN** `uname -m` reports `riscv64`
+- **THEN** the script exits non-zero before downloading anything, and its message names the architecture and the releases page
+
+#### Scenario: Download fails
+- **WHEN** the executable or `checksums.txt` cannot be downloaded, as when the release does not exist
+- **THEN** the script exits non-zero, its message names the URL, and `~/.local/bin/dkt` is as it was
+
+#### Scenario: Target is a directory
+- **WHEN** `~/.local/bin/dkt` is a directory
+- **THEN** the script exits non-zero and the directory is as it was
+
+#### Scenario: Downloaded file does not run
+- **WHEN** the verified executable cannot be run on the machine
+- **THEN** the script exits non-zero, says so, and `~/.local/bin/dkt` is as it was
+
+#### Scenario: Interrupted during a download
+- **WHEN** the script receives a termination signal while downloading
+- **THEN** it leaves no temporary file in `~/.local/bin` and `~/.local/bin/dkt` is as it was

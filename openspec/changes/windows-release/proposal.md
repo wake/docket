@@ -19,7 +19,7 @@ dkt now finds its programs, paths and user folders on Windows, keeps its protect
 
 ## Non-Goals
 
-- `install.sh` stays POSIX and keeps refusing Windows shells, naming the releases page.
+- `install.sh` installing on Windows: it stays POSIX and keeps refusing Windows shells, but its message there now says it does not install on Windows and names the Windows executables, instead of calling the system unsupported.
 - The plugin skills that install or update dkt (`docket-init`, `docket-upgrade`) run `install.sh`; telling Windows users there to download by hand is prompt text, left for a change of its own.
 - Publishing a release: the next one is on hold, so this change is verified on the snapshot builds.
 - Any change to how dkt behaves on any system.
@@ -33,11 +33,12 @@ None.
 ### Modified Capabilities
 
 - `platform-support`: Supported systems is replaced by Supported on macOS, Linux and Windows (OpenSpec does not let a modified requirement drop a scenario, and the old scenario asked for the name this change removes).
-- `release`: Publishing a version tag, Snapshot on every pull request.
+- `release`: Publishing a version tag, Snapshot on every pull request, Failing without installing (a Windows shell gets its own scenario and message).
 
 ## Impact
 
 - `.goreleaser.yaml`: `windows` in `goos`.
-- `release_test.go`: `TestInstallSnapshot` expects the Windows executables and checks `checksums.txt`.
+- `release_test.go`: `TestInstallSnapshot` expects the Windows executables and checks `checksums.txt` through a helper with tests of its own; the install tests' Windows shell case.
+- `install.sh`: the message for a Windows shell.
 - `.github/workflows/ci.yml`: the Windows job's name and comment.
 - `README.md`: requirements and installing on Windows.
