@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/wake/docket/internal/execpath"
+	"github.com/wake/docket/internal/missing"
 	"github.com/wake/docket/internal/safefile"
 )
 
@@ -84,7 +84,7 @@ func Stamp(t time.Time) string { return t.UTC().Truncate(time.Second).Format(tim
 // Load reads the index; a missing file is an empty index.
 func Load(path string) (*Index, error) {
 	data, err := safefile.ReadNoFollow(path)
-	if errors.Is(err, fs.ErrNotExist) {
+	if missing.Path(err, path) {
 		return &Index{Projects: []Entry{}}, nil
 	}
 	if err != nil {
@@ -158,7 +158,7 @@ func (x *Index) Save(path string) error {
 // the file or the key is missing.
 func DefaultMode(settings string) (string, error) {
 	data, err := os.ReadFile(settings)
-	if errors.Is(err, fs.ErrNotExist) {
+	if missing.Path(err, settings) {
 		return "", nil
 	}
 	if err != nil {
@@ -181,7 +181,7 @@ func DefaultMode(settings string) (string, error) {
 // AutoRegister reads projects.autoRegister from the settings; true when missing.
 func AutoRegister(settings string) (bool, error) {
 	data, err := os.ReadFile(settings)
-	if errors.Is(err, fs.ErrNotExist) {
+	if missing.Path(err, settings) {
 		return true, nil
 	}
 	if err != nil {

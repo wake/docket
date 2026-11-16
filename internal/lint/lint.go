@@ -13,6 +13,7 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/domain"
+	"github.com/wake/docket/internal/missing"
 	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/specdoc"
 )
@@ -307,7 +308,7 @@ func Run(in Input) (Report, error) {
 // changes. A link is never a change.
 func (r *state) scope(names []string) []string {
 	entries, err := fs.ReadDir(r.in.Root, changesDir)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err != nil && !missing.In(r.in.Root, err, changesDir) {
 		r.unreadable(changesDir, err)
 	}
 	isChange := map[string]bool{}
@@ -330,7 +331,7 @@ func (r *state) scope(names []string) []string {
 			seen[n] = true
 			if isChange[n] {
 				slugs = append(slugs, n)
-			} else if err == nil || errors.Is(err, fs.ErrNotExist) {
+			} else if err == nil || missing.In(r.in.Root, err, changesDir) {
 				r.rep.Findings = append(r.rep.Findings, Finding{
 					Rule:    "change-missing",
 					Change:  n,

@@ -11,6 +11,7 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/markdown"
+	"github.com/wake/docket/internal/missing"
 )
 
 // checkFront judges the front matter of a docket change's proposal.
@@ -64,7 +65,7 @@ func checkNewCapabilities(r *state, c *loaded, fm change.Front, readable bool) {
 		main := specsDir + "/" + cp + "/spec.md"
 		if _, err := fs.Stat(r.in.Root, main); err == nil {
 			continue
-		} else if !errors.Is(err, fs.ErrNotExist) {
+		} else if !missing.In(r.in.Root, err, main) {
 			r.unreadable(main, err)
 			continue
 		}
@@ -138,7 +139,7 @@ func walkSpecs(root fs.FS, each func(p string, b []byte)) ([]Unreadable, int) {
 	specs := 0
 	_ = fs.WalkDir(root, specsDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
+			if !missing.In(root, err, p) {
 				bad = append(bad, Unreadable{Source: p, Reason: err.Error()})
 			}
 			if d != nil && d.IsDir() {
