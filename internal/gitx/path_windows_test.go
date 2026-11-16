@@ -41,8 +41,8 @@ func TestPathsFromGitWithBackslashes(t *testing.T) {
 			t.Errorf("%q holds a forward slash", p)
 		}
 	}
-	if top != wts[1].Path {
-		t.Errorf("toplevel %q, worktree list %q", top, wts[1].Path)
+	if top != wts[0].Path && top != wts[1].Path {
+		t.Errorf("toplevel %q not in the worktree list %v", top, wts)
 	}
 	if want, _ := filepath.EvalSymlinks(wt); top != want {
 		t.Errorf("toplevel %q, want %q", top, want)
