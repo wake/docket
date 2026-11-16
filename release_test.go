@@ -541,6 +541,8 @@ func TestInstallSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	var names []string
+	var sums []byte
+	executables := map[string][]byte{}
 	for _, a := range artifacts {
 		if !strings.HasPrefix(a.Name, "dkt-") && a.Name != "checksums.txt" {
 			continue
@@ -553,10 +555,20 @@ func TestInstallSnapshot(t *testing.T) {
 			t.Fatal(err)
 		}
 		names = append(names, a.Name)
+		if a.Name == "checksums.txt" {
+			sums = b
+		} else {
+			executables[a.Name] = b
+		}
 	}
-	want := []string{"checksums.txt", "dkt-darwin-amd64", "dkt-darwin-arm64", "dkt-linux-amd64", "dkt-linux-arm64"}
-	if sort.Strings(names); !slices.Equal(names, want) {
+	sort.Strings(names)
+	t.Logf("assets: %v\nchecksums.txt:\n%s", names, sums)
+	want := []string{"checksums.txt", "dkt-darwin-amd64", "dkt-darwin-arm64", "dkt-linux-amd64", "dkt-linux-arm64", "dkt-windows-amd64.exe", "dkt-windows-arm64.exe"}
+	if !slices.Equal(names, want) {
 		t.Fatalf("artifacts = %v, want %v", names, want)
+	}
+	if err := checkSums(sums, executables); err != nil {
+		t.Fatal(err)
 	}
 	if _, stderr, err := e.run(t); err != nil {
 		t.Fatalf("%v\nstderr: %s", err, stderr)
@@ -567,6 +579,43 @@ func TestInstallSnapshot(t *testing.T) {
 	}
 	if got, want := strings.TrimSpace(string(out)), "dkt "+meta.Tag; got != want {
 		t.Errorf("dkt --version = %q, want %q", got, want)
+	}
+}
+
+// checkSums reports an error unless sums, the text of checksums.txt, has a
+// line "<sha256>  <name>" with the right digest for every file in files.
+func checkSums(sums []byte, files map[string][]byte) error {
+	got := map[string]string{}
+	for _, line := range strings.Split(string(sums), "\n") {
+		if digest, name, ok := strings.Cut(line, "  "); ok {
+			got[name] = digest
+		}
+	}
+	for name, b := range files {
+		want := fmt.Sprintf("%x", sha256.Sum256(b))
+		if d, ok := got[name]; !ok {
+			return fmt.Errorf("checksums.txt has no line for %s", name)
+		} else if d != want {
+			return fmt.Errorf("checksums.txt has %s for %s, want %s", d, name, want)
+		}
+	}
+	return nil
+}
+
+func TestCheckSums(t *testing.T) {
+	files := map[string][]byte{"dkt-linux-amd64": []byte("a"), "dkt-windows-amd64.exe": []byte("b")}
+	line := func(name, data string) string { return fmt.Sprintf("%x  %s\n", sha256.Sum256([]byte(data)), name) }
+	for _, c := range []struct {
+		name, sums string
+		ok         bool
+	}{
+		{"every file", line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b"), true},
+		{"a file missing", line("dkt-linux-amd64", "a"), false},
+		{"a wrong digest", line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "x"), false},
+	} {
+		if err := checkSums([]byte(c.sums), files); (err == nil) != c.ok {
+			t.Errorf("%s: err = %v", c.name, err)
+		}
 	}
 }
 
