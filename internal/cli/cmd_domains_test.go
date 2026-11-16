@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -189,6 +190,9 @@ func TestDomainsLinkedSpecsFolder(t *testing.T) {
 }
 
 func TestDomainsChangesIsAFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows reads a file as a missing folder: docket/issues/2026-11-16-file-as-folder-windows.md")
+	}
 	r := dmRepo(t, map[string]string{"docket/domains.md": "- A\n  - `gone`\n", "openspec/changes": "x"})
 	code, m, raw := dmRun(t, r, r.Dir, true)
 	if code != 3 || m.Result == nil || len(m.Unreadable) != 1 || m.Unreadable[0].Source != "openspec/changes" {
@@ -196,15 +200,8 @@ func TestDomainsChangesIsAFile(t *testing.T) {
 	}
 }
 
-func skipRoot(t *testing.T) {
-	t.Helper()
-	if os.Geteuid() == 0 {
-		t.Skip("running as root")
-	}
-}
-
 func TestDomainsUnreadableSpec(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	r := dmRepo(t, map[string]string{
 		"docket/domains.md":             "- A\n  - `gone`\n",
 		"openspec/specs/refund/spec.md": dmSpec("Refund"),
@@ -224,7 +221,7 @@ func TestDomainsUnreadableSpec(t *testing.T) {
 }
 
 func TestDomainsUnreadableProposal(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	r := dmRepo(t, map[string]string{
 		"docket/domains.md":                           "- A\n  - `gone`\n",
 		"openspec/changes/add-x/specs/refund/spec.md": "x",

@@ -2,8 +2,10 @@ package projects
 
 import (
 	"errors"
+	"github.com/wake/docket/internal/testutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -139,10 +141,13 @@ func write(t *testing.T, s string) string {
 	return p
 }
 
+// drive makes the Unix paths of the test data absolute on Windows too.
+var drive = map[bool]string{false: "", true: "C:"}[runtime.GOOS == "windows"]
+
 func TestLoadRemovesUserInfo(t *testing.T) {
 	p := write(t, `{"projects":[
-{"path":"/w/a","origin":"https://user:p%zz@example.com/org/app.git","added":"2026-11-08T09:10:11Z","ignored":false},
-{"path":"/w/b","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`)
+{"path":"`+drive+`/w/a","origin":"https://user:p%zz@example.com/org/app.git","added":"2026-11-08T09:10:11Z","ignored":false},
+{"path":"`+drive+`/w/b","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`)
 	x, err := Load(p)
 	if err != nil {
 		t.Fatal(err)
@@ -170,21 +175,21 @@ func TestLoadInvalid(t *testing.T) {
 	for _, s := range []string{
 		"not json", "{}", `{"projects":"x"}`,
 		`{"projects":[{"path":"rel","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`,
-		`{"projects":[{"path":"/p","origin":null,"added":"yesterday","ignored":false}]}`,
-		`{"projects":[{"path":"/p","origin":null,"added":"2026-13-08T09:10:11Z","ignored":false}]}`,
-		`{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T17:10:11+08:00","ignored":false}]}`,
-		`{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T09:10:11Z","ignored":"no"}]}`,
-		`{"projects":[{"path":"/p","added":"2026-11-08T09:10:11Z","ignored":false}]}`,
-		`{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T09:10:11Z"}]}`,
-		`{"projects":[{"path":"/p","origin":3,"added":"2026-11-08T09:10:11Z","ignored":false}]}`,
-		`{"projects":[{"path":"/w/app","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false},{"path":"/w/app","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`,
+		`{"projects":[{"path":"` + drive + `/p","origin":null,"added":"yesterday","ignored":false}]}`,
+		`{"projects":[{"path":"` + drive + `/p","origin":null,"added":"2026-13-08T09:10:11Z","ignored":false}]}`,
+		`{"projects":[{"path":"` + drive + `/p","origin":null,"added":"2026-11-08T17:10:11+08:00","ignored":false}]}`,
+		`{"projects":[{"path":"` + drive + `/p","origin":null,"added":"2026-11-08T09:10:11Z","ignored":"no"}]}`,
+		`{"projects":[{"path":"` + drive + `/p","added":"2026-11-08T09:10:11Z","ignored":false}]}`,
+		`{"projects":[{"path":"` + drive + `/p","origin":null,"added":"2026-11-08T09:10:11Z"}]}`,
+		`{"projects":[{"path":"` + drive + `/p","origin":3,"added":"2026-11-08T09:10:11Z","ignored":false}]}`,
+		`{"projects":[{"path":"` + drive + `/w/app","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false},{"path":"` + drive + `/w/app","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`,
 	} {
 		p := write(t, s)
 		if _, err := Load(p); err == nil || !strings.Contains(err.Error(), p) {
 			t.Errorf("%s: %v", s, err)
 		}
 	}
-	valid := `{"projects":[{"path":"/p","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`
+	valid := `{"projects":[{"path":"` + drive + `/p","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`
 	if _, err := Load(write(t, valid)); err != nil {
 		t.Errorf("valid: %v", err)
 	}
@@ -212,8 +217,8 @@ func TestSaveRoundTrip(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "a", "b", "projects.json")
 	o := "git@x:y"
 	in := &Index{Projects: []Entry{
-		{Path: "/w/b", Origin: nil, Added: "2026-11-08T09:10:11Z"},
-		{Path: "/w/a", Origin: &o, Added: "2026-11-08T09:10:11Z", Ignored: true},
+		{Path: drive + "/w/b", Origin: nil, Added: "2026-11-08T09:10:11Z"},
+		{Path: drive + "/w/a", Origin: &o, Added: "2026-11-08T09:10:11Z", Ignored: true},
 	}}
 	if err := in.Save(p); err != nil {
 		t.Fatal(err)
@@ -223,17 +228,17 @@ func TestSaveRoundTrip(t *testing.T) {
 	if !strings.HasSuffix(s, "}\n") || !strings.Contains(s, "\n  \"projects\": [") {
 		t.Errorf("format: %q", s)
 	}
-	if fi, _ := os.Stat(p); fi.Mode()&0o077 != 0 {
+	if fi, _ := os.Stat(p); testutil.ModeBits && fi.Mode()&0o077 != 0 {
 		t.Errorf("mode %v", fi.Mode())
 	}
 	out, err := Load(p)
-	if err != nil || len(out.Projects) != 2 || out.Projects[0].Path != "/w/a" || out.Projects[1].Path != "/w/b" {
+	if err != nil || len(out.Projects) != 2 || out.Projects[0].Path != drive+"/w/a" || out.Projects[1].Path != drive+"/w/b" {
 		t.Fatalf("%+v %v", out, err)
 	}
 	if out.Projects[1].Origin != nil || *out.Projects[0].Origin != o || !out.Projects[0].Ignored {
 		t.Errorf("%+v", out.Projects)
 	}
-	if out.Find("/w/b") != 1 || out.Find("/nope") != -1 {
+	if out.Find(drive+"/w/b") != 1 || out.Find("/nope") != -1 {
 		t.Error("Find")
 	}
 }
@@ -257,8 +262,8 @@ func TestAutoRegister(t *testing.T) {
 
 func TestEntryModeSynced(t *testing.T) {
 	p := write(t, `{"projects":[
-{"path":"/w/a","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false,"mode":"sync","synced":{"Plan review":"ab"}},
-{"path":"/w/b","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`)
+{"path":"`+drive+`/w/a","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false,"mode":"sync","synced":{"Plan review":"ab"}},
+{"path":"`+drive+`/w/b","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false}]}`)
 	x, err := Load(p)
 	if err != nil || x.Projects[0].Mode != "sync" || x.Projects[0].Synced["Plan review"] != "ab" || x.Projects[1].Mode != "" {
 		t.Fatalf("%+v %v", x, err)
@@ -275,7 +280,7 @@ func TestEntryModeSynced(t *testing.T) {
 	if err != nil || y.Projects[0].Mode != "sync" || y.Projects[0].Synced["Plan review"] != "ab" {
 		t.Errorf("%+v %v", y, err)
 	}
-	bad := write(t, `{"projects":[{"path":"/w/a","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false,"mode":"always"}]}`)
+	bad := write(t, `{"projects":[{"path":"`+drive+`/w/a","origin":null,"added":"2026-11-08T09:10:11Z","ignored":false,"mode":"always"}]}`)
 	if _, err := Load(bad); err == nil || !strings.Contains(err.Error(), bad) {
 		t.Errorf("unknown mode: %v", err)
 	}

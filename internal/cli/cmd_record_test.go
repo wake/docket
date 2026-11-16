@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -309,6 +310,9 @@ func TestRecordWriteFailsKeepsFolder(t *testing.T) {
 }
 
 func TestRecordOpenMovesToNextSuffix(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("on Windows a folder at the path fails the open as a folder: docket/issues/2026-11-16-record-dir-slug-windows.md")
+	}
 	r := recordRepo(t)
 	// A directory is no use the scan sees, but the exclusive open finds the path taken.
 	if err := os.MkdirAll(filepath.Join(r.Dir, "docket/records/2026-10-30-fix-x.md"), 0o755); err != nil {
@@ -353,6 +357,9 @@ func TestRecordFailedWriteKeepsAnothersFile(t *testing.T) {
 }
 
 func TestRecordCleanupDoesNotFollowALink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not let a folder be renamed while dkt holds it open, so it cannot be swapped for a link mid-run")
+	}
 	r := recordRepo(t)
 	outside := t.TempDir()
 	kept := filepath.Join(outside, "2026-10-30-fix-x.md")

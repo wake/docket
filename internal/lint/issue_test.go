@@ -1,6 +1,7 @@
 package lint
 
 import (
+	"github.com/wake/docket/internal/testutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -108,6 +109,7 @@ func TestIssuePlaceholder(t *testing.T) {
 
 // A folder that cannot be read may hold the named file, so nothing is reported missing.
 func TestNamedMissingWithUnreadableIssues(t *testing.T) {
+	testutil.SkipUnlessModesDeny(t)
 	dir := t.TempDir()
 	locked := filepath.Join(dir, "docket", "issues")
 	if err := os.MkdirAll(locked, 0o755); err != nil {
@@ -232,7 +234,7 @@ func TestCardDuplicate(t *testing.T) {
 }
 
 func TestCardDuplicateUnreadable(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	dir := t.TempDir()
 	for p, c := range map[string]string{issPath: card, otherPath: card} {
 		full := filepath.Join(dir, filepath.FromSlash(p))
