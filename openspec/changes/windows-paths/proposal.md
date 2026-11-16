@@ -20,6 +20,7 @@ Git for Windows prints absolute paths with forward slashes (`C:/Users/me/repo`),
 ## Non-Goals
 
 - Short 8.3 names (`RUNNER~1`): dkt keeps the long names git prints and does not rewrite paths the user gives it.
+- A remote's URL (`origin`), which may name a local folder: it is the user's configuration, printed as configured.
 - Tests that give Unix paths as test data, rely on `chmod`, or name a program without an extension (`windows-suite`), among them `internal/activity`'s own tests; and where the user's files go on Windows (`windows-user-folders`).
 - Any change on macOS or Linux, where git already writes paths as the system does.
 
