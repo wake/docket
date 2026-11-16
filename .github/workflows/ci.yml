@@ -59,8 +59,9 @@ jobs:
         shell: bash
         continue-on-error: true
         run: |
-          go test -v -run 'TestDomainsChangesIsAFile|TestRecordOpenMovesToNextSuffix' ./internal/cli/ 2>&1 | grep -v '^=== ' | head -40 || true
-          go test -v -run 'TestTwoSessionsOneDirectory|TestUnreadableChangesDirectory' ./internal/activity/ ./internal/lint/ 2>&1 | grep -v '^=== ' | head -40 || true
+          go test ./... 2>&1 | tee out.txt | tail -3 || true
+          echo ==== FAILS; grep -E '^(--- FAIL|FAIL|ok)' out.txt | head -80
+          echo ==== DETAIL; grep -A6 -E '^\s*--- FAIL' out.txt | cut -c1-600 | head -300
       - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/ ./internal/testutil/
       - run: go test . ./cmd/dkt/ ./internal/execpath/ ./internal/openspec/
       - run: go test -run 'PathEntry|PathSpelled|PathsFromGit' ./internal/gitx/
