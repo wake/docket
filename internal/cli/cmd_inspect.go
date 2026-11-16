@@ -12,6 +12,7 @@ import (
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/gitx"
 	"github.com/wake/docket/internal/lint"
+	"github.com/wake/docket/internal/missing"
 	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/projects"
 	"github.com/wake/docket/internal/setup"
@@ -93,7 +94,7 @@ func inspectUserWorkflow(c *Context, out *Outcome) (*userWorkflow, error) {
 	u := &userWorkflow{Path: p, Mode: "independent", Sections: []setup.SectionState{}}
 	inspectMode(c, out, u)
 	b, err := os.ReadFile(p) // follows a link: the file is the user's own
-	if errors.Is(err, fs.ErrNotExist) {
+	if missing.Path(err, p) {
 		return u, nil
 	}
 	if err != nil {

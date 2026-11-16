@@ -11,6 +11,7 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/markdown"
+	"github.com/wake/docket/internal/missing"
 )
 
 // Capability is a main spec, a delta spec of an active change, or both.
@@ -86,7 +87,7 @@ func Load(root fs.FS) Loaded {
 	var entries []fs.DirEntry
 	if link := linkOnPath(root, changesDir); link != "" {
 		unreadable(link, linkError(link))
-	} else if entries, err = fs.ReadDir(root, changesDir); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	} else if entries, err = fs.ReadDir(root, changesDir); err != nil && !missing.In(root, err, changesDir) {
 		unreadable(changesDir, err)
 	}
 	names := map[string]map[string]string{} // slug -> name under specs:
@@ -234,7 +235,7 @@ func walkSpecs(root fs.FS, dir string, unreadable func(string, error), fn func(f
 	}
 	_ = fs.WalkDir(root, dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if !errors.Is(err, fs.ErrNotExist) {
+			if !missing.In(root, err, p) {
 				unreadable(p, err)
 			}
 			if d != nil && d.IsDir() {

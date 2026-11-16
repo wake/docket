@@ -1,7 +1,6 @@
 package lint
 
 import (
-	"errors"
 	"io/fs"
 	"path"
 	"sort"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/wake/docket/internal/change"
 	"github.com/wake/docket/internal/markdown"
+	"github.com/wake/docket/internal/missing"
 	"github.com/wake/docket/internal/openspec"
 )
 
@@ -32,7 +32,7 @@ func (r *state) mainSpec(capability string) *mainSpec {
 	r.mains[capability] = m
 	p := path.Join(specsDir, capability, "spec.md")
 	if _, err := fs.Stat(r.in.Root, p); err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
+		if !missing.In(r.in.Root, err, p) {
 			r.unreadable(p, err)
 			m.skip = true
 		}
