@@ -80,6 +80,12 @@ func prReal(t *testing.T, p string) string {
 	return r
 }
 
+// prJSON is p as it appears inside a JSON string: Windows paths hold backslashes, which JSON escapes.
+func prJSON(p string) string {
+	b, _ := json.Marshal(p)
+	return string(b[1 : len(b)-1])
+}
+
 func prWrite(t *testing.T, env []string, body string) string {
 	t.Helper()
 	p := prIndexPath(env)
@@ -103,7 +109,7 @@ func TestProjectsAddNew(t *testing.T) {
 		t.Fatalf("%+v", p)
 	}
 	data, err := os.ReadFile(prIndexPath(r.Env))
-	if err != nil || !strings.Contains(string(data), p.Path) {
+	if err != nil || !strings.Contains(string(data), prJSON(p.Path)) {
 		t.Fatalf("%v %s", err, data)
 	}
 }
@@ -139,7 +145,7 @@ func TestProjectsAddExists(t *testing.T) {
 
 func TestProjectsAddUnignores(t *testing.T) {
 	r := prRepo(t, true)
-	prWrite(t, r.Env, `{"projects":[{"path":"`+prReal(t, r.Dir)+`","origin":null,"added":"2026-01-01T00:00:00Z","ignored":true}]}`)
+	prWrite(t, r.Env, `{"projects":[{"path":"`+prJSON(prReal(t, r.Dir))+`","origin":null,"added":"2026-01-01T00:00:00Z","ignored":true}]}`)
 	code, m, raw, _ := prRun(t, r.Env, r.Dir, "add")
 	if code != 0 || m.Result.State != "unignored" || m.Result.Project.Ignored || m.Result.Project.Added != "2026-01-01T00:00:00Z" {
 		t.Fatalf("%d %s", code, raw)
@@ -186,8 +192,8 @@ func TestProjectsLs(t *testing.T) {
 	env := testutil.Env(t)
 	dir := t.TempDir()
 	gone := filepath.Join(dir, "gone")
-	body := `{"projects":[{"path":"` + gone + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":false},` +
-		`{"path":"` + dir + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":true}]}`
+	body := `{"projects":[{"path":"` + prJSON(gone) + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":false},` +
+		`{"path":"` + prJSON(dir) + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":true}]}`
 	idx := prWrite(t, env, body)
 	before, _ := os.ReadFile(idx)
 	code, m, raw, _ := prRun(t, env, dir, "ls")
@@ -215,7 +221,7 @@ func TestProjectsLsUncheckable(t *testing.T) {
 	}
 	t.Cleanup(func() { os.Chmod(locked, 0o755) })
 	app := filepath.Join(locked, "app")
-	prWrite(t, env, `{"projects":[{"path":"`+app+`","origin":null,"added":"2026-01-01T00:00:00Z","ignored":false}]}`)
+	prWrite(t, env, `{"projects":[{"path":"`+prJSON(app)+`","origin":null,"added":"2026-01-01T00:00:00Z","ignored":false}]}`)
 	if err := os.Chmod(locked, 0); err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +310,7 @@ func prEntry(path string, ignored bool) string {
 	if ignored {
 		i = "true"
 	}
-	return `{"path":"` + path + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":` + i + `}`
+	return `{"path":"` + prJSON(path) + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":` + i + `}`
 }
 
 func TestProjectsRm(t *testing.T) {
@@ -312,7 +318,7 @@ func TestProjectsRm(t *testing.T) {
 	prRun(t, r.Env, r.Dir, "add")
 	code, m, raw, _ := prRun(t, r.Env, r.Dir, "rm", r.Dir)
 	data, _ := os.ReadFile(prIndexPath(r.Env))
-	if code != 0 || m.Result.State != "removed" || m.Result.Project.Path != prReal(t, r.Dir) || strings.Contains(string(data), m.Result.Project.Path) {
+	if code != 0 || m.Result.State != "removed" || m.Result.Project.Path != prReal(t, r.Dir) || strings.Contains(string(data), prJSON(m.Result.Project.Path)) {
 		t.Fatalf("%d %s %s", code, raw, data)
 	}
 }
@@ -411,7 +417,7 @@ func TestProjectsRmSecondEntry(t *testing.T) {
 	idx := prWrite(t, env, `{"projects":[`+prEntry(a, false)+`,`+prEntry(b, false)+`]}`)
 	code, m, raw, _ := prRun(t, env, tmp, "rm", b)
 	data, _ := os.ReadFile(idx)
-	if code != 0 || m.Result.Project.Path != b || !strings.Contains(string(data), a) || strings.Contains(string(data), b) {
+	if code != 0 || m.Result.Project.Path != b || !strings.Contains(string(data), prJSON(a)) || strings.Contains(string(data), prJSON(b)) {
 		t.Fatalf("%d %s %s", code, raw, data)
 	}
 }
@@ -531,7 +537,7 @@ func TestProjectsText(t *testing.T) {
 // A write about one project keeps the mode and synced of another entry.
 func TestProjectsKeepOthersModeSynced(t *testing.T) {
 	r1, r2 := prRepo(t, true), prRepo(t, true)
-	first := `{"path":"` + prReal(t, r1.Dir) + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":false,"mode":"sync","synced":{"Plan review":"ab"}}`
+	first := `{"path":"` + prJSON(prReal(t, r1.Dir)) + `","origin":null,"added":"2026-01-01T00:00:00Z","ignored":false,"mode":"sync","synced":{"Plan review":"ab"}}`
 	idx := prWrite(t, r1.Env, `{"projects":[`+first+`]}`)
 	keeps := func(step string) {
 		t.Helper()
@@ -562,7 +568,7 @@ func TestProjectsKeepOthersModeSynced(t *testing.T) {
 	prRun(t, r1.Env, r2.Dir, "rm", r2.Dir)
 	Run(Options{Args: []string{"status", "--json"}, Dir: r2.Dir, Env: r1.Env, Stdout: &bytes.Buffer{}, Stderr: &bytes.Buffer{}})
 	keeps("status")
-	if data, _ := os.ReadFile(idx); !strings.Contains(string(data), prReal(t, r2.Dir)) {
+	if data, _ := os.ReadFile(idx); !strings.Contains(string(data), prJSON(prReal(t, r2.Dir))) {
 		t.Fatalf("status did not register: %s", data)
 	}
 }
