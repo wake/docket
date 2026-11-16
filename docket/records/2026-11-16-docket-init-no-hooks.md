@@ -19,3 +19,5 @@ The maintainer wants to discuss again how often the hooks run (each prompt, tool
 - The prompt page's zh, zh.base and en copies match after the change.
 
 ## Review
+
+Codex (gpt-5.6-sol, adversarial) approved with no findings: no spec requires the step, nothing else refers to it or tells users to install the hooks, and no code, spec or test changed.
