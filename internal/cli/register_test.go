@@ -241,7 +241,7 @@ func TestRegisterNoHome(t *testing.T) {
 	code, out, errs := regRun(t, env, r.Dir, "status", "--json")
 	regSame(t, code, out, r.Dir, "status", "--json")
 	w := regWarnings(errs)
-	if len(w) != 1 || !strings.Contains(w[0], "HOME") {
+	if home, _ := homeVars(); len(w) != 1 || !strings.Contains(w[0], "set "+home+", XDG_CONFIG_HOME") {
 		t.Errorf("warnings %v", w)
 	}
 }

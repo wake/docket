@@ -65,12 +65,13 @@ func Env(t testing.TB) []string {
 		"GIT_CEILING_DIRECTORIES="+ceiling)
 }
 
-// WithoutHome returns a copy of env without its HOME and USERPROFILE entries, so that dkt
-// finds no home folder on any system.
+// WithoutHome returns a copy of env without its HOME and USERPROFILE entries, whatever the
+// case of their names (as Windows reads them), so that dkt finds no home folder on any system.
 func WithoutHome(env []string) []string {
 	var out []string
 	for _, kv := range env {
-		if !strings.HasPrefix(kv, "HOME=") && !strings.HasPrefix(kv, "USERPROFILE=") {
+		k, _, _ := strings.Cut(kv, "=")
+		if !strings.EqualFold(k, "HOME") && !strings.EqualFold(k, "USERPROFILE") {
 			out = append(out, kv)
 		}
 	}

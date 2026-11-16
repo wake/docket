@@ -34,6 +34,10 @@
 | Removing the home folder in tests | `internal/testutil/repo.go` | new | Six tests strip `HOME=` by hand; on Windows they must strip `USERPROFILE` too, so one helper does both |
 | Windows CI job | `.github/workflows/ci.yml:windows` | extend | Runs the tests of this change |
 
+## Revision 1 (2026-11-16): names without case in WithoutHome, a stricter no-home warning test
+
+Found in the pre-merge review. The attacking reviewer (codex) found that `testutil.WithoutHome` compared names exactly, so on Windows an entry spelled `UserProfile` would stay and dkt would still find a home folder; the task 2 reviewer had noted the same as minor. The attacking reviewer also took `TestRegisterNoHome`'s check for `HOME` to fail on Windows; it passes there only because `XDG_CONFIG_HOME` holds `HOME`, so it now checks for the system's variable. The spec reviewer found a comment in `internal/cli/cmd_projects.go` still saying `HOME`. Task 2 gains two acceptance items and two files.
+
 ---
 
 ### Task 1: The home folder by system
@@ -67,8 +71,10 @@
 - Modify: `internal/cli/register_test.go`
 - Modify: `internal/cli/cmd_workflow_test.go`
 - Modify: `internal/cli/cmd_projects_test.go`
+- Create: `internal/testutil/repo_test.go`
+- Modify: `internal/cli/cmd_projects.go` (a comment)
 
-**Interfaces:** `testutil.WithoutHome(env []string) []string`: a copy of env without its `HOME` and `USERPROFILE` entries.
+**Interfaces:** `testutil.WithoutHome(env []string) []string`: a copy of env without its `HOME` and `USERPROFILE` entries, whatever the case of their names.
 
 - [x] `testutil.Env` sets `USERPROFILE` to the same temporary folder as `HOME`, on every system.
 - [x] `TestInspectUserWorkflowNoHome`, `TestInspectIndexWithoutLocation`, `TestRegisterNoHome`, `TestRegisterNoStateHome` and the no-home cases of `TestWorkflowModeNoHome` remove the home folder with `testutil.WithoutHome`, and still pass on macOS and Linux; the first four still pass on Windows.
@@ -77,6 +83,8 @@
 - [x] A `dkt inspect --json` test with no `XDG_CONFIG_HOME`, and `HOME` and `USERPROFILE` set to two different folders, reports `result.user_workflow.path` as `.config/docket/workflow.md` under the system's variable's folder, with `exists` true for a template written there.
 - [x] The `internal/cli` tests of `dkt activity`, which use a temporary `XDG_STATE_HOME`, pass on Windows (scenario "State home kept on Windows").
 - [x] The helpers that work out an expected path from `HOME` (`prIndexPath` in `cmd_projects_test.go`, `regHome` in `register_test.go`) and `TestInspectNothingWritten`, which watches the `HOME` folder, stay as they are: `testutil.Env` gives `HOME` and `USERPROFILE` the same folder, so they point at the folder dkt uses on every system. Which variable dkt reads is told apart only by the tests above that give the two different folders.
+- [ ] `testutil.WithoutHome` removes `HOME` and `USERPROFILE` whatever the case of their names (`home`, `UserProfile`) and keeps every other entry, such as `HOMEDRIVE`; `TestWithoutHome` covers it.
+- [ ] `TestRegisterNoHome` checks that the warning names the system's variable (`set USERPROFILE, XDG_CONFIG_HOME` on Windows, `set HOME, XDG_CONFIG_HOME` elsewhere).
 
 ### Task 3: The Windows CI job runs these tests
 
