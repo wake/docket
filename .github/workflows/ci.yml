@@ -37,13 +37,16 @@ jobs:
       - run: go test ./...
 
   windows:
-    # Only the build and the protections, and the test fakes they will need,
-    # are verified on Windows; the rest of the suite needs the work in
+    # Only the build, the protections, finding programs and the test fakes are
+    # verified on Windows; the rest of the suite needs the work in
     # docket/ideas/windows-*.md.
     name: 'windows: build and protections only (dkt is not supported on Windows yet)'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # TestEarlierHoldsReleases reads the release tags.
+          fetch-depth: 0
       - uses: actions/setup-go@v7
         with:
           go-version: stable
@@ -53,13 +56,18 @@ jobs:
           GOARCH: arm64
       - run: go vet ./...
       - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/ ./internal/testutil/
+      - run: go test . ./cmd/dkt/ ./internal/execpath/ ./internal/openspec/
+      - run: go test -run 'PathEntry|PathSpelled' ./internal/gitx/
+      - run: go test -run 'TestEarlierHolds' ./internal/setup/
 
   openspec:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         openspec: ['1.14.0', 'latest']
+        # On Windows, npx is npx.cmd: this runs dkt's calls through a batch file.
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7

@@ -14,7 +14,7 @@ import (
 )
 
 func TestReleaseBuild(t *testing.T) {
-	bin := filepath.Join(t.TempDir(), "dkt")
+	bin := filepath.Join(t.TempDir(), "dkt"+testutil.Exe)
 	build := exec.Command("go", "build", "-ldflags", "-X github.com/wake/docket/internal/cli.Version=v0.16.0", "-o", bin, ".")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
@@ -89,7 +89,7 @@ func TestBuildInfoVersion(t *testing.T) {
 	r.Git("add", "-A")
 	r.Git("commit", "-q", "-m", "snapshot")
 	r.Git("tag", "v1.2.3")
-	bin := filepath.Join(t.TempDir(), "dkt") // outside the repository: keeps the tree clean
+	bin := filepath.Join(t.TempDir(), "dkt"+testutil.Exe) // outside the repository: keeps the tree clean
 	build := exec.Command("go", "build", "-buildvcs=true", "-o", bin, "./cmd/dkt")
 	build.Dir = src
 	// The Go toolchain keeps the process environment minus every GIT_*

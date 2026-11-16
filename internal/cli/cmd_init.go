@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/wake/docket/internal/openspec"
 	"github.com/wake/docket/internal/setup"
 )
 
@@ -70,8 +69,7 @@ func runInit(c *Context, tools string, force bool) (Outcome, error) {
 			return Outcome{}, err
 		}
 		if _, err := r.Run("init", "--tools", tools); err != nil {
-			var failed *openspec.FailedError
-			if !errors.As(err, &failed) {
+			if !openSpecFailed(err) {
 				return Outcome{}, err
 			}
 			out.Findings = append(out.Findings, Finding{Rule: "openspec-failed", Message: err.Error()})

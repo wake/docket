@@ -1,6 +1,7 @@
 package gitx
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -28,7 +29,7 @@ func TestRelativePathEntryResolvesAgainstDir(t *testing.T) {
 func TestEmptyPathEntryResolvesAgainstDir(t *testing.T) {
 	dir := t.TempDir()
 	writeStub(t, filepath.Join(dir, "git"))
-	g := Git{Dir: dir, Env: []string{"PATH=:/nonexistent-dir"}}
+	g := Git{Dir: dir, Env: []string{"PATH=" + string(os.PathListSeparator) + "/nonexistent-dir"}}
 	out, err := g.Run("anything")
 	if err != nil {
 		t.Fatal(err)

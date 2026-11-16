@@ -10,8 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+
+	"github.com/wake/docket/internal/execpath"
 )
 
 // Minimum is the oldest OpenSpec version Docket works with; there is no upper bound.
@@ -40,6 +43,48 @@ func (e *UnavailableError) Error() string {
 		why = "is not usable: " + e.Reason
 	}
 	return fmt.Sprintf("OpenSpec CLI %q %s; install OpenSpec %s or later or set DOCKET_OPENSPEC to a command that runs it", e.Program, why, Minimum)
+}
+
+// UnsafeArgError reports a word dkt will not hand to OpenSpec when it is a
+// .bat or .cmd file on Windows: cmd.exe reads the command line of such a file
+// itself, so characters such as & or % could run another command. Arg is the
+// argument, or the program's own path.
+type UnsafeArgError struct{ Program, Arg string }
+
+func (e *UnsafeArgError) Error() string {
+	return fmt.Sprintf("will not run %s with %q: cmd.exe reads the command line of a .bat or .cmd file itself, so its arguments may hold only letters, digits and %s, and its path those, \\, spaces and ~, and ( ) only with a space",
+		e.Program, e.Arg, plainPunct)
+}
+
+// plainPunct is the punctuation an argument to a batch file may hold.
+const plainPunct = "-_.,/@+=:"
+
+// unsafeBatchArg returns the program path or the first argument that is not
+// plain, when cmd[0] is a .bat or .cmd file on Windows.
+func unsafeBatchArg(windows bool, cmd []string) (string, bool) {
+	if ext := strings.ToLower(filepath.Ext(cmd[0])); !windows || ext != ".bat" && ext != ".cmd" {
+		return "", false
+	}
+	// Go quotes a path with a space, inside which cmd.exe reads ( and ) as text
+	if !plain(cmd[0], `\ ~`) && !(strings.ContainsRune(cmd[0], ' ') && plain(cmd[0], `\ ()~`)) {
+		return cmd[0], true
+	}
+	for _, a := range cmd[1:] {
+		if !plain(a, "") {
+			return a, true
+		}
+	}
+	return "", false
+}
+
+// plain reports whether s holds only ASCII letters, digits, plainPunct and extra.
+func plain(s, extra string) bool {
+	for _, c := range s {
+		if !('a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || '0' <= c && c <= '9' || strings.ContainsRune(plainPunct+extra, c)) {
+			return false
+		}
+	}
+	return true
 }
 
 // UnsupportedError reports an OpenSpec that gave no version of the form
@@ -72,13 +117,7 @@ func (e *FailedError) Error() string {
 
 // envValue returns the last value of key in env (the one a child would see).
 func envValue(env []string, key string) (string, bool) {
-	val, found := "", false
-	for _, kv := range env {
-		if k, v, ok := strings.Cut(kv, "="); ok && k == key {
-			val, found = v, true
-		}
-	}
-	return val, found
+	return execpath.Getenv(env, key)
 }
 
 // New builds a Runner for dir. The command comes from DOCKET_OPENSPEC in env
@@ -109,17 +148,23 @@ func resolve(prog, dir string, env []string) (string, bool) {
 		}
 		return p
 	}
-	if strings.Contains(prog, "/") {
-		p := abs(prog)
-		return p, isExecutable(p)
+	if strings.ContainsRune(prog, '/') || strings.ContainsRune(prog, filepath.Separator) {
+		for _, name := range execpath.Names(prog, env) {
+			if p := abs(name); isExecutable(p) {
+				return p, true
+			}
+		}
+		return abs(prog), false
 	}
 	path, _ := envValue(env, "PATH")
 	for _, d := range filepath.SplitList(path) {
 		if !filepath.IsAbs(d) { // like exec.LookPath: never run a program found in the repository
 			continue
 		}
-		if p := abs(filepath.Join(d, prog)); isExecutable(p) {
-			return p, true
+		for _, name := range execpath.Names(prog, env) {
+			if p := abs(filepath.Join(d, name)); isExecutable(p) {
+				return p, true
+			}
 		}
 	}
 	return "", false
@@ -127,11 +172,14 @@ func resolve(prog, dir string, env []string) (string, bool) {
 
 func isExecutable(p string) bool {
 	st, err := os.Stat(p)
-	return err == nil && !st.IsDir() && st.Mode()&0o111 != 0
+	return err == nil && !st.IsDir() && execpath.MayRun(st)
 }
 
 func (r *Runner) exec(args ...string) (string, error) {
 	full := append(append([]string{}, r.Cmd...), args...)
+	if a, ok := unsafeBatchArg(runtime.GOOS == "windows", full); ok {
+		return "", &UnsafeArgError{Program: full[0], Arg: a}
+	}
 	c := exec.Command(full[0], full[1:]...)
 	c.Dir = r.Dir
 	c.Env = append(append([]string{}, r.Env...), "OPENSPEC_TELEMETRY=0")
