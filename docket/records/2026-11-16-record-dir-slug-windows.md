@@ -4,31 +4,21 @@ kind: fix
 source: "docket/issues/2026-11-16-record-dir-slug-windows.md"
 ---
 
-<!-- Keep the title to one line and the rest short; `dkt lint` checks the
-length. The details belong in the code and the pull request. Replace every
-comment with your text. -->
-
 ## What
 
-<!-- What changed, in a few sentences: the files or the behavior touched.
-fix: the behavior restored. refactor: what moved or was restructured.
-test: which behavior the new tests cover. prompt: which text changed, and
-which copies. checks: which checks run differently. -->
+`writeDated` in `internal/cli/cmd_record.go`, shared by `dkt record` and `dkt issue`, now moves on to the next suffix on Windows when a folder holds the path. A new `taken(windows, err)` decides whether the exclusive open's error means the name is taken: `fs.ErrExist` on every system, and on Windows also "is a directory". The Windows CI job runs `TestTakenFolderOnWindows` and `TestRecordOpenMovesToNextSuffix`.
+
+`dkt new` (`openNewFile` in `cmd_new.go`) needs no change. It never takes a suffix after the open: any error from it stops the run and cleans up. A folder at `proposal.md` fails the run on every system; the message differs on Windows.
 
 ## Why
 
-<!-- Why it was needed. fix: the symptom and its cause. refactor: what the
-old shape made hard. test: what was not covered. prompt: what agents did
-wrong or could not do. checks: what the old settings missed. -->
+On Windows, Go's exclusive create reports a folder at the name as `EISDIR`, not as existing. `writeDated` took only `fs.ErrExist` as "taken", so it stopped with an `internal` finding.
 
 ## Verification
 
-<!-- How it was checked and the result, by the light review in the docket
-skill's default steps, or the user's own way: the regression test seen failing, then passing; the
-mutation that made a test fail; the mechanical check of the prompt; the
-pull request's own check run. Say what was not verified, too. -->
+- `TestTakenFolderOnWindows` tests `taken` with `windows` true and false on any system. It failed before the fix (`windows=true ... is a directory: false, want true`) and passes after.
+- macOS and Linux keep `fs.ErrExist` alone; the `windows=false` cases pin that.
+- `TestRecordOpenMovesToNextSuffix` failed on `windows-latest` in #187; the pull request's Windows job runs it with the fix.
+- `go test ./...`, `go vet ./...`, `gofmt -l .` pass on macOS.
 
 ## Review
-
-<!-- Who reviewed the diff (a model, or a person), what the review found,
-and how each finding was handled. -->
