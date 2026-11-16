@@ -32,6 +32,10 @@
 | The Windows CI job's name | .github/workflows/ci.yml:jobs.windows.name | extend | Renamed; the comment about the name goes |
 | Installing on Windows | README.md:Install | extend | Requirements and a Windows install section |
 
+## Revision 1 (2026-11-16): a stricter checksum check, and the release checklist
+
+The pre-merge review on the other model (codex) found that `checkSums` let a later line overwrite an earlier one, so a wrong digest followed by the right one passed, and that extra lines went unchecked; Task 1's acceptance item now asks for exactly one line per file and nothing else. It also found that `docs/release.md` still asked a maintainer to look for four executables after a release; it now names six. Its finding that a renamed check could stall branch protection does not hold: `main` has no branch protection and no rulesets.
+
 ---
 
 ### Task 1: Build and check the Windows executables
@@ -43,9 +47,10 @@
 **Files:**
 - Modify: `.goreleaser.yaml`
 - Modify: `release_test.go`
+- Modify: `docs/release.md`
 
 - [x] `TestInstallSnapshot` expects exactly `checksums.txt`, `dkt-darwin-amd64`, `dkt-darwin-arm64`, `dkt-linux-amd64`, `dkt-linux-arm64`, `dkt-windows-amd64.exe` and `dkt-windows-arm64.exe` among the snapshot's assets, and fails on any other set, a Windows name without `.exe` included.
-- [x] `checkSums(sums []byte, files map[string][]byte) error` accepts `checksums.txt` text only when it has a line `<sha256>  <name>` for every file, with that file's digest; a test with fixed data covers a missing line, a wrong digest and a valid set, and `TestInstallSnapshot` calls it on the snapshot's executables.
+- [x] `checkSums(sums []byte, files map[string][]byte) error` accepts `checksums.txt` text only when its lines are exactly one `<sha256>  <name>` per file, with that file's digest, and nothing else; a test with fixed data covers a valid set, a missing line, a wrong digest, a wrong line before the right one, a line twice, another file, CRLF, one space and a `*` binary marker, and `TestInstallSnapshot` calls it on the snapshot's executables.
 - [x] With `windows` in `goos`, the `release-snapshot` CI job passes: `goreleaser check`, the snapshot build and `TestInstallSnapshot`, whose log lists the assets it found; the install from the snapshot still prints the stamped version.
 - [x] Other tags, tags off `main`, two tags on one commit and the stamped version keep the checks they have, unchanged: `.github/workflows/release.yml` and `TestPluginVersion` are not modified, and the Windows executables get the same `-X ...cli.Version={{ .Tag }}` stamp from the one build entry.
 - [x] Removing `windows` from `goos` makes `TestInstallSnapshot` fail in CI, seen on a throwaway branch.

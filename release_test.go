@@ -582,22 +582,19 @@ func TestInstallSnapshot(t *testing.T) {
 	}
 }
 
-// checkSums reports an error unless sums, the text of checksums.txt, has a
-// line "<sha256>  <name>" with the right digest for every file in files.
+// checkSums reports an error unless sums, the text of checksums.txt, holds
+// exactly one line "<sha256>  <name>" with the right digest for each file in
+// files, and no other line.
 func checkSums(sums []byte, files map[string][]byte) error {
-	got := map[string]string{}
-	for _, line := range strings.Split(string(sums), "\n") {
-		if digest, name, ok := strings.Cut(line, "  "); ok {
-			got[name] = digest
-		}
-	}
+	var want []string
 	for name, b := range files {
-		want := fmt.Sprintf("%x", sha256.Sum256(b))
-		if d, ok := got[name]; !ok {
-			return fmt.Errorf("checksums.txt has no line for %s", name)
-		} else if d != want {
-			return fmt.Errorf("checksums.txt has %s for %s, want %s", d, name, want)
-		}
+		want = append(want, fmt.Sprintf("%x  %s", sha256.Sum256(b), name))
+	}
+	got := strings.Split(strings.TrimSuffix(string(sums), "\n"), "\n")
+	slices.Sort(want)
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		return fmt.Errorf("checksums.txt holds\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 	return nil
 }
@@ -612,6 +609,12 @@ func TestCheckSums(t *testing.T) {
 		{"every file", line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b"), true},
 		{"a file missing", line("dkt-linux-amd64", "a"), false},
 		{"a wrong digest", line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "x"), false},
+		{"a wrong line, then the right one", line("dkt-windows-amd64.exe", "x") + line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b"), false},
+		{"a line twice", line("dkt-linux-amd64", "a") + line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b"), false},
+		{"another file", line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b") + line("other", "c"), false},
+		{"CRLF", strings.ReplaceAll(line("dkt-linux-amd64", "a")+line("dkt-windows-amd64.exe", "b"), "\n", "\r\n"), false},
+		{"one space", strings.Replace(line("dkt-linux-amd64", "a"), "  ", " ", 1) + line("dkt-windows-amd64.exe", "b"), false},
+		{"binary marker", strings.Replace(line("dkt-linux-amd64", "a"), "  ", " *", 1) + line("dkt-windows-amd64.exe", "b"), false},
 	} {
 		if err := checkSums([]byte(c.sums), files); (err == nil) != c.ok {
 			t.Errorf("%s: err = %v", c.name, err)
