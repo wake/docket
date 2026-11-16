@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/wake/docket/internal/missing"
 	"github.com/wake/docket/internal/projects"
 	"github.com/wake/docket/internal/safefile"
 )
@@ -102,7 +103,7 @@ func Read(env []string, now time.Time) ([]Record, error) {
 		return nil, nil
 	}
 	es, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
+	if missing.Path(err, dir) {
 		return nil, nil
 	}
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/wake/docket/internal/missing"
 	"github.com/wake/docket/internal/projects"
 	"github.com/wake/docket/internal/setup"
 )
@@ -125,7 +126,7 @@ func workflowMode(c *Context, mode string) (Outcome, error) {
 			return Outcome{}, err
 		}
 		ub, err := os.ReadFile(user) // follows a link: the file is the user's own
-		if errors.Is(err, fs.ErrNotExist) {
+		if missing.Path(err, user) {
 			return Outcome{Findings: []Finding{{Rule: "user-workflow-missing", File: user, Message: user + " does not exist; there is nothing to sync with"}}}, nil
 		}
 		if err != nil {
@@ -189,7 +190,7 @@ func workflowRefs(c *Context) (Outcome, error) {
 		switch {
 		case err == nil:
 			add(p, "user", b)
-		case !errors.Is(err, fs.ErrNotExist):
+		case !missing.Path(err, p):
 			out.Unreadable = append(out.Unreadable, Unreadable{Source: p, Reason: err.Error()})
 		}
 	} else if !errors.Is(err, projects.ErrNoHome) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/wake/docket/internal/gitx"
+	"github.com/wake/docket/internal/missing"
 	"github.com/wake/docket/internal/safepath"
 	"github.com/wake/docket/internal/scan"
 )
@@ -102,7 +103,7 @@ func worktreeSpecs(u scan.Use) (files map[string][]byte, reason string) {
 	}
 	defer root.Close()
 	sub, err := root.OpenRoot(specs)
-	if errors.Is(err, fs.ErrNotExist) {
+	if missing.In(root.FS(), err, specs) {
 		return files, ""
 	}
 	if err != nil {
