@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -320,6 +322,28 @@ func TestRecordOpenMovesToNextSuffix(t *testing.T) {
 	}
 	if len(m.Result.Used) != 1 || m.Result.Used[0].Path != "docket/records/2026-10-30-fix-x.md" {
 		t.Errorf("used: %+v", m.Result.Used)
+	}
+}
+
+// On Windows the exclusive open reports a folder at the name as "is a directory", not as existing.
+func TestTakenFolderOnWindows(t *testing.T) {
+	isDir := &fs.PathError{Op: "openat", Path: "x.md", Err: syscall.EISDIR}
+	exists := &fs.PathError{Op: "openat", Path: "x.md", Err: fs.ErrExist}
+	for _, c := range []struct {
+		windows bool
+		err     error
+		want    bool
+	}{
+		{true, isDir, true},
+		{false, isDir, false},
+		{true, exists, true},
+		{false, exists, true},
+		{true, fs.ErrPermission, false},
+		{true, nil, false},
+	} {
+		if got := taken(c.windows, c.err); got != c.want {
+			t.Errorf("windows=%v %v: %v, want %v", c.windows, c.err, got, c.want)
+		}
 	}
 }
 

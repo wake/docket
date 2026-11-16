@@ -7,8 +7,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 
 	docket "github.com/wake/docket"
 	"github.com/wake/docket/internal/change"
@@ -22,6 +24,14 @@ import (
 var writeRecordFile = func(f *os.File, b []byte) error {
 	_, err := f.Write(b)
 	return err
+}
+
+const isWindows = runtime.GOOS == "windows"
+
+// taken reports whether err, from openNewFile, means something already holds the name.
+// On Windows the exclusive open reports a folder there as "is a directory", not as existing.
+func taken(windows bool, err error) bool {
+	return errors.Is(err, fs.ErrExist) || windows && errors.Is(err, syscall.EISDIR)
 }
 
 // openNewFile creates the record or the proposal in its folder as opened by
@@ -121,7 +131,7 @@ func writeDated(root, folder, slug string, content []byte, uses []scan.Use) (res
 			}
 		}
 		f, err := openNewFile(dir, filepath.FromSlash(rel))
-		if errors.Is(err, fs.ErrExist) {
+		if taken(isWindows, err) {
 			continue // another run or a file the scan could not see took this slug
 		}
 		if err != nil {

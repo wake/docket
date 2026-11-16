@@ -64,7 +64,7 @@ jobs:
       - run: go test -run 'TestRepoRoot|TestRegister|TestInspectInNewProject|TestProjects|TestWorkflow' -skip 'TestProjectsLsUncheckable' ./internal/cli/
       - run: go test -run 'TestEarlierHolds' ./internal/setup/
       - run: go test -run '^(TestHomeVar|TestHomeVarMatchesUserHomeDir|TestUserFoldersElsewhere|TestUserFoldersOnWindows|TestRegisterNoHomeNamesVariable|TestIndexPath|TestSessionsDir|TestSettingsPath|TestUserWorkflowPath)$' ./internal/projects/
-      - run: go test -run '^(TestInspectUserWorkflow|TestInspectNoUserWorkflow|TestInspectUserWorkflowNoHome|TestInspectUserWorkflowUnderHomeFolder|TestInspectIndexWithoutLocation|TestProjectsAddUnderStateHome|TestProjectsAddUnderHomeFolder|TestProjectsNoHome|TestProjectsNoHomeOtherVariable|TestRegisterNoHome|TestRegisterNoStateHome|TestActivity.*)$' ./internal/cli/
+      - run: go test -run '^(TestInspectUserWorkflow|TestInspectNoUserWorkflow|TestInspectUserWorkflowNoHome|TestInspectUserWorkflowUnderHomeFolder|TestInspectIndexWithoutLocation|TestProjectsAddUnderStateHome|TestProjectsAddUnderHomeFolder|TestProjectsNoHome|TestProjectsNoHomeOtherVariable|TestRegisterNoHome|TestRegisterNoStateHome|TestActivity.*|TestTakenFolderOnWindows|TestRecordOpenMovesToNextSuffix)$' ./internal/cli/
 
   openspec:
     runs-on: ${{ matrix.os }}
