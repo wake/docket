@@ -256,6 +256,12 @@ func TestInstallVersion(t *testing.T) {
 	}
 }
 
+// windowsShell is what install.sh says in a Windows shell: not "unsupported",
+// since the release has Windows executables, but where to get them.
+func windowsShell(system string) []string {
+	return []string{system, "does not install on Windows", "dkt-windows-amd64.exe", "dkt-windows-arm64.exe", "checksums.txt", releasesURL}
+}
+
 func TestInstallRefuses(t *testing.T) {
 	const name = "dkt-linux-amd64"
 	latest := releasesURL + "/latest/download/"
@@ -286,7 +292,9 @@ func TestInstallRefuses(t *testing.T) {
 		}, []string{latest + "checksums.txt"}, false},
 		{"no such release", []string{"DKT_VERSION=v0.1.0"}, func(t *testing.T, e installEnv) {}, []string{"download/v0.1.0/"}, false},
 		{"FreeBSD", []string{"FAKE_OS=FreeBSD"}, func(t *testing.T, e installEnv) {}, []string{"FreeBSD", releasesURL}, true},
-		{"Windows shell", []string{"FAKE_OS=MINGW64_NT-10.0"}, func(t *testing.T, e installEnv) {}, []string{"MINGW64_NT-10.0", releasesURL}, true},
+		{"Git Bash", []string{"FAKE_OS=MINGW64_NT-10.0"}, func(t *testing.T, e installEnv) {}, windowsShell("MINGW64_NT-10.0"), true},
+		{"MSYS", []string{"FAKE_OS=MSYS_NT-10.0"}, func(t *testing.T, e installEnv) {}, windowsShell("MSYS_NT-10.0"), true},
+		{"Cygwin", []string{"FAKE_OS=CYGWIN_NT-10.0"}, func(t *testing.T, e installEnv) {}, windowsShell("CYGWIN_NT-10.0"), true},
 		{"riscv64", []string{"FAKE_ARCH=riscv64"}, func(t *testing.T, e installEnv) {}, []string{"riscv64", releasesURL}, true},
 		{"does not run", nil, func(t *testing.T, e installEnv) {
 			e.publish(t, "latest/download", name, "#!/bin/sh\nexit 3\n")
@@ -533,6 +541,8 @@ func TestInstallSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	var names []string
+	var sums []byte
+	executables := map[string][]byte{}
 	for _, a := range artifacts {
 		if !strings.HasPrefix(a.Name, "dkt-") && a.Name != "checksums.txt" {
 			continue
@@ -545,10 +555,20 @@ func TestInstallSnapshot(t *testing.T) {
 			t.Fatal(err)
 		}
 		names = append(names, a.Name)
+		if a.Name == "checksums.txt" {
+			sums = b
+		} else {
+			executables[a.Name] = b
+		}
 	}
-	want := []string{"checksums.txt", "dkt-darwin-amd64", "dkt-darwin-arm64", "dkt-linux-amd64", "dkt-linux-arm64"}
-	if sort.Strings(names); !slices.Equal(names, want) {
+	sort.Strings(names)
+	t.Logf("assets: %v\nchecksums.txt:\n%s", names, sums)
+	want := []string{"checksums.txt", "dkt-darwin-amd64", "dkt-darwin-arm64", "dkt-linux-amd64", "dkt-linux-arm64", "dkt-windows-amd64.exe", "dkt-windows-arm64.exe"}
+	if !slices.Equal(names, want) {
 		t.Fatalf("artifacts = %v, want %v", names, want)
+	}
+	if err := checkSums(sums, executables); err != nil {
+		t.Fatal(err)
 	}
 	if _, stderr, err := e.run(t); err != nil {
 		t.Fatalf("%v\nstderr: %s", err, stderr)
@@ -559,6 +579,46 @@ func TestInstallSnapshot(t *testing.T) {
 	}
 	if got, want := strings.TrimSpace(string(out)), "dkt "+meta.Tag; got != want {
 		t.Errorf("dkt --version = %q, want %q", got, want)
+	}
+}
+
+// checkSums reports an error unless sums, the text of checksums.txt, holds
+// exactly one line "<sha256>  <name>" with the right digest for each file in
+// files, and no other line.
+func checkSums(sums []byte, files map[string][]byte) error {
+	var want []string
+	for name, b := range files {
+		want = append(want, fmt.Sprintf("%x  %s", sha256.Sum256(b), name))
+	}
+	got := strings.Split(strings.TrimSuffix(string(sums), "\n"), "\n")
+	slices.Sort(want)
+	slices.Sort(got)
+	if !slices.Equal(got, want) {
+		return fmt.Errorf("checksums.txt holds\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+	return nil
+}
+
+func TestCheckSums(t *testing.T) {
+	files := map[string][]byte{"dkt-linux-amd64": []byte("a"), "dkt-windows-amd64.exe": []byte("b")}
+	line := func(name, data string) string { return fmt.Sprintf("%x  %s\n", sha256.Sum256([]byte(data)), name) }
+	for _, c := range []struct {
+		name, sums string
+		ok         bool
+	}{
+		{"every file", line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b"), true},
+		{"a file missing", line("dkt-linux-amd64", "a"), false},
+		{"a wrong digest", line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "x"), false},
+		{"a wrong line, then the right one", line("dkt-windows-amd64.exe", "x") + line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b"), false},
+		{"a line twice", line("dkt-linux-amd64", "a") + line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b"), false},
+		{"another file", line("dkt-linux-amd64", "a") + line("dkt-windows-amd64.exe", "b") + line("other", "c"), false},
+		{"CRLF", strings.ReplaceAll(line("dkt-linux-amd64", "a")+line("dkt-windows-amd64.exe", "b"), "\n", "\r\n"), false},
+		{"one space", strings.Replace(line("dkt-linux-amd64", "a"), "  ", " ", 1) + line("dkt-windows-amd64.exe", "b"), false},
+		{"binary marker", strings.Replace(line("dkt-linux-amd64", "a"), "  ", " *", 1) + line("dkt-windows-amd64.exe", "b"), false},
+	} {
+		if err := checkSums([]byte(c.sums), files); (err == nil) != c.ok {
+			t.Errorf("%s: err = %v", c.name, err)
+		}
 	}
 }
 

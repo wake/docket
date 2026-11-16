@@ -31,7 +31,7 @@ Pull requests and pushes to `main` run a snapshot build with the same configurat
 Only a real release exercises the tag filter, the publish step and the install paths. After each one, look at:
 
 - The workflow ran for the tag, and both checks passed.
-- The release holds the four executables and `checksums.txt`.
+- The release holds the six executables, `dkt-windows-amd64.exe` and `dkt-windows-arm64.exe` among them, and `checksums.txt`, which lists all six.
 - `install.sh` installs it, and `dkt --version` prints the tag.
 - `claude plugin marketplace add wake/docket` and `claude plugin install docket@docket` install the plugin.
 
