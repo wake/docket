@@ -19,3 +19,7 @@ Windows gives a file in the way ERROR_PATH_NOT_FOUND, which matches `fs.ErrNotEx
 - `go test ./...`, `go vet ./...`, `gofmt -l .` pass on macOS.
 
 ## Review
+
+Codex (gpt-5.6-sol, adversarial) raised two must-fixes; I turned both down, and a second codex (high effort) agreed:
+- `dkt sync`'s `Stat` reports a file in the way as `change-missing`: `safepath.Check` stops first, on every system.
+- A path created or removed between the read and `missing`'s `Stat` can flip one answer: a passing race, not a lasting error.
