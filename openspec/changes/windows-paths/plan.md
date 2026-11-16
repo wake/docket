@@ -43,9 +43,9 @@
 - Modify: `internal/gitx/path_windows_test.go`
 - Modify: `internal/cli/repo_test.go`
 
-- [ ] On Windows, `Toplevel` of a linked worktree holds no `/`, equals that worktree's path from `Worktrees`, and equals the worktree folder resolved with `filepath.EvalSymlinks`; `Worktrees` lists both worktrees with no `/`. A new test in `internal/gitx/path_windows_test.go` covers it and fails on Windows without the conversion.
-- [ ] `TestRepoRootFromSubdirectory` expects `repo.root` to be `filepath.FromSlash` of `git rev-parse --show-toplevel`: backslashes on Windows, git's output unchanged on macOS and Linux.
-- [ ] Paths relative to the repository root keep forward slashes on Windows: the tests of `internal/scan` and `internal/conflicts`, which check such paths in their results, pass on `windows-latest` (run by Task 2's CI job).
+- [x] On Windows, `Toplevel` of a linked worktree holds no `/`, equals that worktree's path from `Worktrees`, and equals the worktree folder resolved with `filepath.EvalSymlinks`; `Worktrees` lists both worktrees with no `/`. A new test in `internal/gitx/path_windows_test.go` covers it and fails on Windows without the conversion.
+- [x] `TestRepoRootFromSubdirectory` expects `repo.root` to be `filepath.FromSlash` of `git rev-parse --show-toplevel`: backslashes on Windows, git's output unchanged on macOS and Linux.
+- [x] Paths relative to the repository root keep forward slashes on Windows: the tests of `internal/scan` and `internal/conflicts`, which check such paths in their results, pass on `windows-latest` (run by Task 2's CI job).
 
 ### Task 2: Escape paths in test JSON, and run the tests on Windows
 
@@ -59,6 +59,6 @@
 - Modify: `internal/snapshot/activity_test.go`
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] Every test in `internal/cli/cmd_projects_test.go`, `internal/cli/register_test.go` and `internal/snapshot/activity_test.go` that writes a path into JSON, or looks for one in a JSON file's text, escapes it as JSON does (`prJSON` in `internal/cli`, `json.Marshal` in `internal/snapshot`), the checks that a path is absent included, such as `TestProjectsRm`'s, which would otherwise pass on Windows whatever the file holds.
-- [ ] The `windows-latest` CI job also runs, each reporting tests run and none skipped by name except as listed: `go test ./internal/scan/ ./internal/conflicts/`; `internal/gitx` with `PathsFromGit` added to the tests it runs; `internal/snapshot`'s `TestActivity` tests; and `internal/cli`'s `TestRepoRoot`, `TestRegister`, `TestInspectInNewProject`, `TestProjects` and `TestWorkflow` tests, skipping only `TestProjectsLsUncheckable`, which relies on `chmod`, with the reason in a comment. The job's comment names the paths read from git among what it verifies.
-- [ ] On macOS and Linux, `go test ./...` passes, and no test changed in this task checks anything different there.
+- [x] Every test in `internal/cli/cmd_projects_test.go`, `internal/cli/register_test.go` and `internal/snapshot/activity_test.go` that writes a path into JSON, or looks for one in a JSON file's text, escapes it as JSON does (`prJSON` in `internal/cli`, `json.Marshal` in `internal/snapshot`), the checks that a path is absent included, such as `TestProjectsRm`'s, which would otherwise pass on Windows whatever the file holds.
+- [x] The `windows-latest` CI job also runs, each reporting tests run and none skipped by name except as listed: `go test ./internal/scan/ ./internal/conflicts/`; `internal/gitx` with `PathsFromGit` added to the tests it runs; `internal/snapshot`'s `TestActivity` tests; and `internal/cli`'s `TestRepoRoot`, `TestRegister`, `TestInspectInNewProject`, `TestProjects` and `TestWorkflow` tests, skipping only `TestProjectsLsUncheckable`, which relies on `chmod`, with the reason in a comment. The job's comment names the paths read from git among what it verifies.
+- [x] On macOS and Linux, `go test ./...` passes, and no test changed in this task checks anything different there.
