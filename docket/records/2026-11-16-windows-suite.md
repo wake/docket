@@ -17,3 +17,5 @@ After `windows-runtime`, `windows-paths` and `windows-user-folders`, about 36 te
 Throwaway probes (#187) ran `go test ./...` on `windows-latest`: 36 failures before, every package `ok` after. `go test ./...` passes on macOS. Two failures were product bugs, opened as `docket/issues/2026-11-16-record-dir-slug-windows.md` and `docket/issues/2026-11-16-file-as-folder-windows.md` (#188); their tests skip on Windows until fixed.
 
 ## Review
+
+codex (gpt-5.6-sol), attacking the whole diff: whether a check weakened on macOS or Linux, skips broader than needed, adapted Windows values that miss their point, the two helpers, and coverage lost from the old CI steps. No findings.
