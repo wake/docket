@@ -213,7 +213,7 @@ func TestProjectsLs(t *testing.T) {
 }
 
 func TestProjectsLsUncheckable(t *testing.T) {
-	skipRoot(t)
+	testutil.SkipUnlessModesDeny(t)
 	env := testutil.Env(t)
 	locked := filepath.Join(t.TempDir(), "locked")
 	if err := os.Mkdir(locked, 0o755); err != nil {

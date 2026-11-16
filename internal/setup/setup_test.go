@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"github.com/wake/docket/internal/testutil"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -316,15 +317,15 @@ func TestWriteModes(t *testing.T) {
 		t.Fatal(err)
 	}
 	fi, _ := os.Stat(filepath.Join(root, ".claude/skills/docket/SKILL.md"))
-	if fi.Mode().Perm() != 0o600 {
+	if testutil.ModeBits && fi.Mode().Perm() != 0o600 {
 		t.Errorf("existing mode changed: %v", fi.Mode().Perm())
 	}
 	fi, _ = os.Stat(filepath.Join(root, ".agents/skills/docket/SKILL.md"))
-	if fi.Mode().Perm() != 0o644&^umask() {
+	if testutil.ModeBits && fi.Mode().Perm() != 0o644&^umask() {
 		t.Errorf("new file mode %v", fi.Mode().Perm())
 	}
 	di, _ := os.Stat(filepath.Join(root, "openspec/schemas/docket/templates"))
-	if di.Mode().Perm() != 0o755&^umask() {
+	if testutil.ModeBits && di.Mode().Perm() != 0o755&^umask() {
 		t.Errorf("dir mode %v", di.Mode().Perm())
 	}
 	entries, _ := os.ReadDir(filepath.Join(root, ".claude/skills/docket"))

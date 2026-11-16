@@ -309,9 +309,7 @@ func TestIssueCardTaken(t *testing.T) { // Address already carded
 }
 
 func TestIssueCardUnreadable(t *testing.T) {
-	if os.Geteuid() == 0 {
-		t.Skip("root reads anything")
-	}
+	testutil.SkipUnlessModesDeny(t)
 	r := recordRepo(t)
 	const bad = "docket/issues/2026-10-29-login.md"
 	r.Write(bad, "x\n")
