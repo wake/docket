@@ -49,11 +49,11 @@
 
 **Interfaces:** `ErrNoHome` stays the sentinel callers test with `errors.Is`; only its message changes. Uses `execpath.Getenv(env []string, key string) (string, bool)` as it is.
 
-- [ ] The variable is chosen by a function taking `windows bool`; a test checks it gives `USERPROFILE` for `true` and `HOME` for `false`, on any system.
-- [ ] A test checks that, for the process's own environment, the chosen variable's value equals what `os.UserHomeDir` returns, whenever `os.UserHomeDir` succeeds.
-- [ ] `TestIndexPath`, `TestSessionsDir`, `TestSettingsPath` and `TestUserWorkflowPath` use absolute temporary paths and the system's variable, so they pass on macOS, Linux and Windows; each still covers an absolute `XDG_*`, a relative `XDG_*` falling back to the home folder, the last of two entries winning, and no home folder giving `ErrNoHome`.
-- [ ] On macOS and Linux, an environment holding `USERPROFILE` and `HOME` resolves under `HOME`, and one holding only `USERPROFILE` gives `ErrNoHome` (scenario "Other systems unchanged"); on Windows, one holding only `HOME` gives `ErrNoHome`, one holding `UserProfile` resolves under it, and one holding an absolute `xdg_state_home` or `Xdg_Config_Home` resolves under that folder (scenarios "HOME not read on Windows" and "Variable spelled in another case"). The tests for one system skip on the other, saying why.
-- [ ] `ErrNoHome`'s message and `Register`'s warning name `USERPROFILE` on Windows and `HOME` elsewhere; `projects.envValue` is gone.
+- [x] The variable is chosen by a function taking `windows bool`; a test checks it gives `USERPROFILE` for `true` and `HOME` for `false`, on any system.
+- [x] A test checks that, for the process's own environment, the chosen variable's value equals what `os.UserHomeDir` returns, whenever `os.UserHomeDir` succeeds.
+- [x] `TestIndexPath`, `TestSessionsDir`, `TestSettingsPath` and `TestUserWorkflowPath` use absolute temporary paths and the system's variable, so they pass on macOS, Linux and Windows; each still covers an absolute `XDG_*`, a relative `XDG_*` falling back to the home folder, the last of two entries winning, and no home folder giving `ErrNoHome`.
+- [x] On macOS and Linux, an environment holding `USERPROFILE` and `HOME` resolves under `HOME`, and one holding only `USERPROFILE` gives `ErrNoHome` (scenario "Other systems unchanged"); on Windows, one holding only `HOME` gives `ErrNoHome`, one holding `UserProfile` resolves under it, and one holding an absolute `xdg_state_home` or `Xdg_Config_Home` resolves under that folder (scenarios "HOME not read on Windows" and "Variable spelled in another case"). The tests for one system skip on the other, saying why.
+- [x] `ErrNoHome`'s message and `Register`'s warning name `USERPROFILE` on Windows and `HOME` elsewhere; `projects.envValue` is gone.
 
 ### Task 2: Tests find the home folder on every system
 
@@ -70,13 +70,13 @@
 
 **Interfaces:** `testutil.WithoutHome(env []string) []string`: a copy of env without its `HOME` and `USERPROFILE` entries.
 
-- [ ] `testutil.Env` sets `USERPROFILE` to the same temporary folder as `HOME`, on every system.
-- [ ] `TestInspectUserWorkflowNoHome`, `TestInspectIndexWithoutLocation`, `TestRegisterNoHome`, `TestRegisterNoStateHome` and the no-home cases of `TestWorkflowModeNoHome` remove the home folder with `testutil.WithoutHome`, and still pass on macOS and Linux; the first four still pass on Windows.
-- [ ] A `dkt projects ls --json` test whose environment holds only the other system's variable (`USERPROFILE` on macOS and Linux, `HOME` on Windows) reports `no-home` with a message naming the system's variable, and exits with 4.
-- [ ] A `dkt projects add --json` test with no `XDG_STATE_HOME`, and `HOME` and `USERPROFILE` set to two different temporary folders, writes the index at `.local/state/docket/projects.json` under the system's variable's folder and creates nothing under the other.
-- [ ] A `dkt inspect --json` test with no `XDG_CONFIG_HOME`, and `HOME` and `USERPROFILE` set to two different folders, reports `result.user_workflow.path` as `.config/docket/workflow.md` under the system's variable's folder, with `exists` true for a template written there.
-- [ ] The `internal/cli` tests of `dkt activity`, which use a temporary `XDG_STATE_HOME`, pass on Windows (scenario "State home kept on Windows").
-- [ ] The helpers that work out an expected path from `HOME` (`prIndexPath` in `cmd_projects_test.go`, `regHome` in `register_test.go`) and `TestInspectNothingWritten`, which watches the `HOME` folder, stay as they are: `testutil.Env` gives `HOME` and `USERPROFILE` the same folder, so they point at the folder dkt uses on every system. Which variable dkt reads is told apart only by the tests above that give the two different folders.
+- [x] `testutil.Env` sets `USERPROFILE` to the same temporary folder as `HOME`, on every system.
+- [x] `TestInspectUserWorkflowNoHome`, `TestInspectIndexWithoutLocation`, `TestRegisterNoHome`, `TestRegisterNoStateHome` and the no-home cases of `TestWorkflowModeNoHome` remove the home folder with `testutil.WithoutHome`, and still pass on macOS and Linux; the first four still pass on Windows.
+- [x] A `dkt projects ls --json` test whose environment holds only the other system's variable (`USERPROFILE` on macOS and Linux, `HOME` on Windows) reports `no-home` with a message naming the system's variable, and exits with 4.
+- [x] A `dkt projects add --json` test with no `XDG_STATE_HOME`, and `HOME` and `USERPROFILE` set to two different temporary folders, writes the index at `.local/state/docket/projects.json` under the system's variable's folder and creates nothing under the other.
+- [x] A `dkt inspect --json` test with no `XDG_CONFIG_HOME`, and `HOME` and `USERPROFILE` set to two different folders, reports `result.user_workflow.path` as `.config/docket/workflow.md` under the system's variable's folder, with `exists` true for a template written there.
+- [x] The `internal/cli` tests of `dkt activity`, which use a temporary `XDG_STATE_HOME`, pass on Windows (scenario "State home kept on Windows").
+- [x] The helpers that work out an expected path from `HOME` (`prIndexPath` in `cmd_projects_test.go`, `regHome` in `register_test.go`) and `TestInspectNothingWritten`, which watches the `HOME` folder, stay as they are: `testutil.Env` gives `HOME` and `USERPROFILE` the same folder, so they point at the folder dkt uses on every system. Which variable dkt reads is told apart only by the tests above that give the two different folders.
 
 ### Task 3: The Windows CI job runs these tests
 
@@ -87,6 +87,6 @@
 **Files:**
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] The Windows job runs, with an anchored `-run` pattern since the rest of each package still fails there: in `internal/projects`, the path tests and the home-variable tests of Task 1; in `internal/cli`, `TestInspectUserWorkflow`, `TestInspectNoUserWorkflow`, `TestInspectUserWorkflowNoHome`, `TestInspectIndexWithoutLocation`, `TestProjectsAddUnderStateHome`, `TestProjectsNoHome`, the `dkt projects add` test of Task 2, `TestRegisterNoHome`, `TestRegisterNoStateHome`, the `TestActivity` tests and the new tests of Task 2. Its name is unchanged.
-- [ ] The inspect workflow sync tests and the activity tests of `internal/snapshot` and `internal/activity` are not added: they fail on Windows for path forms and Unix test paths (see design.md, Context), which `windows-paths` and `windows-suite` handle.
-- [ ] The pull request's Windows job passes.
+- [x] The Windows job runs, with an anchored `-run` pattern since the rest of each package still fails there: in `internal/projects`, the path tests and the home-variable tests of Task 1; in `internal/cli`, `TestInspectUserWorkflow`, `TestInspectNoUserWorkflow`, `TestInspectUserWorkflowNoHome`, `TestInspectIndexWithoutLocation`, `TestProjectsAddUnderStateHome`, `TestProjectsNoHome`, the `dkt projects add` test of Task 2, `TestRegisterNoHome`, `TestRegisterNoStateHome`, the `TestActivity` tests and the new tests of Task 2. Its name is unchanged.
+- [x] The inspect workflow sync tests and the activity tests of `internal/snapshot` and `internal/activity` are not added: they fail on Windows for path forms and Unix test paths (see design.md, Context), which `windows-paths` and `windows-suite` handle.
+- [x] The pull request's Windows job passes.
