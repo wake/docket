@@ -198,7 +198,9 @@ func (g Git) Toplevel() (string, error) {
 	if inside != "true" {
 		return "", ErrNotRepo
 	}
-	return g.Run("rev-parse", "--show-toplevel")
+	top, err := g.Run("rev-parse", "--show-toplevel")
+	// git for Windows prints C:/..., while the paths dkt builds use backslashes
+	return filepath.FromSlash(top), err
 }
 
 // Head returns the commit HEAD points at; ok is false while HEAD is unborn.
