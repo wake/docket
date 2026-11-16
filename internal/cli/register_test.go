@@ -237,12 +237,7 @@ func TestRegisterFailingCommand(t *testing.T) {
 
 func TestRegisterNoHome(t *testing.T) {
 	r := prRepo(t, true)
-	var env []string
-	for _, kv := range r.Env {
-		if !strings.HasPrefix(kv, "HOME=") {
-			env = append(env, kv)
-		}
-	}
+	env := testutil.WithoutHome(r.Env)
 	code, out, errs := regRun(t, env, r.Dir, "status", "--json")
 	regSame(t, code, out, r.Dir, "status", "--json")
 	w := regWarnings(errs)
@@ -270,13 +265,7 @@ func TestRegisterNoDocketNoWarning(t *testing.T) {
 
 func TestRegisterNoStateHome(t *testing.T) {
 	r := prRepo(t, true)
-	var env []string
-	for _, kv := range r.Env {
-		if !strings.HasPrefix(kv, "HOME=") {
-			env = append(env, kv)
-		}
-	}
-	env = append(env, "XDG_CONFIG_HOME="+t.TempDir())
+	env := append(testutil.WithoutHome(r.Env), "XDG_CONFIG_HOME="+t.TempDir())
 	_, _, errs := regRun(t, env, r.Dir, "status", "--json")
 	w := regWarnings(errs)
 	if len(w) != 1 || !strings.Contains(w[0], "XDG_STATE_HOME") {

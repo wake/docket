@@ -520,14 +520,14 @@ func TestWorkflowModeNoHome(t *testing.T) {
 		})
 	}
 	r, _ := syncFixture(t, tpl, tpl, "", nil)
-	noState := without(r.Env, "HOME", "XDG_STATE_HOME")
+	noState := without(testutil.WithoutHome(r.Env), "XDG_STATE_HOME")
 	for _, mode := range []string{"independent", "sync"} {
 		if code, m, out := modeRun(t, r.Dir, noState, mode); code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "no-home" {
 			t.Errorf("%s: code=%d %s", mode, code, out)
 		}
 	}
 	state := t.TempDir()
-	onlyState := append(without(r.Env, "HOME", "XDG_CONFIG_HOME"), "XDG_STATE_HOME="+state)
+	onlyState := append(without(testutil.WithoutHome(r.Env), "XDG_CONFIG_HOME"), "XDG_STATE_HOME="+state)
 	idx := filepath.Join(state, "docket", "projects.json")
 	if code, m, out := modeRun(t, r.Dir, onlyState, "sync"); code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "no-home" {
 		t.Errorf("sync: code=%d %s", code, out)

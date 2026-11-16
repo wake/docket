@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -262,6 +263,39 @@ func TestProjectsNoHome(t *testing.T) {
 	code, m, raw, _ := prRun(t, env, t.TempDir(), "ls")
 	if code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "no-home" {
 		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+// homeVars returns the variable dkt reads the home folder from on this system, and the other one.
+func homeVars() (home, other string) {
+	if runtime.GOOS == "windows" {
+		return "USERPROFILE", "HOME"
+	}
+	return "HOME", "USERPROFILE"
+}
+
+func TestProjectsNoHomeOtherVariable(t *testing.T) {
+	home, other := homeVars()
+	env := append(testutil.WithoutHome(testutil.Env(t)), other+"="+t.TempDir())
+	code, m, raw, _ := prRun(t, env, t.TempDir(), "ls")
+	if code != 4 || len(m.Findings) != 1 || m.Findings[0].Rule != "no-home" || !strings.Contains(m.Findings[0].Message, "set "+home) {
+		t.Fatalf("%d %s", code, raw)
+	}
+}
+
+func TestProjectsAddUnderHomeFolder(t *testing.T) {
+	r := prRepo(t, true)
+	home, other := homeVars()
+	h, o := t.TempDir(), t.TempDir()
+	env := append(testutil.WithoutHome(r.Env), home+"="+h, other+"="+o)
+	if code, _, raw, _ := prRun(t, env, r.Dir, "add"); code != 0 {
+		t.Fatalf("%d %s", code, raw)
+	}
+	if _, err := os.Stat(filepath.Join(h, ".local", "state", "docket", "projects.json")); err != nil {
+		t.Error(err)
+	}
+	if ents, err := os.ReadDir(o); err != nil || len(ents) != 0 {
+		t.Errorf("%s folder holds %v, %v", other, ents, err)
 	}
 }
 

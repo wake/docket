@@ -35,8 +35,9 @@ func CountGit(t testing.TB, env []string) (withFake []string, runs func() []stri
 }
 
 // Env returns an allowlisted environment (PATH, TMPDIR and SYSTEMROOT from the
-// process, no inherited GIT_* variable) plus a temporary HOME and a git
-// configuration that is independent of the machine running the tests.
+// process, no inherited GIT_* variable) plus a temporary home folder, as HOME
+// and USERPROFILE, and a git configuration that is independent of the machine
+// running the tests.
 // GIT_CEILING_DIRECTORIES is the directory holding that HOME, which is also
 // the parent of every later t.TempDir of the test, so git never looks for a
 // repository above the test's own directories.
@@ -59,8 +60,21 @@ func Env(t testing.TB) []string {
 			env = append(env, k+"="+v)
 		}
 	}
-	return append(env, "HOME="+home, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+cfg,
+	// USERPROFILE is the home folder dkt reads on Windows; on other systems nothing reads it.
+	return append(env, "HOME="+home, "USERPROFILE="+home, "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL="+cfg,
 		"GIT_CEILING_DIRECTORIES="+ceiling)
+}
+
+// WithoutHome returns a copy of env without its HOME and USERPROFILE entries, so that dkt
+// finds no home folder on any system.
+func WithoutHome(env []string) []string {
+	var out []string
+	for _, kv := range env {
+		if !strings.HasPrefix(kv, "HOME=") && !strings.HasPrefix(kv, "USERPROFILE=") {
+			out = append(out, kv)
+		}
+	}
+	return out
 }
 
 // Repo is a git repository in a temporary directory.
