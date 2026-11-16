@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 
 	docket "github.com/wake/docket"
 	"github.com/wake/docket/internal/change"
@@ -28,8 +29,9 @@ var writeRecordFile = func(f *os.File, b []byte) error {
 const isWindows = runtime.GOOS == "windows"
 
 // taken reports whether err, from openNewFile, means something already holds the name.
+// On Windows the exclusive open reports a folder there as "is a directory", not as existing.
 func taken(windows bool, err error) bool {
-	return errors.Is(err, fs.ErrExist)
+	return errors.Is(err, fs.ErrExist) || windows && errors.Is(err, syscall.EISDIR)
 }
 
 // openNewFile creates the record or the proposal in its folder as opened by
