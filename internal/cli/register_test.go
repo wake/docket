@@ -82,7 +82,7 @@ func TestRegisterFirstCommand(t *testing.T) {
 		t.Errorf("stderr %q", errs)
 	}
 	idx := regIndex(t, r.Env)
-	if !strings.Contains(idx, prReal(t, r.Dir)) || !strings.Contains(idx, `"ignored": false`) {
+	if !strings.Contains(idx, prJSON(prReal(t, r.Dir))) || !strings.Contains(idx, `"ignored": false`) {
 		t.Errorf("index %q", idx)
 	}
 }
@@ -125,7 +125,7 @@ func TestRegisterFromLinkedWorktreeFirst(t *testing.T) {
 	idx := regIndex(t, r.Env)
 	main, _ := filepath.EvalSymlinks(r.Dir)
 	linked, _ := filepath.EvalSymlinks(wt)
-	if strings.Count(idx, `"path"`) != 1 || !strings.Contains(idx, main) || strings.Contains(idx, linked) {
+	if strings.Count(idx, `"path"`) != 1 || !strings.Contains(idx, prJSON(main)) || strings.Contains(idx, prJSON(linked)) {
 		t.Errorf("index %q", idx)
 	}
 }
@@ -163,7 +163,7 @@ func TestRegisterInit(t *testing.T) {
 	if code != 0 {
 		t.Fatal(code, out)
 	}
-	if !strings.Contains(regIndex(t, r.Env), prReal(t, r.Dir)) {
+	if !strings.Contains(regIndex(t, r.Env), prJSON(prReal(t, r.Dir))) {
 		t.Errorf("index %q", regIndex(t, r.Env))
 	}
 }
@@ -230,7 +230,7 @@ func TestRegisterBadIndex(t *testing.T) {
 func TestRegisterFailingCommand(t *testing.T) {
 	r := prRepo(t, true)
 	code, _, _ := regRun(t, r.Env, r.Dir, "sync", "add-none", "--json")
-	if code != 1 || !strings.Contains(regIndex(t, r.Env), prReal(t, r.Dir)) {
+	if code != 1 || !strings.Contains(regIndex(t, r.Env), prJSON(prReal(t, r.Dir))) {
 		t.Errorf("code=%d index %q", code, regIndex(t, r.Env))
 	}
 }
@@ -290,7 +290,7 @@ func TestInspectInNewProject(t *testing.T) {
 	if out := r.Git("status", "--porcelain"); out != "" {
 		t.Errorf("status %q", out)
 	}
-	if !strings.Contains(regIndex(t, r.Env), prReal(t, r.Dir)) {
+	if !strings.Contains(regIndex(t, r.Env), prJSON(prReal(t, r.Dir))) {
 		t.Errorf("index %q", regIndex(t, r.Env))
 	}
 }

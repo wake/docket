@@ -37,8 +37,8 @@ jobs:
       - run: go test ./...
 
   windows:
-    # Only the build, the protections, finding programs and the test fakes are
-    # verified on Windows; the rest of the suite needs the work in
+    # Only the build, the protections, finding programs, the paths read from git
+    # and the test fakes are verified on Windows; the rest of the suite needs the work in
     # docket/ideas/windows-*.md.
     name: 'windows: build and protections only (dkt is not supported on Windows yet)'
     runs-on: windows-latest
@@ -57,7 +57,11 @@ jobs:
       - run: go vet ./...
       - run: go test ./internal/safefile/ ./internal/safepath/ ./internal/lock/ ./internal/testutil/
       - run: go test . ./cmd/dkt/ ./internal/execpath/ ./internal/openspec/
-      - run: go test -run 'PathEntry|PathSpelled' ./internal/gitx/
+      - run: go test -run 'PathEntry|PathSpelled|PathsFromGit' ./internal/gitx/
+      - run: go test ./internal/scan/ ./internal/conflicts/
+      - run: go test -run 'TestActivity' ./internal/snapshot/
+      # TestProjectsLsUncheckable relies on chmod, which Windows ignores.
+      - run: go test -run 'TestRepoRoot|TestRegister|TestInspectInNewProject|TestProjects|TestWorkflow' -skip 'TestProjectsLsUncheckable' ./internal/cli/
       - run: go test -run 'TestEarlierHolds' ./internal/setup/
 
   openspec:
