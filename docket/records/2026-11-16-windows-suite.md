@@ -6,7 +6,7 @@ source: "docket/ideas/windows-suite.md"
 
 ## What
 
-The tests that assumed Unix now skip or adapt on Windows, and the Windows CI job runs `go test ./...`. Skipped, with the reason in the message: mode 000 (`testutil.SkipUnlessModesDeny`, also for root), a folder renamed while dkt holds it open, and two product bugs, each naming its issue. Adapted: names Windows forbids, permission bits (`testutil.ModeBits`), Unix test paths (`C:` on Windows), paths written into JSON, an OpenSpec named without `.exe`, and file times read from the folder listing.
+The tests that assumed Unix now skip or adapt on Windows, and the Windows CI job runs `go test ./...`. Skipped, with the reason in the message: mode 000 (`testutil.SkipUnlessModesDeny`, also for root), a folder renamed while dkt holds it open, and a product bug, naming its issue. Adapted: names Windows forbids, permission bits (`testutil.ModeBits`), Unix test paths (`C:` on Windows), paths written into JSON, an OpenSpec named without `.exe`, and file times read from the folder listing.
 
 ## Why
 
@@ -14,7 +14,7 @@ After `windows-runtime`, `windows-paths` and `windows-user-folders`, about 36 te
 
 ## Verification
 
-Throwaway probes (#187) ran `go test ./...` on `windows-latest`: 36 failures before, every package `ok` after. `go test ./...` passes on macOS. Two failures were product bugs, opened as `docket/issues/2026-11-16-record-dir-slug-windows.md` and `docket/issues/2026-11-16-file-as-folder-windows.md` (#188); their tests skip on Windows until fixed.
+Throwaway probes (#187) ran `go test ./...` on `windows-latest`: 36 failures before, every package `ok` after. `go test ./...` passes on macOS. Two failures were product bugs, opened as `docket/issues/2026-11-16-record-dir-slug-windows.md` and `docket/issues/2026-11-16-file-as-folder-windows.md` (#188). #189 fixed the first, whose test runs on Windows again; the second's skips there until fixed.
 
 ## Review
 
