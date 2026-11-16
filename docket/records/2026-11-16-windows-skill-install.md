@@ -18,3 +18,5 @@ docket-init (step 2), docket-upgrade (step 2) and the README give one PowerShell
 - Not verified: ARM64, the download of a Windows executable from a real release (none yet), Codex on Windows, and the `Path` dialog.
 
 ## Review
+
+Codex (gpt-5.6-sol, adversarial) approved with no findings: the checksum check, the temporary folder, the quoting for Git Bash, `PATH`, and the untouched session activity step.
