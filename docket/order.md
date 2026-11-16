@@ -25,4 +25,5 @@
 - docket/ideas/windows-user-folders.md
 - docket/ideas/windows-suite.md
 - docket/ideas/windows-release.md
+- docket/ideas/windows-skill-install.md
 - docket/ideas/scenario-test-links.md
