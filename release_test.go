@@ -256,6 +256,12 @@ func TestInstallVersion(t *testing.T) {
 	}
 }
 
+// windowsShell is what install.sh says in a Windows shell: not "unsupported",
+// since the release has Windows executables, but where to get them.
+func windowsShell(system string) []string {
+	return []string{system, "does not install on Windows", "dkt-windows-amd64.exe", "dkt-windows-arm64.exe", "checksums.txt", releasesURL}
+}
+
 func TestInstallRefuses(t *testing.T) {
 	const name = "dkt-linux-amd64"
 	latest := releasesURL + "/latest/download/"
@@ -286,7 +292,9 @@ func TestInstallRefuses(t *testing.T) {
 		}, []string{latest + "checksums.txt"}, false},
 		{"no such release", []string{"DKT_VERSION=v0.1.0"}, func(t *testing.T, e installEnv) {}, []string{"download/v0.1.0/"}, false},
 		{"FreeBSD", []string{"FAKE_OS=FreeBSD"}, func(t *testing.T, e installEnv) {}, []string{"FreeBSD", releasesURL}, true},
-		{"Windows shell", []string{"FAKE_OS=MINGW64_NT-10.0"}, func(t *testing.T, e installEnv) {}, []string{"MINGW64_NT-10.0", releasesURL}, true},
+		{"Git Bash", []string{"FAKE_OS=MINGW64_NT-10.0"}, func(t *testing.T, e installEnv) {}, windowsShell("MINGW64_NT-10.0"), true},
+		{"MSYS", []string{"FAKE_OS=MSYS_NT-10.0"}, func(t *testing.T, e installEnv) {}, windowsShell("MSYS_NT-10.0"), true},
+		{"Cygwin", []string{"FAKE_OS=CYGWIN_NT-10.0"}, func(t *testing.T, e installEnv) {}, windowsShell("CYGWIN_NT-10.0"), true},
 		{"riscv64", []string{"FAKE_ARCH=riscv64"}, func(t *testing.T, e installEnv) {}, []string{"riscv64", releasesURL}, true},
 		{"does not run", nil, func(t *testing.T, e installEnv) {
 			e.publish(t, "latest/download", name, "#!/bin/sh\nexit 3\n")

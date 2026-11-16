@@ -16,6 +16,7 @@ main() {
 	case $(uname -s) in
 	Darwin) os=darwin ;;
 	Linux) os=linux ;;
+	MINGW* | MSYS* | CYGWIN*) die "install.sh does not install on Windows ($(uname -s)); download dkt-windows-amd64.exe or dkt-windows-arm64.exe and checksums.txt from $releases" ;;
 	*) die "unsupported system $(uname -s); see $releases" ;;
 	esac
 	case $(uname -m) in
